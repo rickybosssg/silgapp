@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,6 @@ import { toast } from "sonner";
 import { ArrowLeft, Send, Loader2, Sparkles, Navigation, Check, Zap } from "lucide-react";
 import { useAdminContext } from "@/hooks/useAdminContext";
 import { useAdminCourseWindows } from "@/context/AdminCourseWindowsContext";
-import AdminAddressAutocomplete from "@/components/admin/AdminAddressAutocomplete";
 import MapPickerModal from "@/components/admin/MapPickerModal";
 import CourseWindowStack from "@/components/admin/CourseWindowStack";
 import ClientPhoneDetector from "@/components/crm/ClientPhoneDetector";
@@ -48,22 +47,6 @@ function cleanPhone(phone, countryCode) {
   return digits;
 }
 
-function waLink(phone, message, countryCode) {
-  const normalized = cleanPhone(phone, countryCode);
-  return `https://wa.me/${normalized}?text=${encodeURIComponent(message)}`;
-}
-
-function buildTrackingUrl(token) {
-  return `https://silga-dispatch-go.base44.app/suivi-public/${token}`;
-}
-
-function buildQrUrl(token) {
-  return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(token)}`;
-}
-
-const SILGAPP_PLAYSTORE = "https://play.google.com/store/apps/details?id=com.base6a0ec08f3af5e1d1284254c1.app";
-const SILGAPP_APPLE = "https://apps.apple.com/bf/app/silgapp/id6782046749?l=fr-FR";
-
 const PAYS = [
   { code: "BF", nom: "Burkina Faso", drapeau: "🇧🇫" },
   { code: "CI", nom: "Côte d'Ivoire", drapeau: "🇨🇮" },
@@ -84,7 +67,6 @@ const TYPE_OPTIONS = [
 
 // ── Main form component ──
 export default function AdminCourseForm() {
-  const navigate = useNavigate();
   const { countryCode: adminCountryCode } = useAdminContext();
   const { addWindow } = useAdminCourseWindows();
 
@@ -96,7 +78,6 @@ export default function AdminCourseForm() {
   const [countryCode, setCountryCode] = useState(adminCountryCode || "BF");
 
   const [clientNom, setClientNom] = useState("");
-  const [clientPrenom, setClientPrenom] = useState("");
   const [clientTelephone, setClientTelephone] = useState("");
   const [expediteurNom, setExpediteurNom] = useState("");
   const [expediteurTelephone, setExpediteurTelephone] = useState("");
@@ -114,37 +95,6 @@ export default function AdminCourseForm() {
 
   const selectedPays = PAYS.find(p => p.code === countryCode);
 
-  // ── Remplissage rapide depuis l'historique client ──
-  const fillFromCourse = (course) => {
-    setTypeCourse(course.type_course || "expedier");
-    setAdresseDepart(course.adresse_depart && course.adresse_depart !== "—" ? course.adresse_depart : "");
-    setAdresseArrivee(course.adresse_arrivee && course.adresse_arrivee !== "—" ? course.adresse_arrivee : "");
-    setQuartierDepart(course.quartier_depart || "");
-    setQuartierArrivee(course.quartier_arrivee || "");
-    setGpsDepart(course.gps_depart_lat ? { lat: course.gps_depart_lat, lng: course.gps_depart_lng } : null);
-    setGpsArrivee(course.gps_arrivee_lat ? { lat: course.gps_arrivee_lat, lng: course.gps_arrivee_lng } : null);
-    setTypeColis(course.type_colis || "petit_colis");
-    setExpediteurNom(course.expediteur_nom || "");
-    setExpediteurTelephone(course.expediteur_telephone || "");
-    setDestinataireNom(course.destinataire_nom || "");
-    setDestinataireTelephone(course.destinataire_telephone || "");
-    setNotes(course.notes || "");
-    toast.info("Course pré-remplie — vérifiez et créez");
-  };
-
-  const fillAddress = (target, addr) => {
-    if (!addr) return;
-    if (target === "depart") {
-      setAdresseDepart(addr.adresse || "");
-      setQuartierDepart(addr.quartier || "");
-      setGpsDepart(addr.lat ? { lat: addr.lat, lng: addr.lng } : null);
-    } else {
-      setAdresseArrivee(addr.adresse || "");
-      setQuartierArrivee(addr.quartier || "");
-      setGpsArrivee(addr.lat ? { lat: addr.lat, lng: addr.lng } : null);
-    }
-  };
-
   const fillFromTemplate = (template) => {
     setTypeCourse(template.type_course);
     setTypeColis(template.type_colis);
@@ -160,7 +110,6 @@ export default function AdminCourseForm() {
     setGpsDepart(null);
     setGpsArrivee(null);
     setClientNom("");
-    setClientPrenom("");
     setClientTelephone("");
     setExpediteurNom("");
     setExpediteurTelephone("");
