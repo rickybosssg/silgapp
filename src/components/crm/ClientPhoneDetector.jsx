@@ -39,6 +39,7 @@ export default function ClientPhoneDetector({ phone, countryCode, onClientFound,
   useEffect(() => {
     if (!normalizedPhone || normalizedPhone.length < 8) {
       setClient(null);
+      onClientFound?.(null);
       return;
     }
     const timer = setTimeout(searchClient, 400);

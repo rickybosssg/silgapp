@@ -12,6 +12,7 @@ import AdminAddressAutocomplete from "@/components/admin/AdminAddressAutocomplet
 import MapPickerModal from "@/components/admin/MapPickerModal";
 import CourseWindowStack from "@/components/admin/CourseWindowStack";
 import ClientPhoneDetector from "@/components/crm/ClientPhoneDetector";
+import QuickClientPanel from "@/components/crm/QuickClientPanel";
 import { upsertClientsFromCourseContacts, normalizePhone } from "@/lib/crmUtils";
 
 function generarQRData() {
@@ -106,8 +107,47 @@ export default function AdminCourseForm() {
   const [gpsDepart, setGpsDepart] = useState(null);
   const [gpsArrivee, setGpsArrivee] = useState(null);
   const [mapModal, setMapModal] = useState(null); // null | 'depart' | 'arrivee'
+  const [detectedClient, setDetectedClient] = useState(null);
 
   const selectedPays = PAYS.find(p => p.code === countryCode);
+
+  // ── Remplissage rapide depuis l'historique client ──
+  const fillFromCourse = (course) => {
+    setTypeCourse(course.type_course || "expedier");
+    setAdresseDepart(course.adresse_depart && course.adresse_depart !== "—" ? course.adresse_depart : "");
+    setAdresseArrivee(course.adresse_arrivee && course.adresse_arrivee !== "—" ? course.adresse_arrivee : "");
+    setQuartierDepart(course.quartier_depart || "");
+    setQuartierArrivee(course.quartier_arrivee || "");
+    setGpsDepart(course.gps_depart_lat ? { lat: course.gps_depart_lat, lng: course.gps_depart_lng } : null);
+    setGpsArrivee(course.gps_arrivee_lat ? { lat: course.gps_arrivee_lat, lng: course.gps_arrivee_lng } : null);
+    setTypeColis(course.type_colis || "petit_colis");
+    setExpediteurNom(course.expediteur_nom || "");
+    setExpediteurTelephone(course.expediteur_telephone || "");
+    setDestinataireNom(course.destinataire_nom || "");
+    setDestinataireTelephone(course.destinataire_telephone || "");
+    setNotes(course.notes || "");
+    toast.info("Course pré-remplie — vérifiez et créez");
+  };
+
+  const fillAddress = (target, addr) => {
+    if (!addr) return;
+    if (target === "depart") {
+      setAdresseDepart(addr.adresse || "");
+      setQuartierDepart(addr.quartier || "");
+      setGpsDepart(addr.lat ? { lat: addr.lat, lng: addr.lng } : null);
+    } else {
+      setAdresseArrivee(addr.adresse || "");
+      setQuartierArrivee(addr.quartier || "");
+      setGpsArrivee(addr.lat ? { lat: addr.lat, lng: addr.lng } : null);
+    }
+  };
+
+  const fillFromTemplate = (template) => {
+    setTypeCourse(template.type_course);
+    setTypeColis(template.type_colis);
+    if (template.notes) setNotes(template.notes);
+    toast.info(`Modèle « ${template.label} » appliqué`);
+  };
 
   const resetForm = () => {
     setAdresseDepart("");
@@ -476,9 +516,17 @@ export default function AdminCourseForm() {
           <ClientPhoneDetector
             phone={clientTelephone}
             countryCode={countryCode}
+            onClientFound={setDetectedClient}
             onClientName={(nom, prenom) => {
               if (!clientNom) setClientNom(prenom ? `${prenom} ${nom}`.trim() : nom);
             }}
+          />
+
+          <QuickClientPanel
+            client={detectedClient}
+            onFillCourse={fillFromCourse}
+            onFillAddress={fillAddress}
+            onFillTemplate={fillFromTemplate}
           />
 
           {typeCourse === "recevoir" ? (
