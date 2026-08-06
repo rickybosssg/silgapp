@@ -17,101 +17,127 @@ export function normalizePhone(phone, countryCode = "BF") {
 
 /**
  * Recherche un client par téléphone normalisé.
+ * Utilise le champ telephone_normalized pour éviter les doublons.
  */
 export async function findClientByPhone(phone, countryCode) {
   const normalized = normalizePhone(phone, countryCode);
   if (!normalized || normalized.length < 8) return null;
   try {
-    const results = await base44.entities.ClientExterne.filter({ telephone: normalized });
+    const results = await base44.entities.ClientExterne.filter({ telephone_normalized: normalized });
     return results && results.length > 0 ? results[0] : null;
   } catch {
-    return null;
+    // Fallback: recherche par telephone brut (anciennes fiches non migrées)
+    try {
+      const results2 = await base44.entities.ClientExterne.filter({ telephone: normalized });
+      return results2 && results2.length > 0 ? results2[0] : null;
+    } catch {
+      return null;
+    }
   }
 }
 
 /**
- * Crée ou met à jour la fiche client après une course administrative.
- * - Si le client existe, enrichit ses stats CRM.
- * - Sinon, crée une nouvelle fiche automatiquement.
+ * Crée ou met à jour les fiches CRM pour les 3 contacts d'une course admin.
+ * - client / créateur
+ * - expéditeur (si différent du client)
+ * - destinataire (si différent du client et de l'expéditeur)
+ *
+ * IMPORTANT : N'incrémente PAS les statistiques (nb_courses, montant).
+ * Les stats sont mises à jour uniquement quand la course passe à "livree"
+ * via la fonction backend syncCrmOnLivraison (automatisation entity).
  */
-export async function upsertClientFromCourse(courseData, countryCode) {
-  const phone = courseData.client_telephone || courseData.contact_createur_course;
-  if (!phone || phone.replace(/\D/g, "").length < 8) return null;
+export async function upsertClientsFromCourseContacts(courseData, countryCode) {
+  const results = [];
 
+  // Contact 1 : client / créateur
+  const clientPhone = courseData.client_telephone || courseData.contact_createur_course;
+  if (clientPhone) {
+    try {
+      const r = await upsertClientContact(clientPhone, countryCode, courseData.client_nom, "client", courseData);
+      if (r) results.push(r);
+    } catch (e) {
+      console.warn("[CRM] upsert client failed:", e?.message);
+    }
+  }
+
+  // Contact 2 : expéditeur (si différent du client)
+  const expedPhone = courseData.expediteur_telephone;
+  const clientNorm = normalizePhone(clientPhone, countryCode);
+  if (expedPhone && normalizePhone(expedPhone, countryCode) !== clientNorm) {
+    try {
+      const r = await upsertClientContact(expedPhone, countryCode, courseData.expediteur_nom, "expediteur", courseData);
+      if (r) results.push(r);
+    } catch (e) {
+      console.warn("[CRM] upsert expediteur failed:", e?.message);
+    }
+  }
+
+  // Contact 3 : destinataire (si différent du client et de l'expéditeur)
+  const destinPhone = courseData.destinataire_telephone;
+  const expedNorm = normalizePhone(expedPhone, countryCode);
+  if (destinPhone && normalizePhone(destinPhone, countryCode) !== clientNorm && normalizePhone(destinPhone, countryCode) !== expedNorm) {
+    try {
+      const r = await upsertClientContact(destinPhone, countryCode, courseData.destinataire_nom, "destinataire", courseData);
+      if (r) results.push(r);
+    } catch (e) {
+      console.warn("[CRM] upsert destinataire failed:", e?.message);
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Crée ou met à jour une fiche client SANS statistiques.
+ */
+async function upsertClientContact(phone, countryCode, name, role, courseData) {
   const normalized = normalizePhone(phone, countryCode);
-  const clientName = (courseData.client_nom || "").trim();
-  const [prenom, ...nomParts] = clientName.split(" ");
-  const nom = nomParts.join(" ") || clientName || "Client";
+  if (!normalized || normalized.length < 8) return null;
 
   let existing = null;
   try {
-    const results = await base44.entities.ClientExterne.filter({ telephone: normalized });
+    const results = await base44.entities.ClientExterne.filter({ telephone_normalized: normalized });
     existing = results && results.length > 0 ? results[0] : null;
-  } catch {}
+  } catch {
+    try {
+      const results2 = await base44.entities.ClientExterne.filter({ telephone: normalized });
+      existing = results2 && results2.length > 0 ? results2[0] : null;
+    } catch {}
+  }
 
   const roles = new Set(existing?.roles ? JSON.parse(existing.roles) : []);
-  if (courseData.type_course === "expedier") {
-    roles.add("client");
-    roles.add("expediteur");
-  } else if (courseData.type_course === "recevoir") {
-    roles.add("client");
-    roles.add("destinataire");
-  } else {
-    roles.add("client");
-  }
+  if (role) roles.add(role);
 
-  // Quartiers les plus utilisés
-  let quartiers = [];
-  try {
-    quartiers = existing?.quartiers_utilises ? JSON.parse(existing.quartiers_utilises) : [];
-  } catch {}
-  if (courseData.quartier_depart) {
-    const found = quartiers.find(q => q.quartier === courseData.quartier_depart);
-    if (found) found.count++;
-    else quartiers.push({ quartier: courseData.quartier_depart, count: 1 });
-  }
-  if (courseData.quartier_arrivee) {
-    const found = quartiers.find(q => q.quartier === courseData.quartier_arrivee);
-    if (found) found.count++;
-    else quartiers.push({ quartier: courseData.quartier_arrivee, count: 1 });
-  }
-  quartiers.sort((a, b) => b.count - a.count);
-  quartiers = quartiers.slice(0, 10);
+  const clientName = (name || "").trim();
+  const [prenom, ...nomParts] = clientName.split(" ");
+  const nom = nomParts.join(" ") || clientName || "Client";
 
-  const montant = courseData.prix_final || courseData.prix_estimate || 0;
   const isNew = !existing;
-
   const updateData = {
     telephone: normalized,
+    telephone_normalized: normalized,
     nom: existing?.nom || nom,
     prenom: existing?.prenom || prenom || "",
     country_code: countryCode,
-    nb_courses_total: (existing?.nb_courses_total || 0) + 1,
-    nb_courses_admin: (existing?.nb_courses_admin || 0) + 1,
-    montant_total_depense: (existing?.montant_total_depense || 0) + montant,
-    derniere_course_date: new Date().toISOString(),
-    dernier_quartier_depart: courseData.quartier_depart || existing?.dernier_quartier_depart || null,
-    dernier_quartier_arrivee: courseData.quartier_arrivee || existing?.dernier_quartier_arrivee || null,
-    quartiers_utilises: JSON.stringify(quartiers),
-    type_colis_frequent: courseData.type_colis || existing?.type_colis_frequent || null,
     roles: JSON.stringify([...roles]),
     est_expediteur: roles.has("expediteur"),
     est_destinataire: roles.has("destinataire"),
-    statut_crm: isNew ? "nouveau" : (existing?.statut_crm === "nouveau" ? "actif" : existing?.statut_crm),
     cree_via_crm: isNew ? true : (existing?.cree_via_crm || false),
-    ville: courseData.ville_depart || existing?.ville || null,
-    quartier: courseData.quartier_depart || existing?.quartier || null,
+    ville: courseData?.ville_depart || existing?.ville || null,
+    quartier: courseData?.quartier_depart || existing?.quartier || null,
+    type_colis_frequent: courseData?.type_colis || existing?.type_colis_frequent || null,
   };
 
-  if (existing) {
-    // Statut VIP automatique si >= 10 courses ou >= 50 000 FCFA
-    const totalCourses = (existing.nb_courses_total || 0) + 1;
-    const totalMontant = (existing.montant_total_depense || 0) + montant;
-    if (totalCourses >= 10 || totalMontant >= 50000) {
-      updateData.statut_crm = "vip";
+  if (isNew) {
+    updateData.statut_crm = "nouveau";
+    updateData.nb_courses_total = 0;
+    updateData.nb_courses_admin = 0;
+    updateData.montant_total_depense = 0;
+    return await base44.entities.ClientExterne.create(updateData);
+  } else {
+    if (existing.statut_crm === "nouveau" && role) {
+      updateData.statut_crm = "actif";
     }
     return await base44.entities.ClientExterne.update(existing.id, updateData);
-  } else {
-    return await base44.entities.ClientExterne.create(updateData);
   }
 }

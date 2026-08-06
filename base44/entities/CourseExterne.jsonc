@@ -43,6 +43,10 @@
       "type": "string",
       "description": "Telephone du client"
     },
+    "client_phone_normalized": {
+      "type": "string",
+      "description": "Telephone du client normalise (format international sans + ni espace). Utilise pour les recherches CRM."
+    },
     "contact_createur_course": {
       "type": "string",
       "description": "Numero de telephone du CREATEUR de la course \u2014 contact principal que le livreur doit contacter en priorite. OBLIGATOIRE pour toute course creee via VENUS. Peut differer du numero WhatsApp entrant (cas: une personne cree une course pour un autre client). Le numero WhatsApp entrant ne peut etre copie ici qu'apres confirmation explicite du client. Ne jamais reutiliser automatiquement un ancien numero."
@@ -181,7 +185,7 @@
         "programmee",
         "recherche_livreur",
         "livreur_en_route",
-        "client_contacte",
+        "client_contacto",
         "en_route_expediteur",
         "arrive_prise_en_charge",
         "colis_recupere",
@@ -507,6 +511,11 @@
     "conversation_id": {
       "type": "string",
       "description": "ID de la conversation liee a la livraison pharmacie"
+    },
+    "crm_stats_synced": {
+      "type": "boolean",
+      "default": false,
+      "description": "True si les stats CRM ont deja ete incrementees pour cette course (anti double-comptage)"
     }
   },
   "required": [

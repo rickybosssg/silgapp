@@ -12,7 +12,11 @@
     },
     "telephone": {
       "type": "string",
-      "description": "Num\u00e9ro de t\u00e9l\u00e9phone"
+      "description": "Num\u00e9ro de t\u00e9l\u00e9phone (format lisible)"
+    },
+    "telephone_normalized": {
+      "type": "string",
+      "description": "Num\u00e9ro normalis\u00e9 format international sans espace ni + (ex: 22670259008). Utilis\u00e9 pour TOUTES les recherches et la d\u00e9duplication."
     },
     "email": {
       "type": "string",
@@ -113,34 +117,34 @@
     "nb_courses_total": {
       "type": "number",
       "default": 0,
-      "description": "Nombre total de courses (tous types confondus)"
+      "description": "Nombre total de courses LIVR\u00c9ES (tous types confondus). Mis \u00e0 jour uniquement quand une course passe \u00e0 livree."
     },
     "nb_courses_admin": {
       "type": "number",
       "default": 0,
-      "description": "Nombre de courses administratives"
+      "description": "Nombre de courses administratives LIVR\u00c9ES"
     },
     "montant_total_depense": {
       "type": "number",
       "default": 0,
-      "description": "Montant total d\u00e9pens\u00e9 par le client (FCFA)"
+      "description": "Montant total d\u00e9pens\u00e9 par le client (FCFA) \u2014 calcul\u00e9 uniquement sur les courses LIVR\u00c9ES"
     },
     "derniere_course_date": {
       "type": "string",
       "format": "date-time",
-      "description": "Date de la derni\u00e8re course"
+      "description": "Date de la derni\u00e8re course livr\u00e9e"
     },
     "dernier_quartier_depart": {
       "type": "string",
-      "description": "Dernier quartier de d\u00e9part utilis\u00e9"
+      "description": "Dernier quartier de d\u00e9part utilis\u00e9 (course livr\u00e9e)"
     },
     "dernier_quartier_arrivee": {
       "type": "string",
-      "description": "Dernier quartier de livraison utilis\u00e9"
+      "description": "Dernier quartier de livraison utilis\u00e9 (course livr\u00e9e)"
     },
     "quartiers_utilises": {
       "type": "string",
-      "description": "JSON: [{quartier, count}] quartiers les plus utilis\u00e9s"
+      "description": "JSON: [{quartier, count}] quartiers les plus utilis\u00e9s (courses livr\u00e9es uniquement)"
     },
     "type_colis_frequent": {
       "type": "string",

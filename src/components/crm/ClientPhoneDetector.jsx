@@ -2,21 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { base44 } from "@/api/base44Client";
 import { Loader2, UserCheck, UserPlus, Star, UserX, ExternalLink } from "lucide-react";
 import ClientFicheDialog from "./ClientFicheDialog";
-
-const COUNTRY_DIAL_CODE = {
-  BF: "226", CI: "225", TG: "228", BJ: "229", SN: "221",
-  ML: "223", GN: "224", NE: "227", GH: "233",
-};
-
-export function normalizePhone(phone, countryCode = "BF") {
-  let digits = (phone || "").replace(/\D/g, "");
-  if (!digits) return "";
-  const dial = COUNTRY_DIAL_CODE[countryCode] || "226";
-  if (digits.startsWith(dial) && digits.length >= dial.length + 6) return digits;
-  if (digits.startsWith("0")) digits = digits.slice(1);
-  if (digits.length <= 9) return dial + digits;
-  return digits;
-}
+import { normalizePhone } from "@/lib/crmUtils";
 
 export default function ClientPhoneDetector({ phone, countryCode, onClientFound, onClientName }) {
   const [client, setClient] = useState(null);
@@ -32,7 +18,7 @@ export default function ClientPhoneDetector({ phone, countryCode, onClientFound,
     }
     setSearching(true);
     try {
-      const results = await base44.entities.ClientExterne.filter({ telephone: normalizedPhone });
+      const results = await base44.entities.ClientExterne.filter({ telephone_normalized: normalizedPhone });
       if (results && results.length > 0) {
         setClient(results[0]);
         onClientFound?.(results[0]);
@@ -43,7 +29,7 @@ export default function ClientPhoneDetector({ phone, countryCode, onClientFound,
         setClient(null);
         onClientFound?.(null);
       }
-    } catch (e) {
+    } catch {
       setClient(null);
     } finally {
       setSearching(false);

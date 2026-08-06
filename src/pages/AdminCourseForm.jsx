@@ -12,7 +12,7 @@ import AdminAddressAutocomplete from "@/components/admin/AdminAddressAutocomplet
 import MapPickerModal from "@/components/admin/MapPickerModal";
 import CourseWindowStack from "@/components/admin/CourseWindowStack";
 import ClientPhoneDetector from "@/components/crm/ClientPhoneDetector";
-import { upsertClientFromCourse } from "@/lib/crmUtils";
+import { upsertClientsFromCourseContacts, normalizePhone } from "@/lib/crmUtils";
 
 function generarQRData() {
   const pickupQrToken = crypto.randomUUID().replace(/-/g, "");
@@ -202,15 +202,18 @@ export default function AdminCourseForm() {
         passager_nom: typeCourse === "deplacement" ? (clientNom.trim() || "Passager") : null,
         passager_telephone: typeCourse === "deplacement" ? (clientTelephone.trim() || null) : null,
         nb_passagers: typeCourse === "deplacement" ? 1 : null,
+        client_phone_normalized: normalizePhone(clientTel, countryCode),
+        expediteur_phone_normalized: finalExpediteurTel ? normalizePhone(finalExpediteurTel, countryCode) : null,
+        destinataire_phone_normalized: finalDestinataireTel ? normalizePhone(finalDestinataireTel, countryCode) : null,
       };
 
       const course = await base44.entities.CourseExterne.create(courseData);
 
-      // CRM - Creer ou mettre a jour la fiche client automatiquement
+      // CRM - Créer ou mettre à jour les fiches pour les 3 contacts (sans stats)
       try {
-        await upsertClientFromCourse(courseData, countryCode);
+        await upsertClientsFromCourseContacts(courseData, countryCode);
       } catch (crmErr) {
-        console.warn("[CRM] Erreur enrichissement fiche client:", crmErr?.message);
+        console.warn("[CRM] Erreur enrichissement fiches client:", crmErr?.message);
       }
 
       // 📦 Pousser la course dans la pile de fenêtres persistantes

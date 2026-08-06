@@ -64,10 +64,12 @@ export default function ClientsCRM() {
     }
     if (search.trim()) {
       const q = search.toLowerCase().trim();
+      const qDigits = q.replace(/\D/g, "");
       result = result.filter(c =>
         (c.nom || "").toLowerCase().includes(q) ||
         (c.prenom || "").toLowerCase().includes(q) ||
-        (c.telephone || "").includes(q.replace(/\D/g, "")) ||
+        (c.telephone || "").includes(qDigits) ||
+        (c.telephone_normalized || "").includes(qDigits) ||
         (c.quartier || "").toLowerCase().includes(q) ||
         (c.dernier_quartier_depart || "").toLowerCase().includes(q)
       );
