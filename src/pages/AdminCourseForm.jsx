@@ -11,6 +11,8 @@ import { useAdminCourseWindows } from "@/context/AdminCourseWindowsContext";
 import AdminAddressAutocomplete from "@/components/admin/AdminAddressAutocomplete";
 import MapPickerModal from "@/components/admin/MapPickerModal";
 import CourseWindowStack from "@/components/admin/CourseWindowStack";
+import ClientPhoneDetector from "@/components/crm/ClientPhoneDetector";
+import { upsertClientFromCourse } from "@/lib/crmUtils";
 
 function generarQRData() {
   const pickupQrToken = crypto.randomUUID().replace(/-/g, "");
@@ -203,6 +205,13 @@ export default function AdminCourseForm() {
       };
 
       const course = await base44.entities.CourseExterne.create(courseData);
+
+      // CRM - Creer ou mettre a jour la fiche client automatiquement
+      try {
+        await upsertClientFromCourse(courseData, countryCode);
+      } catch (crmErr) {
+        console.warn("[CRM] Erreur enrichissement fiche client:", crmErr?.message);
+      }
 
       // 📦 Pousser la course dans la pile de fenêtres persistantes
       addWindow(course, formData);
@@ -461,7 +470,16 @@ export default function AdminCourseForm() {
             </div>
           </div>
 
+          <ClientPhoneDetector
+            phone={clientTelephone}
+            countryCode={countryCode}
+            onClientName={(nom, prenom) => {
+              if (!clientNom) setClientNom(prenom ? `${prenom} ${nom}`.trim() : nom);
+            }}
+          />
+
           {typeCourse === "recevoir" ? (
+            <>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <p className="text-[10px] text-gray-400 mb-1 font-semibold uppercase tracking-wide">Expéditeur</p>
@@ -482,7 +500,10 @@ export default function AdminCourseForm() {
                 />
               </div>
             </div>
+            <ClientPhoneDetector phone={expediteurTelephone} countryCode={countryCode} />
+            </>
           ) : typeCourse === "expedier" ? (
+            <>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <p className="text-[10px] text-gray-400 mb-1 font-semibold uppercase tracking-wide">Destinataire</p>
@@ -503,6 +524,8 @@ export default function AdminCourseForm() {
                 />
               </div>
             </div>
+            <ClientPhoneDetector phone={destinataireTelephone} countryCode={countryCode} />
+            </>
           ) : null}
 
           <div>

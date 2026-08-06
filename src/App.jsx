@@ -57,6 +57,7 @@ const FraisAnnulationAdmin = lazy(() => import('./pages/FraisAnnulationAdmin.jsx
 const VenusRapportsPage = lazy(() => import('./pages/VenusRapportsPage.jsx'));
 const ZonesChaudesAdmin = lazy(() => import('./pages/ZonesChaudesAdmin.jsx'));
 const AdminCourseForm = lazy(() => import('./pages/AdminCourseForm.jsx'));
+const ClientsCRM = lazy(() => import('./pages/ClientsCRM.jsx'));
 const DemandesLivreursAdmin = lazy(() => import('./components/admin/DemandesLivreursPanel.jsx'));
 const LivreursBloquesEncours = lazy(() => import('./components/admin/LivreursBloquesEncours.jsx'));
 const Comptabilite = lazy(() => import('./pages/Comptabilite.jsx'));
@@ -421,6 +422,7 @@ function AppContent() {
           <Route path="/admin/paiements" element={<AnimatedRoutes><PaiementsAdmin /></AnimatedRoutes>} />
           <Route path="/admin/dispatch-logs" element={<AnimatedRoutes><DispatchLogs /></AnimatedRoutes>} />
           <Route path="/admin/livreurs-prioritaires" element={<AnimatedRoutes><LivreursPrioritaires /></AnimatedRoutes>} />
+          <Route path="/admin/crm-clients" element={<AnimatedRoutes><ClientsCRM /></AnimatedRoutes>} />
           <Route path="/admin/messages" element={<AnimatedRoutes><AdminMessages /></AnimatedRoutes>} />
           <Route path="/admin/whatsapp" element={<AnimatedRoutes><WhatsAppAdmin /></AnimatedRoutes>} />
           <Route path="/admin/venus" element={<AnimatedRoutes><VenusAdminCenter /></AnimatedRoutes>} />

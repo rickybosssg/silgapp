@@ -34,6 +34,7 @@ export const navItems = [
   { path: "/admin/comptabilite", label: "Comptabilité", icon: Wallet },
   { path: "/admin/global", label: "Admin Global", icon: Globe },
   { path: "/admin/gestion-pays", label: "Gestion des pays", icon: Settings },
+  { path: "/admin/crm-clients", label: "CRM Clients", icon: Users },
   { path: "/admin/externe/clients", label: "Clients externes", icon: Users },
   { path: "/admin/publicites", label: "Publicités", icon: Megaphone },
   { path: "/admin/venus-brain", label: "Cerveau de VENUS", icon: Brain },
