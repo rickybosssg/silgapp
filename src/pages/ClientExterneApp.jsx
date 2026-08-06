@@ -806,14 +806,14 @@ export default function ClientExterneApp() {
   // ── Session expirée ───────────────────────────────────────────────────────
   if (sessionExpired) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center bg-[#16191d] p-6">
-        <div className="bg-[#1f2429] rounded-3xl shadow-2xl p-8 max-w-sm w-full text-center space-y-5 border border-white/8">
-          <div className="w-20 h-20 rounded-full bg-red-500/15 flex items-center justify-center mx-auto">
+      <div className="fixed inset-0 flex items-center justify-center bg-gradient-to-br from-red-50 to-orange-50 p-6">
+        <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full text-center space-y-5">
+          <div className="w-20 h-20 rounded-full bg-red-100 flex items-center justify-center mx-auto">
             <span className="text-4xl"></span>
           </div>
           <div>
-            <h2 className="text-xl font-black text-white">Session expirée</h2>
-            <p className="text-sm text-white/60 mt-3 leading-relaxed">
+            <h2 className="text-xl font-black text-gray-900">Session expirée</h2>
+            <p className="text-sm text-gray-600 mt-3 leading-relaxed">
               Vous avez été déconnecté car une autre session a été ouverte sur un autre appareil.
             </p>
           </div>
@@ -824,7 +824,7 @@ export default function ClientExterneApp() {
               { clearPersistedToken(); base44.auth.logout(); };
               setTimeout(() => window.location.reload(), 300);
             }}
-            className="inline-flex items-center justify-center w-full h-12 rounded-2xl bg-[#00a86b] hover:bg-[#00c47a] text-white font-bold text-sm transition-colors"
+            className="inline-flex items-center justify-center w-full h-12 rounded-2xl bg-primary hover:bg-primary/90 text-white font-bold text-sm transition-colors"
           >
             Se reconnecter
           </button>
@@ -836,14 +836,14 @@ export default function ClientExterneApp() {
   // ── Client bloqué pour frais d'annulation impayés ─────────────────────────
   if (!loading && clientProfil?.bloque_frais_annulation) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center bg-[#16191d] p-6">
-        <div className="bg-[#1f2429] rounded-3xl shadow-2xl p-8 max-w-sm w-full text-center space-y-5 border border-white/8">
-          <div className="w-20 h-20 rounded-full bg-red-500/15 flex items-center justify-center mx-auto">
+      <div className="fixed inset-0 flex items-center justify-center bg-gradient-to-br from-red-50 to-orange-50 p-6">
+        <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full text-center space-y-5">
+          <div className="w-20 h-20 rounded-full bg-red-100 flex items-center justify-center mx-auto">
             <span className="text-4xl"></span>
           </div>
           <div>
-            <h2 className="text-xl font-black text-white">Compte bloqué</h2>
-            <p className="text-sm text-white/60 mt-3 leading-relaxed">
+            <h2 className="text-xl font-black text-gray-900">Compte bloqué</h2>
+            <p className="text-sm text-gray-600 mt-3 leading-relaxed">
               Votre compte est temporairement bloqué pour frais d'annulation impayés. Veuillez contacter SILGAPP.
             </p>
           </div>
@@ -851,7 +851,7 @@ export default function ClientExterneApp() {
             href="https://wa.me/22667572857"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center justify-center w-full h-12 rounded-2xl bg-[#00a86b] hover:bg-[#00c47a] text-white font-bold text-sm transition-colors"
+            className="inline-flex items-center justify-center w-full h-12 rounded-2xl bg-green-500 hover:bg-green-600 text-white font-bold text-sm transition-colors"
           >
              Contacter SILGAPP via WhatsApp
           </a>
@@ -863,10 +863,10 @@ export default function ClientExterneApp() {
   // Spinner uniquement si vraiment en chargement et pas encore de profil
   if (loading) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center bg-[#16191d]">
+      <div className="fixed inset-0 flex items-center justify-center bg-gradient-to-br from-primary/5 to-red-50">
         <div className="text-center space-y-4">
-          <Loader2 className="w-12 h-12 text-[#00a86b] animate-spin mx-auto" />
-          <p className="text-sm font-medium text-white/60">Chargement...</p>
+          <Loader2 className="w-12 h-12 text-primary animate-spin mx-auto" />
+          <p className="text-sm font-medium text-muted-foreground">Chargement...</p>
         </div>
       </div>
     );
@@ -889,7 +889,7 @@ export default function ClientExterneApp() {
   const prenom = (clientProfil?.prenom || (clientProfil?.nom || "").split(" ")[0] || "Client").trim() || "Client";
 
   return (
-    <div className="min-h-screen bg-[#16191d] text-white">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-blue-50/30 to-white">
       <PullToRefreshIndicator pulling={pulling} refreshing={refreshing} />
 
       {/* ── COURSES ACTIVES — bannière flottante ─────── */}
@@ -898,14 +898,14 @@ export default function ClientExterneApp() {
           {coursesActives.map((course) => (
             <div
               key={course.id}
-              className="bg-[#1f2429]/95 backdrop-blur-md rounded-2xl shadow-xl border border-[#00a86b]/20 overflow-hidden cursor-pointer active:scale-[0.98] transition-transform"
+              className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-primary/20 overflow-hidden cursor-pointer active:scale-[0.98] transition-transform"
               onClick={() => navigate("/client/suivi", { state: { course_id: course.id } })}
             >
-              <div className="h-1 bg-gradient-to-r from-[#00a86b] to-red-500 w-full" />
+              <div className="h-1 bg-gradient-to-r from-primary to-red-500 w-full" />
               <div className="p-3 flex items-center gap-3">
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse flex-shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-black text-[#00a86b]">
+                  <p className="text-xs font-black text-primary">
                     {course.type_course === "deplacement" && course.statut === "recherche_livreur" ? " Recherche chauffeur..." :
                      course.type_course === "deplacement" && course.statut === "livreur_en_route" ? " Chauffeur en route" :
                      course.type_course === "deplacement" && course.statut === "arrive_prise_en_charge" ? " Arrivé au point de prise en charge" :
@@ -915,7 +915,7 @@ export default function ClientExterneApp() {
                      course.statut === "livreur_en_route"  ? " Livreur en route" :
                      course.statut === "colis_recupere"    ? " Colis récupéré" : " En livraison"}
                   </p>
-                  <p className="text-[11px] text-white/50 truncate mt-0.5">
+                  <p className="text-[11px] text-gray-500 truncate mt-0.5">
                     {course.livreur_nom || "Livreur assigné"} · {course.adresse_depart} → {course.adresse_arrivee}
                   </p>
                   {course.is_multi_colis && (
@@ -929,7 +929,7 @@ export default function ClientExterneApp() {
                     </div>
                   )}
                 </div>
-                <ChevronRight className="w-4 h-4 text-white/60 flex-shrink-0" />
+                <ChevronRight className="w-4 h-4 text-gray-600 flex-shrink-0" />
               </div>
             </div>
           ))}
@@ -941,16 +941,16 @@ export default function ClientExterneApp() {
 
           {/* ── ONGLETS PROMO ─────────────────────── */}
           {canShowCodePromo && (
-            <div className="flex bg-[#1f2429] rounded-2xl p-1 gap-1 shadow-sm border border-white/8">
+            <div className="flex bg-white rounded-2xl p-1 gap-1 shadow-sm border border-gray-100">
               <button
                 onClick={() => setOngletActif("accueil")}
-                className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${ongletActif === "accueil" ? "bg-[#00a86b] text-white shadow" : "text-white/50 hover:text-white/80"}`}
+                className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${ongletActif === "accueil" ? "bg-primary text-white shadow" : "text-gray-500 hover:text-gray-700"}`}
               >
                  Accueil
               </button>
               <button
                 onClick={() => setOngletActif("promo")}
-                className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${ongletActif === "promo" ? "bg-[#00a86b] text-white shadow" : "text-white/50 hover:text-white/80"}`}
+                className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${ongletActif === "promo" ? "bg-purple-600 text-white shadow" : "text-gray-500 hover:text-gray-700"}`}
               >
                  Code Promo
               </button>

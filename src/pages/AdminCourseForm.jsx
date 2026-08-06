@@ -251,7 +251,7 @@ export default function AdminCourseForm() {
         </div>
 
         {/* Type de course — cartes raffinées */}
-        <div className="force-light bg-white rounded-[1.5rem] border border-gray-100 shadow-lg shadow-gray-100/50 overflow-hidden">
+        <div className="bg-white rounded-[1.5rem] border border-gray-100 shadow-lg shadow-gray-100/50 overflow-hidden">
           <div className="px-5 pt-4 pb-1">
             <div className="flex items-center gap-2 mb-1">
               <div className="w-1 h-4 bg-gradient-to-b from-rose-500 to-orange-500 rounded-full" />
@@ -306,7 +306,7 @@ export default function AdminCourseForm() {
         </div>
 
         {/* Détails — trajet visuel */}
-        <div className="force-light bg-white rounded-[1.5rem] border border-gray-100 shadow-lg shadow-gray-100/50 p-5 space-y-4">
+        <div className="bg-white rounded-[1.5rem] border border-gray-100 shadow-lg shadow-gray-100/50 p-5 space-y-4">
           <div className="flex items-center gap-2">
             <div className="w-1 h-4 bg-gradient-to-b from-orange-500 to-amber-500 rounded-full" />
             <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Itinéraire</p>
@@ -315,7 +315,7 @@ export default function AdminCourseForm() {
           <div>
             <p className="text-[11px] font-semibold text-gray-500 mb-1.5">Pays de destination</p>
             <Select value={countryCode} onValueChange={setCountryCode}>
-              <SelectTrigger className="rounded-xl h-12 bg-blue-50/40 border-blue-100/50 text-sm font-medium text-slate-900 focus:ring-blue-300/50">
+              <SelectTrigger className="rounded-xl h-12 bg-blue-50/40 border-blue-100/50 text-sm font-medium focus:ring-blue-300/50">
                 <SelectValue>
                   {selectedPays ? `${selectedPays.drapeau}  ${selectedPays.nom}` : "Choisir un pays"}
                 </SelectValue>
@@ -360,7 +360,7 @@ export default function AdminCourseForm() {
                 countryCode={countryCode}
                 placeholder="Ex: Ouaga 2000, face à la mairie"
                 iconColor="text-emerald-500"
-                inputClassName="rounded-xl h-12 pl-10 pr-28 bg-blue-50 border-blue-200/60 text-sm text-slate-900 placeholder:text-slate-400 focus:ring-blue-300/50 focus:border-blue-400"
+                inputClassName="rounded-xl h-12 pl-10 pr-28 bg-blue-50 border-blue-200/60 text-sm focus:ring-blue-300/50 focus:border-blue-400"
               >
                 <button
                   type="button"
@@ -398,7 +398,7 @@ export default function AdminCourseForm() {
                 countryCode={countryCode}
                 placeholder="Ex: Gounghin, derrière le marché"
                 iconColor="text-rose-500"
-                inputClassName="rounded-xl h-12 pl-10 pr-28 bg-rose-50 border-rose-200/60 text-sm text-slate-900 placeholder:text-slate-400 focus:ring-rose-300/50 focus:border-rose-400"
+                inputClassName="rounded-xl h-12 pl-10 pr-28 bg-rose-50 border-rose-200/60 text-sm focus:ring-rose-300/50 focus:border-rose-400"
               >
                 <button
                   type="button"
@@ -416,7 +416,7 @@ export default function AdminCourseForm() {
             <div>
               <p className="text-[11px] font-semibold text-gray-500 mb-1.5">Type de colis</p>
               <Select value={typeColis} onValueChange={setTypeColis}>
-                <SelectTrigger className="rounded-xl h-12 bg-violet-50/30 border-violet-100/50 text-sm font-medium text-slate-900 focus:ring-violet-300/50">
+                <SelectTrigger className="rounded-xl h-12 bg-violet-50/30 border-violet-100/50 text-sm font-medium focus:ring-violet-300/50">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -433,7 +433,7 @@ export default function AdminCourseForm() {
         </div>
 
         {/* Contacts */}
-        <div className="force-light bg-white rounded-[1.5rem] border border-gray-100 shadow-lg shadow-gray-100/50 p-5 space-y-4">
+        <div className="bg-white rounded-[1.5rem] border border-gray-100 shadow-lg shadow-gray-100/50 p-5 space-y-4">
           <div className="flex items-center gap-2">
             <div className="w-1 h-4 bg-gradient-to-b from-sky-500 to-blue-500 rounded-full" />
             <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Contacts</p>
@@ -447,7 +447,7 @@ export default function AdminCourseForm() {
                 value={clientNom}
                 onChange={e => setClientNom(e.target.value)}
                 placeholder="Nom"
-                className="rounded-xl h-11 bg-blue-50 border-blue-200/60 text-sm text-slate-900 placeholder:text-slate-400 focus:ring-blue-300/50 focus:border-blue-400"
+                className="rounded-xl h-11 bg-blue-50 border-blue-200/60 text-sm focus:ring-blue-300/50 focus:border-blue-400"
               />
             </div>
             <div>
@@ -456,7 +456,7 @@ export default function AdminCourseForm() {
                 value={clientTelephone}
                 onChange={e => setClientTelephone(e.target.value)}
                 placeholder="+226 XX XX XX XX"
-                className="rounded-xl h-11 bg-blue-50 border-blue-200/60 text-sm text-slate-900 placeholder:text-slate-400 focus:ring-blue-300/50 focus:border-blue-400"
+                className="rounded-xl h-11 bg-blue-50 border-blue-200/60 text-sm focus:ring-blue-300/50 focus:border-blue-400"
               />
             </div>
           </div>
@@ -469,7 +469,7 @@ export default function AdminCourseForm() {
                   value={expediteurNom}
                   onChange={e => setExpediteurNom(e.target.value)}
                   placeholder="Nom expéditeur"
-                  className="rounded-xl h-11 bg-amber-50/30 border-amber-100/50 text-sm text-slate-900 placeholder:text-slate-400 focus:ring-amber-300/50 focus:border-amber-300"
+                  className="rounded-xl h-11 bg-amber-50/30 border-amber-100/50 text-sm focus:ring-amber-300/50 focus:border-amber-300"
                 />
               </div>
               <div>
@@ -478,7 +478,7 @@ export default function AdminCourseForm() {
                   value={expediteurTelephone}
                   onChange={e => setExpediteurTelephone(e.target.value)}
                   placeholder="+226 XX XX XX XX"
-                  className="rounded-xl h-11 bg-amber-50/30 border-amber-100/50 text-sm text-slate-900 placeholder:text-slate-400 focus:ring-amber-300/50 focus:border-amber-300"
+                  className="rounded-xl h-11 bg-amber-50/30 border-amber-100/50 text-sm focus:ring-amber-300/50 focus:border-amber-300"
                 />
               </div>
             </div>
@@ -490,7 +490,7 @@ export default function AdminCourseForm() {
                   value={destinataireNom}
                   onChange={e => setDestinataireNom(e.target.value)}
                   placeholder="Nom destinataire"
-                  className="rounded-xl h-11 bg-rose-50 border-rose-200/60 text-sm text-slate-900 placeholder:text-slate-400 focus:ring-rose-300/50 focus:border-rose-400"
+                  className="rounded-xl h-11 bg-rose-50 border-rose-200/60 text-sm focus:ring-rose-300/50 focus:border-rose-400"
                 />
               </div>
               <div>
@@ -499,7 +499,7 @@ export default function AdminCourseForm() {
                   value={destinataireTelephone}
                   onChange={e => setDestinataireTelephone(e.target.value)}
                   placeholder="+226 XX XX XX XX"
-                  className="rounded-xl h-11 bg-rose-50 border-rose-200/60 text-sm text-slate-900 placeholder:text-slate-400 focus:ring-rose-300/50 focus:border-rose-400"
+                  className="rounded-xl h-11 bg-rose-50 border-rose-200/60 text-sm focus:ring-rose-300/50 focus:border-rose-400"
                 />
               </div>
             </div>
@@ -511,7 +511,7 @@ export default function AdminCourseForm() {
               value={notes}
               onChange={e => setNotes(e.target.value)}
               placeholder="Instructions particulières..."
-              className="rounded-xl h-11 bg-gray-50/50 border-gray-200/50 text-sm text-slate-900 placeholder:text-slate-400 focus:ring-gray-300/50"
+              className="rounded-xl h-11 bg-gray-50/50 border-gray-200/50 text-sm focus:ring-gray-300/50"
             />
           </div>
         </div>

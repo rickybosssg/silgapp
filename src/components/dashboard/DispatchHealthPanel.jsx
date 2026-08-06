@@ -72,102 +72,102 @@ export default function DispatchHealthPanel({ courses = [], livreurs = [] }) {
   };
 
   const tempsColor = tempsMoyenAcceptation === null
-    ? "text-white/40"
-    : tempsMoyenAcceptation < 60 ? "text-[#00a86b]"
-    : tempsMoyenAcceptation < 180 ? "text-amber-400"
-    : "text-red-400";
+    ? "text-slate-400"
+    : tempsMoyenAcceptation < 60 ? "text-emerald-600"
+    : tempsMoyenAcceptation < 180 ? "text-amber-600"
+    : "text-rose-600";
 
-  const bloqueesColor = coursesBloquees.length === 0 ? "text-[#00a86b]"
-    : coursesBloquees.length <= 2 ? "text-amber-400"
-    : "text-red-400";
+  const bloqueesColor = coursesBloquees.length === 0 ? "text-emerald-600"
+    : coursesBloquees.length <= 2 ? "text-amber-600"
+    : "text-rose-600";
 
-  const gpsColor = gpsStats.pct >= 80 ? "text-[#00a86b]"
-    : gpsStats.pct >= 50 ? "text-amber-400"
-    : "text-red-400";
+  const gpsColor = gpsStats.pct >= 80 ? "text-emerald-600"
+    : gpsStats.pct >= 50 ? "text-amber-600"
+    : "text-rose-600";
 
   return (
-    <div className="bg-[#1f2429] rounded-2xl border border-white/8 shadow-sm overflow-hidden">
-      <div className="px-4 py-3 border-b border-white/8 flex items-center gap-2">
+    <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
+      <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2">
         <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
           <Zap className="w-4 h-4 text-white" />
         </div>
         <div>
-          <h3 className="text-sm font-bold text-white">Santé du dispatch</h3>
-          <p className="text-[10px] text-white/40">Indicateurs temps réel</p>
+          <h3 className="text-sm font-bold text-slate-800">Santé du dispatch</h3>
+          <p className="text-[10px] text-slate-400">Indicateurs temps réel</p>
         </div>
       </div>
 
       <div className="p-4 grid grid-cols-2 lg:grid-cols-4 gap-3">
         {/* Temps moyen d'acceptation */}
-        <div className="rounded-xl bg-white/5 p-3">
+        <div className="rounded-xl bg-slate-50 p-3">
           <div className="flex items-center gap-1.5 mb-1.5">
-            <Clock className="w-3.5 h-3.5 text-white/40" />
-            <span className="text-[10px] font-semibold text-white/50 uppercase tracking-wide">
+            <Clock className="w-3.5 h-3.5 text-slate-400" />
+            <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">
               Temps accept.
             </span>
           </div>
           <p className={`text-2xl font-black leading-none ${tempsColor}`}>
             {formatTemps(tempsMoyenAcceptation)}
           </p>
-          <p className="text-[10px] text-white/40 mt-1">moyenne du jour</p>
+          <p className="text-[10px] text-slate-400 mt-1">moyenne du jour</p>
         </div>
 
         {/* Courses bloquées */}
-        <div className="rounded-xl bg-white/5 p-3">
+        <div className="rounded-xl bg-slate-50 p-3">
           <div className="flex items-center gap-1.5 mb-1.5">
-            <AlertTriangle className="w-3.5 h-3.5 text-white/40" />
-            <span className="text-[10px] font-semibold text-white/50 uppercase tracking-wide">
+            <AlertTriangle className="w-3.5 h-3.5 text-slate-400" />
+            <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">
               Bloquées {">"}5min
             </span>
           </div>
           <p className={`text-2xl font-black leading-none ${bloqueesColor}`}>
             {coursesBloquees.length}
           </p>
-          <p className="text-[10px] text-white/40 mt-1">sans livreur</p>
+          <p className="text-[10px] text-slate-400 mt-1">sans livreur</p>
         </div>
 
         {/* % GPS frais */}
-        <div className="rounded-xl bg-white/5 p-3">
+        <div className="rounded-xl bg-slate-50 p-3">
           <div className="flex items-center gap-1.5 mb-1.5">
-            <MapPin className="w-3.5 h-3.5 text-white/40" />
-            <span className="text-[10px] font-semibold text-white/50 uppercase tracking-wide">
+            <MapPin className="w-3.5 h-3.5 text-slate-400" />
+            <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">
               GPS frais
             </span>
           </div>
           <p className={`text-2xl font-black leading-none ${gpsColor}`}>
             {gpsStats.pct}%
           </p>
-          <p className="text-[10px] text-white/40 mt-1">
+          <p className="text-[10px] text-slate-400 mt-1">
             {gpsStats.fresh}/{gpsStats.total} dispo
           </p>
         </div>
 
         {/* Exclus GPS périmé */}
-        <div className="rounded-xl bg-white/5 p-3">
+        <div className="rounded-xl bg-slate-50 p-3">
           <div className="flex items-center gap-1.5 mb-1.5">
-            <AlertTriangle className="w-3.5 h-3.5 text-white/40" />
-            <span className="text-[10px] font-semibold text-white/50 uppercase tracking-wide">
+            <AlertTriangle className="w-3.5 h-3.5 text-slate-400" />
+            <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">
               Exclus GPS
             </span>
           </div>
-          <p className={`text-2xl font-black leading-none ${gpsStats.stale === 0 ? "text-[#00a86b]" : "text-amber-400"}`}>
+          <p className={`text-2xl font-black leading-none ${gpsStats.stale === 0 ? "text-emerald-600" : "text-amber-600"}`}>
             {gpsStats.stale}
           </p>
-          <p className="text-[10px] text-white/40 mt-1">GPS {">"}30min</p>
+          <p className="text-[10px] text-slate-400 mt-1">GPS {">"}30min</p>
         </div>
       </div>
 
       {/* Barre de santé globale */}
       <div className="px-4 pb-4">
         <div className="flex items-center justify-between mb-1">
-          <span className="text-[10px] font-semibold text-white/50 uppercase tracking-wide">
+          <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">
             Indice de santé global
           </span>
           <span className={`text-xs font-bold ${gpsColor}`}>
             {gpsStats.pct >= 80 && coursesBloquees.length === 0 ? "🟢 Optimal" : "🟡 À surveiller"}
           </span>
         </div>
-        <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+        <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
           <div
             className={`h-full rounded-full transition-all ${
               gpsStats.pct >= 80 ? "bg-gradient-to-r from-emerald-400 to-emerald-500"

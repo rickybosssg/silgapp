@@ -122,8 +122,8 @@ export default function Dashboard() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex-1">
-          <h1 className="text-xl lg:text-2xl font-bold text-white">Tableau de bord</h1>
-          <p className="text-xs lg:text-sm text-white/50">
+          <h1 className="text-xl lg:text-2xl font-bold text-foreground">Tableau de bord</h1>
+          <p className="text-xs lg:text-sm text-muted-foreground">
             {format(new Date(), "EEEE d MMMM yyyy", { locale: fr })}
           </p>
         </div>

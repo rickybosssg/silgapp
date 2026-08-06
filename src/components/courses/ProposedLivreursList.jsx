@@ -101,8 +101,8 @@ export default function ProposedLivreursList({ course }) {
 
   if (loading) {
     return (
-      <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-3">
-        <p className="text-xs text-blue-400 font-semibold flex items-center gap-1.5">
+      <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-3">
+        <p className="text-xs text-blue-600 font-semibold flex items-center gap-1.5">
           <Users className="w-3.5 h-3.5" />
           Livreurs proposés : chargement...
         </p>
@@ -133,29 +133,29 @@ export default function ProposedLivreursList({ course }) {
   }
 
   return (
-    <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-3 space-y-2">
+    <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-3 space-y-2">
       <div className="flex items-center justify-between">
-        <p className="text-xs font-bold text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
+        <p className="text-xs font-bold text-blue-700 uppercase tracking-wider flex items-center gap-1.5">
           <Users className="w-3.5 h-3.5" />
           Livreurs proposés
         </p>
-        <span className="text-xs font-bold text-blue-400 bg-blue-500/15 px-2 py-0.5 rounded-full">
+        <span className="text-xs font-bold text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full">
           {livreurs.length}
         </span>
       </div>
 
       {/* ── Timeline dispatch : toutes les actions avec leur timing ── */}
       {isSearching && !isTerminal && (
-        <div className="rounded-lg p-3 bg-white/5 border-2 border-blue-500/20 space-y-2.5">
+        <div className="rounded-lg p-3 bg-white border-2 border-blue-200 space-y-2.5">
           {/* En-tête : vague + statut */}
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1.5">
               <Radio className="w-4 h-4 text-blue-500 animate-pulse" />
-              <span className="text-xs font-bold text-blue-400">
+              <span className="text-xs font-bold text-blue-600">
                 Vague #{course?.dispatch_wave || 0}
               </span>
             </div>
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-400">
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
               {dispatchLabel}
             </span>
           </div>
@@ -163,80 +163,80 @@ export default function ProposedLivreursList({ course }) {
           {/* Action 1 : Notification envoyée — temps écoulé */}
           {elapsedSinceNotif !== null && (
             <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-full bg-green-500/15 flex items-center justify-center shrink-0">
-                <CheckCircle2 className="w-3.5 h-3.5 text-green-400" />
+              <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center shrink-0">
+                <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[11px] font-semibold text-white/80">Livreurs notifiés</p>
-                <p className="text-[10px] text-white/40">il y a {fmtSec(elapsedSinceNotif)}</p>
+                <p className="text-[11px] font-semibold text-gray-700">Livreurs notifiés</p>
+                <p className="text-[10px] text-gray-400">il y a {fmtSec(elapsedSinceNotif)}</p>
               </div>
-              <span className="text-xs font-bold text-green-400 tabular-nums">{fmtSec(elapsedSinceNotif)}</span>
+              <span className="text-xs font-bold text-green-600 tabular-nums">{fmtSec(elapsedSinceNotif)}</span>
             </div>
           )}
 
           {/* Action 2 : Attente réponse — compte à rebours */}
           {remainingSec !== null && !isExpired && (
             <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-full bg-blue-500/15 flex items-center justify-center shrink-0">
-                <Timer className="w-3.5 h-3.5 text-blue-400" />
+              <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                <Timer className="w-3.5 h-3.5 text-blue-600" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[11px] font-semibold text-white/80">Attente de réponse</p>
-                <p className="text-[10px] text-white/40">expire dans {fmtSec(remainingSec)}</p>
-                <div className="mt-1 h-1.5 bg-blue-500/15 rounded-full overflow-hidden">
+                <p className="text-[11px] font-semibold text-gray-700">Attente de réponse</p>
+                <p className="text-[10px] text-gray-400">expire dans {fmtSec(remainingSec)}</p>
+                <div className="mt-1 h-1.5 bg-blue-100 rounded-full overflow-hidden">
                   <div className="h-full bg-blue-500 rounded-full transition-all duration-1000" style={{ width: `${Math.min(100, (remainingSec / totalTimeoutSec) * 100)}%` }} />
                 </div>
               </div>
-              <span className="text-lg font-black text-blue-400 tabular-nums">{fmtSec(remainingSec)}</span>
+              <span className="text-lg font-black text-blue-600 tabular-nums">{fmtSec(remainingSec)}</span>
             </div>
           )}
 
           {/* Action 3 : Timeout expiré — relance imminente */}
           {isExpired && (
             <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-full bg-orange-500/15 flex items-center justify-center shrink-0">
-                <RefreshCw className="w-3.5 h-3.5 text-orange-400 animate-spin" />
+              <div className="w-6 h-6 rounded-full bg-orange-100 flex items-center justify-center shrink-0">
+                <RefreshCw className="w-3.5 h-3.5 text-orange-600 animate-spin" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[11px] font-semibold text-orange-400">Timeout dépassé</p>
-                <p className="text-[10px] text-orange-400/60">relance de la vague suivante…</p>
+                <p className="text-[11px] font-semibold text-orange-600">Timeout dépassé</p>
+                <p className="text-[10px] text-orange-400">relance de la vague suivante…</p>
               </div>
-              <span className="text-lg font-black text-orange-400 tabular-nums">00:00</span>
+              <span className="text-lg font-black text-orange-600 tabular-nums">00:00</span>
             </div>
           )}
 
           {/* Action 4 : Prochain tick de relance dispatch */}
           {nextTickIn !== null && (
-            <div className="flex items-center gap-2 pt-1 border-t border-white/8">
-              <div className="w-6 h-6 rounded-full bg-amber-500/10 flex items-center justify-center shrink-0">
-                <Zap className="w-3.5 h-3.5 text-amber-400" />
+            <div className="flex items-center gap-2 pt-1 border-t border-gray-100">
+              <div className="w-6 h-6 rounded-full bg-amber-50 flex items-center justify-center shrink-0">
+                <Zap className="w-3.5 h-3.5 text-amber-500" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[11px] font-semibold text-white/60">Prochain tick de relance</p>
-                <p className="text-[10px] text-white/40">
+                <p className="text-[11px] font-semibold text-gray-600">Prochain tick de relance</p>
+                <p className="text-[10px] text-gray-400">
                   {isExpired
                     ? `Relance de la recherche au prochain tick`
                     : `Moteur dispatch — vérification auto`}
                 </p>
               </div>
-              <span className="text-sm font-bold text-amber-400 tabular-nums">~{fmtSec(nextTickIn)}</span>
+              <span className="text-sm font-bold text-amber-600 tabular-nums">~{fmtSec(nextTickIn)}</span>
             </div>
           )}
         </div>
       )}
       {isCycleEpuise && !isTerminal && (
-        <div className="flex items-center gap-1.5 px-2.5 py-2.5 rounded-lg bg-red-500/10 border-2 border-red-500/30">
-          <RefreshCw className="w-4 h-4 text-red-400 animate-spin" />
-          <span className="text-xs font-bold text-red-400">
+        <div className="flex items-center gap-1.5 px-2.5 py-2.5 rounded-lg bg-red-50 border-2 border-red-300">
+          <RefreshCw className="w-4 h-4 text-red-500 animate-spin" />
+          <span className="text-xs font-bold text-red-600">
             Tous les livreurs sollicités — nouveau cycle imminent…
           </span>
         </div>
       )}
 
       {isTerminal && (
-        <div className="flex items-center gap-1.5 px-2.5 py-2.5 rounded-lg bg-white/5 border border-white/10">
-          <XCircle className="w-4 h-4 text-white/40" />
-          <span className="text-xs font-bold text-white/50">
+        <div className="flex items-center gap-1.5 px-2.5 py-2.5 rounded-lg bg-gray-50 border border-gray-200">
+          <XCircle className="w-4 h-4 text-gray-400" />
+          <span className="text-xs font-bold text-gray-500">
             Dispatch arrêté — course {course?.statut === "annulee" ? "annulée" : "livrée"}
           </span>
         </div>
@@ -249,19 +249,19 @@ export default function ProposedLivreursList({ course }) {
             <div
               key={l.id}
               className={`flex items-center gap-2 p-2 rounded-lg text-xs ${
-                isAccepted ? "bg-[#00a86b]/15 border border-[#00a86b]/30" : "bg-white/5 border border-white/8"
+                isAccepted ? "bg-green-100 border border-green-200" : "bg-white border border-gray-100"
               }`}
             >
               <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 ${
-                isAccepted ? "bg-[#00a86b] text-white" : "bg-white/10 text-white/60"
+                isAccepted ? "bg-green-500 text-white" : "bg-gray-100 text-gray-600"
               }`}>
                 {(l.prenom?.[0] || "") + (l.nom?.[0] || "")}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-semibold text-white truncate">
+                <p className="font-semibold text-gray-800 truncate">
                   {l.prenom} {l.nom}
                 </p>
-                <div className="flex items-center gap-2 text-[10px] text-white/40">
+                <div className="flex items-center gap-2 text-[10px] text-gray-400">
                   {l.telephone && (
                     <span className="flex items-center gap-0.5">
                       <Phone className="w-2.5 h-2.5" />
@@ -277,12 +277,12 @@ export default function ProposedLivreursList({ course }) {
                 </div>
               </div>
               {isAccepted ? (
-                <span className="flex items-center gap-1 text-[10px] font-bold text-[#00a86b] bg-[#00a86b]/20 px-2 py-1 rounded-full shrink-0">
+                <span className="flex items-center gap-1 text-[10px] font-bold text-green-700 bg-green-200 px-2 py-1 rounded-full shrink-0">
                   <CheckCircle2 className="w-3 h-3" />
                   Accepté
                 </span>
               ) : isTerminal ? (
-                <span className="flex items-center gap-1 text-[10px] font-bold text-white/40 bg-white/10 px-2 py-1 rounded-full shrink-0">
+                <span className="flex items-center gap-1 text-[10px] font-bold text-gray-400 bg-gray-100 px-2 py-1 rounded-full shrink-0">
                   <Clock className="w-3 h-3" />
                   Notifié
                 </span>
@@ -290,7 +290,7 @@ export default function ProposedLivreursList({ course }) {
                 <button
                   onClick={() => handleForceAssign(l)}
                   disabled={assigningId === l.id}
-                  className="flex items-center gap-1 text-[10px] font-bold text-white bg-[#00a86b] px-2 py-1 rounded-full shrink-0 hover:bg-[#00a86b]/90 transition disabled:opacity-50"
+                  className="flex items-center gap-1 text-[10px] font-bold text-white bg-primary px-2 py-1 rounded-full shrink-0 hover:bg-primary/90 transition disabled:opacity-50"
                 >
                   {assigningId === l.id ? (
                     <RefreshCw className="w-3 h-3 animate-spin" />

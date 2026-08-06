@@ -54,7 +54,7 @@ export default function WhatsAppMessages({ myEmail, myName }) {
   };
 
   return (
-    <div className="flex h-full force-light">
+    <div className="flex h-full">
       <div className={`${activeConv ? "hidden md:flex" : "flex"} flex-col w-full md:w-96 border-r border-gray-200 bg-white`}>
         <WhatsAppConversationList
           conversations={filtered}

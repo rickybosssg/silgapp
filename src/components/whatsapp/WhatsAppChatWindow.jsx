@@ -171,7 +171,7 @@ export default function WhatsAppChatWindow({ conv, myEmail, myName, onBack, onCo
           onKeyDown={handleKeyDown}
           placeholder="Votre message..."
           disabled={sending}
-          className="flex-1 h-11 min-w-0 rounded-xl border border-gray-200 bg-gray-50 px-4 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-300"
+          className="flex-1 h-11 min-w-0 rounded-xl border border-gray-200 px-4 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500/20"
         />
         <Button
           size="icon"
@@ -196,16 +196,11 @@ function MessageBubble({ msg }) {
         "max-w-[75%] rounded-2xl px-3 py-2",
         isMine
           ? isVenus ? "bg-blue-100 text-blue-900" : "bg-green-600 text-white"
-          : "bg-[#2a2f35] border border-white/10 text-gray-100"
+          : "bg-white border border-gray-200 text-gray-900"
       )}>
         {isMine && (
           <p className={cn("text-[10px] font-bold mb-0.5", isVenus ? "text-blue-600" : "text-green-100")}>
             {isVenus ? "🤖 VENUS" : "👤 Admin"}
-          </p>
-        )}
-        {!isMine && msg.sender_type === "client" && (
-          <p className="text-[10px] font-bold mb-0.5 text-gray-400">
-            {msg.sender_name || "Client"}
           </p>
         )}
         {msg.message_type === "text" && (
@@ -235,7 +230,7 @@ function MessageBubble({ msg }) {
             <MapPin className="w-4 h-4" /> {msg.location_lat?.toFixed(5)}, {msg.location_lng?.toFixed(5)}
           </a>
         )}
-        <p className={cn("text-[10px] mt-1 text-right", isMine ? (isVenus ? "text-blue-400" : "text-green-100") : "text-gray-500")}>
+        <p className={cn("text-[10px] mt-1 text-right", isMine ? (isVenus ? "text-blue-400" : "text-green-100") : "text-gray-400")}>
           {msg.created_date && format(new Date(msg.created_date), "HH:mm", { locale: fr })}
         </p>
       </div>

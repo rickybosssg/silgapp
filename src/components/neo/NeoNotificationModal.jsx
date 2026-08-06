@@ -43,7 +43,7 @@ export default function NeoNotificationModal() {
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={handleDismiss} />
-      <div className="relative w-full max-w-md rounded-3xl bg-[#1f2429] shadow-2xl overflow-hidden border border-white/8">
+      <div className="relative w-full max-w-md rounded-3xl bg-white shadow-2xl overflow-hidden">
         {/* Header */}
         <div className={`p-5 ${hasCritique ? "bg-gradient-to-br from-red-600 to-rose-700" : "bg-gradient-to-br from-slate-900 to-slate-800"}`}>
           <div className="flex items-start justify-between">
@@ -68,28 +68,28 @@ export default function NeoNotificationModal() {
         {/* Liste courte */}
         <div className="p-4 space-y-2 max-h-60 overflow-y-auto">
           {newRecs.slice(0, 5).map(rec => (
-            <div key={rec.id} className="flex items-start gap-2 p-2 rounded-xl bg-white/5">
+            <div key={rec.id} className="flex items-start gap-2 p-2 rounded-xl bg-gray-50">
               <span className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${
                 rec.priorite === "critique" ? "bg-red-500" :
                 rec.priorite === "elevee" ? "bg-orange-500" :
                 rec.priorite === "moyenne" ? "bg-yellow-500" : "bg-green-500"
               }`} />
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-bold text-white truncate">{rec.titre}</p>
-                <p className="text-[10px] text-white/50 truncate">{rec.categorie}</p>
+                <p className="text-xs font-bold text-gray-900 truncate">{rec.titre}</p>
+                <p className="text-[10px] text-gray-500 truncate">{rec.categorie}</p>
               </div>
             </div>
           ))}
           {newRecs.length > 5 && (
-            <p className="text-center text-xs text-white/40 pt-1">+{newRecs.length - 5} autre(s)</p>
+            <p className="text-center text-xs text-gray-400 pt-1">+{newRecs.length - 5} autre(s)</p>
           )}
         </div>
 
         {/* Actions */}
-        <div className="p-4 border-t border-white/8">
+        <div className="p-4 border-t border-gray-100">
           <button
             onClick={handleGoToNeo}
-            className="w-full h-11 rounded-xl bg-[#00a86b] text-white text-sm font-bold flex items-center justify-center gap-2 hover:bg-[#00a86b]/90 transition-colors"
+            className="w-full h-11 rounded-xl bg-slate-900 text-white text-sm font-bold flex items-center justify-center gap-2 hover:bg-slate-800 transition-colors"
           >
             Consulter NEO <ArrowRight className="w-4 h-4" />
           </button>

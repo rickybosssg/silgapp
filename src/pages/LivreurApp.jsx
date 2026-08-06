@@ -370,7 +370,7 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
 
   if (!livreurProfil) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center bg-[#16191d]">
+      <div className="fixed inset-0 flex items-center justify-center bg-background">
         <div className="text-center space-y-4">
           <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">
             <Truck className="w-8 h-8 text-primary animate-pulse" />
@@ -389,7 +389,7 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
   const livreurVisible = isEnLigne && gpsActif && livreurProfil.latitude && livreurProfil.longitude;
 
   return (
-    <div className="min-h-screen bg-[#16191d] text-white">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <AlertesLivreurModal
         livreurId={livreurProfil?.id}
         livreurNom={`${livreurProfil?.prenom || ""} ${livreurProfil?.nom || ""}`.trim()}

@@ -44,10 +44,10 @@ export default function DemandesLivreursPopup() {
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-4"
       style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}>
-      <div className="w-full max-w-md bg-[#1f2429] rounded-3xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 duration-300 border border-white/8">
+      <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
 
         {/* Header */}
-        <div className="bg-gradient-to-r from-[#00a86b] to-red-600 px-5 py-4">
+        <div className="bg-gradient-to-r from-primary to-red-600 px-5 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-xl">
@@ -66,26 +66,26 @@ export default function DemandesLivreursPopup() {
 
         {/* Dernier livreur */}
         <div className="p-5 space-y-4">
-          <p className="text-sm font-bold text-white">Dernière demande reçue</p>
-          <div className="bg-white/5 rounded-2xl p-4 space-y-3 border border-white/8">
+          <p className="text-sm font-bold text-gray-700">Dernière demande reçue</p>
+          <div className="bg-gray-50 rounded-2xl p-4 space-y-3">
             <div className="flex items-center gap-3">
               {latest.photo_url ? (
                 <img src={latest.photo_url} alt="" className="w-12 h-12 rounded-xl object-cover" />
               ) : (
-                <div className="w-12 h-12 rounded-xl bg-[#00a86b]/15 flex items-center justify-center">
-                  <User className="w-6 h-6 text-[#00a86b]" />
+                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                  <User className="w-6 h-6 text-primary" />
                 </div>
               )}
               <div>
-                <p className="font-black text-white">{latest.prenom || ""} {latest.nom}</p>
-                <div className="flex items-center gap-1 text-xs text-white/50 mt-0.5">
+                <p className="font-black text-gray-900">{latest.prenom || ""} {latest.nom}</p>
+                <div className="flex items-center gap-1 text-xs text-gray-500 mt-0.5">
                   <Phone className="w-3 h-3" /> {latest.telephone || "N/A"}
                 </div>
-                <div className="flex items-center gap-1 text-xs text-white/50">
+                <div className="flex items-center gap-1 text-xs text-gray-500">
                   <MapPin className="w-3 h-3" /> {latest.country_code || "BF"} · {latest.ville || "N/A"}
                 </div>
               </div>
-              <div className="ml-auto text-xs text-white/50 flex items-center gap-1">
+              <div className="ml-auto text-xs text-gray-500 flex items-center gap-1">
                 <Clock className="w-3 h-3" />
                 {(() => {
                   const d = new Date(latest.created_date);
@@ -98,7 +98,7 @@ export default function DemandesLivreursPopup() {
           </div>
 
           {demandes.length > 1 && (
-            <p className="text-xs text-white/50 text-center">
+            <p className="text-xs text-gray-500 text-center">
               + {demandes.length - 1} autre{(demandes.length - 1) > 1 ? "s" : ""} demande{(demandes.length - 1) > 1 ? "s" : ""} en attente
             </p>
           )}
@@ -106,7 +106,7 @@ export default function DemandesLivreursPopup() {
           {/* Actions */}
           <div className="grid grid-cols-3 gap-2 pt-2">
             <Button
-              className="h-12 rounded-xl bg-gradient-to-r from-[#00a86b] to-red-700 text-white font-bold shadow-md"
+              className="h-12 rounded-xl bg-gradient-to-r from-primary to-red-700 text-white font-bold shadow-md"
               onClick={handleVoir}>
               Voir le dossier
             </Button>
@@ -117,7 +117,7 @@ export default function DemandesLivreursPopup() {
             </Button>
             <Button
               variant="outline"
-              className="h-12 rounded-xl text-white/60 font-semibold border-white/15"
+              className="h-12 rounded-xl text-gray-600 font-semibold"
               onClick={handleDismiss}>
               Plus tard
             </Button>

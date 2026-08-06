@@ -137,9 +137,9 @@ export default function ChatWindow({ courseId, senderType, senderId, senderName,
   }
 
   return (
-    <div className="flex flex-col h-[460px] bg-[#16191d] rounded-2xl overflow-hidden border border-white/8 shadow-sm">
+    <div className="flex flex-col h-[460px] bg-slate-50 rounded-2xl overflow-hidden border border-slate-200 shadow-sm">
       {/* Header */}
-      <div className="p-3 bg-[#0f1216] text-white flex items-center justify-between">
+      <div className="p-3 bg-slate-950 text-white flex items-center justify-between">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <MessageCircle className="w-4 h-4 flex-shrink-0" />
@@ -160,10 +160,10 @@ export default function ChatWindow({ courseId, senderType, senderId, senderName,
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-3 bg-[#16191d]">
+      <div className="flex-1 overflow-y-auto p-3 bg-gradient-to-b from-slate-50 to-white">
         {messages.length === 0 && (
           <div className="flex items-center justify-center h-full">
-            <p className="text-xs text-white/50 text-center">
+            <p className="text-xs text-gray-400 text-center">
               Aucun message. Commencez la conversation !
             </p>
           </div>
@@ -179,7 +179,7 @@ export default function ChatWindow({ courseId, senderType, senderId, senderName,
       </div>
 
       {/* Barre de saisie — bouton Envoyer toujours visible */}
-      <div className="p-2.5 bg-[#1f2429] border-t border-white/8 flex items-end gap-1.5 safe-area-bottom">
+      <div className="p-2.5 bg-white border-t border-slate-200 flex items-end gap-1.5 safe-area-bottom shadow-[0_-8px_24px_rgba(15,23,42,0.06)]">
         <AudioRecorder
           onSend={handleAudioSend}
           disabled={sending}
@@ -187,7 +187,7 @@ export default function ChatWindow({ courseId, senderType, senderId, senderName,
         />
         <label className="cursor-pointer flex-shrink-0">
           <input type="file" accept="image/*" onChange={handlePhotoSend} className="hidden" disabled={sending || uploadingPhoto} />
-          <div className="h-10 w-10 rounded-full flex items-center justify-center text-white/50 hover:text-[#00a86b] hover:bg-white/10 transition-colors">
+          <div className="h-10 w-10 rounded-full flex items-center justify-center text-gray-500 hover:text-primary hover:bg-gray-100 transition-colors">
             {uploadingPhoto ? <Loader2 className="w-5 h-5 animate-spin" /> : <ImagePlus className="w-5 h-5" />}
           </div>
         </label>
@@ -198,12 +198,12 @@ export default function ChatWindow({ courseId, senderType, senderId, senderName,
           placeholder="Votre message..."
           disabled={sending}
           rows={2}
-          className="flex-1 min-h-14 max-h-32 min-w-0 resize-none rounded-2xl border border-white/10 bg-[#16191d] px-4 py-3 text-[15px] font-medium leading-5 text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-[#00a86b]/40 focus:border-[#00a86b]/40"
+          className="flex-1 min-h-14 max-h-32 min-w-0 resize-none rounded-2xl border border-slate-300 bg-white px-4 py-3 text-[15px] font-medium leading-5 text-slate-950 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/40"
         />
         <Button
           onClick={handleSend}
           disabled={sending || !input.trim()}
-          className="h-11 w-11 sm:w-auto sm:min-w-[92px] rounded-full sm:rounded-xl bg-[#00a86b] hover:bg-[#00a86b]/90 shadow-md flex-shrink-0 disabled:opacity-60 gap-2 px-0 sm:px-4 font-black text-white"
+          className="h-11 w-11 sm:w-auto sm:min-w-[92px] rounded-full sm:rounded-xl bg-primary hover:bg-primary/90 shadow-md flex-shrink-0 disabled:opacity-60 gap-2 px-0 sm:px-4 font-black text-white"
         >
           {sending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
           <span className="hidden sm:inline">Envoyer</span>

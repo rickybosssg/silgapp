@@ -547,62 +547,18 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ── Auto-assignation intelligente des localisations GPS ──
-    // Au lieu de demander "récupération ou livraison?", assigner automatiquement:
-    // 1ère localisation → départ, 2ème → arrivée
+    // ── Sauvegarder la localisation GPS dans la mémoire courte ──
     if (!reponseVenus && latitude !== null && longitude !== null) {
       let pendingCourseLoc: any = null;
       try { pendingCourseLoc = conversation.venus_pending_course ? JSON.parse(conversation.venus_pending_course) : {}; } catch { pendingCourseLoc = {}; }
-
-      const hasDepart = pendingCourseLoc.gps_depart_lat != null || (pendingCourseLoc.adresse_depart && pendingCourseLoc.adresse_depart.trim());
-      const hasArrivee = pendingCourseLoc.gps_arrivee_lat != null || (pendingCourseLoc.adresse_arrivee && pendingCourseLoc.adresse_arrivee.trim());
-
-      if (!hasDepart) {
-        // 1ère localisation → assigner au départ
-        pendingCourseLoc.gps_depart_lat = latitude;
-        pendingCourseLoc.gps_depart_lng = longitude;
-        pendingCourseLoc.adresse_depart = 'Localisation GPS partagee';
-        delete pendingCourseLoc.pending_location_lat;
-        delete pendingCourseLoc.pending_location_lng;
-        await base44.asServiceRole.entities.Conversation.update(conversation.id, {
-          venus_pending_course: JSON.stringify(pendingCourseLoc),
-        });
-        venusLog(`[WebhookVenus] 📍 Localisation AUTO-assignée au DÉPART pour ${conversation.id}`);
-        conversation.venus_pending_course = JSON.stringify(pendingCourseLoc);
-
-        if (!hasArrivee && !pendingCourseLoc.type_course) {
-          reponseVenus = "Merci, j'ai bien reçu ton point de départ. Maintenant, envoie-moi la localisation du lieu de livraison (ou indique le quartier).";
-        } else if (!hasArrivee) {
-          reponseVenus = "Merci, j'ai bien reçu ton point de départ. Maintenant, envoie-moi la localisation du lieu de livraison (ou indique le quartier).";
-        } else if (!pendingCourseLoc.type_course) {
-          reponseVenus = "Merci, j'ai bien reçu ton point de départ. Quel type de course ? (envoyer un colis, recevoir un colis, ou te déplacer)";
-        } else {
-          reponseVenus = "Merci, j'ai bien reçu ton point de départ. Ta demande est prête. Je lance la recherche d'un livreur. Confirme avec 'oui'.";
-        }
-      } else if (!hasArrivee) {
-        // 2ème localisation → assigner à l'arrivée
-        pendingCourseLoc.gps_arrivee_lat = latitude;
-        pendingCourseLoc.gps_arrivee_lng = longitude;
-        pendingCourseLoc.adresse_arrivee = 'Localisation GPS partagee';
-        delete pendingCourseLoc.pending_location_lat;
-        delete pendingCourseLoc.pending_location_lng;
-        await base44.asServiceRole.entities.Conversation.update(conversation.id, {
-          venus_pending_course: JSON.stringify(pendingCourseLoc),
-        });
-        venusLog(`[WebhookVenus] 📍 Localisation AUTO-assignée à l'ARRIVÉE pour ${conversation.id}`);
-        conversation.venus_pending_course = JSON.stringify(pendingCourseLoc);
-
-        if (!pendingCourseLoc.type_course) {
-          reponseVenus = "Merci, j'ai bien reçu ton lieu de livraison. Quel type de course ? (envoyer un colis, recevoir un colis, ou te déplacer)";
-        } else if (pendingCourseLoc.type_course === 'expedier' || pendingCourseLoc.type_course === 'recevoir') {
-          reponseVenus = "Merci, j'ai bien reçu ton lieu de livraison. Donne-moi le numéro de téléphone du destinataire (ou dis 'c'est moi' si c'est ton numéro).";
-        } else {
-          reponseVenus = "Merci, j'ai bien reçu ton lieu de livraison. Ta demande est prête. Je lance la recherche d'un livreur. Confirme avec 'oui'.";
-        }
-      } else {
-        // Les deux lieux sont déjà assignés — localisation supplémentaire ignorée
-        reponseVenus = "J'ai déjà tes deux points (départ et arrivée). Souhaites-tu modifier un lieu ? Dis-moi lequel.";
-      }
+      pendingCourseLoc.pending_location_lat = latitude;
+      pendingCourseLoc.pending_location_lng = longitude;
+      await base44.asServiceRole.entities.Conversation.update(conversation.id, {
+        venus_pending_course: JSON.stringify(pendingCourseLoc),
+      });
+      venusLog(`[WebhookVenus] 📍 Localisation sauvegardée en attente d'assignation pour ${conversation.id}`);
+      // ── Mettre à jour la variable locale pour que le moteur de raisonnement voie la localisation ──
+      conversation.venus_pending_course = JSON.stringify(pendingCourseLoc);
     }
 
     // ── Détection d'incidents (avant le moteur de raisonnement) ──
@@ -814,19 +770,15 @@ Deno.serve(async (req) => {
             // Si un champ manque → on surcharge l'action en poser_question et on demande
             // l'info manquante. JAMAIS de création avec des infos incomplètes.
             const um = { ...(pendingCourse || {}), ...reasoningResult.memoire_courte_update };
-            // ── AUTO-REMPLIR contact_createur_course avec le numéro WhatsApp ──
-            if (!um.contact_createur_course || !um.contact_createur_course.trim()) {
-              um.contact_createur_course = telephone;
-            }
             const _tc = (um.type_course || '').toLowerCase().trim();
             const _hasType = ['expedier', 'recevoir', 'deplacement'].includes(_tc);
             const _hasDepart = !!(um.adresse_depart && um.adresse_depart.trim()) || um.gps_depart_lat != null;
             const _hasArrivee = !!(um.adresse_arrivee && um.adresse_arrivee.trim()) || um.gps_arrivee_lat != null;
             const _needsContact = _tc === 'expedier' || _tc === 'recevoir';
             const _hasContact = !!(um.contact_telephone && um.contact_telephone.trim()) || um.contact_is_client === true;
-            // ── contact_createur_course : AUTO = numéro WhatsApp du client ──
+            // ── contact_createur_course : OBLIGATOIRE pour toute course VENUS ──
             const _createurDigits = (um.contact_createur_course || '').replace(/\D/g, '');
-            const _hasCreateurContact = _createurDigits.length >= 8 && _createurDigits.length <= 15;
+            const _hasCreateurContact = !!(um.contact_createur_course && um.contact_createur_course.trim()) && _createurDigits.length >= 8 && _createurDigits.length <= 15;
 
             let _missingField = '';
             if (!_hasType) _missingField = 'type_course';
@@ -845,6 +797,8 @@ Deno.serve(async (req) => {
                 _askMsg = 'Quel est le lieu exact de récupération ? (indiquez le quartier ou un point de repère précis)';
               } else if (_missingField === 'adresse_arrivee') {
                 _askMsg = 'Quel est le lieu exact de livraison ? (indiquez le quartier ou un point de repère précis)';
+              } else if (_missingField === 'contact_createur_course') {
+                _askMsg = 'Quel est le numéro de téléphone de la personne qui crée cette course et que le livreur devra contacter en priorité ? (Si c\'est votre numéro, indiquez-le moi)';
               } else if (_missingField === 'contact') {
                 const _role = _tc === 'expedier' ? 'destinataire' : 'expéditeur';
                 _askMsg = `Quel est le numéro de téléphone du ${_role} ? (Si vous êtes vous-même le ${_role}, dites-le moi)`;

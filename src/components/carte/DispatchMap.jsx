@@ -466,33 +466,12 @@ function buildStyles() {
 
     /* ─── Badge légende en overlay ─── */
     .dmap-overlay-badge {
-      background: rgba(31, 36, 41, 0.95);
+      background: rgba(255,255,255,0.95);
       backdrop-filter: blur(8px);
-      border: 1px solid rgba(255,255,255,0.1);
+      border: 1px solid #e2e8f0;
       border-radius: 12px;
       padding: 8px 14px;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.3);
-      color: #fff;
-    }
-    /* ─── Popups Leaflet en thème sombre ─── */
-    .leaflet-popup-content-wrapper {
-      background: #1f2429 !important;
-      color: #fff !important;
-      border: 1px solid rgba(255,255,255,0.1) !important;
-      border-radius: 12px !important;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.4) !important;
-    }
-    .leaflet-popup-content-wrapper p {
-      color: #fff !important;
-    }
-    .leaflet-popup-tip {
-      background: #1f2429 !important;
-    }
-    .leaflet-popup-close-button {
-      color: rgba(255,255,255,0.6) !important;
-    }
-    .leaflet-popup-close-button:hover {
-      color: #fff !important;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.1);
     }
   `;
 }
@@ -573,12 +552,12 @@ function buildLivreurPopup(livreur, livreurIdsEnCourseReelle) {
   
   return `
     <div style="min-width:210px;font-family:sans-serif;padding:4px 0">
-      <p style="font-weight:700;font-size:14px;margin:0 0 4px 0;color:#ffffff">${livreur.prenom || ""} ${livreur.nom || ""}</p>
+      <p style="font-weight:700;font-size:14px;margin:0 0 4px 0;color:#1a1a1a">${livreur.prenom || ""} ${livreur.nom || ""}</p>
       <p style="font-size:12px;margin:2px 0;color:${statutColor}">${statutLabel}</p>
-      ${livreur.telephone ? `<p style="font-size:12px;margin:2px 0;color:#cbd5e1">📞 ${livreur.telephone}</p>` : ""}
-      <p style="font-size:12px;margin:2px 0;color:#94a3b8">📍 GPS il y a ${gpsStr}</p>
-      ${gpsQuality ? `<p style="font-size:11px;margin:2px 0;color:#64748b">Qualité: ${gpsQuality}</p>` : ""}
-      ${livreur.vehicule ? `<p style="font-size:12px;margin:2px 0;color:#94a3b8">🏍 ${livreur.vehicule}</p>` : ""}
+      ${livreur.telephone ? `<p style="font-size:12px;margin:2px 0;color:#444">📞 ${livreur.telephone}</p>` : ""}
+      <p style="font-size:12px;margin:2px 0;color:#6b7280">📍 GPS il y a ${gpsStr}</p>
+      ${gpsQuality ? `<p style="font-size:11px;margin:2px 0;color:#999">Qualité: ${gpsQuality}</p>` : ""}
+      ${livreur.vehicule ? `<p style="font-size:12px;margin:2px 0;color:#888">🏍 ${livreur.vehicule}</p>` : ""}
       ${livreur.validation !== "valide" ? `<p style="font-size:11px;margin:2px 0;color:#f59e0b">⚠️ Validation: ${livreur.validation || "en attente"}</p>` : ""}
     </div>
   `;
@@ -619,12 +598,12 @@ function buildCoursePopup(course) {
   const ageStr = age === null ? "" : age < 1 ? "à l'instant" : `il y a ${age} min`;
   return `
     <div style="min-width:210px;font-family:sans-serif;padding:4px 0">
-      <p style="font-weight:700;font-size:14px;margin:0 0 4px 0;color:#f87171">🔴 Course en attente</p>
-      ${course.client_nom ? `<p style="font-size:12px;margin:2px 0;color:#cbd5e1">👤 ${course.client_nom}</p>` : ""}
-      ${course.client_telephone ? `<p style="font-size:12px;margin:2px 0;color:#cbd5e1">📞 ${course.client_telephone}</p>` : ""}
-      ${course.adresse_depart ? `<p style="font-size:12px;margin:2px 0;color:#cbd5e1">📍 Départ : ${course.adresse_depart}</p>` : ""}
-      ${course.adresse_arrivee ? `<p style="font-size:12px;margin:2px 0;color:#94a3b8">🏁 Arrivée : ${course.adresse_arrivee}</p>` : ""}
-      ${ageStr ? `<p style="font-size:11px;margin:4px 0 0 0;color:#f87171;font-weight:600">⏱ Créée ${ageStr}</p>` : ""}
+      <p style="font-weight:700;font-size:14px;margin:0 0 4px 0;color:#dc2626">🔴 Course en attente</p>
+      ${course.client_nom ? `<p style="font-size:12px;margin:2px 0;color:#444">👤 ${course.client_nom}</p>` : ""}
+      ${course.client_telephone ? `<p style="font-size:12px;margin:2px 0;color:#444">📞 ${course.client_telephone}</p>` : ""}
+      ${course.adresse_depart ? `<p style="font-size:12px;margin:2px 0;color:#444">📍 Départ : ${course.adresse_depart}</p>` : ""}
+      ${course.adresse_arrivee ? `<p style="font-size:12px;margin:2px 0;color:#888">🏁 Arrivée : ${course.adresse_arrivee}</p>` : ""}
+      ${ageStr ? `<p style="font-size:11px;margin:4px 0 0 0;color:#dc2626;font-weight:600">⏱ Créée ${ageStr}</p>` : ""}
     </div>
   `;
 }
@@ -662,14 +641,14 @@ function buildPartenairePopup(partenaire) {
     : '<span style="color:#16a34a;font-weight:600">🟢 Ouvert</span>';
   return `
     <div style="min-width:220px;font-family:sans-serif;padding:4px 0">
-      <p style="font-weight:700;font-size:14px;margin:0 0 4px 0;color:#ffffff">${partenaire.nom || ""}</p>
+      <p style="font-weight:700;font-size:14px;margin:0 0 4px 0;color:#1a1a1a">${partenaire.nom || ""}</p>
       <p style="font-size:12px;margin:2px 0;color:${typeColor};font-weight:600">${typeLabel}</p>
       <p style="font-size:12px;margin:2px 0">${statutLabel}</p>
-      ${partenaire.adresse ? `<p style="font-size:12px;margin:2px 0;color:#94a3b8">📍 ${partenaire.adresse}</p>` : ""}
-      ${partenaire.quartier ? `<p style="font-size:12px;margin:2px 0;color:#94a3b8">📌 ${partenaire.quartier}</p>` : ""}
-      ${partenaire.ville ? `<p style="font-size:11px;margin:2px 0;color:#64748b">${partenaire.ville}</p>` : ""}
-      ${partenaire.telephone ? `<p style="font-size:12px;margin:2px 0;color:#cbd5e1">📞 ${partenaire.telephone}</p>` : ""}
-      ${partenaire._commandes_en_attente > 0 ? `<p style="font-size:12px;margin:4px 0 0 0;color:#f87171;font-weight:600">📦 ${partenaire._commandes_en_attente} commande(s) en attente</p>` : ""}
+      ${partenaire.adresse ? `<p style="font-size:12px;margin:2px 0;color:#6b7280">📍 ${partenaire.adresse}</p>` : ""}
+      ${partenaire.quartier ? `<p style="font-size:12px;margin:2px 0;color:#6b7280">📌 ${partenaire.quartier}</p>` : ""}
+      ${partenaire.ville ? `<p style="font-size:11px;margin:2px 0;color:#9ca3af">${partenaire.ville}</p>` : ""}
+      ${partenaire.telephone ? `<p style="font-size:12px;margin:2px 0;color:#444">📞 ${partenaire.telephone}</p>` : ""}
+      ${partenaire._commandes_en_attente > 0 ? `<p style="font-size:12px;margin:4px 0 0 0;color:#dc2626;font-weight:600">📦 ${partenaire._commandes_en_attente} commande(s) en attente</p>` : ""}
     </div>
   `;
 }
@@ -703,12 +682,12 @@ function buildClientPopup(client) {
   
   return `
     <div style="min-width:210px;font-family:sans-serif;padding:4px 0">
-      <p style="font-weight:700;font-size:14px;margin:0 0 4px 0;color:#ffffff">${client.prenom || ""} ${client.nom || ""}</p>
+      <p style="font-weight:700;font-size:14px;margin:0 0 4px 0;color:#1a1a1a">${client.prenom || ""} ${client.nom || ""}</p>
       <p style="font-size:12px;margin:2px 0;color:${statutColors[statut]}">${statutLabels[statut]}</p>
-      ${client.telephone ? `<p style="font-size:12px;margin:2px 0;color:#cbd5e1">📞 ${client.telephone}</p>` : ""}
-      <p style="font-size:12px;margin:2px 0;color:#94a3b8">📍 GPS il y a ${gpsStr}</p>
-      ${gpsQuality ? `<p style="font-size:11px;margin:2px 0;color:#64748b">Qualité: ${gpsQuality}</p>` : ""}
-      ${client.quartier ? `<p style="font-size:12px;margin:2px 0;color:#94a3b8">📌 ${client.quartier}</p>` : ""}
+      ${client.telephone ? `<p style="font-size:12px;margin:2px 0;color:#444">📞 ${client.telephone}</p>` : ""}
+      <p style="font-size:12px;margin:2px 0;color:#6b7280">📍 GPS il y a ${gpsStr}</p>
+      ${gpsQuality ? `<p style="font-size:11px;margin:2px 0;color:#999">Qualité: ${gpsQuality}</p>` : ""}
+      ${client.quartier ? `<p style="font-size:12px;margin:2px 0;color:#888">📌 ${client.quartier}</p>` : ""}
     </div>
   `;
 }
@@ -1066,92 +1045,92 @@ export default function DispatchMap({
         <>
           {/* Stats + légende (top-left) — panneau repliable */}
           <div className="absolute top-4 left-4 z-[1000]">
-            <div className="bg-[#1f2429]/95 backdrop-blur-md border border-white/10 rounded-xl p-3 shadow-lg">
+            <div className="dmap-overlay-badge">
               {/* En-tête repliable */}
               <button
                 onClick={() => setStatsCollapsed(v => !v)}
                 className="flex items-center justify-between w-full gap-2 mb-1"
               >
-                <span className="text-xs font-bold text-white">Activité terrain</span>
-                <span className="text-[10px] text-white/50">{statsCollapsed ? "Afficher" : "Masquer"}</span>
+                <span className="text-xs font-bold text-slate-800">Activité terrain</span>
+                <span className="text-[10px] text-slate-500">{statsCollapsed ? "Afficher" : "Masquer"}</span>
               </button>
               {!statsCollapsed && (
                 <div className="space-y-1 text-xs font-medium">
                   {courses.length > 0 && (
                     <div className="flex items-center gap-2">
-                      <span className="w-3 h-3 rounded-full bg-red-500 flex-shrink-0" />
-                      <span className="text-red-400 font-bold">{courses.length} en attente !</span>
+                      <span className="w-3 h-3 rounded-full bg-red-600 flex-shrink-0" />
+                      <span className="text-red-700 font-bold">{courses.length} en attente !</span>
                     </div>
                   )}
                   {showLivreurs && nbLibres > 0 && (
-                    <button onClick={() => onCategoryClick?.("libre")} className="flex items-center gap-2 hover:bg-white/10 rounded-lg px-1 -mx-1 transition-colors w-full">
+                    <button onClick={() => onCategoryClick?.("libre")} className="flex items-center gap-2 hover:bg-green-50 rounded-lg px-1 -mx-1 transition-colors w-full">
                       <span className="w-3 h-3 rounded-full bg-green-500 flex-shrink-0" />
-                      <span className="text-green-400 font-bold">{nbLibres} libre{nbLibres > 1 ? "s" : ""} (GPS ≤ 60 min)</span>
+                      <span className="text-green-700 font-bold">{nbLibres} libre{nbLibres > 1 ? "s" : ""} (GPS ≤ 60 min)</span>
                     </button>
                   )}
                   {showLivreurs && nbGPSExpire > 0 && (
-                    <button onClick={() => onCategoryClick?.("gps_expire")} className="flex items-center gap-2 hover:bg-white/10 rounded-lg px-1 -mx-1 transition-colors w-full">
+                    <button onClick={() => onCategoryClick?.("gps_expire")} className="flex items-center gap-2 hover:bg-amber-50 rounded-lg px-1 -mx-1 transition-colors w-full">
                       <span className="w-3 h-3 rounded-full bg-amber-500 flex-shrink-0" />
-                      <span className="text-amber-400 font-semibold">{nbGPSExpire} GPS expiré</span>
+                      <span className="text-amber-700 font-semibold">{nbGPSExpire} GPS expiré</span>
                     </button>
                   )}
                   {showLivreurs && nbCourse > 0 && (
-                    <button onClick={() => onCategoryClick?.("en_course")} className="flex items-center gap-2 hover:bg-white/10 rounded-lg px-1 -mx-1 transition-colors w-full">
+                    <button onClick={() => onCategoryClick?.("en_course")} className="flex items-center gap-2 hover:bg-orange-50 rounded-lg px-1 -mx-1 transition-colors w-full">
                       <span className="w-3 h-3 rounded-full bg-orange-500 flex-shrink-0" />
-                      <span className="text-orange-400">{nbCourse} en course</span>
+                      <span className="text-orange-700">{nbCourse} en course</span>
                     </button>
                   )}
                   {showLivreurs && nbHorsLigne > 0 && (
-                    <button onClick={() => onCategoryClick?.("hors_ligne")} className="flex items-center gap-2 hover:bg-white/10 rounded-lg px-1 -mx-1 transition-colors w-full">
-                      <span className="w-3 h-3 rounded-full bg-gray-500 flex-shrink-0" />
-                      <span className="text-white/50">{nbHorsLigne} hors ligne</span>
+                    <button onClick={() => onCategoryClick?.("hors_ligne")} className="flex items-center gap-2 hover:bg-gray-100 rounded-lg px-1 -mx-1 transition-colors w-full">
+                      <span className="w-3 h-3 rounded-full bg-gray-400 flex-shrink-0" />
+                      <span className="text-gray-600">{nbHorsLigne} hors ligne</span>
                     </button>
                   )}
                   {showClients && nbClientsActifs > 0 && (
                     <div className="flex items-center gap-2">
-                      <span className="w-3 h-3 rounded-full bg-blue-500 flex-shrink-0" />
-                      <span className="text-blue-400">{nbClientsActifs} actif{nbClientsActifs > 1 ? "s" : ""} (&lt;5 min)</span>
+                      <span className="w-3 h-3 rounded-full bg-blue-600 flex-shrink-0" />
+                      <span className="text-blue-700">{nbClientsActifs} actif{nbClientsActifs > 1 ? "s" : ""} (&lt;5 min)</span>
                     </div>
                   )}
                   {showClients && nbClientsRecents > 0 && (
                     <div className="flex items-center gap-2">
                       <span className="w-3 h-3 rounded-full bg-yellow-500 flex-shrink-0" />
-                      <span className="text-yellow-400">{nbClientsRecents} récent{nbClientsRecents > 1 ? "s" : ""} (5-15 min)</span>
+                      <span className="text-yellow-700">{nbClientsRecents} récent{nbClientsRecents > 1 ? "s" : ""} (5-15 min)</span>
                     </div>
                   )}
                   {!masquerInactifs && showClients && nbClientsInactifs > 0 && (
                     <div className="flex items-center gap-2">
-                      <span className="w-3 h-3 rounded-full bg-gray-500 flex-shrink-0" />
-                      <span className="text-white/60 font-medium">⚫ {nbClientsInactifs} client{nbClientsInactifs > 1 ? "s" : ""} inactif{nbClientsInactifs > 1 ? "s" : ""}</span>
+                      <span className="w-3 h-3 rounded-full bg-gray-400 flex-shrink-0" />
+                      <span className="text-gray-700 font-medium">⚫ {nbClientsInactifs} client{nbClientsInactifs > 1 ? "s" : ""} inactif{nbClientsInactifs > 1 ? "s" : ""}</span>
                     </div>
                   )}
                   {showPartenaires && nbPartenairesBoutiques > 0 && (
                     <div className="flex items-center gap-2">
                       <span className="w-3 h-3 rounded-full bg-violet-500 flex-shrink-0" />
-                      <span className="text-violet-400 font-medium">🏪 {nbPartenairesBoutiques} boutique{nbPartenairesBoutiques > 1 ? "s" : ""}</span>
+                      <span className="text-violet-700 font-medium">🏪 {nbPartenairesBoutiques} boutique{nbPartenairesBoutiques > 1 ? "s" : ""}</span>
                     </div>
                   )}
                   {showPartenaires && nbPartenairesRestaurants > 0 && (
                     <div className="flex items-center gap-2">
                       <span className="w-3 h-3 rounded-full bg-pink-500 flex-shrink-0" />
-                      <span className="text-pink-400 font-medium">🍽️ {nbPartenairesRestaurants} restaurant{nbPartenairesRestaurants > 1 ? "s" : ""}</span>
+                      <span className="text-pink-700 font-medium">🍽️ {nbPartenairesRestaurants} restaurant{nbPartenairesRestaurants > 1 ? "s" : ""}</span>
                     </div>
                   )}
                   {showPartenaires && nbPartenairesPharmacies > 0 && (
                     <div className="flex items-center gap-2">
-                      <span className="w-3 h-3 rounded-full bg-blue-700 flex-shrink-0" />
-                      <span className="text-blue-400 font-medium">💊 {nbPartenairesPharmacies} pharmacie{nbPartenairesPharmacies > 1 ? "s" : ""}</span>
+                      <span className="w-3 h-3 rounded-full bg-blue-900 flex-shrink-0" />
+                      <span className="text-blue-900 font-medium">💊 {nbPartenairesPharmacies} pharmacie{nbPartenairesPharmacies > 1 ? "s" : ""}</span>
                     </div>
                   )}
                   {courses.length === 0 && nbLivreursVisibles === 0 && nbClientsVisibles === 0 && (
-                    <span className="text-white/50">Aucun élément visible</span>
+                    <span className="text-gray-500">Aucun élément visible</span>
                   )}
                   {/* Légende GPS qualité fusionnée */}
-                  <div className="pt-1.5 mt-1.5 border-t border-white/10 text-[10px] text-white/50 space-y-0.5">
-                    <div className="font-semibold text-white/70">Qualité GPS</div>
+                  <div className="pt-1.5 mt-1.5 border-t border-slate-200 text-[10px] text-slate-600 space-y-0.5">
+                    <div className="font-semibold text-slate-700">Qualité GPS</div>
                     <div>❤️ &lt;2min · 💚 2-5min · 🧡 5-15min</div>
                     <div>❤️‍🩹 15-30min · ❤️‍🔥 &gt;30min</div>
-                    <div className="text-white/40">⚫ Noir = non dispatchable</div>
+                    <div className="text-slate-500">⚫ Noir = non dispatchable</div>
                   </div>
                 </div>
               )}
@@ -1161,12 +1140,12 @@ export default function DispatchMap({
           {/* Contrôles heatmap + légende (top-right) */}
           <div className="absolute top-4 right-4 z-[1000] space-y-2">
             {showHeatmapHint && heatmapModeLocal === "off" && (
-              <div className="bg-[#1f2429]/95 border border-blue-500/20 rounded-lg p-2 shadow-lg max-w-[180px]">
-                <p className="text-xs font-semibold text-blue-400 mb-0.5">✨ Cartes thermiques</p>
-                <p className="text-[11px] text-blue-400/80 leading-tight">Analysez demande & couverture</p>
-!               <button
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 shadow-lg max-w-[180px]">
+                <p className="text-xs font-semibold text-blue-800 mb-0.5">✨ Cartes thermiques</p>
+                <p className="text-[11px] text-blue-700 leading-tight">Analysez demande & couverture</p>
+                <button
                   onClick={() => setShowHeatmapHint(false)}
-                  className="text-[10px] text-blue-400 hover:text-blue-300 mt-1 underline"
+                  className="text-[10px] text-blue-600 hover:text-blue-800 mt-1 underline"
                 >
                   Fermer
                 </button>
@@ -1193,7 +1172,7 @@ export default function DispatchMap({
           <div className="absolute bottom-4 right-4 z-[1000] flex flex-col gap-2">
             <button
               onClick={centerOnAll}
-              className="w-11 h-11 rounded-xl bg-[#1f2429] shadow-lg border border-white/10 flex items-center justify-center text-white/80 hover:bg-[#2a3038] active:scale-95 transition-all"
+              className="w-11 h-11 rounded-xl bg-white shadow-lg border border-slate-200 flex items-center justify-center text-slate-700 hover:bg-slate-50 active:scale-95 transition-all"
               title="Centrer sur tous les marqueurs"
             >
               <Maximize className="w-5 h-5" />
@@ -1207,7 +1186,7 @@ export default function DispatchMap({
                   userInteractedRef.current = false;
                 }
               }}
-              className="w-11 h-11 rounded-xl bg-[#1f2429] shadow-lg border border-white/10 flex items-center justify-center text-white/80 hover:bg-[#2a3038] active:scale-95 transition-all"
+              className="w-11 h-11 rounded-xl bg-white shadow-lg border border-slate-200 flex items-center justify-center text-slate-700 hover:bg-slate-50 active:scale-95 transition-all"
               title="Recentrer sur la position initiale"
             >
               <Locate className="w-5 h-5" />
@@ -1217,12 +1196,12 @@ export default function DispatchMap({
           {/* Sélecteur pays (bottom-left) */}
           {onCountryChange && (
             <div className="absolute bottom-4 left-4 z-[1000]">
-              <div className="bg-[#1f2429]/95 backdrop-blur-md border border-white/10 rounded-xl p-3 shadow-lg" style={{ colorScheme: "dark" }}>
+              <div className="dmap-overlay-badge" style={{ colorScheme: "light" }}>
                 <div className="flex items-center gap-2 mb-1">
-                  <Globe className="w-3 h-3 text-white/50" />
-                  <span className="text-xs font-semibold text-white/80">Pays</span>
+                  <Globe className="w-3 h-3 text-slate-500" />
+                  <span className="text-xs font-semibold text-slate-700">Pays</span>
                 </div>
-                <div className="[&_button]:!bg-[#16191d] [&_button]:!text-white [&_button]:!border-white/10 [&_div]:!bg-[#16191d] [&_div]:!text-white">
+                <div className="[&_button]:!bg-white [&_button]:!text-slate-800 [&_button]:!border-slate-200 [&_div]:!bg-white [&_div]:!text-slate-800">
                   <CountrySelector
                     value={countryCode}
                     onChange={onCountryChange}

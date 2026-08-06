@@ -387,11 +387,9 @@ export async function creerCourseDepuisMemoire(
   const hasRequiredContact = cd.contact_telephone || cd.contact_is_client;
   const hasDepart = cd.adresse_depart || cd.gps_depart_lat != null;
   const hasArrivee = cd.adresse_arrivee || cd.gps_arrivee_lat != null;
-  // ── contact_createur_course : AUTO = numéro WhatsApp du client ──
-  // Le client qui écrit sur WhatsApp EST le créateur de la course. Pas besoin de demander.
-  if (!cd.contact_createur_course || !cd.contact_createur_course.trim()) {
-    cd.contact_createur_course = telephone;
-  }
+  // ── contact_createur_course : OBLIGATOIRE pour toute course VENUS ──
+  // Le numéro WhatsApp entrant ne peut être utilisé QUE si le client a confirmé
+  // explicitement (contact_createur_is_sender=true). Ne jamais réutiliser un ancien numéro.
   const hasCreateurContact = !!(cd.contact_createur_course && cd.contact_createur_course.trim());
 
   if (!hasDepart || !hasArrivee || !hasRequiredContact || !hasCreateurContact) {
@@ -649,80 +647,19 @@ function extraireInfosDepuisMessage(message: string): Record<string, any> {
   }
 
   // Adresses — chercher des noms de quartiers connus
-  // Patterns de départ: "depuis X", "au depart de X", "je suis à X", "de X"
-  // Patterns d'arrivée: "vers X", "pour X", "à destination de X", "à X"
-  // Format multi-lignes: "De X\nà Y" ou "De X à Y"
-  const lignes = msg.split(/[\n.]/).map((l: string) => l.trim()).filter(Boolean);
-
   for (const q of QUARTIERS_OUAGA) {
     if (msg.includes(q)) {
       const isJeSuisA = msg.includes('je suis à ' + q) || msg.includes('je suis a ' + q);
       const isDepuis = msg.includes('depuis ' + q) || msg.includes('au depart de ' + q);
-      const isDeDepart = msg.includes('de ' + q) && !msg.includes('vers ' + q);
-      const isVersArrivee = msg.includes('vers ' + q) || msg.includes('a destination de ' + q);
-      // "à X" comme arrivée (mais pas "je suis à" qui est un départ)
-      const hasPlainA = (msg.includes('à ' + q) || msg.includes('a ' + q)) && !isJeSuisA;
+      const isVersArrivee = msg.includes('vers ' + q) || msg.includes('pour ' + q) || msg.includes('a destination de ' + q);
+      const hasPlainA = msg.includes('à ' + q) || msg.includes('a ' + q);
 
       if (isJeSuisA || isDepuis) {
         if (!updates.adresse_depart) updates.adresse_depart = q.charAt(0).toUpperCase() + q.slice(1);
-      } else if (isDeDepart && !updates.adresse_depart) {
-        // "De pissy" au début d'une ligne = départ
-        updates.adresse_depart = q.charAt(0).toUpperCase() + q.slice(1);
       } else if (isVersArrivee || hasPlainA) {
         if (!updates.adresse_arrivee) updates.adresse_arrivee = q.charAt(0).toUpperCase() + q.slice(1);
       } else if (!updates.adresse_arrivee && !updates.adresse_depart) {
         updates.adresse_arrivee = q.charAt(0).toUpperCase() + q.slice(1);
-      }
-    }
-  }
-
-  // ── Extraction multi-lignes: "De X à Y" ou "De X\nà Y" ──
-  // Gère les messages comme: "Pour expédier un repas. De pissy à cissin. 11h30"
-  if (!updates.adresse_depart || !updates.adresse_arrivee) {
-    for (const ligne of lignes) {
-      // Pattern: "de <quartier> à <quartier>" ou "de <quartier> a <quartier>"
-      const matchTrajet = ligne.match(/\bde\s+([a-zàâäéèêëïîôöùûüç\s]+?)\s+à\s+([a-zàâäéèêëïîôöùûüç\s]+)/i) ||
-                          ligne.match(/\bde\s+([a-zàâäéèêëïîôöùûüç\s]+?)\s+a\s+([a-zàâäéèêëïîôöùûüç\s]+)/i);
-      if (matchTrajet) {
-        const depRaw = matchTrajet[1].trim().toLowerCase();
-        const arrRaw = matchTrajet[2].trim().toLowerCase();
-        // Vérifier si ce sont des quartiers connus ou des noms libres
-        if (!updates.adresse_depart) {
-          const depMatch = QUARTIERS_OUAGA.find(q => depRaw.includes(q));
-          if (depMatch) {
-            updates.adresse_depart = depMatch.charAt(0).toUpperCase() + depMatch.slice(1);
-          } else if (depRaw.length >= 3 && depRaw.length <= 30) {
-            updates.adresse_depart = depRaw.charAt(0).toUpperCase() + depRaw.slice(1);
-          }
-        }
-        if (!updates.adresse_arrivee) {
-          const arrMatch = QUARTIERS_OUAGA.find(q => arrRaw.includes(q));
-          if (arrMatch) {
-            updates.adresse_arrivee = arrMatch.charAt(0).toUpperCase() + arrMatch.slice(1);
-          } else if (arrRaw.length >= 3 && arrRaw.length <= 30) {
-            updates.adresse_arrivee = arrRaw.charAt(0).toUpperCase() + arrRaw.slice(1);
-          }
-        }
-        break; // Premier match suffit
-      }
-    }
-  }
-
-  // ── Extraction heure souhaitée ──
-  if (!updates.date_souhaitee) {
-    const heureMatch = msg.match(/\b(\d{1,2})\s*[hH:](\d{0,2})\b/);
-    if (heureMatch) {
-      const heure = parseInt(heureMatch[1]);
-      const minute = heureMatch[2] ? parseInt(heureMatch[2]) : 0;
-      if (heure >= 0 && heure <= 23 && minute >= 0 && minute <= 59) {
-        const now = new Date();
-        const dateRdv = new Date(now);
-        dateRdv.setHours(heure, minute, 0, 0);
-        // Si l'heure est déjà passée aujourd'hui, programmer pour demain
-        if (dateRdv <= now) {
-          dateRdv.setDate(dateRdv.getDate() + 1);
-        }
-        updates.date_souhaitee = dateRdv.toISOString();
       }
     }
   }
@@ -1083,21 +1020,20 @@ creer_course | suivre_course | contacter_livreur | annuler_course | modifier_inf
 nouvelle_course | course_en_cours | ancienne_course | paiement | livreur | partenaire | general
 
 ═══ INFOS REQUISES POUR creer_course ═══
-type_course, adresse_depart (ou GPS), adresse_arrivee (ou GPS), ET contact_telephone si type_course = expedier ou recevoir.
-- contact_createur_course = numéro WhatsApp du client (${input.telephone}). AUTOMATIQUE. NE JAMAIS demander.
-- "expedier": contact_telephone = DESTINATAIRE (obligatoire). "recevoir": contact_telephone = EXPÉDITEUR (obligatoire). "deplacement": contact destinataire FACULTATIF.
-- Nom du destinataire/expéditeur FACULTATIF. Plusieurs numéros → utilise le PREMIER. Ne demande PAS lequel choisir.
+type_course, adresse_depart (ou GPS), adresse_arrivee (ou GPS), contact_createur_course (OBLIGATOIRE), ET contact_telephone si type_course = expedier ou recevoir.
+- contact_createur_course = numéro du CRÉATEUR de la course (contact principal du livreur). OBLIGATOIRE pour chaque course. Ne JAMAIS copier auto le numéro WhatsApp entrant — demander explicitement. Exception: si le client dit "c'est mon numéro"/"c'est moi" → autorisé après confirmation. Ne JAMAIS réutiliser un ancien numéro.
+- Pour "expedier": contact_telephone = DESTINATAIRE. Pour "recevoir": contact_telephone = EXPÉDITEUR. OBLIGATOIRE.
+- Pour "deplacement": contact destinataire FACULTATIF.
+- Nom du destinataire/expéditeur FACULTATIF (seul le téléphone est requis).
 
-═══ FLUX CRÉATION DE COURSE — LE PLUS COURT POSSIBLE ═══
-RÈGLE D'OR: DÈS que toutes les infos sont présentes → action=creer_course IMMÉDIATEMENT. PAS de récapitulatif. PAS de confirmation. CRÉE DIRECTEMENT.
-a) Si UNE info manque → action=poser_question (UNE SEULE question, combine plusieurs infos manquantes dans une phrase).
-b) Si TOUTES les infos sont présentes → action=creer_course DIRECTEMENT (sans demander "oui").
-c) Client corrige → mets à jour memoire_courte_update, puis recrée si tout est complet.
-MAXIMUM 3 questions: type → départ+arrivée → (destinataire si expedier). Puis CRÉATION DIRECTE.
-Ne JAMAIS demander le numéro du créateur (auto=WhatsApp). Ne JAMAIS demander "quel numéro comme principal".
-Ne JAMAIS demander confirmation ("oui") avant de créer. CRÉE DÈS que les infos sont complètes.
-EXCEPTION: Si audio faible confiance → demande confirmation ("Si j'ai bien compris...") avant de créer.
-Si contact_telephone manquant → action=poser_question, JAMAIS creer_course.
+═══ FLUX CRÉATION DE COURSE (STRICT) ═══
+a) Infos manquantes → action=poser_question (UNE SEULE question).
+b) Toutes infos présentes ET récapitulatif pas encore montré → montre récapitulatif COMPLET + "Confirmez-vous la création de cette course ?" (action=poser_question).
+c) Récapitulatif montré + client répond oui/ok/d'accord/je confirme/valider/go → action=creer_course.
+d) Client corrige → mets à jour memoire_courte_update, reviens à (a) ou (b).
+JAMAIS de "all_info_collected" ou "user_confirmed" (ces champs n'existent pas).
+INTERDICTION: Ne JAMAIS dire "je lance la création"/"je crée"/"je valide"/"je finalise" tant que: contact_telephone non collecté ET récapitulatif non présenté ET client n'a pas confirmé.
+Si contact_telephone manquant → action DOIT être poser_question, JAMAIS creer_course.
 
 ═══ ACTIONS POSSIBLES ═══
 poser_question | creer_course | suivre_course | contacter_livreur | annuler_course | repondre_info | clarifier | saluer
@@ -1111,7 +1047,7 @@ poser_question | creer_course | suivre_course | contacter_livreur | annuler_cour
 3. CORRECTIONS: Si client corrige ("non c'est Y"), mets à jour et confirme.
 4. PAS DE PRIX: Ne JAMAIS inventer un prix. Le livreur confirmera le coût.
 5. SALUTATION simple (Bonjour/Bonsoir/Salut) sans course en cours → accueil chaleureux SANS mentionner de services. Modèle: "Bonjour 👋 Je suis VENUS, l'assistante intelligente de SILGAPP. Comment puis-je vous aider aujourd'hui ?"
-6. CONTINUITÉ: Si VENUS a posé une question, le message actuel est LA RÉPONSE. Ne pas réinterpréter comme nouvelle demande. Ne pas écraser une adresse/type_course déjà connu. Un numéro = contact_telephone, pas nouvelle demande. Ne pas reformuler "Si j'ai bien compris..." si la réponse est directe. DÈS que les infos sont complètes → creer_course SANS confirmation.
+6. CONTINUITÉ: Si VENUS a posé une question, le message actuel est probablement LA RÉPONSE. Ne pas réinterpréter comme nouvelle demande. Ne pas écraser une adresse/type_course déjà connu. Un numéro = contact_telephone, pas nouvelle demande. Ne pas reformuler "Si j'ai bien compris..." si la réponse est directe.
 7. ANTI-FAUX-ANNULATION: "Oui"/"OK"/"D'accord" SEUL ≠ annuler_course. Annulation UNIQUEMENT si mot explicite ("annule", "plus besoin") OU VENUS a posé une question d'annulation et client répond oui.
 8. NOUVELLE COURSE APRÈS FIN: "nouvelle course"/"autre course" sans course active → vide mémoire courte, recommence collecte depuis zéro.
 9. RAG/RÈGLES = CONTEXTE uniquement. C'est TOI qui décides, le RAG ne répond pas à ta place.
@@ -1244,17 +1180,9 @@ Réponds UNIQUEMENT avec un JSON.`;
         llmUpdateFiltered[k] = v;
       }
     }
-    // ── AUTO-REMPLIR contact_createur_course avec le numéro WhatsApp ──
-    // Le client qui écrit sur WhatsApp EST le créateur de la course. Pas besoin de demander.
-    if (!llmUpdateFiltered.contact_createur_course && !mergedMemoireCourte.contact_createur_course) {
-      llmUpdateFiltered.contact_createur_course = input.telephone;
-    }
     result.memoire_courte_update = llmUpdateFiltered;
     // Fusionner infos_connues avec la mémoire existante
     result.infos_connues = { ...mergedMemoireCourte, ...(result.infos_connues || {}) };
-    if (!result.infos_connues.contact_createur_course) {
-      result.infos_connues.contact_createur_course = input.telephone;
-    }
 
     // Valider le business_rule_id
     if (result.business_rule_id && businessRuleEntries.length > 0) {
@@ -1340,61 +1268,6 @@ Réponds UNIQUEMENT avec un JSON.`;
       };
     }
 
-    // ── DERNIER RECOURS : Extraction heuristique + création de course ──
-    // Quand le LLM échoue (timeout, rate limit, erreur réseau), on essaie de
-    // sauver la conversation en extrayant les infos du message avec des
-    // heuristiques. Si on a assez d'infos (type + départ + arrivée), on crée
-    // la course directement. Sinon, on retourne le fallback contextuel.
-    try {
-      const infosHeuristiques = extraireInfosDepuisMessage(input.messageClient);
-      const memoireFusionnee = { ...(input.memoireCourte || {}), ...infosHeuristiques };
-      // Auto-remplir contact_createur_course
-      if (!memoireFusionnee.contact_createur_course) {
-        memoireFusionnee.contact_createur_course = input.telephone;
-      }
-      // Pour "expedier", le client est souvent le destinataire lui-même
-      if (memoireFusionnee.type_course === 'expedier' && !memoireFusionnee.contact_telephone) {
-        memoireFusionnee.contact_is_client = true;
-      }
-
-      const hasType = !!memoireFusionnee.type_course;
-      const hasDepart = !!memoireFusionnee.adresse_depart;
-      const hasArrivee = !!memoireFusionnee.adresse_arrivee;
-
-      if (hasType && hasDepart && hasArrivee) {
-        console.log(`[ReasoningEngine] 🔄 Fallback heuristique: type=${memoireFusionnee.type_course} depart=${memoireFusionnee.adresse_depart} arrivee=${memoireFusionnee.adresse_arrivee}`);
-        const courseResult = await creerCourseDepuisMemoire(
-          base44, memoireFusionnee, input.countryCode, input.tarifs,
-          input.telephone, input.profileName
-        );
-        if (courseResult.success) {
-          console.log(`[ReasoningEngine] ✅ Course créée via fallback heuristique (LLM avait échoué)`);
-          return {
-            intention: 'creer_course',
-            contexte: 'nouvelle_course',
-            infos_connues: memoireFusionnee,
-            infos_manquantes: [],
-            action: 'creer_course',
-            prochaine_question: '',
-            outils_utilises: ['heuristic_fallback:create_course'],
-            confiance: 60,
-            reponse: courseResult.message || 'Course créée avec succès !',
-            memoire_courte_update: { course_created: true, ...infosHeuristiques },
-            memoire_longue_update: {},
-            business_rule_id: undefined,
-            document_sources: undefined,
-            temps_traitement_ms: Date.now() - startTime,
-            decision_moteur: 'fallback_heuristique',
-            openai_appele: openaiWasAttempted,
-            model_utilise: openaiWasAttempted ? 'heuristic_fallback' : '',
-            _erreur_detail: `LLM échec: ${e.message?.substring(0, 300) || 'Unknown'} → fallback heuristique réussi`,
-          };
-        }
-      }
-    } catch (heuristicErr: any) {
-      console.warn(`[ReasoningEngine] Fallback heuristique échoué: ${heuristicErr?.message}`);
-    }
-
     // Erreur LLM générique — fallback standard
     return {
       intention: 'autre',
@@ -1421,7 +1294,7 @@ Réponds UNIQUEMENT avec un JSON.`;
       document_sources: undefined,
       temps_traitement_ms: Date.now() - startTime,
       decision_moteur: 'erreur',
-      openai_appele: openaiWasAttempted,
+      openai_appele: false,
       model_utilise: '',
       _erreur_detail: `Erreur raisonnement: ${e.message?.substring(0, 400) || 'Unknown error'}`,
     };

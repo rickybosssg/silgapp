@@ -6,28 +6,28 @@ export default function ClientsEnLigne({ clients = [] }) {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="p-4 bg-[#1f2429] rounded-2xl border border-white/8">
+    <div className="p-4">
       {/* Header cliquable */}
       <button
         onClick={() => setOpen(o => !o)}
         className="w-full flex items-center justify-between group"
       >
-        <h2 className="font-semibold text-sm flex items-center gap-2 text-white">
-          <User className="w-4 h-4 text-[#00a86b]" />
+        <h2 className="font-semibold text-sm flex items-center gap-2">
+          <User className="w-4 h-4 text-primary" />
           Clients en ligne
-          <span className="text-xs bg-[#00a86b]/15 text-[#00a86b] font-semibold px-1.5 py-0.5 rounded-full">
+          <span className="text-xs bg-primary/10 text-primary font-semibold px-1.5 py-0.5 rounded-full">
             {clients.length}
           </span>
         </h2>
         <div className="flex items-center gap-2">
           {clients.length > 0 && (
-            <span className="flex items-center gap-1 text-[11px] text-white/40">
+            <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
               <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse inline-block" />
               GPS actif
             </span>
           )}
           <ChevronDown className={cn(
-            "w-4 h-4 text-white/40 transition-transform duration-200",
+            "w-4 h-4 text-muted-foreground transition-transform duration-200",
             open && "rotate-180"
           )} />
         </div>
@@ -37,7 +37,7 @@ export default function ClientsEnLigne({ clients = [] }) {
       {open && (
         <div className="mt-3">
           {clients.length === 0 ? (
-            <p className="text-xs text-white/40 text-center py-3">
+            <p className="text-xs text-muted-foreground text-center py-3">
               Aucun client avec GPS actif
             </p>
           ) : (
@@ -48,9 +48,9 @@ export default function ClientsEnLigne({ clients = [] }) {
                 return (
                   <div
                     key={c.id}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-medium bg-red-500/10 border-red-500/20 text-red-300"
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-medium bg-red-50 border-red-200 text-red-800"
                   >
-                    <span className="w-5 h-5 rounded-full bg-red-500/20 flex items-center justify-center flex-shrink-0 text-[9px] font-bold text-red-400">
+                    <span className="w-5 h-5 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0 text-[9px] font-bold text-red-700">
                       {nom.charAt(0).toUpperCase()}
                     </span>
                     <span>{nom}</span>
