@@ -281,7 +281,7 @@ export default function ProposedLivreursList({ course }) {
                   <CheckCircle2 className="w-3 h-3" />
                   Accepté
                 </span>
-              ) : isTerminal ? (
+              ) : isTerminal && course?.statut === "livree" ? (
                 <span className="flex items-center gap-1 text-[10px] font-bold text-gray-400 bg-gray-100 px-2 py-1 rounded-full shrink-0">
                   <Clock className="w-3 h-3" />
                   Notifié
