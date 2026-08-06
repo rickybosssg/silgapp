@@ -12,10 +12,11 @@ const TWILIO_API_BASE = 'https://api.twilio.com/2010-04-01/Accounts';
 export async function envoyerWhatsAppRaw(
   to: string,
   body: string,
+  from_override?: string,
 ): Promise<{ success: boolean; sid?: string; error?: string; code?: number }> {
   const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
   const authToken = Deno.env.get('TWILIO_AUTH_TOKEN');
-  const fromRaw = Deno.env.get('TWILIO_WHATSAPP_FROM') || '';
+  const fromRaw = from_override || Deno.env.get('TWILIO_WHATSAPP_FROM') || '';
   if (!accountSid || !authToken || !fromRaw) {
     return { success: false, error: 'TWILIO credentials missing' };
   }

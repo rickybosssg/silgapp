@@ -274,7 +274,9 @@ Deno.serve(async (req) => {
         const conv = convs?.[0];
         if (conv && conv.source === 'whatsapp' && conv.whatsapp_phone) {
           const clientTel = `+${conv.whatsapp_phone.replace(/\D/g, '')}`;
-          const waResult = await envoyerWhatsAppRaw(clientTel, content);
+          // ── Dual-number: utiliser silgapp_from_number si disponible ──
+          const fromOverride = conv.silgapp_from_number || undefined;
+          const waResult = await envoyerWhatsAppRaw(clientTel, content, fromOverride);
           if (waResult.success) {
             console.log(`[envoyerMessage] ✅ Message admin relayé via WhatsApp à ${clientTel}`);
           } else {
