@@ -561,7 +561,7 @@ Deno.serve(async (req) => {
       const now = new Date();
       const resultats = [];
 
-      const MAX_COURSES_PER_TICK = 25; // Limite anti-rate-limit (augmenté pour couvrir plus de courses)
+      const MAX_COURSES_PER_TICK = 12; // Limite anti-rate-limit (réduit pour éviter la surcharge API)
       // 🎯 PHASE 8 — Tri par priorité : urgente > haute > normal
       // Les courses prioritaires sont traitées en premier à chaque tick
       const PRIORITY_ORDER = { urgente: 0, haute: 1, normal: 2 };
@@ -819,7 +819,7 @@ Deno.serve(async (req) => {
           resultats.push({ course_id: course.id, error: err.message });
         }
         // Délai minimal entre courses (les notifications sont fire-and-forget)
-        await new Promise(r => setTimeout(r, 100));
+        await new Promise(r => setTimeout(r, 250));
       }
 
       // ── FILET DE SÉCURITÉ — corriger les statuts "en_course" fantômes ──
@@ -1126,7 +1126,7 @@ Deno.serve(async (req) => {
       const base44 = createClientFromRequest(req);
       // 🛡️ Anti-spam : ne créer une alerte que si aucune alerte récente (< 30 min) n'existe
       // Délai augmenté à 30 min pour les rate limits (transitoires) vs 5 min pour les autres erreurs
-      const alertWindow = isRateLimit ? 30 * 60 * 1000 : 5 * 60 * 1000;
+      const alertWindow = isRateLimit ? 60 * 60 * 1000 : 5 * 60 * 1000;
       const recentAlerts = await base44.asServiceRole.entities.Notification.filter({
         type: 'alerte_critique_dispatch', lue: false,
       }, '-created_date', 1);
