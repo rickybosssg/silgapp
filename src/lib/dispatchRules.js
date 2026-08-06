@@ -170,13 +170,14 @@ export function isEligibleCarte(livreur) {
 }
 
 /**
- * Client éligible carte = actif + a des coordonnées GPS
- * Affiche tous les clients avec GPS, même si ancien (en gris si inactif)
+ * Client éligible carte = app active au premier plan + GPS récent
+ * N'affiche PAS les clients en arrière-plan (app_active: false)
+ * pour éviter les "ghost clients" qui apparaissent toujours connectés.
  */
 export function isClientEligibleCarte(client) {
   if (client.actif === false) return false;
+  if (client.app_active !== true) return false;
   if (!client.latitude || !client.longitude) return false;
-  // Tous les clients avec GPS sont affichés
   return true;
 }
 
