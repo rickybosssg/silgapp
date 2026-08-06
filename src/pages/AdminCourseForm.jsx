@@ -13,7 +13,8 @@ import MapPickerModal from "@/components/admin/MapPickerModal";
 import CourseWindowStack from "@/components/admin/CourseWindowStack";
 import ClientPhoneDetector from "@/components/crm/ClientPhoneDetector";
 import QuickClientPanel from "@/components/crm/QuickClientPanel";
-import PartnerSuggestions from "@/components/crm/PartnerSuggestions";
+import SmartAddressPicker from "@/components/crm/SmartAddressPicker";
+import { upsertCourseAddresses } from "@/lib/addressBook";
 import { upsertClientsFromCourseContacts, normalizePhone } from "@/lib/crmUtils";
 
 function generarQRData() {
@@ -258,6 +259,13 @@ export default function AdminCourseForm() {
         console.warn("[CRM] Erreur enrichissement fiches client:", crmErr?.message);
       }
 
+      // Carnet d'adresses intelligent — upsert les adresses de départ et d'arrivée
+      try {
+        await upsertCourseAddresses(courseData, countryCode);
+      } catch (addrErr) {
+        console.warn("[AddressBook] Erreur upsert adresses:", addrErr?.message);
+      }
+
       // 📦 Pousser la course dans la pile de fenêtres persistantes
       addWindow(course, formData);
       toast.success("Course créée ! Fenêtre ajoutée à droite →");
@@ -415,7 +423,9 @@ export default function AdminCourseForm() {
                   </span>
                 )}
               </div>
-              <AdminAddressAutocomplete
+              <SmartAddressPicker
+                client={detectedClient}
+                role="depart"
                 value={adresseDepart}
                 onChange={setAdresseDepart}
                 onSelect={(r) => {
@@ -437,7 +447,7 @@ export default function AdminCourseForm() {
                   <Navigation className="w-3.5 h-3.5" />
                   Localiser
                 </button>
-              </AdminAddressAutocomplete>
+              </SmartAddressPicker>
             </div>
 
             {/* Arrivée */}
@@ -453,7 +463,9 @@ export default function AdminCourseForm() {
                   </span>
                 )}
               </div>
-              <AdminAddressAutocomplete
+              <SmartAddressPicker
+                client={detectedClient}
+                role="arrivee"
                 value={adresseArrivee}
                 onChange={setAdresseArrivee}
                 onSelect={(r) => {
@@ -475,11 +487,9 @@ export default function AdminCourseForm() {
                   <Navigation className="w-3.5 h-3.5" />
                   Localiser
                 </button>
-              </AdminAddressAutocomplete>
+              </SmartAddressPicker>
             </div>
           </div>
-
-          <PartnerSuggestions countryCode={countryCode} onFillAddress={fillAddress} />
 
           {typeCourse !== "deplacement" && (
             <div>
@@ -541,8 +551,6 @@ export default function AdminCourseForm() {
 
           <QuickClientPanel
             client={detectedClient}
-            onFillCourse={fillFromCourse}
-            onFillAddress={fillAddress}
             onFillTemplate={fillFromTemplate}
           />
 
