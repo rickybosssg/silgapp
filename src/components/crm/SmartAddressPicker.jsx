@@ -47,9 +47,41 @@ export default function SmartAddressPicker({
     }
     let cancelled = false;
     setLoading(true);
-    base44.entities.ClientAddress
-      .filter({ client_id: client.id, role: addressRole }, "-nb_utilisations", 50)
-      .then((data) => {
+
+    (async () => {
+      try {
+        // 1. Récupérer les adresses enregistrées dans le carnet d'adresses
+        let data = await base44.entities.ClientAddress.filter(
+          { client_id: client.id, role: addressRole }, "-nb_utilisations", 50
+        );
+
+        // 2. Si aucune adresse enregistrée, fallback : récupérer depuis l'historique des courses
+        if ((!data || data.length === 0) && client.telephone_normalized) {
+          const phoneField = role === "depart" ? "client_phone_normalized" : "client_phone_normalized";
+          const courses = await base44.entities.CourseExterne.filter(
+            { [phoneField]: client.telephone_normalized },
+            "-created_date", 20
+          );
+          const addressMap = new Map();
+          for (const c of courses || []) {
+            // Pour "depart": utiliser adresse_depart; pour "arrivee": adresse_arrivee
+            const addrText = role === "depart" ? c.adresse_depart : c.adresse_arrivee;
+            if (!addrText || addrText === "—") continue;
+            if (addressMap.has(addrText)) continue; // éviter doublons
+            addressMap.set(addrText, {
+              id: `course_${c.id}_${role}`,
+              adresse: addrText,
+              quartier: role === "depart" ? c.quartier_depart : c.quartier_arrivee,
+              latitude: role === "depart" ? c.gps_depart_lat : c.gps_arrivee_lat,
+              longitude: role === "depart" ? c.gps_depart_lng : c.gps_arrivee_lng,
+              nb_utilisations: 1,
+              derniere_utilisation: c.created_date,
+              is_favorite: false,
+            });
+          }
+          data = Array.from(addressMap.values());
+        }
+
         if (cancelled) return;
         const sorted = (data || []).sort((a, b) => {
           if (a.is_favorite && !b.is_favorite) return -1;
@@ -60,17 +92,17 @@ export default function SmartAddressPicker({
           return new Date(b.derniere_utilisation || 0).getTime() - new Date(a.derniere_utilisation || 0).getTime();
         });
         setAddresses(sorted);
-      })
-      .catch(() => {
+      } catch {
         if (!cancelled) setAddresses([]);
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) setLoading(false);
-      });
+      }
+    })();
+
     return () => {
       cancelled = true;
     };
-  }, [client?.id, addressRole]);
+  }, [client?.id, addressRole, client?.telephone_normalized, role]);
 
   // Fermer le panneau d'historique au clic extérieur
   useEffect(() => {
