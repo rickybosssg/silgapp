@@ -88,6 +88,23 @@ Deno.serve(async (req) => {
             personalize: false,
           });
 
+          // 💬 Envoyer aussi le message dans la messagerie interne de la course
+          const idempotencyKey = `rappel-prise-en-charge-${course.id}`;
+          try {
+            await base44.asServiceRole.entities.Message.create({
+              course_id: course.id,
+              sender_type: 'admin',
+              sender_id: 'silgapp_system',
+              sender_name: 'SILGAPP',
+              message_type: 'text',
+              content: '🚨 Votre course est trop lente. Merci de récupérer le colis au plus vite pour éviter tout retard de livraison.',
+              source: 'app',
+              client_message_id: idempotencyKey,
+            });
+          } catch (err) {
+            console.warn(`[rappelPriseEnCharge] Erreur envoi message interne course ${course.id}:`, err.message);
+          }
+
           return { course_id: course.id, success: true, notif_data: res?.data || res };
         } catch (err) {
           console.error(`[rappelPriseEnCharge] Erreur course ${course.id}:`, err.message);
