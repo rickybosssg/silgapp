@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { ArrowLeft, Send, Loader2, Sparkles, Navigation, Check } from "lucide-react";
+import { ArrowLeft, Send, Loader2, Sparkles, Navigation, Check, Zap } from "lucide-react";
 import { useAdminContext } from "@/hooks/useAdminContext";
 import { useAdminCourseWindows } from "@/context/AdminCourseWindowsContext";
 import AdminAddressAutocomplete from "@/components/admin/AdminAddressAutocomplete";
@@ -13,6 +13,7 @@ import MapPickerModal from "@/components/admin/MapPickerModal";
 import CourseWindowStack from "@/components/admin/CourseWindowStack";
 import ClientPhoneDetector from "@/components/crm/ClientPhoneDetector";
 import QuickClientPanel from "@/components/crm/QuickClientPanel";
+import PartnerSuggestions from "@/components/crm/PartnerSuggestions";
 import { upsertClientsFromCourseContacts, normalizePhone } from "@/lib/crmUtils";
 
 function generarQRData() {
@@ -108,6 +109,7 @@ export default function AdminCourseForm() {
   const [gpsArrivee, setGpsArrivee] = useState(null);
   const [mapModal, setMapModal] = useState(null); // null | 'depart' | 'arrivee'
   const [detectedClient, setDetectedClient] = useState(null);
+  const [quickMode, setQuickMode] = useState(false);
 
   const selectedPays = PAYS.find(p => p.code === countryCode);
 
@@ -291,16 +293,29 @@ export default function AdminCourseForm() {
               </div>
               <p className="text-xs text-white/60 mt-0.5">Création manuelle administrateur</p>
             </div>
-            <div className="flex flex-col items-end">
-              <span className="text-2xl font-black text-white/90 leading-none">
-                {String(new Date().getDate()).padStart(2, '0')}
-              </span>
-              <span className="text-[10px] text-white/50 uppercase tracking-wider">
-                {new Date().toLocaleDateString('fr-FR', { month: 'short' })}
-              </span>
-            </div>
+            <button
+              type="button"
+              onClick={() => setQuickMode(!quickMode)}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-bold transition-all ${
+                quickMode
+                  ? "bg-emerald-400 text-white shadow-lg shadow-emerald-300/30"
+                  : "bg-white/15 text-white hover:bg-white/30 border border-white/25"
+              }`}
+            >
+              <Zap className="w-3.5 h-3.5" />
+              Mode rapide
+            </button>
           </div>
         </div>
+
+        {quickMode && (
+          <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-50 border border-emerald-200">
+            <Zap className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+            <span className="text-[11px] font-semibold text-emerald-700">
+              Mode rapide — tapez le numéro du client, sélectionnez une course dans l'historique, puis cliquez sur Créer
+            </span>
+          </div>
+        )}
 
         {/* Type de course — cartes raffinées */}
         <div className="bg-white rounded-[1.5rem] border border-gray-100 shadow-lg shadow-gray-100/50 overflow-hidden">
@@ -464,6 +479,8 @@ export default function AdminCourseForm() {
             </div>
           </div>
 
+          <PartnerSuggestions countryCode={countryCode} onFillAddress={fillAddress} />
+
           {typeCourse !== "deplacement" && (
             <div>
               <p className="text-[11px] font-semibold text-gray-500 mb-1.5">Type de colis</p>
@@ -529,7 +546,7 @@ export default function AdminCourseForm() {
             onFillTemplate={fillFromTemplate}
           />
 
-          {typeCourse === "recevoir" ? (
+          {!quickMode && (typeCourse === "recevoir" ? (
             <>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -577,8 +594,9 @@ export default function AdminCourseForm() {
             </div>
             <ClientPhoneDetector phone={destinataireTelephone} countryCode={countryCode} />
             </>
-          ) : null}
+          ) : null)}
 
+          {!quickMode && (
           <div>
             <p className="text-[10px] text-gray-400 mb-1 font-semibold uppercase tracking-wide">Notes</p>
             <Input
@@ -588,6 +606,7 @@ export default function AdminCourseForm() {
               className="rounded-xl h-11 bg-gray-50/50 border-gray-200/50 text-sm focus:ring-gray-300/50"
             />
           </div>
+          )}
         </div>
 
         {/* Bouton Créer — premium avec glow */}
