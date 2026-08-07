@@ -2,7 +2,7 @@
 // Extrait de dispatchExterneAuto pour réduire la taille du fichier principal.
 // Aucune logique métier modifiée — uniquement déplacement + console.log → dispatchLog.
 
-import { calculerDistance, INDICATIFS } from './dispatchConstants.ts';
+import { calculerDistance, INDICATIFS, STATUTS_ACTIFS_COURSE } from './dispatchConstants.ts';
 import { dispatchLog, normalizeNom, supprimerNotificationsCourse, journaliserDispatch } from './dispatchUtils.ts';
 import { chargerConfigDispatch, chargerLivreursEnCourse, chargerConfigVaguesGPS, CYCLE_EPUISE_TIMEOUT_MS } from './dispatchConfig.ts';
 import { envoyerWhatsAppRaw } from './twilioWhatsApp.ts';
@@ -34,6 +34,30 @@ export async function trouverLivreursCandidats(base44, course, exclusions = [], 
 
   const livreurIdsEnCourse = await chargerLivreursEnCourse(base44, course.country_code);
 
+  // 🛡️ VÉRIFICATION FRAICHE PAR LIVREUR — ne pas se fier uniquement au statut
+  // du livreur ni au cache. Pour chaque candidat restant, vérifier directement
+  // s'il possède une course active en base. Cette vérification élimine tout
+  // décalage de synchronisation ou race condition.
+  const tousLivreursIds = tousLivreurs.map(l => l.id);
+  const livreurIdsAvecCourseActive = new Set<string>(livreurIdsEnCourse);
+
+  // Requête directe: courses actives pour les livreur_ids candidats
+  if (tousLivreursIds.length > 0) {
+    try {
+      const coursesActives = await base44.asServiceRole.entities.CourseExterne.filter(
+        { country_code: course.country_code },
+        '-created_date', 200
+      );
+      for (const c of coursesActives || []) {
+        if (c.livreur_id && tousLivreursIds.includes(c.livreur_id) && STATUTS_ACTIFS_COURSE.includes(c.statut)) {
+          livreurIdsAvecCourseActive.add(c.livreur_id);
+        }
+      }
+    } catch (err) {
+      dispatchLog(`[DISPATCH] ⚠️ Erreur vérification fraiche courses actives: ${err.message}`);
+    }
+  }
+
   const exclusionSet = new Set(exclusions);
   const now = Date.now();
   const raisonsExclusion = [];
@@ -42,7 +66,7 @@ export async function trouverLivreursCandidats(base44, course, exclusions = [], 
     const nomComplet = `${l.prenom || ''} ${l.nom || ''}`.trim();
     if (!skipGpsFilter && (!l.latitude || !l.longitude)) { raisonsExclusion.push({ livreur_id: l.id, nom: nomComplet, raison: 'sans_gps' }); return false; }
     if (exclusionSet.has(l.id)) { raisonsExclusion.push({ livreur_id: l.id, nom: nomComplet, raison: 'deja_notifie_ou_refuse' }); return false; }
-    if (livreurIdsEnCourse.has(l.id)) { raisonsExclusion.push({ livreur_id: l.id, nom: nomComplet, raison: 'en_course' }); return false; }
+    if (livreurIdsAvecCourseActive.has(l.id)) { raisonsExclusion.push({ livreur_id: l.id, nom: nomComplet, raison: 'en_course' }); return false; }
     if (l.admin_hors_ligne === true) { raisonsExclusion.push({ livreur_id: l.id, nom: nomComplet, raison: 'admin_hors_ligne' }); return false; }
     if (l.manual_hors_ligne === true) { raisonsExclusion.push({ livreur_id: l.id, nom: nomComplet, raison: 'manual_hors_ligne' }); return false; }
     return true;

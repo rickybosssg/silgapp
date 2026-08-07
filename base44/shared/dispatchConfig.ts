@@ -7,8 +7,10 @@ export const CYCLE_EPUISE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
 const CONFIG_CACHE: { dispatch: any; gps: any; expires: number } = { dispatch: null, gps: null, expires: 0 };
 const CONFIG_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
-const LIVREURS_EN_COURSE_CACHE = new Map<string, { ids: Set<string>; expires: number }>();
-const LIVREURS_EN_COURSE_TTL_MS = 30 * 1000; // 30 secondes
+// ⚠️ PAS DE CACHE — la liste des livreurs en course doit toujours être fraiche.
+// Un cache de 30s pouvait permettre à un livreur d'être proposé sur une deuxième
+// course dans les 30 secondes suivant l'acceptation de la première.
+
 
 export async function chargerConfigDispatch(base44) {
   if (CONFIG_CACHE.dispatch && Date.now() < CONFIG_CACHE.expires) return CONFIG_CACHE.dispatch;
@@ -30,21 +32,17 @@ export async function chargerConfigDispatch(base44) {
 
 export async function chargerLivreursEnCourse(base44, countryCode) {
   if (!countryCode) return new Set();
-  const now = Date.now();
-  const cached = LIVREURS_EN_COURSE_CACHE.get(countryCode);
-  if (cached && cached.expires > now) return cached.ids;
   try {
     const courses = await base44.asServiceRole.entities.CourseExterne.filter(
       { country_code: countryCode },
-      '-created_date', 100
+      '-created_date', 200
     );
     const ids = new Set(
       (courses || [])
         .filter((c: any) => STATUTS_ACTIFS_COURSE.includes(c.statut) && c.livreur_id)
         .map((c: any) => c.livreur_id)
     );
-    LIVREURS_EN_COURSE_CACHE.set(countryCode, { ids, expires: now + LIVREURS_EN_COURSE_TTL_MS });
-    dispatchLog(`[DISPATCH] 🛡️ ${ids.size} livreur(s) en course détecté(s) pour ${countryCode} (cache 30s)`);
+    dispatchLog(`[DISPATCH] 🛡️ ${ids.size} livreur(s) en course détecté(s) pour ${countryCode} (fresh)`);
     return ids;
   } catch (err) {
     console.warn(`[DISPATCH] ⚠️ Impossible de charger les livreurs en course pour ${countryCode}:`, err.message);

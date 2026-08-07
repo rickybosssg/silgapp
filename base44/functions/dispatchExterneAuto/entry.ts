@@ -151,13 +151,25 @@ Deno.serve(async (req) => {
         });
       }
 
-      // 🛡️ Vérification anti-courses multiples : le livreur ne peut pas accepter
-      // une nouvelle course s'il en a déjà une active en cours.
+      // 🛡️ PROTECTION B — Vérification anti-courses multiples au moment de l'acceptation.
+      // Le livreur ne peut pas accepter une nouvelle course s'il en a déjà une active.
+      // On vérifie par livreur_id ET accepted_by_livreur_id (couvre les prix manuels
+      // en attente de validation client où livreur_id est peut-être vide mais
+      // accepted_by_livreur_id est posé).
       const coursesActivesLivreur = await base44.asServiceRole.entities.CourseExterne.filter({
         livreur_id: livreur_id,
       }, '-created_date', 20);
-      const courseActiveExistante = coursesActivesLivreur.find(c =>
+      const coursesAccepteesLivreur = await base44.asServiceRole.entities.CourseExterne.filter({
+        accepted_by_livreur_id: livreur_id,
+      }, '-created_date', 20);
+      const toutesCoursesLivreur = [...coursesActivesLivreur, ...coursesAccepteesLivreur];
+      const courseActiveExistante = toutesCoursesLivreur.find(c =>
         STATUTS_ACTIFS_COURSE.includes(c.statut) && c.id !== course_id
+      );
+      // Vérification prix manuel en attente (dispatch_status='propose' + livreur_id posé)
+      const coursePrixManuelEnAttente = toutesCoursesLivreur.find(c =>
+        c.id !== course_id && c.dispatch_status === 'propose' &&
+        (c.livreur_id === livreur_id || c.accepted_by_livreur_id === livreur_id)
       );
       if (courseActiveExistante) {
         console.warn(`[DISPATCH] 🚫 Livreur ${livreur_id} a déjà la course ${courseActiveExistante.id} active (${courseActiveExistante.statut}) — acceptation refusée`);
@@ -166,6 +178,14 @@ Deno.serve(async (req) => {
           error: 'Vous avez déjà une course en cours. Terminez-la avant d\'en accepter une nouvelle.',
           course_active_id: courseActiveExistante.id,
           course_active_statut: courseActiveExistante.statut,
+        });
+      }
+      if (coursePrixManuelEnAttente) {
+        console.warn(`[DISPATCH] 🚫 Livreur ${livreur_id} a une course ${coursePrixManuelEnAttente.id} avec prix manuel en attente — acceptation refusée`);
+        return Response.json({
+          success: false, accepted: false, reason: 'prix_manuel_en_attente',
+          error: 'Vous avez déjà proposé un prix sur une course en attente de validation. Attendez la réponse du client.',
+          course_active_id: coursePrixManuelEnAttente.id,
         });
       }
 
@@ -290,6 +310,26 @@ Deno.serve(async (req) => {
         updateData.manual_price_status = 'pending_client_validation';
         updateData.proposed_by_livreur_id = livreur_id;
         updateData.timeout_expires_at = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+      }
+
+      // 🛡️ CHECK FINAL ATOMIQUE ANTI-DOUBLON — juste avant l'updateMany, on refait
+      // une vérification fraiche pour s'assurer que le livreur n'a pas accepté une
+      // autre course dans les millisecondes écoulées. Cette vérification élimine
+      // définitivement la race condition entre deux acceptations simultanées.
+      const coursesActivesFinal = await base44.asServiceRole.entities.CourseExterne.filter({
+        livreur_id: livreur_id,
+      }, '-created_date', 20);
+      const courseActiveFinal = coursesActivesFinal.find(c =>
+        STATUTS_ACTIFS_COURSE.includes(c.statut) && c.id !== course_id
+      );
+      if (courseActiveFinal) {
+        console.warn(`[DISPATCH] 🚫 RACE CONDITION BLOQUÉE — Livreur ${livreur_id} a accepté la course ${courseActiveFinal.id} (${courseActiveFinal.statut}) entre les checks — acceptation refusée`);
+        return Response.json({
+          success: false, accepted: false, reason: 'deja_en_course',
+          error: 'Vous avez déjà une course en cours. Terminez-la avant d\'en accepter une nouvelle.',
+          course_active_id: courseActiveFinal.id,
+          course_active_statut: courseActiveFinal.statut,
+        });
       }
 
       // 🔐 MISE À JOUR ATOMIQUE CONDITIONNELLE — empêche la course condition (race condition)
