@@ -211,7 +211,7 @@ function FraisCard({ frais, onPayer, onBloquer, payerLoading, bloquerLoading }) 
 export default function DusLivreursExternes() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("livreurs");
-  const [filtre, setFiltre] = useState("arecouvrer");
+  const [filtre, setFiltre] = useState("tous");
   const [detailEntry, setDetailEntry] = useState(null);
   const [search, setSearch] = useState("");
   const [confirmEncaisser, setConfirmEncaisser] = useState(null);
