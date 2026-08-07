@@ -295,7 +295,9 @@ export async function lancerDispatchMulti(base44, courseId, exclusions = [], cac
 
   let dejaRefuses = [];
   try { dejaRefuses = JSON.parse(course.dispatch_refused_ids || '[]'); } catch {}
-  exclusions = [...new Set([...exclusions, ...dejaRefuses])];
+  let dejaNotifies = [];
+  try { dejaNotifies = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
+  exclusions = [...new Set([...exclusions, ...dejaRefuses, ...dejaNotifies])];
 
   const waveNum = course.dispatch_wave || 0;
   dispatchLog(`[DISPATCH] 🔄 Vague ${waveNum + 1} — recalcul dynamique des candidats (GPS, distances, statut) pour course ${courseId}`);
@@ -331,9 +333,6 @@ export async function lancerDispatchMulti(base44, courseId, exclusions = [], cac
   let candidats = candidatsTous;
 
   dispatchLog(`[DISPATCH] 📍 Vague ${wave}/${gpsConfig.waves.length} — ${candidats.length} candidats triés par distance`);
-
-  let dejaNotifies = [];
-  try { dejaNotifies = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
 
   if (candidats.length > 0 && wave >= gpsConfig.waves.length) {
     const fallbackResult = await trouverLivreursCandidats(base44, course, exclusions, { skipGpsFilter: true });
