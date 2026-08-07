@@ -378,22 +378,25 @@ export async function creerCourseDepuisMemoire(
 ): Promise<{ success: boolean; course?: any; error?: string; message?: string }> {
   const cd = { ...memoireCourte };
 
+  // ── RÈGLE: type_course par défaut = expedier ──
+  if (!cd.type_course) cd.type_course = 'expedier';
+
   // Normaliser type_course
-  const normalizedType = normalizeTypeCourse(cd.type_course) || cd.type_course;
+  const normalizedType = normalizeTypeCourse(cd.type_course) || cd.type_course || 'expedier';
   if (!normalizedType || !['expedier', 'recevoir', 'deplacement'].includes(normalizedType)) {
     return { success: false, error: 'MISSING_TYPE' };
   }
 
-  const hasRequiredContact = cd.contact_telephone || cd.contact_is_client;
+  // ── RÈGLE: contact_createur_course = numéro WhatsApp du client (par défaut, ne pas demander) ──
+  if (!cd.contact_createur_course || !cd.contact_createur_course.trim()) {
+    cd.contact_createur_course = telephone;
+  }
+
   // ── Fallback GPS: pending_location_lat/lng (partagé via WhatsApp mais non encore assigné) ──
   const hasDepart = cd.adresse_depart || cd.gps_depart_lat != null || cd.pending_location_lat != null;
   const hasArrivee = cd.adresse_arrivee || cd.gps_arrivee_lat != null;
-  // ── contact_createur_course : OBLIGATOIRE pour toute course VENUS ──
-  // Le numéro WhatsApp entrant ne peut être utilisé QUE si le client a confirmé
-  // explicitement (contact_createur_is_sender=true). Ne jamais réutiliser un ancien numéro.
-  const hasCreateurContact = !!(cd.contact_createur_course && cd.contact_createur_course.trim());
 
-  if (!hasDepart || !hasArrivee || !hasRequiredContact || !hasCreateurContact) {
+  if (!hasDepart || !hasArrivee) {
     return { success: false, error: 'MISSING_INFO' };
   }
 
@@ -1021,20 +1024,18 @@ creer_course | suivre_course | contacter_livreur | annuler_course | modifier_inf
 nouvelle_course | course_en_cours | ancienne_course | paiement | livreur | partenaire | general
 
 ═══ INFOS REQUISES POUR creer_course ═══
-type_course, adresse_depart (ou GPS), adresse_arrivee (ou GPS), contact_createur_course (OBLIGATOIRE), ET contact_telephone si type_course = expedier ou recevoir.
-- contact_createur_course = numéro du CRÉATEUR de la course (contact principal du livreur). OBLIGATOIRE pour chaque course. Ne JAMAIS copier auto le numéro WhatsApp entrant — demander explicitement. Exception: si le client dit "c'est mon numéro"/"c'est moi" → autorisé après confirmation. Ne JAMAIS réutiliser un ancien numéro.
-- Pour "expedier": contact_telephone = DESTINATAIRE. Pour "recevoir": contact_telephone = EXPÉDITEUR. OBLIGATOIRE.
-- Pour "deplacement": contact destinataire FACULTATIF.
-- Nom du destinataire/expéditeur FACULTATIF (seul le téléphone est requis).
+SEULES les infos requises: adresse_depart (ou GPS) + adresse_arrivee (ou GPS).
+- type_course: PAR DÉFAUT "expedier" (ne PAS demander). N'utilise "recevoir"/"deplacement" que si le client le précise explicitement.
+- contact_createur_course: numéro WhatsApp du client (automatique, ne PAS demander).
+- contact_telephone (destinataire/expéditeur): FACULTATIF. Ne PAS demander. Laisser vide si non fourni.
+- Nom du destinataire/expéditeur: FACULTATIF.
 
 ═══ FLUX CRÉATION DE COURSE (STRICT) ═══
-a) Infos manquantes → action=poser_question (UNE SEULE question).
-b) Toutes infos présentes ET récapitulatif pas encore montré → montre récapitulatif COMPLET + "Confirmez-vous la création de cette course ?" (action=poser_question).
-c) Récapitulatif montré + client répond oui/ok/d'accord/je confirme/valider/go → action=creer_course.
-d) Client corrige → mets à jour memoire_courte_update, reviens à (a) ou (b).
+Dès que tu as adresse_depart + adresse_arrivee → crée la course IMMÉDIATEMENT (action=creer_course). Ne demande PAS confirmation, ne demande PAS le numéro du destinataire.
+Si une adresse manque → action=poser_question (UNE SEULE question sur l'adresse manquante).
+Client corrige une adresse → mets à jour memoire_courte_update, puis crée la course.
 JAMAIS de "all_info_collected" ou "user_confirmed" (ces champs n'existent pas).
-INTERDICTION: Ne JAMAIS dire "je lance la création"/"je crée"/"je valide"/"je finalise" tant que: contact_telephone non collecté ET récapitulatif non présenté ET client n'a pas confirmé.
-Si contact_telephone manquant → action DOIT être poser_question, JAMAIS creer_course.
+INTERDICTION: Ne JAMAIS demander le numéro de téléphone du destinataire. Ne JAMAIS dire "je lance la création"/"je crée"/"je valide"/"je finalise" sans créer la course.
 
 ═══ ACTIONS POSSIBLES ═══
 poser_question | creer_course | suivre_course | contacter_livreur | annuler_course | repondre_info | clarifier | saluer
@@ -1052,8 +1053,8 @@ poser_question | creer_course | suivre_course | contacter_livreur | annuler_cour
 7. ANTI-FAUX-ANNULATION: "Oui"/"OK"/"D'accord" SEUL ≠ annuler_course. Annulation UNIQUEMENT si mot explicite ("annule", "plus besoin") OU VENUS a posé une question d'annulation et client répond oui.
 8. NOUVELLE COURSE APRÈS FIN: "nouvelle course"/"autre course" sans course active → vide mémoire courte, recommence collecte depuis zéro.
 9. RAG/RÈGLES = CONTEXTE uniquement. C'est TOI qui décides, le RAG ne répond pas à ta place.
-10. Ne JAMAIS confondre: numéro WhatsApp entrant, créateur de course, expéditeur, destinataire.
-11. Récapitulatif DOIT afficher: 📞 Contact principal — créateur : [numéro] + 📞 Contact destinataire : [numéro ou "Non renseigné"]
+10. Ne JAMAIS demander le numéro de téléphone du destinataire. Le contact_createur_course est automatiquement le numéro WhatsApp du client.
+11. Récapitulatif DOIT afficher: 📍 Départ + 🎯 Destination. Le contact destinataire est FACULTATIF ("Non renseigné" si absent).
 
 ═══ MÉMOIRE COURTE À METTRE À JOUR ═══
 Uniquement les champs nouveaux/modifiés. type_course: "expedier"|"recevoir"|"deplacement" uniquement.

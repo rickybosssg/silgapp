@@ -604,16 +604,17 @@ Deno.serve(async (req) => {
         // Ne pas intercepter si c'est une modification de course (géré par handleModifierCourse)
         // ou si la course a déjà été créée
         if (pendingCourseConf && !pendingCourseConf.modification_mode && !pendingCourseConf.course_created) {
+          // ── RÈGLE: type_course par défaut = expedier, contact_createur = numéro WhatsApp ──
+          if (!pendingCourseConf.type_course) pendingCourseConf.type_course = 'expedier';
+          if (!pendingCourseConf.contact_createur_course || !pendingCourseConf.contact_createur_course.trim()) {
+            pendingCourseConf.contact_createur_course = telephone;
+          }
           const _tcC = (pendingCourseConf.type_course || '').toLowerCase().trim();
           const _hasTypeC = ['expedier', 'recevoir', 'deplacement'].includes(_tcC);
           const _hasDepartC = !!(pendingCourseConf.adresse_depart && pendingCourseConf.adresse_depart.trim()) || pendingCourseConf.gps_depart_lat != null || pendingCourseConf.pending_location_lat != null;
           const _hasArriveeC = !!(pendingCourseConf.adresse_arrivee && pendingCourseConf.adresse_arrivee.trim()) || pendingCourseConf.gps_arrivee_lat != null;
-          const _needsContactC = _tcC === 'expedier' || _tcC === 'recevoir';
-          const _hasContactC = !!(pendingCourseConf.contact_telephone && pendingCourseConf.contact_telephone.trim()) || pendingCourseConf.contact_is_client === true;
-          const _createurDigitsC = (pendingCourseConf.contact_createur_course || '').replace(/\D/g, '');
-          const _hasCreateurC = !!(pendingCourseConf.contact_createur_course && pendingCourseConf.contact_createur_course.trim()) && _createurDigitsC.length >= 8 && _createurDigitsC.length <= 15;
 
-          if (_hasTypeC && _hasDepartC && _hasArriveeC && _hasCreateurC && (!_needsContactC || _hasContactC)) {
+          if (_hasTypeC && _hasDepartC && _hasArriveeC) {
             venusLog(`[WebhookVenus] ✅ Confirmation déterministe — création directe (0 crédit GPT)`);
             try {
               const crConf = await creerCourseDepuisMemoire(base44, pendingCourseConf, countryCode, tarifs, telephone, profileName, conversation.silgapp_from_number);
@@ -770,22 +771,20 @@ Deno.serve(async (req) => {
             // Si un champ manque → on surcharge l'action en poser_question et on demande
             // l'info manquante. JAMAIS de création avec des infos incomplètes.
             const um = { ...(pendingCourse || {}), ...reasoningResult.memoire_courte_update };
+            // ── RÈGLE: type_course par défaut = expedier, contact_createur = numéro WhatsApp ──
+            if (!um.type_course) um.type_course = 'expedier';
+            if (!um.contact_createur_course || !um.contact_createur_course.trim()) {
+              um.contact_createur_course = telephone;
+            }
             const _tc = (um.type_course || '').toLowerCase().trim();
             const _hasType = ['expedier', 'recevoir', 'deplacement'].includes(_tc);
             const _hasDepart = !!(um.adresse_depart && um.adresse_depart.trim()) || um.gps_depart_lat != null || um.pending_location_lat != null;
             const _hasArrivee = !!(um.adresse_arrivee && um.adresse_arrivee.trim()) || um.gps_arrivee_lat != null;
-            const _needsContact = _tc === 'expedier' || _tc === 'recevoir';
-            const _hasContact = !!(um.contact_telephone && um.contact_telephone.trim()) || um.contact_is_client === true;
-            // ── contact_createur_course : OBLIGATOIRE pour toute course VENUS ──
-            const _createurDigits = (um.contact_createur_course || '').replace(/\D/g, '');
-            const _hasCreateurContact = !!(um.contact_createur_course && um.contact_createur_course.trim()) && _createurDigits.length >= 8 && _createurDigits.length <= 15;
 
             let _missingField = '';
             if (!_hasType) _missingField = 'type_course';
             else if (!_hasDepart) _missingField = 'adresse_depart';
             else if (!_hasArrivee) _missingField = 'adresse_arrivee';
-            else if (!_hasCreateurContact) _missingField = 'contact_createur_course';
-            else if (_needsContact && !_hasContact) _missingField = 'contact';
 
             if (_missingField) {
               // ── Champ obligatoire manquant → surcharger en poser_question ──
@@ -797,11 +796,6 @@ Deno.serve(async (req) => {
                 _askMsg = 'Quel est le lieu exact de récupération ? (indiquez le quartier ou un point de repère précis)';
               } else if (_missingField === 'adresse_arrivee') {
                 _askMsg = 'Quel est le lieu exact de livraison ? (indiquez le quartier ou un point de repère précis)';
-              } else if (_missingField === 'contact_createur_course') {
-                _askMsg = 'Quel est le numéro de téléphone de la personne qui crée cette course et que le livreur devra contacter en priorité ? (Si c\'est votre numéro, indiquez-le moi)';
-              } else if (_missingField === 'contact') {
-                const _role = _tc === 'expedier' ? 'destinataire' : 'expéditeur';
-                _askMsg = `Quel est le numéro de téléphone du ${_role} ? (Si vous êtes vous-même le ${_role}, dites-le moi)`;
               }
               reasoningResult.action = 'poser_question';
               reponseFinale = _askMsg;
@@ -891,13 +885,15 @@ Deno.serve(async (req) => {
           if (ditCreationLancee) {
             console.warn(`[WebhookVenus] 🚫 FAUSSE CRÉATION détectée — VENUS dit "création/recherche" mais course NON créée (action=${reasoningResult.action}) — remplacement par question`);
             const umCheck = { ...(pendingCourse || {}), ...reasoningResult.memoire_courte_update };
+            // ── RÈGLE: type_course par défaut = expedier, contact_createur = numéro WhatsApp ──
+            if (!umCheck.type_course) umCheck.type_course = 'expedier';
+            if (!umCheck.contact_createur_course || !umCheck.contact_createur_course.trim()) {
+              umCheck.contact_createur_course = telephone;
+            }
             const _tcCh = (umCheck.type_course || '').toLowerCase().trim();
             const _hasTypeCh = ['expedier', 'recevoir', 'deplacement'].includes(_tcCh);
             const _hasDepartCh = !!(umCheck.adresse_depart && umCheck.adresse_depart.trim()) || umCheck.gps_depart_lat != null || umCheck.pending_location_lat != null;
             const _hasArriveeCh = !!(umCheck.adresse_arrivee && umCheck.adresse_arrivee.trim()) || umCheck.gps_arrivee_lat != null;
-            const _needsContactCh = _tcCh === 'expedier' || _tcCh === 'recevoir';
-            const _hasContactCh = !!(umCheck.contact_telephone && umCheck.contact_telephone.trim()) || umCheck.contact_is_client === true;
-            const _hasCreateurCh = !!(umCheck.contact_createur_course && umCheck.contact_createur_course.trim());
 
             if (!_hasTypeCh) {
               reponseFinale = 'Souhaitez-vous envoyer un colis, recevoir un colis, ou vous déplacer ?';
@@ -905,11 +901,6 @@ Deno.serve(async (req) => {
               reponseFinale = 'Quel est le lieu exact de récupération ? (indiquez le quartier ou un point de repère précis)';
             } else if (!_hasArriveeCh) {
               reponseFinale = 'Quel est le lieu exact de livraison ? (indiquez le quartier ou un point de repère précis)';
-            } else if (!_hasCreateurCh) {
-              reponseFinale = 'Quel est le numéro de téléphone de la personne qui crée cette course et que le livreur devra contacter en priorité ? (Si c\'est votre numéro, indiquez-le moi)';
-            } else if (_needsContactCh && !_hasContactCh) {
-              const _roleCh = _tcCh === 'expedier' ? 'destinataire' : 'expéditeur';
-              reponseFinale = `Quel est le numéro de téléphone du ${_roleCh} ? (Si vous êtes vous-même le ${_roleCh}, dites-le moi)`;
             } else {
               // Toutes les infos sont présentes mais GPT n'a pas utilisé creer_course
               // → forcer le récapitulatif et demander confirmation explicite
