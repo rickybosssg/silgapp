@@ -8,8 +8,10 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.os.Build;
+import android.content.SharedPreferences;
 import android.os.IBinder;
 import android.os.Looper;
+import android.os.PowerManager;
 import android.util.Log;
 
 import androidx.annotation.Nullable;
@@ -37,9 +39,12 @@ public class SilgappLocationService extends Service {
     private static final String CHANNEL_ID = "silgapp_gps";
     private static final int NOTIFICATION_ID = 4402;
 
+    private static final String PREFS_NAME = "silgapp_heartbeat";
+
     private FusedLocationProviderClient fusedLocationClient;
     private LocationCallback locationCallback;
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
+    private PowerManager.WakeLock wakeLock;
 
     private String token = "";
     private String serverUrl = "https://silga-dispatch-go.base44.app";
@@ -78,15 +83,43 @@ public class SilgappLocationService extends Service {
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build());
 
+        saveServiceState(true);
+        acquireWakeLock();
         startLocationUpdates();
         Log.i(TAG, "foreground location service started userType=" + userType + " intervalMs=" + intervalMs + " distanceFilter=" + distanceFilter);
         return START_STICKY;
     }
 
     @Override
+    public void onTaskRemoved(Intent rootIntent) {
+        // L'utilisateur a swipé l'app — Android va tuer le service.
+        // On programme un redémarrage immédiat pour contrer la fermeture.
+        Log.i(TAG, "onTaskRemoved — reprogrammation du service");
+        Intent restartIntent = new Intent(this, SilgappLocationService.class);
+        restartIntent.putExtra("token", token);
+        restartIntent.putExtra("serverUrl", serverUrl);
+        restartIntent.putExtra("appId", appId);
+        restartIntent.putExtra("functionsVersion", functionsVersion);
+        restartIntent.putExtra("userType", userType);
+        restartIntent.putExtra("sessionId", sessionId);
+        restartIntent.putExtra("intervalMs", intervalMs);
+        restartIntent.putExtra("distanceFilter", distanceFilter);
+
+        android.app.AlarmManager am = (android.app.AlarmManager) getSystemService(ALARM_SERVICE);
+        android.app.PendingIntent pi = android.app.PendingIntent.getService(
+            this, 1, restartIntent,
+            android.app.PendingIntent.FLAG_ONE_SHOT | android.app.PendingIntent.FLAG_IMMUTABLE);
+        am.set(android.app.AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + 1000, pi);
+
+        super.onTaskRemoved(rootIntent);
+    }
+
+    @Override
     public void onDestroy() {
         stopLocationUpdates();
+        releaseWakeLock();
         executor.shutdownNow();
+        saveServiceState(false);
         Log.i(TAG, "foreground location service stopped");
         super.onDestroy();
     }
@@ -95,6 +128,42 @@ public class SilgappLocationService extends Service {
     @Override
     public IBinder onBind(Intent intent) {
         return null;
+    }
+
+    private void saveServiceState(boolean active) {
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        SharedPreferences.Editor editor = prefs.edit();
+        editor.putBoolean("service_active", active);
+        if (active) {
+            editor.putString("token", token);
+            editor.putString("serverUrl", serverUrl);
+            editor.putString("appId", appId);
+            editor.putString("functionsVersion", functionsVersion);
+            editor.putString("userType", userType);
+            editor.putString("sessionId", sessionId);
+            editor.putLong("intervalMs", intervalMs);
+            editor.putFloat("distanceFilter", distanceFilter);
+        }
+        editor.apply();
+    }
+
+    private void acquireWakeLock() {
+        try {
+            PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
+            if (pm == null) return;
+            wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "SilgappGPS:WakeLock");
+            wakeLock.setReferenceCounted(false);
+            wakeLock.acquire(10 * 60 * 1000L); // 10 minutes max — libéré entre chaque update
+        } catch (Exception e) {
+            Log.w(TAG, "WakeLock acquire failed: " + e.getMessage());
+        }
+    }
+
+    private void releaseWakeLock() {
+        if (wakeLock != null && wakeLock.isHeld()) {
+            try { wakeLock.release(); } catch (Exception ignored) {}
+        }
+        wakeLock = null;
     }
 
     private void createChannel() {
