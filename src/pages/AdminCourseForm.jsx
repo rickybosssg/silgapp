@@ -11,7 +11,6 @@ import { useAdminCourseWindows } from "@/context/AdminCourseWindowsContext";
 import MapPickerModal from "@/components/admin/MapPickerModal";
 import CourseWindowStack from "@/components/admin/CourseWindowStack";
 import ClientPhoneDetector from "@/components/crm/ClientPhoneDetector";
-import QuickClientPanel from "@/components/crm/QuickClientPanel";
 import SmartAddressPicker from "@/components/crm/SmartAddressPicker";
 import { upsertCourseAddresses } from "@/lib/addressBook";
 import { upsertClientsFromCourseContacts, normalizePhone } from "@/lib/crmUtils";
@@ -365,11 +364,6 @@ export default function AdminCourseForm() {
             onClientName={(nom, prenom) => {
               if (!clientNom) setClientNom(prenom ? `${prenom} ${nom}`.trim() : nom);
             }}
-          />
-
-          <QuickClientPanel
-            client={detectedClient}
-            onFillTemplate={fillFromTemplate}
           />
 
           {!quickMode && (typeCourse === "recevoir" ? (
