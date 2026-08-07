@@ -329,6 +329,112 @@ export default function AdminCourseForm() {
           </div>
         </div>
 
+        {/* Contacts */}
+        <div className="bg-white rounded-[1.5rem] border border-gray-100 shadow-lg shadow-gray-100/50 p-5 space-y-4">
+          <div className="flex items-center gap-2">
+            <div className="w-1 h-4 bg-gradient-to-b from-sky-500 to-blue-500 rounded-full" />
+            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Contacts</p>
+            <span className="text-[10px] bg-sky-50 text-sky-600 px-2 py-0.5 rounded-full font-semibold border border-sky-100">Optionnel</span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <p className="text-[10px] text-gray-400 mb-1 font-semibold uppercase tracking-wide">Nom du client</p>
+              <Input
+                value={clientNom}
+                onChange={e => setClientNom(e.target.value)}
+                placeholder="Nom"
+                className="rounded-xl h-11 bg-blue-50 border-blue-200/60 text-sm focus:ring-blue-300/50 focus:border-blue-400"
+              />
+            </div>
+            <div>
+              <p className="text-[10px] text-gray-400 mb-1 font-semibold uppercase tracking-wide">Téléphone</p>
+              <Input
+                value={clientTelephone}
+                onChange={e => setClientTelephone(e.target.value)}
+                placeholder="+226 XX XX XX XX"
+                className="rounded-xl h-11 bg-blue-50 border-blue-200/60 text-sm focus:ring-blue-300/50 focus:border-blue-400"
+              />
+            </div>
+          </div>
+
+          <ClientPhoneDetector
+            phone={clientTelephone}
+            countryCode={countryCode}
+            onClientFound={setDetectedClient}
+            onClientName={(nom, prenom) => {
+              if (!clientNom) setClientNom(prenom ? `${prenom} ${nom}`.trim() : nom);
+            }}
+          />
+
+          <QuickClientPanel
+            client={detectedClient}
+            onFillTemplate={fillFromTemplate}
+          />
+
+          {!quickMode && (typeCourse === "recevoir" ? (
+            <>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <p className="text-[10px] text-gray-400 mb-1 font-semibold uppercase tracking-wide">Expéditeur</p>
+                <Input
+                  value={expediteurNom}
+                  onChange={e => setExpediteurNom(e.target.value)}
+                  placeholder="Nom expéditeur"
+                  className="rounded-xl h-11 bg-amber-50/30 border-amber-100/50 text-sm focus:ring-amber-300/50 focus:border-amber-300"
+                />
+              </div>
+              <div>
+                <p className="text-[10px] text-gray-400 mb-1 font-semibold uppercase tracking-wide">Tél. expéditeur</p>
+                <Input
+                  value={expediteurTelephone}
+                  onChange={e => setExpediteurTelephone(e.target.value)}
+                  placeholder="+226 XX XX XX XX"
+                  className="rounded-xl h-11 bg-amber-50/30 border-amber-100/50 text-sm focus:ring-amber-300/50 focus:border-amber-300"
+                />
+              </div>
+            </div>
+            <ClientPhoneDetector phone={expediteurTelephone} countryCode={countryCode} />
+            </>
+          ) : typeCourse === "expedier" ? (
+            <>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <p className="text-[10px] text-gray-400 mb-1 font-semibold uppercase tracking-wide">Destinataire</p>
+                <Input
+                  value={destinataireNom}
+                  onChange={e => setDestinataireNom(e.target.value)}
+                  placeholder="Nom destinataire"
+                  className="rounded-xl h-11 bg-rose-50 border-rose-200/60 text-sm focus:ring-rose-300/50 focus:border-rose-400"
+                />
+              </div>
+              <div>
+                <p className="text-[10px] text-gray-400 mb-1 font-semibold uppercase tracking-wide">Tél. destinataire</p>
+                <Input
+                  value={destinataireTelephone}
+                  onChange={e => setDestinataireTelephone(e.target.value)}
+                  placeholder="+226 XX XX XX XX"
+                  className="rounded-xl h-11 bg-rose-50 border-rose-200/60 text-sm focus:ring-rose-300/50 focus:border-rose-400"
+                />
+              </div>
+            </div>
+            <ClientPhoneDetector phone={destinataireTelephone} countryCode={countryCode} />
+            </>
+          ) : null)}
+
+          {!quickMode && (
+          <div>
+            <p className="text-[10px] text-gray-400 mb-1 font-semibold uppercase tracking-wide">Notes</p>
+            <Input
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              placeholder="Instructions particulières..."
+              className="rounded-xl h-11 bg-gray-50/50 border-gray-200/50 text-sm focus:ring-gray-300/50"
+            />
+          </div>
+          )}
+        </div>
+
         {/* Détails — trajet visuel */}
         <div className="bg-white rounded-[1.5rem] border border-gray-100 shadow-lg shadow-gray-100/50 p-5 space-y-4">
           <div className="flex items-center gap-2">
@@ -457,112 +563,6 @@ export default function AdminCourseForm() {
                 </SelectContent>
               </Select>
             </div>
-          )}
-        </div>
-
-        {/* Contacts */}
-        <div className="bg-white rounded-[1.5rem] border border-gray-100 shadow-lg shadow-gray-100/50 p-5 space-y-4">
-          <div className="flex items-center gap-2">
-            <div className="w-1 h-4 bg-gradient-to-b from-sky-500 to-blue-500 rounded-full" />
-            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Contacts</p>
-            <span className="text-[10px] bg-sky-50 text-sky-600 px-2 py-0.5 rounded-full font-semibold border border-sky-100">Optionnel</span>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <p className="text-[10px] text-gray-400 mb-1 font-semibold uppercase tracking-wide">Nom du client</p>
-              <Input
-                value={clientNom}
-                onChange={e => setClientNom(e.target.value)}
-                placeholder="Nom"
-                className="rounded-xl h-11 bg-blue-50 border-blue-200/60 text-sm focus:ring-blue-300/50 focus:border-blue-400"
-              />
-            </div>
-            <div>
-              <p className="text-[10px] text-gray-400 mb-1 font-semibold uppercase tracking-wide">Téléphone</p>
-              <Input
-                value={clientTelephone}
-                onChange={e => setClientTelephone(e.target.value)}
-                placeholder="+226 XX XX XX XX"
-                className="rounded-xl h-11 bg-blue-50 border-blue-200/60 text-sm focus:ring-blue-300/50 focus:border-blue-400"
-              />
-            </div>
-          </div>
-
-          <ClientPhoneDetector
-            phone={clientTelephone}
-            countryCode={countryCode}
-            onClientFound={setDetectedClient}
-            onClientName={(nom, prenom) => {
-              if (!clientNom) setClientNom(prenom ? `${prenom} ${nom}`.trim() : nom);
-            }}
-          />
-
-          <QuickClientPanel
-            client={detectedClient}
-            onFillTemplate={fillFromTemplate}
-          />
-
-          {!quickMode && (typeCourse === "recevoir" ? (
-            <>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <p className="text-[10px] text-gray-400 mb-1 font-semibold uppercase tracking-wide">Expéditeur</p>
-                <Input
-                  value={expediteurNom}
-                  onChange={e => setExpediteurNom(e.target.value)}
-                  placeholder="Nom expéditeur"
-                  className="rounded-xl h-11 bg-amber-50/30 border-amber-100/50 text-sm focus:ring-amber-300/50 focus:border-amber-300"
-                />
-              </div>
-              <div>
-                <p className="text-[10px] text-gray-400 mb-1 font-semibold uppercase tracking-wide">Tél. expéditeur</p>
-                <Input
-                  value={expediteurTelephone}
-                  onChange={e => setExpediteurTelephone(e.target.value)}
-                  placeholder="+226 XX XX XX XX"
-                  className="rounded-xl h-11 bg-amber-50/30 border-amber-100/50 text-sm focus:ring-amber-300/50 focus:border-amber-300"
-                />
-              </div>
-            </div>
-            <ClientPhoneDetector phone={expediteurTelephone} countryCode={countryCode} />
-            </>
-          ) : typeCourse === "expedier" ? (
-            <>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <p className="text-[10px] text-gray-400 mb-1 font-semibold uppercase tracking-wide">Destinataire</p>
-                <Input
-                  value={destinataireNom}
-                  onChange={e => setDestinataireNom(e.target.value)}
-                  placeholder="Nom destinataire"
-                  className="rounded-xl h-11 bg-rose-50 border-rose-200/60 text-sm focus:ring-rose-300/50 focus:border-rose-400"
-                />
-              </div>
-              <div>
-                <p className="text-[10px] text-gray-400 mb-1 font-semibold uppercase tracking-wide">Tél. destinataire</p>
-                <Input
-                  value={destinataireTelephone}
-                  onChange={e => setDestinataireTelephone(e.target.value)}
-                  placeholder="+226 XX XX XX XX"
-                  className="rounded-xl h-11 bg-rose-50 border-rose-200/60 text-sm focus:ring-rose-300/50 focus:border-rose-400"
-                />
-              </div>
-            </div>
-            <ClientPhoneDetector phone={destinataireTelephone} countryCode={countryCode} />
-            </>
-          ) : null)}
-
-          {!quickMode && (
-          <div>
-            <p className="text-[10px] text-gray-400 mb-1 font-semibold uppercase tracking-wide">Notes</p>
-            <Input
-              value={notes}
-              onChange={e => setNotes(e.target.value)}
-              placeholder="Instructions particulières..."
-              className="rounded-xl h-11 bg-gray-50/50 border-gray-200/50 text-sm focus:ring-gray-300/50"
-            />
-          </div>
           )}
         </div>
 
