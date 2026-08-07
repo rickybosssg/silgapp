@@ -211,7 +211,7 @@ function FraisCard({ frais, onPayer, onBloquer, payerLoading, bloquerLoading }) 
 export default function DusLivreursExternes() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("livreurs");
-  const [filtre, setFiltre] = useState("tous");
+  const [filtre, setFiltre] = useState("arecouvrer");
   const [detailEntry, setDetailEntry] = useState(null);
   const [search, setSearch] = useState("");
   const [confirmEncaisser, setConfirmEncaisser] = useState(null);
@@ -306,11 +306,8 @@ export default function DusLivreursExternes() {
     Object.values(map).forEach(entry => {
       const info = entry.livreurInfo;
       if (info) {
-        // VRAIE DETTE = commissions générées − déjà réglé
-        // = somme des commissions des courses livrées non encore payées
-        entry.montantDu = entry.courses
-          .filter(c => c.statut_paiement_livreur !== "paye")
-          .reduce((s, c) => s + (c.commission_silga ?? 0), 0);
+        // Source de vérité = champ stocké sur le livreur, mis à jour à chaque paiement
+        entry.montantDu = info.montant_du_silga ?? info.encours ?? 0;
       } else {
         // Pas d'info livreur — calcul de secours basé sur les courses impayées
         entry.montantDu = entry.commissionTotal - entry.montantPaye;
