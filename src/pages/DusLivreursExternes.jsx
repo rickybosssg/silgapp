@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Link } from "react-router-dom";
 import {
-  ArrowLeft, X, Phone, Search, CheckCircle2, Ban, Unlock, Wallet, AlertCircle, Store, UtensilsCrossed
+  ArrowLeft, X, Phone, Search, CheckCircle2, Ban, Unlock, Wallet, AlertCircle, Store, UtensilsCrossed,
+  ChevronLeft, ChevronRight, Loader2
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -221,35 +222,31 @@ export default function DusLivreursExternes() {
   const livreursFilter = effectiveCountry ? { type_livreur: "externe", country_code: effectiveCountry } : { type_livreur: "externe" };
   const fraisFilter = effectiveCountry ? { country_code: effectiveCountry } : null;
 
-  const { data: courses = [] } = useQuery({
+  const { data: courses, isLoading: coursesLoading } = useQuery({
     queryKey: ["courses-externes-livrees", effectiveCountry],
     queryFn: () => base44.entities.CourseExterne.filter(coursesFilter, "-heure_livraison", 500),
-    initialData: [],
     refetchInterval: 15000,
   });
 
-  const { data: livreurs = [] } = useQuery({
+  const { data: livreurs, isLoading: livreursLoading } = useQuery({
     queryKey: ["livreurs-externes-all", effectiveCountry],
     queryFn: () => base44.entities.Livreur.filter(livreursFilter, "-created_date", 200),
-    initialData: [],
     refetchInterval: 15000,
   });
 
   const boutiquesFilter = effectiveCountry ? { pays_code: effectiveCountry } : {};
   const restaurantsFilter = effectiveCountry ? { pays_code: effectiveCountry } : {};
 
-  const { data: boutiques = [] } = useQuery({
+  const { data: boutiques, isLoading: boutiquesLoading } = useQuery({
     queryKey: ["boutiques-dettes", effectiveCountry],
     queryFn: () => base44.entities.Boutique.filter(boutiquesFilter, "-created_date", 200),
-    initialData: [],
     refetchInterval: 15000,
     enabled: activeTab === "boutiques",
   });
 
-  const { data: restaurants = [] } = useQuery({
+  const { data: restaurants, isLoading: restaurantsLoading } = useQuery({
     queryKey: ["restaurants-dettes", effectiveCountry],
     queryFn: () => base44.entities.Restaurant.filter(restaurantsFilter, "-created_date", 200),
-    initialData: [],
     refetchInterval: 15000,
     enabled: activeTab === "restaurants",
   });
@@ -269,10 +266,21 @@ export default function DusLivreursExternes() {
     return d;
   }, []);
 
+  // ── États de chargement globaux ──
+  const isLoadingData = coursesLoading || livreursLoading;
+  const coursesList = courses || [];
+  const livreursList = livreurs || [];
+  const boutiquesList = boutiques || [];
+  const restaurantsList = restaurants || [];
+
+  // ── Recherche + pagination ──
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
   // ── Agréger par livreur ──
   const recapLivreurs = useMemo(() => {
     const map = {};
-    courses.forEach(c => {
+    coursesList.forEach(c => {
       if (!c.livreur_id) return;
       const dateLivraison = c.heure_livraison || c.colis_livre_at || c.updated_date;
       const isToday = dateLivraison ? new Date(dateLivraison) >= startOfToday : false;
@@ -291,7 +299,7 @@ export default function DusLivreursExternes() {
     });
     // Inclure TOUS les livreurs — ceux sans course livrée et sans dette
     // doivent apparaître dans le filtre "À jour" (montantDu = 0)
-    livreurs.forEach(l => {
+    livreursList.forEach(l => {
       if (map[l.id]) return;
       map[l.id] = { id: l.id, nom: l.nom || "Inconnu", prenom: l.prenom || "", telephone: l.telephone || "", livreurInfo: l, courses: [], montantTotal: 0, commissionTotal: 0, commissionJour: 0, nbCoursesJour: 0, montantPaye: 0, montantDu: 0 };
     });
@@ -316,11 +324,11 @@ export default function DusLivreursExternes() {
     // On ne somme que les dettes positives (les crédits négatifs ne réduisent pas le total dû)
     const totalDuGlobal = result.reduce((s, r) => s + Math.max(0, r.montantDu), 0);
     return { list: result.sort((a, b) => b.montantDu - a.montantDu), totalDuGlobal, totalCommissionJour };
-  }, [courses, livreurs, filtre, startOfToday]);
+  }, [coursesList, livreursList, filtre, startOfToday]);
 
   // ── Recap Boutiques ──
   const recapBoutiques = useMemo(() => {
-    const list = boutiques.map(b => ({
+    const list = boutiquesList.map(b => ({
       id: b.id, nom: b.nom || "Inconnu", prenom: "", telephone: b.telephone || "",
       livreurInfo: b, entityType: 'boutique', courses: [],
       montantTotal: 0, commissionTotal: 0, montantPaye: 0, montantDu: b.montant_du_silga || 0,
@@ -330,11 +338,11 @@ export default function DusLivreursExternes() {
     if (filtre === "arecouvrer") result = list.filter(r => r.montantDu > 0);
     if (filtre === "ajour") result = list.filter(r => r.montantDu <= 0);
     return { list: result.sort((a, b) => b.montantDu - a.montantDu), totalDuGlobal };
-  }, [boutiques, filtre]);
+  }, [boutiquesList, filtre]);
 
   // ── Recap Restaurants ──
   const recapRestaurants = useMemo(() => {
-    const list = restaurants.map(r => ({
+    const list = restaurantsList.map(r => ({
       id: r.id, nom: r.nom || "Inconnu", prenom: "", telephone: r.telephone || "",
       livreurInfo: r, entityType: 'restaurant', courses: [],
       montantTotal: 0, commissionTotal: 0, montantPaye: 0, montantDu: r.montant_du_silga || 0,
@@ -344,10 +352,50 @@ export default function DusLivreursExternes() {
     if (filtre === "arecouvrer") result = list.filter(r => r.montantDu > 0);
     if (filtre === "ajour") result = list.filter(r => r.montantDu <= 0);
     return { list: result.sort((a, b) => b.montantDu - a.montantDu), totalDuGlobal };
-  }, [restaurants, filtre]);
+  }, [restaurantsList, filtre]);
 
   const recapList = recapLivreurs.list;
   const totalDu = recapLivreurs.totalDuGlobal;
+
+  // ── Recherche + pagination sur la liste filtrée ──
+  const filteredList = useMemo(() => {
+    if (!search.trim()) return recapList;
+    const q = search.trim().toLowerCase();
+    return recapList.filter(e =>
+      (e.nom || "").toLowerCase().includes(q) ||
+      (e.prenom || "").toLowerCase().includes(q) ||
+      (e.telephone || "").toLowerCase().includes(q)
+    );
+  }, [recapList, search]);
+
+  const totalPages = Math.ceil(filteredList.length / itemsPerPage);
+  const paginatedList = filteredList.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  // ── Recherche + pagination Boutiques ──
+  const filteredBoutiques = useMemo(() => {
+    if (!search.trim()) return recapBoutiques.list;
+    const q = search.trim().toLowerCase();
+    return recapBoutiques.list.filter(e =>
+      (e.nom || "").toLowerCase().includes(q) ||
+      (e.telephone || "").toLowerCase().includes(q)
+    );
+  }, [recapBoutiques.list, search]);
+
+  const totalBoutiquePages = Math.ceil(filteredBoutiques.length / itemsPerPage);
+  const paginatedBoutiques = filteredBoutiques.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  // ── Recherche + pagination Restaurants ──
+  const filteredRestaurants = useMemo(() => {
+    if (!search.trim()) return recapRestaurants.list;
+    const q = search.trim().toLowerCase();
+    return recapRestaurants.list.filter(e =>
+      (e.nom || "").toLowerCase().includes(q) ||
+      (e.telephone || "").toLowerCase().includes(q)
+    );
+  }, [recapRestaurants.list, search]);
+
+  const totalRestaurantPages = Math.ceil(filteredRestaurants.length / itemsPerPage);
+  const paginatedRestaurants = filteredRestaurants.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   // ── Frais ──
   const fraisFiltres = frais.filter(f => {
@@ -463,19 +511,19 @@ export default function DusLivreursExternes() {
 
       {/* Onglets premium */}
       <div className="flex gap-1.5 overflow-x-auto scrollbar-hide bg-white rounded-2xl p-1.5 shadow-sm border border-gray-100">
-        <button onClick={() => setActiveTab("livreurs")}
+        <button onClick={() => { setActiveTab("livreurs"); setSearch(""); setCurrentPage(1); }}
           className={`flex-1 min-w-[70px] py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${activeTab === "livreurs" ? "bg-gradient-to-br from-primary to-red-600 text-white shadow-md shadow-primary/20" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"}`}>
           💼 Livreurs
         </button>
-        <button onClick={() => setActiveTab("boutiques")}
+        <button onClick={() => { setActiveTab("boutiques"); setSearch(""); setCurrentPage(1); }}
           className={`flex-1 min-w-[70px] py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${activeTab === "boutiques" ? "bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-md shadow-amber-500/20" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"}`}>
           🏪 Boutiques
         </button>
-        <button onClick={() => setActiveTab("restaurants")}
+        <button onClick={() => { setActiveTab("restaurants"); setSearch(""); setCurrentPage(1); }}
           className={`flex-1 min-w-[70px] py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${activeTab === "restaurants" ? "bg-gradient-to-br from-red-500 to-rose-600 text-white shadow-md shadow-red-500/20" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"}`}>
           🍽️ Restaurants
         </button>
-        <button onClick={() => setActiveTab("frais")}
+        <button onClick={() => { setActiveTab("frais"); setSearch(""); setCurrentPage(1); }}
           className={`flex-1 min-w-[70px] py-2.5 rounded-xl text-xs font-bold transition-all relative whitespace-nowrap ${activeTab === "frais" ? "bg-gradient-to-br from-orange-500 to-amber-600 text-white shadow-md shadow-orange-500/20" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"}`}>
           🚫 Frais
           {nbImpayeFrais > 0 && <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white text-[9px] font-black rounded-full flex items-center justify-center border-2 border-white">{nbImpayeFrais}</span>}
@@ -510,24 +558,45 @@ export default function DusLivreursExternes() {
           {/* Filtres premium */}
           <div className="flex gap-1.5 bg-white rounded-xl p-1 shadow-sm border border-gray-100">
             {FILTRES.map(f => (
-              <button key={f.id} onClick={() => setFiltre(f.id)}
+              <button key={f.id} onClick={() => { setFiltre(f.id); setCurrentPage(1); }}
                 className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${filtre === f.id ? "bg-gradient-to-br from-primary to-red-600 text-white shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
                 {f.label}
               </button>
             ))}
           </div>
 
+          {/* Recherche */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Input placeholder="Rechercher un livreur..." value={search} onChange={e => { setSearch(e.target.value); setCurrentPage(1); }} className="pl-9 rounded-xl h-10" />
+          </div>
+
           {/* Liste — cartes premium */}
-          {recapList.length === 0 ? (
+          {isLoadingData ? (
             <div className="text-center py-16 text-gray-400">
+              <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-3" />
+              <p className="text-sm font-medium">Chargement des données...</p>
+            </div>
+          ) : filteredList.length === 0 ? (
+            <div className="text-center py-16 text-gray-400 space-y-3">
               <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3">
                 <AlertCircle className="w-7 h-7 opacity-40" />
               </div>
-              <p className="text-sm font-medium">Aucun livreur dans ce filtre</p>
+              <p className="text-sm font-medium">{search.trim() ? "Aucun livreur ne correspond à votre recherche" : "Aucun livreur dans ce filtre"}</p>
+              {!search.trim() && filtre !== "tous" && (
+                <Button variant="outline" size="sm" className="text-xs" onClick={() => { setFiltre("tous"); setCurrentPage(1); }}>
+                  Voir tous les livreurs
+                </Button>
+              )}
+              {search.trim() && (
+                <Button variant="outline" size="sm" className="text-xs" onClick={() => { setSearch(""); setCurrentPage(1); }}>
+                  Réinitialiser la recherche
+                </Button>
+              )}
             </div>
           ) : (
             <div className="space-y-2.5">
-              {recapList.map(entry => {
+              {paginatedList.map(entry => {
                 const sf = statutFinancier(entry.montantDu, entry.montantPaye);
                 const isBloque = entry.livreurInfo?.actif === false;
                 return (
@@ -573,6 +642,24 @@ export default function DusLivreursExternes() {
                   </div>
                 );
               })}
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between pt-2 px-1">
+                  <span className="text-[10px] text-gray-400">
+                    Page {currentPage} sur {totalPages} — {filteredList.length} livreur(s)
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <Button variant="outline" size="sm" className="h-7 w-7 p-0" disabled={currentPage <= 1}
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}>
+                      <ChevronLeft className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button variant="outline" size="sm" className="h-7 w-7 p-0" disabled={currentPage >= totalPages}
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </>
@@ -597,23 +684,44 @@ export default function DusLivreursExternes() {
 
           <div className="flex gap-1.5 bg-white rounded-xl p-1 shadow-sm border border-gray-100">
             {FILTRES.map(f => (
-              <button key={f.id} onClick={() => setFiltre(f.id)}
+              <button key={f.id} onClick={() => { setFiltre(f.id); setCurrentPage(1); }}
                 className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${filtre === f.id ? "bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
                 {f.label}
               </button>
             ))}
           </div>
 
-          {recapBoutiques.list.length === 0 ? (
+          {/* Recherche */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Input placeholder="Rechercher une boutique..." value={search} onChange={e => { setSearch(e.target.value); setCurrentPage(1); }} className="pl-9 rounded-xl h-10" />
+          </div>
+
+          {boutiquesLoading ? (
             <div className="text-center py-16 text-gray-400">
+              <Loader2 className="w-8 h-8 animate-spin text-amber-500 mx-auto mb-3" />
+              <p className="text-sm font-medium">Chargement des boutiques...</p>
+            </div>
+          ) : filteredBoutiques.length === 0 ? (
+            <div className="text-center py-16 text-gray-400 space-y-3">
               <div className="w-16 h-16 rounded-full bg-amber-50 flex items-center justify-center mx-auto mb-3">
                 <Store className="w-7 h-7 text-amber-300" />
               </div>
-              <p className="text-sm font-medium">Aucune boutique dans ce filtre</p>
+              <p className="text-sm font-medium">{search.trim() ? "Aucune boutique ne correspond à votre recherche" : "Aucune boutique dans ce filtre"}</p>
+              {!search.trim() && filtre !== "tous" && (
+                <Button variant="outline" size="sm" className="text-xs" onClick={() => { setFiltre("tous"); setCurrentPage(1); }}>
+                  Voir toutes les boutiques
+                </Button>
+              )}
+              {search.trim() && (
+                <Button variant="outline" size="sm" className="text-xs" onClick={() => { setSearch(""); setCurrentPage(1); }}>
+                  Réinitialiser la recherche
+                </Button>
+              )}
             </div>
           ) : (
             <div className="space-y-2.5">
-              {recapBoutiques.list.map(entry => {
+              {paginatedBoutiques.map(entry => {
                 const sf = statutFinancier(entry.montantDu, entry.montantPaye);
                 return (
                   <div key={entry.id} className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm hover:shadow-md transition-all">
@@ -650,6 +758,24 @@ export default function DusLivreursExternes() {
                   </div>
                 );
               })}
+              {/* Pagination */}
+              {totalBoutiquePages > 1 && (
+                <div className="flex items-center justify-between pt-2 px-1">
+                  <span className="text-[10px] text-gray-400">
+                    Page {currentPage} sur {totalBoutiquePages} — {filteredBoutiques.length} boutique(s)
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <Button variant="outline" size="sm" className="h-7 w-7 p-0" disabled={currentPage <= 1}
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}>
+                      <ChevronLeft className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button variant="outline" size="sm" className="h-7 w-7 p-0" disabled={currentPage >= totalBoutiquePages}
+                      onClick={() => setCurrentPage(p => Math.min(totalBoutiquePages, p + 1))}>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </>
@@ -674,23 +800,44 @@ export default function DusLivreursExternes() {
 
           <div className="flex gap-1.5 bg-white rounded-xl p-1 shadow-sm border border-gray-100">
             {FILTRES.map(f => (
-              <button key={f.id} onClick={() => setFiltre(f.id)}
+              <button key={f.id} onClick={() => { setFiltre(f.id); setCurrentPage(1); }}
                 className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${filtre === f.id ? "bg-gradient-to-br from-red-500 to-rose-600 text-white shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
                 {f.label}
               </button>
             ))}
           </div>
 
-          {recapRestaurants.list.length === 0 ? (
+          {/* Recherche */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Input placeholder="Rechercher un restaurant..." value={search} onChange={e => { setSearch(e.target.value); setCurrentPage(1); }} className="pl-9 rounded-xl h-10" />
+          </div>
+
+          {restaurantsLoading ? (
             <div className="text-center py-16 text-gray-400">
+              <Loader2 className="w-8 h-8 animate-spin text-red-500 mx-auto mb-3" />
+              <p className="text-sm font-medium">Chargement des restaurants...</p>
+            </div>
+          ) : filteredRestaurants.length === 0 ? (
+            <div className="text-center py-16 text-gray-400 space-y-3">
               <div className="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-3">
                 <UtensilsCrossed className="w-7 h-7 text-red-300" />
               </div>
-              <p className="text-sm font-medium">Aucun restaurant dans ce filtre</p>
+              <p className="text-sm font-medium">{search.trim() ? "Aucun restaurant ne correspond à votre recherche" : "Aucun restaurant dans ce filtre"}</p>
+              {!search.trim() && filtre !== "tous" && (
+                <Button variant="outline" size="sm" className="text-xs" onClick={() => { setFiltre("tous"); setCurrentPage(1); }}>
+                  Voir tous les restaurants
+                </Button>
+              )}
+              {search.trim() && (
+                <Button variant="outline" size="sm" className="text-xs" onClick={() => { setSearch(""); setCurrentPage(1); }}>
+                  Réinitialiser la recherche
+                </Button>
+              )}
             </div>
           ) : (
             <div className="space-y-2.5">
-              {recapRestaurants.list.map(entry => {
+              {paginatedRestaurants.map(entry => {
                 const sf = statutFinancier(entry.montantDu, entry.montantPaye);
                 return (
                   <div key={entry.id} className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm hover:shadow-md transition-all">
@@ -727,6 +874,24 @@ export default function DusLivreursExternes() {
                   </div>
                 );
               })}
+              {/* Pagination */}
+              {totalRestaurantPages > 1 && (
+                <div className="flex items-center justify-between pt-2 px-1">
+                  <span className="text-[10px] text-gray-400">
+                    Page {currentPage} sur {totalRestaurantPages} — {filteredRestaurants.length} restaurant(s)
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <Button variant="outline" size="sm" className="h-7 w-7 p-0" disabled={currentPage <= 1}
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}>
+                      <ChevronLeft className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button variant="outline" size="sm" className="h-7 w-7 p-0" disabled={currentPage >= totalRestaurantPages}
+                      onClick={() => setCurrentPage(p => Math.min(totalRestaurantPages, p + 1))}>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </>
