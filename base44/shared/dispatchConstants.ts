@@ -13,7 +13,7 @@ export { haversineKm as calculerDistance };
 // Un livreur avec une course dans un de ces statuts ne doit JAMAIS
 // recevoir de nouvelle proposition de dispatch.
 export const STATUTS_ACTIFS_COURSE = [
-  'livreur_en_route', 'client_contacto', 'en_route_expediteur',
+  'livreur_en_route', 'client_contacte', 'en_route_expediteur',
   'arrive_prise_en_charge', 'colis_recupere',
   'passager_embarque', 'pris_en_charge', 'en_livraison', 'arrivee',
 ];
