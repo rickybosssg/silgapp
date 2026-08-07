@@ -58,13 +58,8 @@ function ProfilLivreurModal({ livreur, courses, onClose, onAction }) {
   const coursesLivrees = courses.filter(c => c.statut === "livree");
   const coursesActives = courses.filter(c => !["livree", "annulee"].includes(c.statut));
   const montantTotal = coursesLivrees.reduce((s, c) => s + (c.prix_final || 0), 0);
-  const montantDu = livreur.montant_du_silga || 0;
-  // ── Encours RÉEL = somme des commissions impayées des courses livrées
-  //    (même logique que la page "Dû Utilisateur" et PayerSilgapp)
-  const encoursReel = coursesLivrees
-    .filter(c => c.statut_paiement_livreur !== "paye")
-    .reduce((s, c) => s + (c.commission_silga || 0), 0);
-  const resteAPayerSilga = Math.max(0, encoursReel);
+  // ── Source de vérité unique : montant_du_silga (champ stocké, mis à jour à chaque paiement)
+  const montantDu = livreur.montant_du_silga ?? livreur.encours ?? 0;
 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-end sm:items-center justify-center p-4">
@@ -183,22 +178,10 @@ function ProfilLivreurModal({ livreur, courses, onClose, onAction }) {
               <span className="text-muted-foreground">Total cours générées</span>
               <span className="font-semibold">{montantTotal.toLocaleString()} FCFA</span>
             </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Encours (commissions accumulées)</span>
-              <span className={`font-bold ${encoursReel > 0 ? "text-red-600" : "text-green-600"}`}>
-                {encoursReel.toLocaleString()} {livreur.devise || "FCFA"}
-              </span>
-            </div>
-            {montantDu !== encoursReel && (
-              <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Ancien montant_du_silga</span>
-                <span className="text-gray-400 line-through">{montantDu.toLocaleString()} FCFA</span>
-              </div>
-            )}
             <div className="border-t pt-2 flex justify-between text-sm font-bold">
-              <span>Reste à payer</span>
-              <span className={encoursReel > 0 ? "text-red-600" : "text-green-600"}>
-                {encoursReel.toLocaleString()} FCFA
+              <span>Montant dû à SILGAPP</span>
+              <span className={montantDu > 0 ? "text-red-600" : "text-green-600"}>
+                {montantDu.toLocaleString()} {livreur.devise || "FCFA"}
               </span>
             </div>
             {livreur.bloque_encours && (
@@ -603,7 +586,7 @@ export default function LivreursExternes() {
             const libre = isLibre(livreur);
             const enMission = isEnCourse(livreur);
             const appActive = isAppActive(livreur);
-            const encoursReel = livreur.encours || 0;
+            const encoursReel = livreur.montant_du_silga ?? livreur.encours ?? 0;
             const coursesLivreur = coursesAll.filter(c => c.livreur_id === livreur.id);
             const kmParcourus = coursesLivreur
               .filter(c => c.statut === "livree")
