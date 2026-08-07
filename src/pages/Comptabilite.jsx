@@ -45,7 +45,7 @@ export default function Comptabilite() {
   const [periodPreset, setPeriodPreset] = useState("month");
   const [selectedLivreur, setSelectedLivreur] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortField, setSortField] = useState("encours");
+  const [sortField, setSortField] = useState("montant_du_silga");
   const [sortDir, setSortDir] = useState("desc");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -101,9 +101,9 @@ export default function Comptabilite() {
 
   const handleExportCSV = () => {
     if (!topLivreurs.length) return;
-    const headers = "Livreur,Téléphone,CA,Commission,Gain,Courses,Encours\n";
+    const headers = "Livreur,Téléphone,CA,Commission,Gain,Courses,Dû SILGAPP\n";
     const rows = topLivreurs.map(l =>
-      `"${l.livreur_nom}","${l.livreur_telephone}",${l.ca},${l.commission},${l.gain},${l.nb_courses},${l.encours}`
+      `"${l.livreur_nom}","${l.livreur_telephone}",${l.ca},${l.commission},${l.gain},${l.nb_courses},${l.montant_du_silga ?? l.encours ?? 0}`
     ).join("\n");
     const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -134,7 +134,7 @@ export default function Comptabilite() {
       topLivreurs.slice(0, 25).forEach((l, i) => {
         if (y > 270) { doc.addPage(); y = 20; }
         doc.setFontSize(8);
-        doc.text(`${i+1}. ${l.livreur_nom} - CA: ${formatMontant(l.ca)} ${devisePays} - Gain: ${formatMontant(l.gain)} ${devisePays} - Encours: ${formatMontant(l.encours)}`, 14, y);
+        doc.text(`${i+1}. ${l.livreur_nom} - CA: ${formatMontant(l.ca)} ${devisePays} - Gain: ${formatMontant(l.gain)} ${devisePays} - Dû SILGAPP: ${formatMontant(l.montant_du_silga ?? l.encours ?? 0)}`, 14, y);
         y += 8;
       });
     }
@@ -460,7 +460,7 @@ export default function Comptabilite() {
                       <SortHeader field="ca" label="CA" className="text-right" />
                       <SortHeader field="commission" label="Commission" className="text-right" />
                       <SortHeader field="gain" label="Gain" className="text-right" />
-                      <SortHeader field="encours" label="Encours" className="text-right" />
+                      <SortHeader field="montant_du_silga" label="Dû SILGAPP" className="text-right" />
                       <th className="text-center py-2 text-xs text-gray-500 font-medium">Action</th>
                     </tr>
                   </thead>
@@ -490,7 +490,7 @@ export default function Comptabilite() {
                           <td className="py-2.5 text-right text-violet-600">{formatMontant(l.gain)}</td>
                           <td className="py-2.5 text-right">
                             <span className={l.bloque_encours ? "text-red-600 font-bold" : "text-amber-600"}>
-                              {formatMontant(l.encours)}
+                              {formatMontant(l.montant_du_silga ?? l.encours ?? 0)}
                             </span>
                           </td>
                           <td className="py-2.5 text-center" onClick={e => e.stopPropagation()}>

@@ -444,6 +444,7 @@ async function handleGetBloques(base44, body) {
       telephone: l.telephone,
       country_code: l.country_code,
       encours: encoursReel,
+      montant_du_silga: encoursReel,
       seuil,
       devise,
       bloque_at: l.encours_bloque_at,

@@ -99,13 +99,7 @@ export default function PayerSilgapp({ userType: forcedType }) {
       try {
         if (userType === "livreur") {
           const l = await base44.entities.Livreur.filter({ id: userInfo.id });
-          const livrees = await base44.entities.CourseExterne.filter({
-            livreur_id: userInfo.id, statut: "livree",
-          }, "-heure_livraison", 200).catch(() => []);
-          const commImpayees = (livrees || [])
-            .filter(c => c.statut_paiement_livreur !== "paye")
-            .reduce((s, c) => s + (c.commission_silga ?? 0), 0);
-          if (l?.[0]) setMontantDu(commImpayees);
+          if (l?.[0]) setMontantDu(l[0].montant_du_silga ?? l[0].encours ?? 0);
         } else if (userType === "client") {
           const frais = await base44.entities.FraisAnnulation.filter({ client_id: userInfo.id });
           const impaye = (frais || []).filter((f) => f.statut_paiement !== "paye").reduce((s, f) => s + (f.montant || 0), 0);

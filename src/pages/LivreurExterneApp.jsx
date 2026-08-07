@@ -1550,9 +1550,9 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
                 <p className="text-red-400/80 text-xs leading-relaxed">
                   Votre plafond d'encours SILGAPP a été atteint. Veuillez effectuer votre dépôt auprès de SILGAPP afin de réactiver votre compte.
                 </p>
-                {livreurProfil?.encours > 0 && (
+                {(livreurProfil?.montant_du_silga ?? livreurProfil?.encours ?? 0) > 0 && (
                   <p className="text-red-400/60 text-[10px]">
-                    Encours actuel : {livreurProfil.encours.toLocaleString()} {livreurProfil.country_code ? "FCFA" : "FCFA"}
+                    Dû SILGAPP : {(livreurProfil.montant_du_silga ?? livreurProfil.encours ?? 0).toLocaleString()} FCFA
                   </p>
                 )}
               </div>
