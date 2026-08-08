@@ -7,6 +7,13 @@ import { dispatchLog, normalizeNom, supprimerNotificationsCourse, journaliserDis
 import { chargerConfigDispatch, chargerLivreursEnCourse, chargerConfigVaguesGPS, CYCLE_EPUISE_TIMEOUT_MS } from './dispatchConfig.ts';
 import { envoyerWhatsAppRaw } from './twilioWhatsApp.ts';
 import { notifierRedispatchClient } from './venusRedispatchNotifier.ts';
+import {
+  getLivreursNotifies,
+  getLivreursRefuses,
+  enregistrerNotification,
+  marquerExpirees,
+  resetNotifications,
+} from './dispatchNotifications.ts';
 
 /**
  * Trouve les livreurs candidats classés par priorité.
@@ -293,10 +300,8 @@ export async function lancerDispatchMulti(base44, courseId, exclusions = [], cac
     return { ignore: true, statut: course.statut };
   }
 
-  let dejaRefuses = [];
-  try { dejaRefuses = JSON.parse(course.dispatch_refused_ids || '[]'); } catch {}
-  let dejaNotifies = [];
-  try { dejaNotifies = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
+  let dejaRefuses = await getLivreursRefuses(base44, courseId);
+  let dejaNotifies = await getLivreursNotifies(base44, courseId);
   exclusions = [...new Set([...exclusions, ...dejaRefuses, ...dejaNotifies])];
 
   const waveNum = course.dispatch_wave || 0;
@@ -372,6 +377,7 @@ export async function lancerDispatchMulti(base44, courseId, exclusions = [], cac
       });
       journaliserDispatch(base44, { course_id: courseId, country_code: course.country_code, vague: wave, evenement: 'cycle_epuise' });
       const messageVenus = `📍 Nous avons sollicité tous les livreurs disponibles autour de vous, mais aucun n'a accepté votre course pour le moment.\n\nVoulez-vous que je relance la recherche ?\n\nRépondez 'oui' pour relancer ou 'non' pour annuler.`;
+      marquerExpirees(base44, courseId).catch(() => {});
       notifierRedispatchClient({ base44, course, messageVenus, motif: 'cycle_epuise' }).catch(err => console.error('[DISPATCH] ❌ VENUS notif cycle_epuise:', err.message));
       return { cycleEpuise: true };
     }
@@ -400,14 +406,13 @@ export async function lancerDispatchMulti(base44, courseId, exclusions = [], cac
       dispatchLog(`[DISPATCH] 🔄 Nouveau cycle ${cycleCount}/3 — réinitialisation des notifiés pour course ${courseId}`);
       await base44.asServiceRole.entities.CourseExterne.update(courseId, {
         dispatch_status: 'en_attente',
-        dispatch_notified_ids: '[]',
-        dispatch_wave_notified_ids: '[]',
         dispatch_wave: 0,
         dispatch_cycle_count: cycleCount,
         dispatch_locked_until: null,
         livreur_id: '',
         livreur_nom: '',
       });
+      resetNotifications(base44, courseId).catch(() => {});
       journaliserDispatch(base44, { course_id: courseId, country_code: course.country_code, vague: wave, evenement: 'reset' });
       return { cycleReset: true };
     } else {
@@ -429,6 +434,7 @@ export async function lancerDispatchMulti(base44, courseId, exclusions = [], cac
         });
         journaliserDispatch(base44, { course_id: courseId, country_code: course.country_code, vague: wave, evenement: 'cycle_epuise' });
         const messageVenus = `📍 Nous avons sollicité tous les livreurs disponibles autour de vous, mais aucun n'a accepté votre course pour le moment.\n\nVoulez-vous que je relance la recherche ?\n\nRépondez 'oui' pour relancer ou 'non' pour annuler.`;
+        marquerExpirees(base44, courseId).catch(() => {});
         notifierRedispatchClient({ base44, course, messageVenus, motif: 'cycle_epuise' }).catch(err => console.error('[DISPATCH] ❌ VENUS notif cycle_epuise:', err.message));
         return { cycleEpuise: true };
       }
@@ -471,9 +477,11 @@ export async function lancerDispatchMulti(base44, courseId, exclusions = [], cac
       timeout_expires_at: pTimeoutAt,
       dispatch_wave_started_at: new Date().toISOString(),
       dispatch_next_wave_at: pTimeoutAt,
-      dispatch_notified_ids: JSON.stringify(pTousNotifies),
-      dispatch_wave_notified_ids: JSON.stringify(pNouveauxIds),
     });
+
+    for (const l of priorityNotYetNotified) {
+      enregistrerNotification(base44, courseId, l, wave, { country_code: course.country_code }).catch(() => {});
+    }
 
     if (wave > 1) {
       await supprimerNotificationsCourse(base44, courseId);
@@ -561,9 +569,11 @@ export async function lancerDispatchMulti(base44, courseId, exclusions = [], cac
     timeout_expires_at: timeoutAt,
     dispatch_wave_started_at: new Date().toISOString(),
     dispatch_next_wave_at: timeoutAt,
-    dispatch_notified_ids: JSON.stringify(tousNotifies),
-    dispatch_wave_notified_ids: JSON.stringify(nouveauxNotifiedIds),
   });
+
+  for (const l of selection) {
+    enregistrerNotification(base44, courseId, l, wave, { country_code: course.country_code }).catch(() => {});
+  }
 
   if (wave > 1) {
     await supprimerNotificationsCourse(base44, courseId);

@@ -4,6 +4,7 @@ import { STATUTS_ACTIFS_COURSE, STATUTS_ACTIFS_VERIF, normalizeCommissionPct, ch
 import { verifierPaysCourseLivreur, reponseDejaPrise, generateToken, generatePIN, supprimerNotificationsCourse, journaliserDispatch } from '../../shared/dispatchUtils.ts';
 import { chargerConfigDispatch, chargerConfigVaguesGPS, CYCLE_EPUISE_TIMEOUT_MS } from '../../shared/dispatchConfig.ts';
 import { lancerDispatchMulti } from '../../shared/dispatchEngine.ts';
+import { marquerRefuse, marquerAccepte, getLivreursNotifies, resetNotifications as resetNotifsEntity } from '../../shared/dispatchNotifications.ts';
 
 // ============================================================================
 // HANDLER PRINCIPAL
@@ -123,8 +124,7 @@ Deno.serve(async (req) => {
         return Response.json({ found: false, already_taken: true, taken_by: course.livreur_id });
       }
 
-      let notifiedIds = [];
-      try { notifiedIds = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
+      const notifiedIds = await getLivreursNotifies(base44, course_id);
       const isNotified = notifiedIds.includes(livreur_id);
       if (!isNotified) return Response.json({ found: false });
 
@@ -211,8 +211,7 @@ Deno.serve(async (req) => {
         });
       }
 
-      let notifiedIds = [];
-      try { notifiedIds = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
+      const notifiedIds = await getLivreursNotifies(base44, course_id);
       const isEligible = notifiedIds.includes(livreur_id) || course.livreur_id === livreur_id;
       if (!isEligible) {
         return Response.json({ success: false, error: 'Vous n\'êtes pas éligible pour cette course', not_eligible: true });
@@ -409,6 +408,8 @@ Deno.serve(async (req) => {
           temps_avant_acceptation_sec: tempsAcceptationSec,
         });
 
+        marquerAccepte(base44, course_id, livreur_id, tempsAcceptationSec).catch(() => {});
+
         return Response.json({ success: true, accepted: true, course_id, livreur_id });
       }
 
@@ -463,16 +464,9 @@ Deno.serve(async (req) => {
         return Response.json({ success: true, message: 'Course déjà prise par un autre' });
       }
 
-      // 🚫 Ajouter le livreur aux refusés définitifs (exclusion permanente, survit au reset de cycle)
-      let dejaRefuses = [];
-      try { dejaRefuses = JSON.parse(course.dispatch_refused_ids || '[]'); } catch {}
-      if (!dejaRefuses.includes(livreur_id)) {
-        dejaRefuses.push(livreur_id);
-        await base44.asServiceRole.entities.CourseExterne.update(course_id, {
-          dispatch_refused_ids: JSON.stringify(dejaRefuses),
-        });
-        console.log(`[DISPATCH] 🚫 Livreur ${livreur_id} ajouté aux refusés définitifs — course ${course_id}`);
-      }
+      // 🚫 Marquer le livreur comme refusé définitif (exclusion permanente, survit au reset de cycle)
+      await marquerRefuse(base44, course_id, livreur_id, raison || 'Refusé');
+      console.log(`[DISPATCH] 🚫 Livreur ${livreur_id} marqué comme refusé — course ${course_id}`);
 
       // 🧹 Marquer les notifications "nouvelle_course" comme lues pour ce livreur (bulk)
       try {
@@ -660,14 +654,16 @@ Deno.serve(async (req) => {
         c.dispatch_status === 'en_attente' &&
         c.statut === 'recherche_livreur'
       );
+      // Pre-charger les IDs de courses ayant au moins une notification DispatchNotification
+      const notifCourses = await base44.asServiceRole.entities.DispatchNotification.filter(
+        {}, 'date_notification', 500
+      ).catch(() => []);
+      const courseIdsWithNotifs = new Set((notifCourses || []).map(n => n.course_id));
       const coursesJamaisTraitees = coursesEnAttente.filter(c => {
         const ageMs = now.getTime() - new Date(c.created_date).getTime();
         if (ageMs <= PREMIER_TICK_SEUIL_MS) return false;
         // ✅ Exclure les courses déjà traitées (notifiées ou reset de cycle)
-        // Un "premier tick manquant" ne concerne QUE les courses jamais prises en charge.
-        let notifiedIds = [];
-        try { notifiedIds = JSON.parse(c.dispatch_notified_ids || '[]'); } catch {}
-        if (notifiedIds.length > 0) return false;
+        if (courseIdsWithNotifs.has(c.id)) return false;
         if ((c.dispatch_cycle_count || 0) > 0) return false;
         return true;
       });
@@ -855,8 +851,8 @@ Deno.serve(async (req) => {
             console.log(`[DISPATCH] ⚡ Mode direct — reset notifiés + redispatch course ${course.id}`);
             await base44.asServiceRole.entities.CourseExterne.update(course.id, {
               dispatch_status: 'redispatch',
-              dispatch_notified_ids: '[]',
             });
+            resetNotifsEntity(base44, course.id).catch(() => {});
           }
 
           const result = await lancerDispatchMulti(base44, course.id, [], cachedConfig);
@@ -938,8 +934,7 @@ Deno.serve(async (req) => {
           const updatedTime = new Date(course.updated_date);
           if (now.getTime() - updatedTime.getTime() < 5 * 60 * 1000) continue;
 
-          let notifiedIds = [];
-          try { notifiedIds = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
+          const notifiedIds = await getLivreursNotifies(base44, course.id);
           if (notifiedIds.length > 0) continue;
 
           const searchMin = Math.round((now.getTime() - updatedTime.getTime()) / 60000);
