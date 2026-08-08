@@ -75,13 +75,15 @@ export async function logIntegrationCredit(base44: any, opts: CreditLogOptions, 
  * Wrapper pour InvokeLLM avec traçage automatique des crédits.
  * Utiliser à la place de base44.asServiceRole.integrations.Core.InvokeLLM.
  */
-export async function invokeLLMTracked(base44: any, params: any, logOpts: CreditLogOptions): Promise<any> {
+export async function invokeLLMTracked(base44: any, params: any, logOpts?: CreditLogOptions): Promise<any> {
   const t0 = Date.now();
+  const opts = logOpts || { function_source: 'unknown', endpoint: 'InvokeLLM' };
   try {
-    const result = await base44.asServiceRole.integrations.Core.InvokeLLM(params);
+    const client = base44.asServiceRole || base44;
+    const result = await client.integrations.Core.InvokeLLM(params);
     const elapsed = Date.now() - t0;
     logIntegrationCredit(base44, {
-      ...logOpts,
+      ...opts,
       endpoint: 'InvokeLLM',
       model: params.model || 'automatic',
     }, 'success', elapsed).catch(() => {});
@@ -89,7 +91,7 @@ export async function invokeLLMTracked(base44: any, params: any, logOpts: Credit
   } catch (e) {
     const elapsed = Date.now() - t0;
     logIntegrationCredit(base44, {
-      ...logOpts,
+      ...opts,
       endpoint: 'InvokeLLM',
       model: params.model || 'automatic',
     }, 'error', elapsed, e.message).catch(() => {});

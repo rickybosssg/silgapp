@@ -1,3 +1,5 @@
+import { invokeLLMTracked } from './integrationCreditTracker.ts';
+
 /**
  * venusAgentEngine.ts — Moteur d'Agent IA Autonome VENUS
  *
@@ -81,7 +83,7 @@ async function comprendre(base44, context: AgentContext) {
 
   if (source === 'whatsapp' && message) {
     // Comprendre le message client
-    const llmResponse = await base44.integrations.Core.InvokeLLM({
+    const llmResponse = await invokeLLMTracked(base44, {
       prompt: `Analyse ce message WhatsApp dans le contexte SILGAPP (livraison/course).
 Message: "${message}"
 
@@ -233,7 +235,7 @@ async function ameliorer(base44, context: AgentContext, decision: any) {
   // Mettre à jour la mémoire stratégique si pertinent
   if (context.source === 'whatsapp' && context.message) {
     // Détecter si une nouvelle fonctionnalité est demandée
-    const llmResponse = await base44.integrations.Core.InvokeLLM({
+    const llmResponse = await invokeLLMTracked(base44, {
       prompt: `Analyse ce message client SILGAPP et identifie s'il demande une fonctionnalité qui n'existe pas encore.
 Message: "${context.message}"
 
@@ -370,7 +372,7 @@ export async function explainDecision(base44, actionId: string) {
 // ─── Apprentissage sous Contrôle ───
 export async function proposeImprovement(base44, context: AgentContext) {
   // Analyser une interaction et proposer une amélioration
-  const llmResponse = await base44.integrations.Core.InvokeLLM({
+  const llmResponse = await invokeLLMTracked(base44, {
     prompt: `Analyse cette interaction SILGAPP et identifie si une réponse de la base de connaissances pourrait être améliorée.
 
 Message client: "${context.message || 'N/A'}"

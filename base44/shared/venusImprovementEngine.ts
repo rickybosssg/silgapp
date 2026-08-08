@@ -1,5 +1,9 @@
 /**
  * ═══════════════════════════════════════════════════════════════════
+import { invokeLLMTracked } from './integrationCreditTracker.ts';
+
+/**
+ * ════════════════════════════════════════════════════════════════════
  * MOTEUR D'APPRENTISSAGE CONTINU VENUS
  * ═══════════════════════════════════════════════════════════════════
  *
@@ -96,7 +100,7 @@ Détermine aussi:
 Réponds UNIQUEMENT avec un JSON:`;
 
   try {
-    const llmRes = await base44.asServiceRole.integrations.Core.InvokeLLM({
+    const llmRes = await invokeLLMTracked(base44, {
       prompt,
       response_json_schema: {
         type: 'object',
@@ -317,7 +321,7 @@ async function creerOuMettreAJourSuggestion(base44: any, qr: any): Promise<void>
   let reponseProposee = '';
   let motsCles: string[] = [];
   try {
-    const llmRes = await base44.asServiceRole.integrations.Core.InvokeLLM({
+    const llmRes = await invokeLLMTracked(base44, {
       prompt: `Tu es VENUS, l'assistante SILGAPP. Un client pose fréquemment cette question: "${qr.question_detectee}"
 
 Cette question a été posée ${qr.occurrences} fois. Génère une réponse officielle claire, concise et chaleureuse.

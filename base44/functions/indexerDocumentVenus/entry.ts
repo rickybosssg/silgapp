@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.38';
+import { invokeLLMTracked } from '../../shared/integrationCreditTracker.ts';
 import {
   indexerDocumentComplet,
   indexerTexteDirect,
@@ -328,7 +329,7 @@ Deno.serve(async (req) => {
 
         let titre = '', resume = '', motsCles: string[] = [];
         try {
-          const llmCombined = await base44.asServiceRole.integrations.Core.InvokeLLM({
+          const llmCombined = await invokeLLMTracked(base44, {
             prompt: `Analyse ce document et génère en UNE SEULE réponse:
 1. Un titre court et descriptif (max 80 caractères)
 2. Un résumé concis (max 300 caractères)

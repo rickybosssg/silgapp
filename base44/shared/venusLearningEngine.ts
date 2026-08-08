@@ -1,3 +1,5 @@
+import { invokeLLMTracked } from './integrationCreditTracker.ts';
+
 /**
  * Moteur d'Apprentissage VENUS — Centre d'Apprentissage
  *
@@ -128,7 +130,7 @@ ${message}
 
 Réponds UNIQUEMENT en JSON:`;
 
-  const llmRes = await base44.asServiceRole.integrations.Core.InvokeLLM({
+  const llmRes = await invokeLLMTracked(base44, {
     prompt,
     response_json_schema: {
       type: 'object',

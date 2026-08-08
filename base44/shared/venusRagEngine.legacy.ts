@@ -1,5 +1,9 @@
 /**
  * ═══════════════════════════════════════════════════════════════════
+import { invokeLLMTracked } from './integrationCreditTracker.ts';
+
+/**
+ * ════════════════════════════════════════════════════════════════════
  * MOTEUR RAG (Retrieval-Augmented Generation) VENUS
  * ═══════════════════════════════════════════════════════════════════
  *
@@ -59,7 +63,7 @@ export async function extraireTexteDocument(
 
   // Pour les autres formats (PDF, Word, Excel, Image) → LLM avec file_urls
   try {
-    const llmRes = await base44.asServiceRole.integrations.Core.InvokeLLM({
+    const llmRes = await invokeLLMTracked(base44, {
       prompt: `Tu es un extracteur de texte. Extrais l'INTEGRALITE du texte contenu dans ce document.
 
 Regles:
@@ -190,7 +194,7 @@ export async function genererResumeDocument(base44: any, texte: string): Promise
   if (!texte || texte.length < 50) return texte || '';
 
   try {
-    const llmRes = await base44.asServiceRole.integrations.Core.InvokeLLM({
+    const llmRes = await invokeLLMTracked(base44, {
       prompt: `Genere un resume concis (max 300 caracteres) du document suivant. Ce resume doit capturer les points essentiels pour un administrateur SILGAPP.
 
 Document:
@@ -215,7 +219,7 @@ export async function extraireMotsClesDocument(base44: any, texte: string): Prom
   if (!texte || texte.length < 20) return [];
 
   try {
-    const llmRes = await base44.asServiceRole.integrations.Core.InvokeLLM({
+    const llmRes = await invokeLLMTracked(base44, {
       prompt: `Extrais les 15 mots-cles les plus importants de ce document. Ces mots-cles seront utilises pour la recherche sémantique.
 
 Regles:
@@ -601,7 +605,7 @@ export async function indexerDocumentComplet(
     let resume = '';
     let motsCles: string[] = [];
     try {
-      const llmCombined = await base44.asServiceRole.integrations.Core.InvokeLLM({
+      const llmCombined = await invokeLLMTracked(base44, {
         prompt: `Analyse ce document et génère en UNE SEULE réponse:
 1. Un résumé concis (max 300 caractères) capturant les points essentiels
 2. Les 15 mots-clés les plus importants (minuscules, sans accents, sans mots vides)
@@ -762,7 +766,7 @@ export async function genererTitreAutomatique(base44: any, texte: string): Promi
 
   // Sinon, utiliser l'IA pour générer un titre
   try {
-    const llmRes = await base44.asServiceRole.integrations.Core.InvokeLLM({
+    const llmRes = await invokeLLMTracked(base44, {
       prompt: `Genere un titre court et descriptif (max 80 caracteres) pour le document suivant. Retourne uniquement le titre, sans guillemets ni ponctuation finale.
 
 Document:
@@ -858,7 +862,7 @@ export async function indexerTexteDirect(
     let resume = '';
     let motsCles: string[] = [];
     try {
-      const llmCombined = await base44.asServiceRole.integrations.Core.InvokeLLM({
+      const llmCombined = await invokeLLMTracked(base44, {
         prompt: `Analyse ce document et génère en UNE SEULE réponse:
 1. Un titre court et descriptif (max 80 caractères)
 2. Un résumé concis (max 300 caractères)

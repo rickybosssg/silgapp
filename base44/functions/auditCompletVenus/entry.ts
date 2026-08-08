@@ -1,5 +1,9 @@
 /**
  * ═══════════════════════════════════════════════════════════════════
+import { invokeLLMTracked } from '../../shared/integrationCreditTracker.ts';
+
+/**
+ * ════════════════════════════════════════════════════════════════════
  * AUDIT COMPLET VENUS
  * ═══════════════════════════════════════════════════════════════════
  *
@@ -468,7 +472,7 @@ async function autoCorriger(base44: any, questionsNonCouvertes: any[]): Promise<
     const questionsStr = qs.slice(0, 15).map((q, i) => `${i + 1}. ${q.question}`).join('\n');
 
     try {
-      const llmRes = await base44.asServiceRole.integrations.Core.InvokeLLM({
+      const llmRes = await invokeLLMTracked(base44, {
         prompt: `Tu es un expert SILGAPP. Voici ${qs.length} questions de clients non couvertes par la base de connaissances actuelle, dans la catégorie "${cat}".
 
 Questions non couvertes:

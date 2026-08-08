@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.38';
+import { invokeLLMTracked } from '../../shared/integrationCreditTracker.ts';
 
 /**
  * Recherche intelligente dans la base de connaissances VENUS.
@@ -82,7 +83,7 @@ Analyse chaque connaissance et détermine lesquelles correspondent à la recherc
 
 Réponds UNIQUEMENT avec un JSON: {"results": [{"id": "...", "score": 0.95, "raison": "..."}]}`;
 
-    const llmRes = await base44.asServiceRole.integrations.Core.InvokeLLM({
+    const llmRes = await invokeLLMTracked(base44, {
       prompt,
       response_json_schema: {
         type: 'object',
