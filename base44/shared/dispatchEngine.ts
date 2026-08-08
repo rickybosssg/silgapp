@@ -355,11 +355,13 @@ export async function lancerDispatchMulti(base44, courseId, exclusions = [], cac
   }
 
   if (candidats.length === 0) {
-    if (wave > gpsConfig.waves.length) {
+    if (wave >= gpsConfig.waves.length) {
       dispatchLog(`[DISPATCH] 📍 Vague GPS ${wave} épuisée (dernière: ${gpsConfig.waves.length}) — cycle_epuise pour course ${courseId}`);
+      const cycleEpuiseDeadline = new Date(Date.now() + CYCLE_EPUISE_TIMEOUT_MS).toISOString();
       await base44.asServiceRole.entities.CourseExterne.update(courseId, {
         dispatch_status: 'cycle_epuise',
         dispatch_wave: gpsConfig.waves.length,
+        timeout_expires_at: cycleEpuiseDeadline,
         livreur_id: '',
         livreur_nom: '',
         livreur_telephone: '',
@@ -369,6 +371,8 @@ export async function lancerDispatchMulti(base44, courseId, exclusions = [], cac
         livreur_nombre_avis: 0,
       });
       journaliserDispatch(base44, { course_id: courseId, country_code: course.country_code, vague: wave, evenement: 'cycle_epuise' });
+      const messageVenus = `📍 Nous avons sollicité tous les livreurs disponibles autour de vous, mais aucun n'a accepté votre course pour le moment.\n\nVoulez-vous que je relance la recherche ?\n\nRépondez 'oui' pour relancer ou 'non' pour annuler.`;
+      notifierRedispatchClient({ base44, course, messageVenus, motif: 'cycle_epuise' }).catch(err => console.error('[DISPATCH] ❌ VENUS notif cycle_epuise:', err.message));
       return { cycleEpuise: true };
     }
     if (dejaNotifies.length > 0) {
