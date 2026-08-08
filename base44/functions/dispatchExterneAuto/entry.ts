@@ -662,7 +662,14 @@ Deno.serve(async (req) => {
       );
       const coursesJamaisTraitees = coursesEnAttente.filter(c => {
         const ageMs = now.getTime() - new Date(c.created_date).getTime();
-        return ageMs > PREMIER_TICK_SEUIL_MS;
+        if (ageMs <= PREMIER_TICK_SEUIL_MS) return false;
+        // ✅ Exclure les courses déjà traitées (notifiées ou reset de cycle)
+        // Un "premier tick manquant" ne concerne QUE les courses jamais prises en charge.
+        let notifiedIds = [];
+        try { notifiedIds = JSON.parse(c.dispatch_notified_ids || '[]'); } catch {}
+        if (notifiedIds.length > 0) return false;
+        if ((c.dispatch_cycle_count || 0) > 0) return false;
+        return true;
       });
 
       if (coursesJamaisTraitees.length > 0) {
