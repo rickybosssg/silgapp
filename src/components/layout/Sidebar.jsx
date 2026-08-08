@@ -3,7 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { clearPersistedToken } from "@/lib/authPersistence";
 import { 
   LayoutDashboard, MapPin, Plus, Truck, BarChart3, Bell, 
-  Package, TrendingUp, ChevronLeft, ChevronRight, LogOut, Wallet, Shield, Globe, Settings, MessageCircle, Users, Megaphone, ChevronDown, Check, UserCheck, ShieldAlert, Store, UtensilsCrossed, Pill, PieChart, Sparkles, Brain, FlaskConical, Cpu, Crown
+  Package, TrendingUp, ChevronLeft, ChevronRight, LogOut, Wallet, Shield, Globe, Settings, MessageCircle, Users, Megaphone, ChevronDown, Check, UserCheck, ShieldAlert, Store, UtensilsCrossed, Pill, PieChart, Sparkles, Brain, FlaskConical, Cpu, Crown, Zap
 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { cn } from "@/lib/utils";
@@ -42,6 +42,7 @@ export const navItems = [
   { path: "/admin/venus-improvement", label: "Amélioration VENUS", icon: Sparkles },
   { path: "/admin/venus-test-lab", label: "Laboratoire de Test VENUS", icon: FlaskConical },
   { path: "/admin/openai-dashboard", label: "Suivi OpenAI", icon: Cpu },
+  { path: "/admin/credits-integration", label: "Crédits d'intégration", icon: Zap },
   { path: "/admin/centre-notifications", label: "Notifications Push", icon: Megaphone },
   { path: "/admin/externe", label: "Config Dispatch", icon: Settings },
   { path: "/admin/livreurs-prioritaires", label: "Livreurs prioritaires", icon: Crown },

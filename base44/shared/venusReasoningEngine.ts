@@ -40,6 +40,7 @@ import {
 import { genererReferenceCourse } from './venusCourseReference.ts';
 import { isOpenAIEnabled, raisonnerAvecOpenAI, getOpenAIModel } from './venusOpenAIEngine.ts';
 import { logOpenAIUsage, loggerMessageVenus, calculateCost } from './venusOpenAITracker.ts';
+import { invokeLLMTracked } from './integrationCreditTracker.ts';
 
 /**
  * Recherche les scénarios validés pour un pays/langue donnés (Source 3).
@@ -1115,12 +1116,18 @@ Réponds UNIQUEMENT avec un JSON.`;
       }
     }
 
-    // ── Fallback: InvokeLLM (Base44) ──
+    // ── Fallback: InvokeLLM (Base44) — traçé via IntegrationCreditLog ──
     if (!llmRes) {
       const wasOpenAIEnabled = await isOpenAIEnabled(base44);
-      llmRes = await base44.asServiceRole.integrations.Core.InvokeLLM({
+      llmRes = await invokeLLMTracked(base44, {
         prompt,
         response_json_schema: RAISONNEMENT_SCHEMA,
+      }, {
+        function_source: 'raisonnerVenus',
+        endpoint: 'InvokeLLM',
+        model: 'automatic',
+        telephone: input.telephone,
+        country_code: input.countryCode,
       });
       const fallbackTime = Date.now() - tLLMStart;
       console.log(`[ReasoningEngine] ⏱️ LLM (Base44): ${fallbackTime}ms`);
