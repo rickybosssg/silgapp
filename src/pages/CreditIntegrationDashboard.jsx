@@ -31,7 +31,7 @@ function StatCard({ icon: Icon, label, value, sublabel, color = 'indigo' }) {
 export default function CreditIntegrationDashboard() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [period, setPeriod] = useState('24h');
+  const [period, setPeriod] = useState('7d');
   const [error, setError] = useState(null);
 
   const loadStats = useCallback(async () => {
