@@ -334,7 +334,7 @@ export async function lancerDispatchMulti(base44, courseId, exclusions = [], cac
 
   dispatchLog(`[DISPATCH] 📍 Vague ${wave}/${gpsConfig.waves.length} — ${candidats.length} candidats triés par distance`);
 
-  if (candidats.length > 0 && wave >= gpsConfig.waves.length) {
+  if (wave >= gpsConfig.waves.length) {
     const fallbackResult = await trouverLivreursCandidats(base44, course, exclusions, { skipGpsFilter: true });
     const fallbackCandidats = (fallbackResult.tous || []).filter(f => !candidats.some(c => c.id === f.id));
     if (fallbackCandidats.length > 0) {
