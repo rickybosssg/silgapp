@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
 import {
   Zap, Clock, AlertTriangle, RefreshCw, TrendingDown,
-  CheckCircle, XCircle, Cpu, Activity
+  CheckCircle, XCircle, Cpu, Activity, DollarSign, Brain, Database
 } from 'lucide-react';
 
 function StatCard({ icon: Icon, label, value, sublabel, color = 'indigo' }) {
@@ -29,82 +29,69 @@ function StatCard({ icon: Icon, label, value, sublabel, color = 'indigo' }) {
 }
 
 export default function CreditIntegrationDashboard() {
-  const [logs, setLogs] = useState([]);
+  const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState('24h');
+  const [error, setError] = useState(null);
 
-  const loadLogs = useCallback(async () => {
+  const loadStats = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
-      const now = new Date();
-      let since = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      if (period === '7d') since = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      if (period === '30d') since = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      if (period === '1h') since = new Date(now.getTime() - 60 * 60 * 1000);
-
-      const all = await base44.entities.IntegrationCreditLog.list('-date_appel', 500);
-      const filtered = (all || []).filter(l => {
-        const d = new Date(l.date_appel || l.created_date);
-        return d >= since;
-      });
-      setLogs(filtered);
+      const result = await base44.functions.invoke('getCreditStats', { period });
+      const unwrapped = result?.data ? result.data : result;
+      if (unwrapped?.error) {
+        setError(unwrapped.error);
+      } else {
+        setStats(unwrapped);
+      }
     } catch (e) {
-      console.error('Erreur chargement logs crédit:', e.message);
+      console.error('Erreur chargement stats crédit:', e.message);
+      setError(e.message);
     } finally {
       setLoading(false);
     }
   }, [period]);
 
-  useEffect(() => { loadLogs(); }, [loadLogs]);
+  useEffect(() => { loadStats(); }, [loadStats]);
 
-  // ── Calculs statistiques ──
-  const totalCredits = logs.reduce((s, l) => s + (l.credits_estimated || 0), 0);
-  const totalCalls = logs.length;
-  const successCount = logs.filter(l => l.status === 'success').length;
-  const errorCount = logs.filter(l => l.status === 'error').length;
-  const avgResponseMs = logs.length > 0
-    ? Math.round(logs.reduce((s, l) => s + (l.response_time_ms || 0), 0) / logs.length)
-    : 0;
+  useEffect(() => {
+    const interval = setInterval(loadStats, 30000);
+    return () => clearInterval(interval);
+  }, [loadStats]);
 
-  // ── Grouper par fonction source ──
-  const byFunction = {};
-  for (const l of logs) {
-    const key = l.function_source || 'inconnu';
-    if (!byFunction[key]) byFunction[key] = { calls: 0, credits: 0, errors: 0, avgMs: 0, totalMs: 0 };
-    byFunction[key].calls++;
-    byFunction[key].credits += l.credits_estimated || 0;
-    if (l.status === 'error') byFunction[key].errors++;
-    byFunction[key].totalMs += l.response_time_ms || 0;
+  if (loading && !stats) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <RefreshCw className="w-8 h-8 text-indigo-500 animate-spin" />
+      </div>
+    );
   }
-  const functionStats = Object.entries(byFunction)
-    .map(([name, s]) => ({ name, ...s, avgMs: Math.round(s.totalMs / s.calls) }))
-    .sort((a, b) => b.credits - a.credits);
 
-  // ── Grouper par endpoint ──
-  const byEndpoint = {};
-  for (const l of logs) {
-    const key = l.endpoint || 'inconnu';
-    if (!byEndpoint[key]) byEndpoint[key] = { calls: 0, credits: 0 };
-    byEndpoint[key].calls++;
-    byEndpoint[key].credits += l.credits_estimated || 0;
+  if (error && !stats) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+        <div className="bg-white rounded-xl border border-red-200 p-6 max-w-md text-center shadow-sm">
+          <XCircle className="w-10 h-10 text-red-500 mx-auto mb-3" />
+          <h2 className="text-sm font-bold text-slate-900 mb-2">Impossible de charger les statistiques</h2>
+          <p className="text-xs text-red-600 font-mono bg-red-50 rounded p-2 mb-4 break-all">{error}</p>
+          <button
+            onClick={loadStats}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 mx-auto"
+          >
+            <RefreshCw className="w-4 h-4" /> Réessayer
+          </button>
+        </div>
+      </div>
+    );
   }
-  const endpointStats = Object.entries(byEndpoint).sort((a, b) => b[1].credits - a[1].credits);
 
-  // ── Grouper par heure (24h) ──
-  const hourlyData = {};
-  for (let i = 23; i >= 0; i--) {
-    const h = new Date(Date.now() - i * 60 * 60 * 1000);
-    const key = `${String(h.getHours()).padStart(2, '0')}h`;
-    hourlyData[key] = 0;
-  }
-  for (const l of logs) {
-    const d = new Date(l.date_appel || l.created_date);
-    const h = String(d.getHours()).padStart(2, '0') + 'h';
-    if (hourlyData[h] !== undefined) hourlyData[h] += l.credits_estimated || 0;
-  }
-  const maxHourly = Math.max(...Object.values(hourlyData), 1);
-
-  const errorRate = totalCalls > 0 ? ((errorCount / totalCalls) * 100).toFixed(1) : '0';
+  const summary = stats?.summary || {};
+  const base44Stats = stats?.base44_integrations || {};
+  const openaiStats = stats?.openai_direct || {};
+  const hourly = stats?.hourly || {};
+  const recentLogs = stats?.recent_logs || [];
+  const maxHourly = Math.max(...Object.values(hourly), 1);
 
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
@@ -113,10 +100,10 @@ export default function CreditIntegrationDashboard() {
         <div>
           <h1 className="text-xl md:text-2xl font-bold text-slate-900 flex items-center gap-2">
             <Zap className="w-5 h-5 md:w-6 md:h-6 text-indigo-600" />
-            Consommation de crédits d'intégration
+            Crédits d'intégration — SILGAPP
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Suivi en temps réel des appels aux intégrations Base44 (InvokeLLM, GenerateImage, etc.)
+            Consommation globale des crédits sur toute la plateforme (VENUS, NEO, dispatch, et plus)
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -131,7 +118,7 @@ export default function CreditIntegrationDashboard() {
             <option value="30d">30 derniers jours</option>
           </select>
           <button
-            onClick={loadLogs}
+            onClick={loadStats}
             disabled={loading}
             className="flex items-center gap-1.5 text-sm bg-indigo-600 text-white px-3 py-2 rounded-lg hover:bg-indigo-700 disabled:opacity-50"
           >
@@ -141,22 +128,24 @@ export default function CreditIntegrationDashboard() {
         </div>
       </div>
 
-      {/* ── Stats cards ── */}
+      {/* ── Stats globales ── */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-        <StatCard icon={Zap} label="Crédits totaux" value={totalCredits.toLocaleString()} color="amber" />
-        <StatCard icon={Activity} label="Appels totaux" value={totalCalls} color="indigo" />
-        <StatCard icon={CheckCircle} label="Succès" value={successCount} color="green" />
-        <StatCard icon={XCircle} label="Erreurs" value={errorCount} color="red"
-          sublabel={`${errorRate}% du total`} />
-        <StatCard icon={Clock} label="Temps moyen" value={`${avgResponseMs}ms`} color="blue" />
-        <StatCard icon={TrendingDown} label="Crédits/heure" value={period === '1h' ? totalCredits : Math.round(totalCredits / (period === '24h' ? 24 : period === '7d' ? 168 : 720))} color="slate" />
+        <StatCard icon={Zap} label="Crédits Base44" value={(base44Stats.total_credits || 0).toLocaleString()} color="amber"
+          sublabel={`${base44Stats.total_calls || 0} appels`} />
+        <StatCard icon={DollarSign} label="Coût OpenAI" value={`$${(openaiStats.cost_usd || 0).toFixed(4)}`} color="green"
+          sublabel={`${openaiStats.total_calls || 0} appels`} />
+        <StatCard icon={Activity} label="Appels totaux" value={summary.total_calls || 0} color="indigo" />
+        <StatCard icon={CheckCircle} label="Succès" value={summary.success_count || 0} color="green" />
+        <StatCard icon={XCircle} label="Erreurs" value={summary.error_count || 0} color="red"
+          sublabel={`${summary.error_rate}% du total`} />
+        <StatCard icon={Clock} label="Temps moyen" value={`${summary.avg_response_ms || 0}ms`} color="blue" />
       </div>
 
       {/* ── Graphique horaire ── */}
       <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
         <h2 className="text-sm font-semibold text-slate-700 mb-3">Consommation par heure (24h)</h2>
         <div className="flex items-end gap-0.5 h-32">
-          {Object.entries(hourlyData).map(([hour, credits]) => (
+          {Object.entries(hourly).map(([hour, credits]) => (
             <div key={hour} className="flex-1 flex flex-col items-center justify-end gap-1">
               <div
                 className="w-full bg-gradient-to-t from-indigo-500 to-purple-500 rounded-t-sm transition-all hover:opacity-80"
@@ -171,18 +160,39 @@ export default function CreditIntegrationDashboard() {
         </div>
       </div>
 
-      {/* ── Par fonction source ── */}
+      {/* ── Section Base44 (intégrations natives) ── */}
       <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
         <h2 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-          <Cpu className="w-4 h-4 text-slate-400" />
-          Consommation par fonction backend
+          <Database className="w-4 h-4 text-amber-500" />
+          Intégrations Base44 — InvokeLLM, GenerateImage, etc.
         </h2>
-        {functionStats.length === 0 ? (
-          <p className="text-sm text-slate-400 text-center py-6">Aucun appel enregistré sur cette période.</p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+          <div className="text-center p-2 bg-amber-50 rounded-lg">
+            <p className="text-xs text-slate-500">Crédits totaux</p>
+            <p className="text-lg font-bold text-amber-600">{(base44Stats.total_credits || 0).toLocaleString()}</p>
+          </div>
+          <div className="text-center p-2 bg-indigo-50 rounded-lg">
+            <p className="text-xs text-slate-500">Appels</p>
+            <p className="text-lg font-bold text-indigo-600">{base44Stats.total_calls || 0}</p>
+          </div>
+          <div className="text-center p-2 bg-emerald-50 rounded-lg">
+            <p className="text-xs text-slate-500">Succès</p>
+            <p className="text-lg font-bold text-emerald-600">{base44Stats.success || 0}</p>
+          </div>
+          <div className="text-center p-2 bg-red-50 rounded-lg">
+            <p className="text-xs text-slate-500">Erreurs</p>
+            <p className="text-lg font-bold text-red-600">{base44Stats.errors || 0}</p>
+          </div>
+        </div>
+
+        {/* Par fonction source */}
+        <h3 className="text-xs font-semibold text-slate-600 mb-2">Par fonction backend</h3>
+        {(base44Stats.by_function || []).length === 0 ? (
+          <p className="text-sm text-slate-400 text-center py-4">Aucun appel enregistré sur cette période.</p>
         ) : (
           <div className="space-y-2">
-            {functionStats.map((f) => {
-              const pct = totalCredits > 0 ? (f.credits / totalCredits) * 100 : 0;
+            {(base44Stats.by_function || []).map((f) => {
+              const pct = (base44Stats.total_credits || 0) > 0 ? (f.credits / base44Stats.total_credits) * 100 : 0;
               return (
                 <div key={f.name} className="border border-slate-100 rounded-lg p-3">
                   <div className="flex items-center justify-between mb-1.5">
@@ -214,16 +224,14 @@ export default function CreditIntegrationDashboard() {
             })}
           </div>
         )}
-      </div>
 
-      {/* ── Par endpoint ── */}
-      <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-        <h2 className="text-sm font-semibold text-slate-700 mb-3">Répartition par type d'intégration</h2>
-        {endpointStats.length === 0 ? (
-          <p className="text-sm text-slate-400 text-center py-4">Aucune donnée.</p>
+        {/* Par endpoint */}
+        <h3 className="text-xs font-semibold text-slate-600 mb-2 mt-4">Par type d'intégration</h3>
+        {(base44Stats.by_endpoint || []).length === 0 ? (
+          <p className="text-sm text-slate-400 text-center py-2">Aucune donnée.</p>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-            {endpointStats.map(([name, s]) => (
+            {(base44Stats.by_endpoint || []).map(([name, s]) => (
               <div key={name} className="border border-slate-100 rounded-lg p-3 flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-slate-700">{name}</p>
@@ -236,10 +244,84 @@ export default function CreditIntegrationDashboard() {
         )}
       </div>
 
-      {/* ── Logs récents ── */}
+      {/* ── Section OpenAI direct ── */}
       <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-        <h2 className="text-sm font-semibold text-slate-700 mb-3">Appels récents</h2>
-        {logs.length === 0 ? (
+        <h2 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+          <Brain className="w-4 h-4 text-emerald-500" />
+          API OpenAI directe — gpt-4.1-mini, etc.
+        </h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-4">
+          <div className="text-center p-2 bg-indigo-50 rounded-lg">
+            <p className="text-xs text-slate-500">Appels totaux</p>
+            <p className="text-lg font-bold text-indigo-600">{openaiStats.total_calls || 0}</p>
+          </div>
+          <div className="text-center p-2 bg-emerald-50 rounded-lg">
+            <p className="text-xs text-slate-500">Succès 1er coup</p>
+            <p className="text-lg font-bold text-emerald-600">{openaiStats.success || 0}</p>
+          </div>
+          <div className="text-center p-2 bg-blue-50 rounded-lg">
+            <p className="text-xs text-slate-500">Succès après retry</p>
+            <p className="text-lg font-bold text-blue-600">{openaiStats.success_retry || 0}</p>
+          </div>
+          <div className="text-center p-2 bg-amber-50 rounded-lg">
+            <p className="text-xs text-slate-500">Fallbacks Base44</p>
+            <p className="text-lg font-bold text-amber-600">{openaiStats.fallbacks || 0}</p>
+          </div>
+          <div className="text-center p-2 bg-red-50 rounded-lg">
+            <p className="text-xs text-slate-500">Erreurs</p>
+            <p className="text-lg font-bold text-red-600">{openaiStats.errors || 0}</p>
+          </div>
+          <div className="text-center p-2 bg-slate-50 rounded-lg">
+            <p className="text-xs text-slate-500">Réponses vides</p>
+            <p className="text-lg font-bold text-slate-600">{openaiStats.empty_response || 0}</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+          <StatCard icon={DollarSign} label="Coût total" value={`$${(openaiStats.cost_usd || 0).toFixed(4)}`} color="green" />
+          <StatCard icon={Cpu} label="Tokens totaux" value={(openaiStats.total_tokens || 0).toLocaleString()} color="blue" />
+          <StatCard icon={Clock} label="Temps moyen" value={`${openaiStats.avg_response_ms || 0}ms`} color="slate" />
+        </div>
+
+        {/* Par modèle */}
+        <h3 className="text-xs font-semibold text-slate-600 mb-2">Par modèle</h3>
+        {(openaiStats.by_model || []).length === 0 ? (
+          <p className="text-sm text-slate-400 text-center py-2">Aucun appel OpenAI sur cette période.</p>
+        ) : (
+          <div className="space-y-2">
+            {(openaiStats.by_model || []).map(([name, s]) => (
+              <div key={name} className="border border-slate-100 rounded-lg p-3">
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-slate-700">{name}</span>
+                    {s.errors > 0 && (
+                      <span className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full">
+                        {s.errors} erreur(s)
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3 text-xs text-slate-500">
+                    <span>{s.calls} appels</span>
+                    <span className="font-bold text-emerald-600">${s.cost.toFixed(4)}</span>
+                    <span>{s.tokens.toLocaleString()} tokens</span>
+                  </div>
+                </div>
+                <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full transition-all"
+                    style={{ width: `${Math.min(((s.cost / (openaiStats.cost_usd || 1)) * 100), 100)}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Logs récents combinés ── */}
+      <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+        <h2 className="text-sm font-semibold text-slate-700 mb-3">Appels récents (toutes sources)</h2>
+        {recentLogs.length === 0 ? (
           <p className="text-sm text-slate-400 text-center py-6">Aucun appel enregistré sur cette période.</p>
         ) : (
           <div className="overflow-x-auto">
@@ -247,32 +329,44 @@ export default function CreditIntegrationDashboard() {
               <thead>
                 <tr className="border-b border-slate-200 text-left text-slate-500">
                   <th className="py-2 px-2 font-medium">Date</th>
+                  <th className="py-2 px-2 font-medium">Source</th>
                   <th className="py-2 px-2 font-medium">Fonction</th>
                   <th className="py-2 px-2 font-medium">Endpoint</th>
                   <th className="py-2 px-2 font-medium">Modèle</th>
                   <th className="py-2 px-2 font-medium text-right">Crédits</th>
+                  <th className="py-2 px-2 font-medium text-right">Coût $</th>
                   <th className="py-2 px-2 font-medium text-right">Temps</th>
                   <th className="py-2 px-2 font-medium">Statut</th>
                 </tr>
               </thead>
               <tbody>
-                {logs.slice(0, 50).map((l) => (
-                  <tr key={l.id} className="border-b border-slate-50 hover:bg-slate-50">
+                {recentLogs.map((l, i) => (
+                  <tr key={i} className="border-b border-slate-50 hover:bg-slate-50">
                     <td className="py-1.5 px-2 text-slate-500 whitespace-nowrap">
-                      {new Date(l.date_appel || l.created_date).toLocaleTimeString('fr-FR')}
+                      {new Date(l.date).toLocaleTimeString('fr-FR')}
+                    </td>
+                    <td className="py-1.5 px-2">
+                      <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                        l.source === 'openai' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                      }`}>
+                        {l.source === 'openai' ? 'OpenAI' : 'Base44'}
+                      </span>
                     </td>
                     <td className="py-1.5 px-2 text-slate-700 font-medium">{l.function_source || '?'}</td>
                     <td className="py-1.5 px-2 text-slate-600">{l.endpoint || '?'}</td>
                     <td className="py-1.5 px-2 text-slate-500">{l.model_used || '-'}</td>
-                    <td className="py-1.5 px-2 text-right font-bold text-amber-600">{l.credits_estimated || 0}</td>
+                    <td className="py-1.5 px-2 text-right font-bold text-amber-600">{l.credits || 0}</td>
+                    <td className="py-1.5 px-2 text-right font-bold text-emerald-600">
+                      {l.cost_usd > 0 ? `$${l.cost_usd.toFixed(4)}` : '-'}
+                    </td>
                     <td className="py-1.5 px-2 text-right text-slate-500">{l.response_time_ms || 0}ms</td>
                     <td className="py-1.5 px-2">
-                      {l.status === 'success' ? (
+                      {l.status === 'success' || l.status === 'success_retry' ? (
                         <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
                       ) : (
                         <span className="flex items-center gap-1 text-red-600">
                           <AlertTriangle className="w-3.5 h-3.5" />
-                          <span className="truncate max-w-[120px]">{l.error_message}</span>
+                          <span className="truncate max-w-[100px]">{l.error_message}</span>
                         </span>
                       )}
                     </td>
@@ -282,6 +376,10 @@ export default function CreditIntegrationDashboard() {
             </table>
           </div>
         )}
+      </div>
+
+      <div className="text-center text-xs text-slate-400 pb-4">
+        Données générées le {stats?.generated_at ? new Date(stats.generated_at).toLocaleString('fr-FR') : '...'} — Auto-rafraîchissement toutes les 30 secondes
       </div>
     </div>
   );
