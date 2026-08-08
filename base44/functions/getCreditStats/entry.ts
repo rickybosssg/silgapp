@@ -17,8 +17,13 @@ Deno.serve(async (req) => {
     if (!user) return Response.json({ error: 'Non autorisé' }, { status: 401 });
     if (user.role !== 'admin') return Response.json({ error: 'Admin requis' }, { status: 403 });
 
-    const url = new URL(req.url);
-    const period = url.searchParams.get('period') || '24h';
+    let period = '24h';
+    try {
+      const body = await req.json();
+      if (body?.period) period = body.period;
+    } catch {
+      // Body peut être vide — utiliser la valeur par défaut
+    }
 
     const now = new Date();
     let since = new Date(now.getTime() - 24 * 60 * 60 * 1000);
@@ -26,30 +31,50 @@ Deno.serve(async (req) => {
     if (period === '30d') since = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     if (period === '1h') since = new Date(now.getTime() - 60 * 60 * 1000);
 
-    // ── Source 1: IntegrationCreditLog (intégrations Base44) ──
+    // ── Source 1: IntegrationCreditLog (intégrations Base44 tracées via wrapper) ──
     const creditLogs = await base44.asServiceRole.entities.IntegrationCreditLog.list('-date_appel', 500);
     const filteredCreditLogs = (creditLogs || []).filter((l: any) => {
       const d = new Date(l.date_appel || l.created_date);
       return d >= since;
     });
 
-    // ── Source 2: VenusOpenAIUsage (API OpenAI directe) ──
+    // ── Source 2: VenusMessageLog (tous les messages VENUS — contient les appels InvokeLLM réels) ──
+    const messageLogs = await base44.asServiceRole.entities.VenusMessageLog.list('-date_traitement', 1000);
+    const filteredMessageLogs = (messageLogs || []).filter((l: any) => {
+      const d = new Date(l.date_traitement || l.created_date);
+      return d >= since;
+    });
+
+    // ── Source 3: VenusOpenAIUsage (API OpenAI directe) ──
     const openAiLogs = await base44.asServiceRole.entities.VenusOpenAIUsage.list('-date_appel', 500);
     const filteredOpenAiLogs = (openAiLogs || []).filter((l: any) => {
       const d = new Date(l.date_appel || l.created_date);
       return d >= since;
     });
 
-    // ── Agrégation IntegrationCreditLog ──
-    const creditTotal = filteredCreditLogs.reduce((s: number, l: any) => s + (l.credits_estimated || 0), 0);
-    const creditCalls = filteredCreditLogs.length;
-    const creditSuccess = filteredCreditLogs.filter((l: any) => l.status === 'success').length;
-    const creditErrors = filteredCreditLogs.filter((l: any) => l.status === 'error').length;
+    // ── Agrégation IntegrationCreditLog (wrapper) + VenusMessageLog (appels réels) ──
+    // VenusMessageLog contient TOUS les appels InvokeLLM via decision_moteur:
+    //   rag_llm = Base44 InvokeLLM, fallback_base44 = OpenAI échoué → Base44 InvokeLLM
+    //   openai = OpenAI direct (compté dans openaiStats), déterministes = 0 crédit
+    const BASE44_DECISIONS = ['rag_llm', 'fallback_base44'];
+    const base44FromMessages = filteredMessageLogs.filter((l: any) => BASE44_DECISIONS.includes(l.decision_moteur));
+
+    const creditTotal = filteredCreditLogs.reduce((s: number, l: any) => s + (l.credits_estimated || 0), 0)
+      + base44FromMessages.length; // chaque appel InvokeLLM = 1 crédit
+    const creditCalls = filteredCreditLogs.length + base44FromMessages.length;
+    const creditSuccess = filteredCreditLogs.filter((l: any) => l.status === 'success').length
+      + base44FromMessages.filter((l: any) => l.statut === 'succes').length;
+    const creditErrors = filteredCreditLogs.filter((l: any) => l.status === 'error').length
+      + base44FromMessages.filter((l: any) => l.statut === 'erreur').length;
     const creditAvgMs = creditCalls > 0
-      ? Math.round(filteredCreditLogs.reduce((s: number, l: any) => s + (l.response_time_ms || 0), 0) / creditCalls)
+      ? Math.round(
+          (filteredCreditLogs.reduce((s: number, l: any) => s + (l.response_time_ms || 0), 0)
+           + base44FromMessages.reduce((s: number, l: any) => s + (l.temps_reponse_ms || 0), 0))
+          / creditCalls
+        )
       : 0;
 
-    // Par fonction source
+    // Par fonction source (IntegrationCreditLog + VenusMessageLog)
     const byFunction: Record<string, any> = {};
     for (const l of filteredCreditLogs) {
       const key = l.function_source || 'inconnu';
@@ -58,6 +83,15 @@ Deno.serve(async (req) => {
       byFunction[key].credits += l.credits_estimated || 0;
       if (l.status === 'error') byFunction[key].errors++;
       byFunction[key].totalMs += l.response_time_ms || 0;
+    }
+    // Ajouter les appels InvokeLLM depuis VenusMessageLog
+    for (const l of base44FromMessages) {
+      const key = `VENUS (${l.decision_moteur === 'rag_llm' ? 'RAG+LLM' : 'Fallback Base44'})`;
+      if (!byFunction[key]) byFunction[key] = { calls: 0, credits: 0, errors: 0, totalMs: 0 };
+      byFunction[key].calls++;
+      byFunction[key].credits += 1;
+      if (l.statut === 'erreur') byFunction[key].errors++;
+      byFunction[key].totalMs += l.temps_reponse_ms || 0;
     }
     const functionStats = Object.entries(byFunction)
       .map(([name, s]: [string, any]) => ({ name, ...s, avgMs: Math.round(s.totalMs / s.calls) }))
@@ -126,10 +160,23 @@ Deno.serve(async (req) => {
         telephone: l.telephone || '',
         cost_usd: 0,
       })),
+      ...base44FromMessages.map((l: any) => ({
+        source: 'base44',
+        date: l.date_traitement || l.created_date,
+        function_source: `VENUS (${l.decision_moteur === 'rag_llm' ? 'RAG+LLM' : 'Fallback'})`,
+        endpoint: 'InvokeLLM',
+        model_used: l.model_utilise || 'base44-invoke-llm',
+        credits: 1,
+        response_time_ms: l.temps_reponse_ms || 0,
+        status: l.statut === 'succes' ? 'success' : 'error',
+        error_message: l.erreur_detail || '',
+        telephone: l.telephone || '',
+        cost_usd: 0,
+      })),
       ...filteredOpenAiLogs.map((l: any) => ({
         source: 'openai',
         date: l.date_appel || l.created_date,
-        function_source: 'venusReasoning (OpenAI direct)',
+        function_source: 'VENUS (OpenAI direct)',
         endpoint: 'OpenAI Chat Completions',
         model_used: l.model_used || '',
         credits: 0,
