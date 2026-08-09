@@ -33,6 +33,18 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Course introuvable' }, { status: 404 });
     }
 
+    // ── Garde-fou : ne JAMAIS recalculer le prix des courses admin_manuel ──
+    // Le prix proposé (prix_propose_admin) est la source de vérité unique.
+    if (course.pricing_mode === 'admin_manuel' || course.source === 'admin') {
+      return Response.json({
+        success: false,
+        skipped: true,
+        reason: 'admin_manuel_price_locked',
+        message: 'Le prix de cette course est défini par l\'admin/client — recalcul automatique désactivé.',
+        prix_final: course.prix_final || course.prix_propose_admin || null,
+      });
+    }
+
     // Vérification minimale : au moins une source de coordonnées de départ ET d'arrivée
     const hasDepart = course.latitude_recuperation || course.gps_depart_lat;
     const hasArrivee = course.latitude_livraison || course.latitude_arrivee_livraison || course.gps_arrivee_lat;

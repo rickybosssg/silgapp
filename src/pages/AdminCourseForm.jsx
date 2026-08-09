@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ import ClientPhoneDetector from "@/components/crm/ClientPhoneDetector";
 import SmartAddressPicker from "@/components/crm/SmartAddressPicker";
 import { upsertCourseAddresses } from "@/lib/addressBook";
 import { upsertClientsFromCourseContacts, normalizePhone } from "@/lib/crmUtils";
+import { calculerPrixApproximatif } from "@/lib/priceEstimate";
 
 function generarQRData() {
   const pickupQrToken = crypto.randomUUID().replace(/-/g, "");
@@ -91,8 +92,29 @@ export default function AdminCourseForm() {
   const [mapModal, setMapModal] = useState(null); // null | 'depart' | 'arrivee'
   const [detectedClient, setDetectedClient] = useState(null);
   const [quickMode, setQuickMode] = useState(false);
+  const [prixApproximatif, setPrixApproximatif] = useState(null);
+  const [prixProposeAdmin, setPrixProposeAdmin] = useState("");
+  const prixProposeManuelModifie = useRef(false);
 
   const selectedPays = PAYS.find(p => p.code === countryCode);
+
+  // ── Calcul automatique du prix approximatif dès que le GPS est connu ──
+  useEffect(() => {
+    if (gpsDepart?.lat && gpsDepart?.lng && gpsArrivee?.lat && gpsArrivee?.lng && countryCode) {
+      const result = calculerPrixApproximatif(
+        gpsDepart.lat, gpsDepart.lng,
+        gpsArrivee.lat, gpsArrivee.lng,
+        countryCode
+      );
+      setPrixApproximatif(result);
+      if (!prixProposeManuelModifie.current) {
+        setPrixProposeAdmin(result ? String(result.prix) : "");
+      }
+    } else {
+      setPrixApproximatif(null);
+      if (!prixProposeManuelModifie.current) setPrixProposeAdmin("");
+    }
+  }, [gpsDepart, gpsArrivee, countryCode]);
 
   const fillFromTemplate = (template) => {
     setTypeCourse(template.type_course);
@@ -116,6 +138,9 @@ export default function AdminCourseForm() {
     setDestinataireTelephone("");
     setNotes("");
     setTypeColis("petit_colis");
+    setPrixApproximatif(null);
+    setPrixProposeAdmin("");
+    prixProposeManuelModifie.current = false;
   };
 
   const handleSubmit = async () => {
@@ -183,7 +208,8 @@ export default function AdminCourseForm() {
         statut: "recherche_livreur",
         dispatch_status: "en_attente",
         pricing_mode: "admin_manuel",
-        prix_estimate: 0,
+        prix_estimate: prixApproximatif?.prix || 0,
+        prix_propose_admin: prixProposeAdmin ? Number(prixProposeAdmin) : (prixApproximatif?.prix || 0),
         tracking_token: trackingToken,
         tracking_link: trackingLink,
         pickup_qr_token: pickupQrToken,
@@ -558,6 +584,59 @@ export default function AdminCourseForm() {
               </Select>
             </div>
           )}
+        </div>
+
+        {/* ── Prix de la course ── */}
+        <div className="bg-white rounded-[1.5rem] border border-gray-100 shadow-lg shadow-gray-100/50 p-5 space-y-4">
+          <div className="flex items-center gap-2">
+            <div className="w-1 h-4 bg-gradient-to-b from-amber-500 to-yellow-500 rounded-full" />
+            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Prix de la course</p>
+          </div>
+
+          {/* Prix approximatif (auto) */}
+          <div className="flex items-center justify-between rounded-xl bg-amber-50/50 border border-amber-100 px-4 py-3">
+            <div>
+              <p className="text-[10px] font-semibold text-amber-600 uppercase tracking-wide">Prix approximatif</p>
+              <p className="text-[10px] text-amber-400 mt-0.5">Calculé automatiquement selon la distance</p>
+            </div>
+            {prixApproximatif ? (
+              <div className="text-right">
+                <p className="text-xl font-black text-amber-700">
+                  {prixApproximatif.prix.toLocaleString()} <span className="text-xs font-bold">{prixApproximatif.devise}</span>
+                </p>
+                <p className="text-[10px] text-amber-400 mt-0.5">{prixApproximatif.distance} km</p>
+              </div>
+            ) : (
+              <p className="text-[10px] text-gray-400 italic max-w-[140px] text-right">
+                Prix approximatif indisponible — localisation nécessaire
+              </p>
+            )}
+          </div>
+
+          {/* Prix proposé (éditable) */}
+          <div>
+            <p className="text-[10px] font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">Prix proposé</p>
+            <div className="relative">
+              <Input
+                type="number"
+                value={prixProposeAdmin}
+                onChange={e => {
+                  prixProposeManuelModifie.current = true;
+                  setPrixProposeAdmin(e.target.value);
+                }}
+                placeholder={prixApproximatif ? String(prixApproximatif.prix) : "—"}
+                className="rounded-xl h-12 pr-20 bg-amber-50/30 border-amber-100/50 text-lg font-bold focus:ring-amber-300/50 focus:border-amber-400"
+              />
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-bold text-gray-400">
+                {prixApproximatif?.devise || "FCFA"}
+              </span>
+            </div>
+            {prixApproximatif && (
+              <p className="text-[10px] text-gray-400 mt-1">
+                Prérempli avec le prix approximatif. Modifiable avant création.
+              </p>
+            )}
+          </div>
         </div>
 
         {/* Bouton Créer — premium avec glow */}

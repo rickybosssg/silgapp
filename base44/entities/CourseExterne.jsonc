@@ -165,7 +165,12 @@
       ]
     },
     "prix_estimate": {
-      "type": "number"
+      "type": "number",
+      "description": "Prix approximatif calcule automatiquement a partir de la distance GPS et de la grille tarifaire SILGAPP. Uniquement informatif."
+    },
+    "prix_propose_admin": {
+      "type": "number",
+      "description": "Prix propose par l'admin lors de la creation d'une course administrative. Visible par le livreur avant acceptation. Sert de reference pour eviter les declarations de montant artificiellement basses."
     },
     "prix_final": {
       "type": "number"

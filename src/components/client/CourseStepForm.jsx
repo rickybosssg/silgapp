@@ -6,10 +6,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   ArrowLeft, ArrowRight, MapPin, Navigation, Package,
   User, FileText, CheckCircle, Truck, AlertCircle,
-  Loader2, Search, Send, Inbox, Sparkles, Car
+  Loader2, Search, Send, Inbox, Sparkles, Car, DollarSign
 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
+import { calculerPrixApproximatif } from "@/lib/priceEstimate";
 import CarnetAdresses from "@/components/client/CarnetAdresses";
 import ContactPickerButton from "@/components/client/ContactPickerButton";
 import { SILGAPP_COUNTRIES, phoneVariants } from "@/lib/phoneUtils";
@@ -125,6 +126,20 @@ export default function CourseStepForm({
   // Auto-activer GPS expéditeur si disponible (flux "recevoir")
   // IMPORTANT : désactivé pour éviter boucle React #185
   // La logique est maintenant gérée directement dans le UI (bouton toggle étape 2)
+
+  // ── Auto-remplir le prix proposé avec l'estimation GPS ──
+  useEffect(() => {
+    const lat1 = formData.gps_depart_lat;
+    const lng1 = formData.gps_depart_lng;
+    const lat2 = formData.gps_arrivee_lat;
+    const lng2 = formData.gps_arrivee_lng;
+    if (lat1 && lng1 && lat2 && lng2) {
+      const estimation = calculerPrixApproximatif(lat1, lng1, lat2, lng2, activeCountry);
+      if (estimation && !formData.prix_propose) {
+        setFormData(prev => ({ ...prev, prix_propose: estimation.prix }));
+      }
+    }
+  }, [formData.gps_depart_lat, formData.gps_depart_lng, formData.gps_arrivee_lat, formData.gps_arrivee_lng, activeCountry]);
 
   // Sauvegarder le brouillon — uniquement si changement significatif
   // Utilise JSON.stringify pour éviter les boucles sur des changements de référence mineurs
@@ -1013,6 +1028,55 @@ export default function CourseStepForm({
             </div>
           )}
         </div>
+
+        {/* ── Section Prix ── */}
+        {(() => {
+          const isMulti = formData.type_course === "expedier" && (formData.nb_colis || 1) > 1;
+          if (isMulti) return null;
+          const lat1 = formData.gps_depart_lat;
+          const lng1 = formData.gps_depart_lng;
+          const lat2 = formData.gps_arrivee_lat;
+          const lng2 = formData.gps_arrivee_lng;
+          const estimation = (lat1 && lng1 && lat2 && lng2)
+            ? calculerPrixApproximatif(lat1, lng1, lat2, lng2, activeCountry)
+            : null;
+          return (
+            <div className="space-y-3 pt-2">
+              <div className="flex items-start gap-3 p-4 rounded-2xl bg-blue-50 border border-blue-100">
+                <div className="w-9 h-9 rounded-xl bg-white flex items-center justify-center flex-shrink-0 shadow-sm">
+                  <DollarSign className="w-4 h-4 text-blue-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Prix approximatif</p>
+                  <p className="font-bold text-blue-900 mt-0.5">
+                    {estimation ? `${estimation.prix.toLocaleString()} ${estimation.devise}` : "GPS requis pour l'estimation"}
+                  </p>
+                  {estimation && (
+                    <p className="text-xs text-blue-500 mt-0.5">≈ {estimation.distance} km</p>
+                  )}
+                </div>
+              </div>
+              {estimation && (
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold text-gray-700">
+                    Prix proposé <span className="text-red-500">*</span>
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      type="number"
+                      value={formData.prix_propose || ""}
+                      onChange={(e) => setFormData({ ...formData, prix_propose: parseInt(e.target.value) || 0 })}
+                      className="h-14 rounded-2xl border-2 border-gray-200 bg-gray-50 focus:bg-white focus:border-primary px-4 text-base font-bold pr-16"
+                      placeholder="1500"
+                    />
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-gray-600">FCFA</span>
+                  </div>
+                  <p className="text-xs text-gray-400 pl-1">Montant proposé au livreur — modifiable si nécessaire</p>
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </div>
     );
   }
