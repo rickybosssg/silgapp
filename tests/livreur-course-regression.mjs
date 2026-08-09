@@ -42,4 +42,28 @@ for (const file of [
   assert.match(source, /pharmacie_id/, `${file} doit reconnaitre les livraisons pharmacie`);
 }
 
+const livreurAppSource = readFileSync(
+  new URL("../src/pages/LivreurExterneApp.jsx", import.meta.url),
+  "utf8",
+);
+const coursesDisponiblesSource = readFileSync(
+  new URL("../src/components/livreur/CoursesDisponibles.jsx", import.meta.url),
+  "utf8",
+);
+const dispatchSource = readFileSync(
+  new URL("../base44/functions/dispatchExterneAuto/entry.ts", import.meta.url),
+  "utf8",
+);
+
+assert.match(livreurAppSource, /id:\s*"disponibles"/, "l'onglet Disponibles doit etre declare");
+assert.match(livreurAppSource, /activeTab === "disponibles"/, "l'onglet Disponibles doit etre rendu");
+assert.match(livreurAppSource, /<CoursesDisponibles/, "le composant CoursesDisponibles doit etre monte");
+assert.match(coursesDisponiblesSource, /dispatch_status:\s*"disponible_push"/, "la liste doit charger uniquement les courses disponibles");
+assert.match(coursesDisponiblesSource, /country_code:\s*countryCode/, "la liste doit rester isolee par pays");
+assert.match(coursesDisponiblesSource, /refusedCourseIds\.includes\(course\.id\)/, "une course refusee ne doit pas reapparaitre");
+assert.match(coursesDisponiblesSource, /livreurDisponible/, "un livreur hors ligne ne doit pas charger les courses disponibles");
+assert.match(dispatchSource, /getLivreursRefuses/, "le backend doit verifier les refus persistants");
+assert.match(dispatchSource, /isDisponiblePush\s*\?\s*isLivreurDisponible/, "le backend doit autoriser un livreur eligible en mode disponible_push");
+assert.match(dispatchSource, /!refusedIds\.includes\(livreur_id\)/, "le backend doit exclure le livreur ayant refuse cette course");
+
 console.log("LIVREUR_COURSE_REGRESSION=PASS");

@@ -217,9 +217,10 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Mettre à jour l'encours
+    // Mettre à jour l'encours ET montant_du_silga (source de vérité unique)
     await base44.asServiceRole.entities.Livreur.update(livreurId, {
       encours: nouvelEncours,
+      montant_du_silga: nouvelEncours,
     });
     await base44.asServiceRole.entities.CourseExterne.update(courseId, {
       encours_comptabilise_at: now,
@@ -255,7 +256,7 @@ async function handleDeblocage(base44, body) {
     return Response.json({ error: 'Accès réservé aux administrateurs' }, { status: 403 });
   }
 
-  const encoursAvant = livreur.encours || 0;
+  const encoursAvant = livreur.montant_du_silga ?? livreur.encours ?? 0;
   let nouvelEncours;
   const now = new Date().toISOString();
 
@@ -275,6 +276,7 @@ async function handleDeblocage(base44, body) {
 
   await base44.asServiceRole.entities.Livreur.update(livreur_id, {
     encours: nouvelEncours,
+    montant_du_silga: nouvelEncours,
     bloque_encours: encoreBloque,
     encours_bloque_at: encoreBloque ? (livreur.encours_bloque_at || now) : null,
     admin_hors_ligne: encoreBloque,
@@ -334,7 +336,7 @@ async function handleAjustement(base44, body) {
   const livreur = await base44.asServiceRole.entities.Livreur.get(livreur_id);
   if (!livreur) return Response.json({ error: 'Livreur introuvable' }, { status: 404 });
 
-  const encoursAvant = livreur.encours || 0;
+  const encoursAvant = livreur.montant_du_silga ?? livreur.encours ?? 0;
   const countryCode = livreur.country_code;
   const countries = await base44.asServiceRole.entities.Country.filter({ code: countryCode, actif: true });
   const seuil = countries?.[0]?.seuil_encours_max || 5000;
@@ -344,6 +346,7 @@ async function handleAjustement(base44, body) {
 
   await base44.asServiceRole.entities.Livreur.update(livreur_id, {
     encours: nouvel_encours,
+    montant_du_silga: nouvel_encours,
     bloque_encours: seraBloque,
     encours_bloque_at: seraBloque ? (livreur.encours_bloque_at || now) : null,
     admin_hors_ligne: seraBloque,
@@ -441,6 +444,7 @@ async function handleGetBloques(base44, body) {
       telephone: l.telephone,
       country_code: l.country_code,
       encours: encoursReel,
+      montant_du_silga: encoursReel,
       seuil,
       devise,
       bloque_at: l.encours_bloque_at,

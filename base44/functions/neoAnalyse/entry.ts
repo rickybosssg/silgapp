@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { invokeLLMTracked } from '../../shared/integrationCreditTracker.ts';
 
 Deno.serve(async (req) => {
   try {
@@ -209,7 +210,7 @@ Génère entre 5 et 15 recommandations pertinentes. Sois précis et actionnable.
 
 Réponds en français.`;
 
-    const llmRaw = await base44.integrations.Core.InvokeLLM({
+    const llmRaw = await invokeLLMTracked(base44, {
       prompt,
       response_json_schema: {
         type: "object",

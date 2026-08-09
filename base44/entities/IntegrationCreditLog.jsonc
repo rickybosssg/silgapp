@@ -1,0 +1,66 @@
+{
+  "name": "IntegrationCreditLog",
+  "type": "object",
+  "properties": {
+    "date_appel": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Moment de l'appel"
+    },
+    "function_source": {
+      "type": "string",
+      "description": "Fonction/backend qui a d\u00e9clench\u00e9 l'appel (ex: raisonnerVenus, neoAnalyse, ameliorationContinueVenus)"
+    },
+    "endpoint": {
+      "type": "string",
+      "description": "Endpoint d'int\u00e9gration appel\u00e9 (ex: InvokeLLM, GenerateImage, GenerateSpeech, GenerateVideo, UploadFile, TranscribeAudio)"
+    },
+    "model_used": {
+      "type": "string",
+      "description": "Mod\u00e8le utilis\u00e9 si applicable (ex: automatic, gpt_5_mini, claude_sonnet_4_6)"
+    },
+    "credits_estimated": {
+      "type": "number",
+      "default": 1,
+      "description": "Cr\u00e9dits estim\u00e9s consomm\u00e9s"
+    },
+    "response_time_ms": {
+      "type": "number",
+      "default": 0,
+      "description": "Temps de r\u00e9ponse en ms"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "success",
+        "error"
+      ],
+      "default": "success",
+      "description": "Statut de l'appel"
+    },
+    "error_message": {
+      "type": "string",
+      "description": "Message d'erreur si \u00e9chec"
+    },
+    "telephone": {
+      "type": "string",
+      "description": "T\u00e9l\u00e9phone client si applicable"
+    },
+    "conversation_id": {
+      "type": "string",
+      "description": "ID de conversation si applicable"
+    },
+    "country_code": {
+      "type": "string",
+      "description": "Code pays si applicable"
+    },
+    "metadata": {
+      "type": "string",
+      "description": "JSON: m\u00e9tadonn\u00e9es suppl\u00e9mentaires"
+    }
+  },
+  "required": [
+    "function_source",
+    "endpoint"
+  ]
+}

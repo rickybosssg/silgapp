@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { X, Phone, MapPin, TrendingUp, Banknote, CheckCircle, Clock } from "lucide-react";
+import { X, Phone, MapPin, Banknote, CheckCircle, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -74,8 +74,7 @@ export default function ComptabiliteLivreurDetail({ livreurId, livreurNom, onClo
         {/* KPIs */}
         <div className="grid grid-cols-3 gap-2 p-4">
           {[
-            { icon: <TrendingUp className="w-4 h-4" />, label: "Encours", val: formatMontant(l.encours || 0), color: l.bloque_encours ? "text-red-600" : "text-amber-600" },
-            { icon: <Banknote className="w-4 h-4" />, label: "Dû SILGAPP", val: formatMontant(l.montant_du_silga || 0), color: "text-blue-600" },
+            { icon: <Banknote className="w-4 h-4" />, label: "Dû SILGAPP", val: formatMontant(l.montant_du_silga ?? l.encours ?? 0), color: (l.montant_du_silga ?? l.encours ?? 0) > 0 ? "text-red-600" : "text-green-600" },
             { icon: <MapPin className="w-4 h-4" />, label: "Pays", val: l.country_code || "—", color: "text-gray-600" },
           ].map((item, i) => (
             <div key={i} className="bg-gray-50 rounded-xl p-3 text-center">

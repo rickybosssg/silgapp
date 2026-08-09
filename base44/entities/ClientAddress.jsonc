@@ -1,0 +1,68 @@
+{
+  "name": "ClientAddress",
+  "type": "object",
+  "properties": {
+    "client_id": {
+      "type": "string",
+      "description": "ID du ClientExterne propri\u00e9taire de l'adresse"
+    },
+    "client_telephone_normalized": {
+      "type": "string",
+      "description": "T\u00e9l\u00e9phone normalis\u00e9 du client (pour recherche rapide sans jointure)"
+    },
+    "role": {
+      "type": "string",
+      "enum": [
+        "pickup",
+        "delivery"
+      ],
+      "description": "R\u00f4le de l'adresse: pickup (r\u00e9cup\u00e9ration/exp\u00e9dition) ou delivery (livraison/arriv\u00e9e)"
+    },
+    "label": {
+      "type": "string",
+      "description": "Libell\u00e9 personnalis\u00e9 (ex: Maison, Bureau, Pharmacie)"
+    },
+    "adresse": {
+      "type": "string",
+      "description": "Adresse pr\u00e9cise (texte saisissable)"
+    },
+    "quartier": {
+      "type": "string"
+    },
+    "ville": {
+      "type": "string"
+    },
+    "latitude": {
+      "type": "number",
+      "description": "Latitude GPS"
+    },
+    "longitude": {
+      "type": "number",
+      "description": "Longitude GPS"
+    },
+    "nb_utilisations": {
+      "type": "number",
+      "default": 1,
+      "description": "Nombre de fois que cette adresse a \u00e9t\u00e9 utilis\u00e9e"
+    },
+    "derniere_utilisation": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date de derni\u00e8re utilisation"
+    },
+    "is_favorite": {
+      "type": "boolean",
+      "default": false,
+      "description": "Adresse marqu\u00e9e comme favorite par l'op\u00e9rateur"
+    },
+    "country_code": {
+      "type": "string",
+      "description": "Code pays"
+    }
+  },
+  "required": [
+    "client_id",
+    "role",
+    "adresse"
+  ]
+}

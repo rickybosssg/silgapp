@@ -207,6 +207,9 @@ public class SilgappNativePlugin extends Plugin {
     @PluginMethod
     public void stopBackgroundHeartbeat(PluginCall call) {
         stopNativeHeartbeat();
+        // Marquer le service comme inactif dans les SharedPreferences
+        android.content.SharedPreferences prefs = getContext().getSharedPreferences("silgapp_heartbeat", android.content.Context.MODE_PRIVATE);
+        prefs.edit().putBoolean("service_active", false).apply();
         JSObject result = new JSObject();
         result.put("success", true);
         call.resolve(result);

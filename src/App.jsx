@@ -57,6 +57,7 @@ const FraisAnnulationAdmin = lazy(() => import('./pages/FraisAnnulationAdmin.jsx
 const VenusRapportsPage = lazy(() => import('./pages/VenusRapportsPage.jsx'));
 const ZonesChaudesAdmin = lazy(() => import('./pages/ZonesChaudesAdmin.jsx'));
 const AdminCourseForm = lazy(() => import('./pages/AdminCourseForm.jsx'));
+const ClientsCRM = lazy(() => import('./pages/ClientsCRM.jsx'));
 const DemandesLivreursAdmin = lazy(() => import('./components/admin/DemandesLivreursPanel.jsx'));
 const LivreursBloquesEncours = lazy(() => import('./components/admin/LivreursBloquesEncours.jsx'));
 const Comptabilite = lazy(() => import('./pages/Comptabilite.jsx'));
@@ -99,6 +100,7 @@ const VenusAgentCenter = lazy(() => import('./pages/VenusAgentCenter.jsx'));
 const VenusIntelligenceCenter = lazy(() => import('./pages/VenusIntelligenceCenter.jsx'));
 const VenusTestLab = lazy(() => import('./pages/VenusTestLab.jsx'));
 const OpenAIDashboard = lazy(() => import('./pages/OpenAIDashboard.jsx'));
+const CreditIntegrationDashboard = lazy(() => import('./pages/CreditIntegrationDashboard.jsx'));
 const NeoDashboard = lazy(() => import('./pages/NeoDashboard.jsx'));
 const BugsTracking = lazy(() => import('./pages/BugsTracking.jsx'));
 const PayerSilgapp = lazy(() => import('./pages/PayerSilgapp.jsx'));
@@ -421,6 +423,7 @@ function AppContent() {
           <Route path="/admin/paiements" element={<AnimatedRoutes><PaiementsAdmin /></AnimatedRoutes>} />
           <Route path="/admin/dispatch-logs" element={<AnimatedRoutes><DispatchLogs /></AnimatedRoutes>} />
           <Route path="/admin/livreurs-prioritaires" element={<AnimatedRoutes><LivreursPrioritaires /></AnimatedRoutes>} />
+          <Route path="/admin/crm-clients" element={<AnimatedRoutes><ClientsCRM /></AnimatedRoutes>} />
           <Route path="/admin/messages" element={<AnimatedRoutes><AdminMessages /></AnimatedRoutes>} />
           <Route path="/admin/whatsapp" element={<AnimatedRoutes><WhatsAppAdmin /></AnimatedRoutes>} />
           <Route path="/admin/venus" element={<AnimatedRoutes><VenusAdminCenter /></AnimatedRoutes>} />
@@ -438,6 +441,7 @@ function AppContent() {
           <Route path="/admin/venus-intelligence" element={<AnimatedRoutes><VenusIntelligenceCenter /></AnimatedRoutes>} />
           <Route path="/admin/venus-test-lab" element={<AnimatedRoutes><VenusTestLab /></AnimatedRoutes>} />
           <Route path="/admin/openai-dashboard" element={<AnimatedRoutes><OpenAIDashboard /></AnimatedRoutes>} />
+          <Route path="/admin/credits-integration" element={<AnimatedRoutes><CreditIntegrationDashboard /></AnimatedRoutes>} />
           <Route path="/admin/neo" element={<AnimatedRoutes><NeoDashboard /></AnimatedRoutes>} />
           <Route path="/admin/bugs" element={<AnimatedRoutes><BugsTracking /></AnimatedRoutes>} />
           <Route path="/admin/statistiques" element={<AnimatedRoutes><Statistiques /></AnimatedRoutes>} />

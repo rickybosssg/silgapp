@@ -7,17 +7,19 @@ import { haversineKm } from './geoUtils.ts';
 // Ré-export pour rétrocompatibilité (haversineKm retourne null si coords invalides)
 export { haversineKm as calculerDistance };
 
-// Statuts de course active (le livreur est engagé dans la livraison)
+// Statuts de course active (le livreur est engagé dans la livraison).
+// INCLUS: tous les statuts intermédiaires des courses administratives
+// (client_contacto, en_route_expediteur) et le statut arrivee.
+// Un livreur avec une course dans un de ces statuts ne doit JAMAIS
+// recevoir de nouvelle proposition de dispatch.
 export const STATUTS_ACTIFS_COURSE = [
-  'livreur_en_route', 'arrive_prise_en_charge', 'colis_recupere',
-  'passager_embarque', 'pris_en_charge', 'en_livraison',
-];
-
-// Statuts actifs élargi (inclut 'arrivee' pour la vérification des fantômes)
-export const STATUTS_ACTIFS_VERIF = [
-  'livreur_en_route', 'arrive_prise_en_charge', 'colis_recupere',
+  'livreur_en_route', 'client_contacte', 'en_route_expediteur',
+  'arrive_prise_en_charge', 'colis_recupere',
   'passager_embarque', 'pris_en_charge', 'en_livraison', 'arrivee',
 ];
+
+// Statuts actifs élargi (identique à STATUTS_ACTIFS_COURSE — unifié)
+export const STATUTS_ACTIFS_VERIF = STATUTS_ACTIFS_COURSE;
 
 // Map pays → indicatif téléphonique (avec +)
 export const INDICATIFS: Record<string, string> = {

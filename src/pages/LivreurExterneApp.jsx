@@ -45,6 +45,7 @@ import {
   listIncludesLivreur,
   sameLivreurId,
 } from "@/lib/livreurCourseState";
+import CoursesDisponibles from "@/components/livreur/CoursesDisponibles";
 
 // Haversine — utilisée aussi pour le calcul de prix
 function calculerDistance(lat1, lng1, lat2, lng2) {
@@ -78,7 +79,6 @@ function isCourseTargetingLivreur(course, livreurId) {
     sameLivreurId(course.livreur_id, livreurId) ||
     sameLivreurId(course.proposed_by_livreur_id, livreurId) ||
     sameLivreurId(course.proposed_livreur_id, livreurId) ||
-    listIncludesLivreur(course.dispatch_notified_ids, livreurId) ||
     listIncludesLivreur(course.notified_livreur_ids, livreurId)
   );
 }
@@ -520,6 +520,16 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         const allCourses = await base44.entities.CourseExterne.list("-created_date", 50);
         if (cancelled) return;
 
+        // ── Récupérer les notifications actives du livreur depuis DispatchNotification ──
+        // (remplace l'ancien champ JSON dispatch_notified_ids qui n'est plus mis à jour)
+        let notifiedCourseIds = [];
+        try {
+          const myNotifs = await base44.entities.DispatchNotification.filter(
+            { livreur_id: livreurId, statut: 'notifie' }, '-date_notification', 50
+          );
+          notifiedCourseIds = (myNotifs || []).map(n => n.course_id);
+        } catch {}
+
         const found = (allCourses || []).find((course) => (
           course.dispatch_status === "propose" &&
           !course.livreur_id &&
@@ -527,7 +537,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
           !FINAL_COURSE_STATUSES.has(course.statut) &&
           course.manual_price_status !== "pending_client_validation" &&
           (!livreurProfil?.country_code || course.country_code === livreurProfil.country_code) &&
-          listIncludesLivreur(course.dispatch_notified_ids, livreurId) &&
+          notifiedCourseIds.includes(course.id) &&
           // 🛡️ Ignorer les courses expirées (timeout dépassé)
           (!course.timeout_expires_at || new Date(course.timeout_expires_at) > new Date())
         )) || null;
@@ -827,16 +837,12 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     [livreesToday]
   );
 
-  // ── Montant total dû (source de vérité) ───────────────────────────────────
-  // Calculé à partir des commissions impayées des courses livrées (même logique
-  // que la page admin "Dû Utilisateur"). mesCourses contient déjà toutes les
-  // courses du livreur (via getAllCoursesForLivreur), donc pas besoin de fallback
-  // sur le snapshot montant_du_silga qui peut être stale.
+  // ── Montant total dû (source de vérité unique : montant_du_silga) ────────
+  // Le champ montant_du_silga est mis à jour à chaque livraison (calculPrixCourseExterne)
+  // et à chaque paiement (paiementLivreur, traiterPaiementSilgapp, verifierEncoursLivreur).
   const montantDuSilga = useMemo(() =>
-    mesCourses
-      .filter(c => c.statut === "livree" && c.statut_paiement_livreur !== "paye" && sameLivreurId(c.livreur_id, livreurProfil?.id))
-      .reduce((s, c) => s + (c.commission_silga ?? 0), 0),
-    [mesCourses, livreurProfil?.id]
+    Number(livreurProfil?.montant_du_silga) || 0,
+    [livreurProfil?.montant_du_silga]
   );
 
   // ─── isEnLigne ────────────────────────────────────────────────────────────
@@ -1303,6 +1309,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   // ─── Dashboard principal ──────────────────────────────────────────────────
   const TABS = [
     { id: "courses", label: "Courses", emoji: "" },
+    { id: "disponibles", label: "Disponibles", emoji: "" },
     { id: "historique", label: "Historique", emoji: "" },
     { id: "messages", label: "Messages", emoji: "" },
     ...(livreurHasPromoCode ? [{ id: "promo", label: "Code Promo", emoji: "" }] : []),
@@ -1496,7 +1503,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
               }`}>
                 <div className="flex items-center gap-3">
                   <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
-                    montantDuSilga > 0 ? "bg-orange-100" : "bg-blue-50"
+                    montantDuSilga > 0 ? "bg-orange-500/15" : "bg-white/5"
                   }`}>
                     <Wallet className={`w-5 h-5 ${montantDuSilga > 0 ? "text-orange-400" : "text-[#00a86b]"}`} />
                   </div>
@@ -1559,9 +1566,9 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
                 <p className="text-red-400/80 text-xs leading-relaxed">
                   Votre plafond d'encours SILGAPP a été atteint. Veuillez effectuer votre dépôt auprès de SILGAPP afin de réactiver votre compte.
                 </p>
-                {livreurProfil?.encours > 0 && (
+                {(livreurProfil?.montant_du_silga ?? livreurProfil?.encours ?? 0) > 0 && (
                   <p className="text-red-400/60 text-[10px]">
-                    Encours actuel : {livreurProfil.encours.toLocaleString()} {livreurProfil.country_code ? "FCFA" : "FCFA"}
+                    Dû SILGAPP : {(livreurProfil.montant_du_silga ?? livreurProfil.encours ?? 0).toLocaleString()} FCFA
                   </p>
                 )}
               </div>
@@ -1569,10 +1576,20 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
               <div className="rounded-2xl bg-white border border-black/5 text-slate-900 p-5 text-center space-y-2 shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
                 <p className="text-2xl"></p>
                 <p className="font-black text-base">Vous êtes hors ligne</p>
-                <p className="text-white/60 text-xs">Appuyez sur <strong>Activer</strong> dans le header pour recevoir des courses</p>
+                <p className="text-slate-500 text-xs">Appuyez sur <strong>Activer</strong> dans le header pour recevoir des courses</p>
               </div>
             )}
           </div>
+        )}
+
+        {activeTab === "disponibles" && (
+          <CoursesDisponibles
+            livreurProfil={livreurProfil}
+            onAcceptSuccess={() => {
+              setActiveTab("courses");
+              statutMutation.mutate("en_course");
+            }}
+          />
         )}
 
         {activeTab === "historique" && (

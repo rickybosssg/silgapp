@@ -171,8 +171,9 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
     course.commande_restaurant_id ||
     course.pharmacie_id
   );
-  // ── Course administrative (colis) : étape « Client contacté » avant le départ vers l'expéditeur ──
-  const isAdminColisCourse = course.source === "admin" && !isDeplacement && !isPartnerCourse;
+  // ── Étape « Client contacté » : visible pour TOUTES les courses (admin + client)
+  //    sauf déplacements et courses partenaire (boutique/restaurant/pharmacie) ──
+  const isAdminColisCourse = !isDeplacement && !isPartnerCourse;
   const isClientContactePhase = isAdminColisCourse && effectiveStatut === "livreur_en_route";
   const isEnRouteExpediteurPending = isAdminColisCourse && effectiveStatut === "client_contacte";
   const adminPreTrip = isClientContactePhase || isEnRouteExpediteurPending;

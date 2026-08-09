@@ -4,6 +4,8 @@ import { STATUTS_ACTIFS_COURSE, STATUTS_ACTIFS_VERIF, normalizeCommissionPct, ch
 import { verifierPaysCourseLivreur, reponseDejaPrise, generateToken, generatePIN, supprimerNotificationsCourse, journaliserDispatch } from '../../shared/dispatchUtils.ts';
 import { chargerConfigDispatch, chargerConfigVaguesGPS, CYCLE_EPUISE_TIMEOUT_MS } from '../../shared/dispatchConfig.ts';
 import { lancerDispatchMulti } from '../../shared/dispatchEngine.ts';
+import { runWatchdog } from '../../shared/dispatchWatchdog.ts';
+import { marquerRefuse, marquerAccepte, getLivreursNotifies, getLivreursRefuses, resetNotifications as resetNotifsEntity } from '../../shared/dispatchNotifications.ts';
 
 // ============================================================================
 // HANDLER PRINCIPAL
@@ -20,9 +22,9 @@ Deno.serve(async (req) => {
       course_id = body.event.entity_id;
     }
 
-    // Déclenchement depuis automation scheduled (tick) — sans action = avancer les vagues
+    // Déclenchement depuis automation scheduled (tick de secours) — sans action = watchdog
     if (!action) {
-      action = 'avancer_vagues_expirees';
+      action = 'watchdog';
     }
 
     // ─── 1. Lancer la recherche automatique (multi-livreurs) ──────────────
@@ -102,6 +104,39 @@ Deno.serve(async (req) => {
       });
     }
 
+    // 🛡️ NIVEAU 0 — VÉRIFICATION DE COURSE ACTIVE : un livreur ayant déjà une
+    // course active ne doit JAMAIS voir ou accepter une nouvelle proposition.
+    // Cette vérification est la première barrière du cas "Amidou Ouédraogo".
+    if (countryGuard.ok) {
+      const coursesActivesLivreur = await base44.asServiceRole.entities.CourseExterne.filter({
+        livreur_id: livreur_id,
+      }, '-created_date', 10);
+      const coursesAccepteesLivreur = await base44.asServiceRole.entities.CourseExterne.filter({
+        accepted_by_livreur_id: livreur_id,
+      }, '-created_date', 10);
+      const toutesCoursesLivreur = [...coursesActivesLivreur, ...coursesAccepteesLivreur];
+      const courseActiveExistante = toutesCoursesLivreur.find(c =>
+        STATUTS_ACTIFS_COURSE.includes(c.statut) && c.id !== course_id
+      );
+      const coursePrixManuelEnAttente = toutesCoursesLivreur.find(c =>
+        c.id !== course_id && c.dispatch_status === 'propose' &&
+        (c.livreur_id === livreur_id || c.accepted_by_livreur_id === livreur_id)
+      );
+      if (courseActiveExistante) {
+        console.warn(`[DISPATCH] 🚫 check_course_pour_livreur — Livreur ${livreur_id} a déjà la course ${courseActiveExistante.id} active (${courseActiveExistante.statut}) — proposition masquée`);
+        return Response.json({
+          found: false, deja_en_course: true,
+          error: 'Vous avez déjà une course en cours. Terminez-la avant d\'en voir une nouvelle.',
+        });
+      }
+      if (coursePrixManuelEnAttente) {
+        return Response.json({
+          found: false, prix_manuel_en_attente: true,
+          error: 'Vous avez déjà proposé un prix sur une course en attente de validation.',
+        });
+      }
+    }
+
     if (course.statut === 'annulee' || course.statut === 'livree') {
         try {
           const livreurData = countryGuard.livreur;
@@ -123,8 +158,13 @@ Deno.serve(async (req) => {
         return Response.json({ found: false, already_taken: true, taken_by: course.livreur_id });
       }
 
-      let notifiedIds = [];
-      try { notifiedIds = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
+      // 🔥 Course en disponible_push → visible par tous les livreurs éligibles (Push-to-Bid)
+      if (course.dispatch_status === 'disponible_push') {
+        const expired = !!(course.timeout_expires_at && new Date(course.timeout_expires_at) < new Date());
+        return Response.json({ found: true, course, expired, disponible_push: true, timeout_expires_at: course.timeout_expires_at });
+      }
+
+      const notifiedIds = await getLivreursNotifies(base44, course_id);
       const isNotified = notifiedIds.includes(livreur_id);
       if (!isNotified) return Response.json({ found: false });
 
@@ -151,13 +191,25 @@ Deno.serve(async (req) => {
         });
       }
 
-      // 🛡️ Vérification anti-courses multiples : le livreur ne peut pas accepter
-      // une nouvelle course s'il en a déjà une active en cours.
+      // 🛡️ PROTECTION B — Vérification anti-courses multiples au moment de l'acceptation.
+      // Le livreur ne peut pas accepter une nouvelle course s'il en a déjà une active.
+      // On vérifie par livreur_id ET accepted_by_livreur_id (couvre les prix manuels
+      // en attente de validation client où livreur_id est peut-être vide mais
+      // accepted_by_livreur_id est posé).
       const coursesActivesLivreur = await base44.asServiceRole.entities.CourseExterne.filter({
         livreur_id: livreur_id,
       }, '-created_date', 20);
-      const courseActiveExistante = coursesActivesLivreur.find(c =>
+      const coursesAccepteesLivreur = await base44.asServiceRole.entities.CourseExterne.filter({
+        accepted_by_livreur_id: livreur_id,
+      }, '-created_date', 20);
+      const toutesCoursesLivreur = [...coursesActivesLivreur, ...coursesAccepteesLivreur];
+      const courseActiveExistante = toutesCoursesLivreur.find(c =>
         STATUTS_ACTIFS_COURSE.includes(c.statut) && c.id !== course_id
+      );
+      // Vérification prix manuel en attente (dispatch_status='propose' + livreur_id posé)
+      const coursePrixManuelEnAttente = toutesCoursesLivreur.find(c =>
+        c.id !== course_id && c.dispatch_status === 'propose' &&
+        (c.livreur_id === livreur_id || c.accepted_by_livreur_id === livreur_id)
       );
       if (courseActiveExistante) {
         console.warn(`[DISPATCH] 🚫 Livreur ${livreur_id} a déjà la course ${courseActiveExistante.id} active (${courseActiveExistante.statut}) — acceptation refusée`);
@@ -166,6 +218,14 @@ Deno.serve(async (req) => {
           error: 'Vous avez déjà une course en cours. Terminez-la avant d\'en accepter une nouvelle.',
           course_active_id: courseActiveExistante.id,
           course_active_statut: courseActiveExistante.statut,
+        });
+      }
+      if (coursePrixManuelEnAttente) {
+        console.warn(`[DISPATCH] 🚫 Livreur ${livreur_id} a une course ${coursePrixManuelEnAttente.id} avec prix manuel en attente — acceptation refusée`);
+        return Response.json({
+          success: false, accepted: false, reason: 'prix_manuel_en_attente',
+          error: 'Vous avez déjà proposé un prix sur une course en attente de validation. Attendez la réponse du client.',
+          course_active_id: coursePrixManuelEnAttente.id,
         });
       }
 
@@ -184,16 +244,26 @@ Deno.serve(async (req) => {
         return Response.json(reponseDejaPrise('livreur_lock_already_set', course));
       }
 
-      if (course.dispatch_status !== 'propose') {
+      if (course.dispatch_status !== 'propose' && course.dispatch_status !== 'disponible_push') {
         return Response.json({
           success: false, accepted: false, reason: 'not_available',
           error: "Cette course n'est plus disponible", dispatch_status: course.dispatch_status || '',
         });
       }
 
-      let notifiedIds = [];
-      try { notifiedIds = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
-      const isEligible = notifiedIds.includes(livreur_id) || course.livreur_id === livreur_id;
+      const notifiedIds = await getLivreursNotifies(base44, course_id);
+      const isDisponiblePush = course.dispatch_status === 'disponible_push';
+      const refusedIds = isDisponiblePush ? await getLivreursRefuses(base44, course_id) : [];
+      const isLivreurDisponible =
+        livreur.type_livreur === 'externe' &&
+        livreur.validation === 'valide' &&
+        livreur.actif === true &&
+        livreur.statut === 'disponible' &&
+        livreur.manual_hors_ligne !== true &&
+        livreur.admin_hors_ligne !== true;
+      const isEligible = isDisponiblePush
+        ? isLivreurDisponible && !refusedIds.includes(livreur_id)
+        : notifiedIds.includes(livreur_id) || course.livreur_id === livreur_id;
       if (!isEligible) {
         return Response.json({ success: false, error: 'Vous n\'êtes pas éligible pour cette course', not_eligible: true });
       }
@@ -247,7 +317,7 @@ Deno.serve(async (req) => {
         });
       }
       
-      if (courseFinal.dispatch_status !== 'propose' || courseFinal.livreur_id || courseFinal.accepted_by_livreur_id) {
+      if ((courseFinal.dispatch_status !== 'propose' && courseFinal.dispatch_status !== 'disponible_push') || courseFinal.livreur_id || courseFinal.accepted_by_livreur_id) {
         return Response.json(reponseDejaPrise('final_check_already_taken', courseFinal));
       }
 
@@ -292,12 +362,32 @@ Deno.serve(async (req) => {
         updateData.timeout_expires_at = new Date(Date.now() + 5 * 60 * 1000).toISOString();
       }
 
+      // 🛡️ CHECK FINAL ATOMIQUE ANTI-DOUBLON — juste avant l'updateMany, on refait
+      // une vérification fraiche pour s'assurer que le livreur n'a pas accepté une
+      // autre course dans les millisecondes écoulées. Cette vérification élimine
+      // définitivement la race condition entre deux acceptations simultanées.
+      const coursesActivesFinal = await base44.asServiceRole.entities.CourseExterne.filter({
+        livreur_id: livreur_id,
+      }, '-created_date', 20);
+      const courseActiveFinal = coursesActivesFinal.find(c =>
+        STATUTS_ACTIFS_COURSE.includes(c.statut) && c.id !== course_id
+      );
+      if (courseActiveFinal) {
+        console.warn(`[DISPATCH] 🚫 RACE CONDITION BLOQUÉE — Livreur ${livreur_id} a accepté la course ${courseActiveFinal.id} (${courseActiveFinal.statut}) entre les checks — acceptation refusée`);
+        return Response.json({
+          success: false, accepted: false, reason: 'deja_en_course',
+          error: 'Vous avez déjà une course en cours. Terminez-la avant d\'en accepter une nouvelle.',
+          course_active_id: courseActiveFinal.id,
+          course_active_statut: courseActiveFinal.statut,
+        });
+      }
+
       // 🔐 MISE À JOUR ATOMIQUE CONDITIONNELLE — empêche la course condition (race condition)
       // où deux livreurs passent le double-check simultanément. Le updateMany ne modifie
       // la course QUE si dispatch_status est toujours 'propose' ET livreur_id toujours vide.
       // Si un autre livreur a déjà verrouillé la course, 0 enregistrement sera modifié.
       await base44.asServiceRole.entities.CourseExterne.updateMany(
-        { id: course_id, dispatch_status: 'propose', livreur_id: '' },
+        { id: course_id, dispatch_status: { $in: ['propose', 'disponible_push'] }, livreur_id: '' },
         { $set: updateData }
       );
 
@@ -369,6 +459,8 @@ Deno.serve(async (req) => {
           temps_avant_acceptation_sec: tempsAcceptationSec,
         });
 
+        marquerAccepte(base44, course_id, livreur_id, tempsAcceptationSec).catch(() => {});
+
         return Response.json({ success: true, accepted: true, course_id, livreur_id });
       }
 
@@ -423,16 +515,9 @@ Deno.serve(async (req) => {
         return Response.json({ success: true, message: 'Course déjà prise par un autre' });
       }
 
-      // 🚫 Ajouter le livreur aux refusés définitifs (exclusion permanente, survit au reset de cycle)
-      let dejaRefuses = [];
-      try { dejaRefuses = JSON.parse(course.dispatch_refused_ids || '[]'); } catch {}
-      if (!dejaRefuses.includes(livreur_id)) {
-        dejaRefuses.push(livreur_id);
-        await base44.asServiceRole.entities.CourseExterne.update(course_id, {
-          dispatch_refused_ids: JSON.stringify(dejaRefuses),
-        });
-        console.log(`[DISPATCH] 🚫 Livreur ${livreur_id} ajouté aux refusés définitifs — course ${course_id}`);
-      }
+      // 🚫 Marquer le livreur comme refusé définitif (exclusion permanente, survit au reset de cycle)
+      await marquerRefuse(base44, course_id, livreur_id, raison || 'Refusé');
+      console.log(`[DISPATCH] 🚫 Livreur ${livreur_id} marqué comme refusé — course ${course_id}`);
 
       // 🧹 Marquer les notifications "nouvelle_course" comme lues pour ce livreur (bulk)
       try {
@@ -538,374 +623,10 @@ Deno.serve(async (req) => {
       return Response.json({ expired, dispatch_status: course.dispatch_status, livreur_id: course.livreur_id });
     }
 
-    // ─── 6. Avancer les vagues expirées (N1→N2→N3→cycle_epuise→N1) ──
-    if (action === 'avancer_vagues_expirees') {
-      const { country_code: filterCountry } = body;
-      const filter = { statut: 'recherche_livreur' };
-      if (filterCountry) filter.country_code = filterCountry;
-
-      const coursesRecherche = await base44.asServiceRole.entities.CourseExterne.filter(filter, '-created_date', 200);
-
-      // ── Courses "nouvelle" avec dispatch en attente (créées par Venus/WhatsApp ou app client) ──
-      // Elles doivent être prises en charge par le moteur de dispatch automatique
-      const filterNouvelles = { statut: 'nouvelle' };
-      if (filterCountry) filterNouvelles.country_code = filterCountry;
-      const coursesNouvelles = await base44.asServiceRole.entities.CourseExterne.filter(filterNouvelles, '-created_date', 200);
-
-      const seenIds = new Set();
-      const courses = [...coursesRecherche, ...coursesNouvelles].filter(c => {
-        if (seenIds.has(c.id)) return false;
-        seenIds.add(c.id);
-        return true;
-      });
-      const now = new Date();
-      const resultats = [];
-
-      const MAX_COURSES_PER_TICK = 25; // Limite anti-rate-limit (augmenté pour couvrir plus de courses)
-      // 🎯 PHASE 8 — Tri par priorité : urgente > haute > normal
-      // Les courses prioritaires sont traitées en premier à chaque tick
-      const PRIORITY_ORDER = { urgente: 0, haute: 1, normal: 2 };
-      const sortByPriority = (a, b) => {
-        const pa = PRIORITY_ORDER[a.priority] ?? 2;
-        const pb = PRIORITY_ORDER[b.priority] ?? 2;
-        if (pa !== pb) return pa - pb;
-        // ✅ Prioriser les courses ANCIENNES en premier (plus longtemps bloquées)
-        // Une course ancienne bloquée ne doit jamais être repoussée par les nouvelles
-        return new Date(a.created_date).getTime() - new Date(b.created_date).getTime();
-      };
-      // Prioriser les courses VRAIMENT bloquées (en_attente/redispatch/cycle_epuise)
-      // ET les courses "propose" avec timeout expiré (besoin d'avancement de vague immédiat)
-      const isStuck = (c) => {
-        // ✅ cycle_epuise EXCLU du comptage : ces courses attendent la réponse client
-        // et ne doivent pas occuper les slots de traitement au détriment des autres courses
-        if (['en_attente', 'redispatch'].includes(c.dispatch_status)) return true;
-        // ✅ Course en 'propose' = bloquée si timeout expiré OU timeout manquant (corrompu)
-        if (c.dispatch_status === 'propose') {
-          if (!c.timeout_expires_at) return true;
-          if (new Date(c.timeout_expires_at) < now) return true;
-        }
-        return false;
-      };
-      const stuck = courses.filter(isStuck).sort(sortByPriority);
-      const waiting = courses.filter(c => !isStuck(c) && c.dispatch_status !== 'cycle_epuise').sort(sortByPriority);
-      const coursesToProcess = [...stuck, ...waiting].slice(0, MAX_COURSES_PER_TICK);
-      // ✅ cycle_epuise : traitées SANS compter dans MAX_COURSES_PER_TICK
-      // (vérification auto-annulation 15min uniquement, ne bloque pas les autres courses)
-      const cycleEpuiseCourses = courses.filter(c => c.dispatch_status === 'cycle_epuise');
-      const allToProcess = [...coursesToProcess, ...cycleEpuiseCourses];
-      // 📝 JOURNAL DE SÉLECTION — aucune course ne disparaît silencieusement
-      // Enregistre combien de courses ont été détectées, retenues, ignorées et pourquoi
-      const processedIds = new Set(allToProcess.map(c => c.id));
-      const ignoredCourses = courses.filter(c => !processedIds.has(c.id));
-      console.log(`[DISPATCH] 📋 SÉLECTION: ${courses.length} détectées | ${allToProcess.length} retenues | ${ignoredCourses.length} ignorées`);
-      if (ignoredCourses.length > 0) {
-        console.log(`[DISPATCH] 📋 Ignorées:`, ignoredCourses.map(c => ({
-          id: c.id?.slice(-8), statut: c.statut, dispatch: c.dispatch_status,
-          raison: !isStuck(c) ? 'non_bloquée' : 'limite_max_25',
-        })));
-      }
-
-      // 📦 Cache config — déjà mis en cache au niveau module (TTL 5 min), ne fait qu'une seule requête
-      const cachedConfig = {
-        dispatch: await chargerConfigDispatch(base44),
-        gps: await chargerConfigVaguesGPS(base44),
-      };
-
-      // 🛡️ FILET DE SÉCURITÉ — premier_tick_manquant
-      // Détecte les courses en_attente depuis > 2 min SANS aucun DispatchLog.
-      // Ces courses n'ont jamais été prises en charge par le moteur (automatisation
-      // entity ou tick programmé). On les force immédiatement + alerte admin.
-      const PREMIER_TICK_SEUIL_MS = 45 * 1000; // 45 secondes — filet de sécurité raccourci
-      const coursesEnAttente = courses.filter(c =>
-        c.dispatch_status === 'en_attente' &&
-        c.statut === 'recherche_livreur'
-      );
-      const coursesJamaisTraitees = coursesEnAttente.filter(c => {
-        const ageMs = now.getTime() - new Date(c.created_date).getTime();
-        return ageMs > PREMIER_TICK_SEUIL_MS;
-      });
-
-      if (coursesJamaisTraitees.length > 0) {
-        // ⚡ OPTIMISATION: On ne vérifie plus DispatchLog individuellement (1 lecture par course = trop cher).
-        // On force le dispatch pour toutes les courses en_attente > 45s sans distinction.
-        // Le lancerDispatchMulti vérifie lui-même si la course a déjà été notifiée (dispatch_notified_ids).
-        for (const course of coursesJamaisTraitees) {
-          const ageMin = Math.round((now.getTime() - new Date(course.created_date).getTime()) / 60000);
-          console.error(`[DISPATCH] 🚨 PREMIER TICK MANQUANT: Course ${course.id} en_attente depuis ${ageMin}min sans AUCUN DispatchLog — force dispatch`);
-
-          // Log spécifique premier_tick_manquant
-          journaliserDispatch(base44, {
-            course_id: course.id,
-            country_code: course.country_code,
-            vague: 0,
-            vague_avant: 0,
-            vague_apres: 0,
-            evenement: 'premier_tick_manquant',
-            raison_blocage: `en_attente_${ageMin}min_sans_log`,
-            raison_passage: 'filet_securite_premier_tick',
-          });
-
-          // Alerte admin
-          base44.asServiceRole.entities.Notification.create({
-            titre: '🚨 Premier tick manquant — course jamais traitée',
-            message: `Course ${course.client_nom || '?'} (${course.adresse_depart || '?'}) en_attente depuis ${ageMin}min sans aucun DispatchLog. L'automatisation de dispatch ne l'a pas prise en charge. Traitement forcé en cours.`,
-            type: 'alerte_critique_dispatch', course_id: course.id, lue: false,
-          }).catch(() => {});
-
-          // Force dispatch immédiat
-          try {
-            const result = await lancerDispatchMulti(base44, course.id, [], cachedConfig);
-            resultats.push({ course_id: course.id, wave: 'premier_tick_manquant', ...result });
-          } catch (err) {
-            console.error(`[DISPATCH] ❌ Erreur force dispatch premier_tick ${course.id}:`, err.message);
-            resultats.push({ course_id: course.id, wave: 'premier_tick_manquant', error: err.message });
-          }
-          await new Promise(r => setTimeout(r, 100));
-        }
-      }
-
-      // Recharger allToProcess si des courses premier_tick_manquant ont été traitées
-      // (leur dispatch_status a changé, éviter de les retraiter dans la boucle principale)
-      const premierTickProcessed = new Set(resultats
-        .filter(r => r.wave === 'premier_tick_manquant')
-        .map(r => r.course_id));
-
-      for (const course of allToProcess) {
-        try {
-          // Skip les courses déjà traitées par le filet premier_tick_manquant
-          if (premierTickProcessed.has(course.id)) continue;
-
-          // 🚨 RATTRAPAGE: course bloquée depuis > 10 min sans aucune évolution de vague
-          // Seuil élevé (10 min) pour laisser le code normal d'avancement de vague fonctionner
-          // à chaque tick. Le rattrapage n'est qu'un filet de sécurité pour les courses
-          // vraiment coincées (tick manqué plusieurs fois de suite).
-          //
-          // ⚡ OPTIMISATION: On utilise les données du snapshot (déjà chargées en début de tick)
-          // au lieu de relire chaque course individuellement (1 lecture = trop cher).
-          // Le risque de réinitialiser une vague est acceptable : le rattrapage ne se déclenche
-          // qu'après 10+ min de blocage, et lancerDispatchMulti gère lui-même les doublons.
-          const waveTimeoutMs = (cachedConfig.gps.waves[0]?.timeout_sec || 60) * 1000;
-          const stuckDurationMs = now.getTime() - new Date(course.updated_date).getTime();
-          const RATTRAPAGE_SEUIL_MS = Math.max(waveTimeoutMs * 2, 10 * 60 * 1000); // min 10 minutes
-          if (stuckDurationMs > RATTRAPAGE_SEUIL_MS && course.dispatch_status === 'propose' && !course.livreur_id) {
-            console.log(`[DISPATCH] 🚨 RATTRAPAGE: Course ${course.id} bloquée depuis ${Math.round(stuckDurationMs / 60000)}min — force-reset vague`);
-            await base44.asServiceRole.entities.CourseExterne.update(course.id, {
-              dispatch_status: 'redispatch',
-              dispatch_locked_until: null,
-              timeout_expires_at: null,
-            });
-            base44.asServiceRole.entities.Notification.create({
-              titre: '🚨 Course bloquée — rattrapage automatique',
-              message: `Course ${course.client_nom || '?'} (${course.adresse_depart || '?'}) bloquée depuis ${Math.round(stuckDurationMs / 60000)}min — rattrapage automatique déclenché.`,
-              type: 'alerte_critique_dispatch', course_id: course.id, lue: false,
-            }).catch(() => {});
-            journaliserDispatch(base44, {
-              course_id: course.id, country_code: course.country_code,
-              vague: course.dispatch_wave || 0,
-              vague_avant: course.dispatch_wave || 0,
-              vague_apres: course.dispatch_wave || 0,
-              evenement: 'rattrapage',
-              raison_passage: `bloquée_${Math.round(stuckDurationMs / 60000)}min_force_reset`,
-            });
-            const result = await lancerDispatchMulti(base44, course.id, [], cachedConfig);
-            resultats.push({ course_id: course.id, wave: 'rattrapage', ...result });
-            continue;
-          }
-
-          // 🔄 cycle_epuise : VENUS a demandé au client s'il veut relancer.
-          // On attend sa réponse (15 min max). Si timeout → auto-annulation.
-          if (course.dispatch_status === 'cycle_epuise') {
-            const deadlineMs = course.timeout_expires_at
-              ? new Date(course.timeout_expires_at).getTime()
-              : 0;
-            const nowMs = now.getTime();
-
-            if (deadlineMs > 0 && nowMs < deadlineMs) {
-              // Délai non expiré — attendre la réponse du client
-              console.log(`[DISPATCH] ⏳ Cycle épuisé course ${course.id} — en attente réponse client (deadline: ${new Date(deadlineMs).toISOString()})`);
-              resultats.push({ course_id: course.id, wave: 'cycle_epuise_waiting' });
-              continue;
-            }
-
-            // Délai de 15 min dépassé sans réponse client — mise en attente (suspend le dispatch)
-            // L'admin doit repasser la course en 'nouvelle' pour relancer le dispatch.
-            console.log(`[DISPATCH] ⏰ Cycle épuisé + 15min sans réponse pour course ${course.id} — mise en attente`);
-            await base44.asServiceRole.entities.CourseExterne.update(course.id, {
-              statut: 'en_attente',
-              dispatch_status: 'en_attente',
-              notes: (course.notes || '') + ' | [EN ATTENTE] Cycle dispatch épuisé, client sans réponse sous 15 min',
-            });
-            resultats.push({ course_id: course.id, wave: 'cycle_epuise_en_attente' });
-            continue;
-          }
-
-          // 📌 Courses en attente / redispatch (hors vagues) → relancer
-          if (!course.dispatch_status || ['en_attente', 'redispatch'].includes(course.dispatch_status)) {
-            const result = await lancerDispatchMulti(base44, course.id, [], cachedConfig);
-            resultats.push({ course_id: course.id, wave: 'retry', ...result });
-            continue;
-          }
-
-          // 🌊/📍 Vagues expirées (propose sans verrou, mode vagues heartbeat ou GPS)
-          // ✅ Traiter null timeout comme expiré (course corrompue ne doit jamais rester bloquée)
-          const expired = !course.timeout_expires_at || new Date(course.timeout_expires_at) < now;
-          if (!expired || course.dispatch_status !== 'propose') continue;
-
-          // ⏰ Verrou expiré AVEC livreur_id (prix manuel sans réponse client, ou acceptation expirée)
-          if (course.livreur_id) {
-            console.log(`[DISPATCH] ⏰ Verrou expiré (livreur ${course.livreur_id}) course ${course.id} — libération + redispatch`);
-            await base44.asServiceRole.entities.CourseExterne.update(course.id, {
-              statut: 'recherche_livreur',
-              dispatch_status: 'redispatch',
-              livreur_id: '',
-              livreur_nom: '',
-              livreur_telephone: '',
-              heure_acceptation: null,
-              accepted_by_livreur_id: '',
-              accepted_at: null,
-              pricing_mode: 'automatic',
-              manual_price: null,
-              manual_price_status: null,
-              proposed_by_livreur_id: '',
-              timeout_expires_at: null,
-            });
-            const result = await lancerDispatchMulti(base44, course.id, [], cachedConfig);
-            resultats.push({ course_id: course.id, wave: 'expired_lock_redispatch', ...result });
-            continue;
-          }
-
-          const currentWave = course.dispatch_wave || 0;
-          if (currentWave > 0) {
-            const maxWave = cachedConfig.gps.waves.length;
-
-            const nextWave = currentWave + 1;
-            if (nextWave > maxWave) {
-              console.log(`[DISPATCH] 📍 GPS vague ${currentWave} expirée (max: ${maxWave}) — cycle_epuise pour course ${course.id}`);
-              const cycleEpuiseDeadline = new Date(now.getTime() + CYCLE_EPUISE_TIMEOUT_MS).toISOString();
-              await base44.asServiceRole.entities.CourseExterne.update(course.id, {
-                dispatch_status: 'cycle_epuise',
-                dispatch_wave: maxWave,
-                timeout_expires_at: cycleEpuiseDeadline,
-              });
-              // ── Notifier VENUS WhatsApp au client : voulez-vous relancer ? ──
-              const messageVenus = `📍 Nous avons sollicité tous les livreurs disponibles autour de vous, mais aucun n'a accepté votre course pour le moment.\n\nVoulez-vous que je relance la recherche ?\n\nRépondez 'oui' pour relancer ou 'non' pour annuler.`;
-              const notifie = await notifierRedispatchClient({
-                base44,
-                course,
-                messageVenus,
-                motif: 'cycle_epuise',
-              });
-              resultats.push({ course_id: course.id, wave: `${currentWave}→epuise`, venus_notifie: notifie });
-              continue;
-            }
-            console.log(`[DISPATCH] 📍 GPS avancement vague ${currentWave} → ${nextWave} pour course ${course.id}`);
-            await base44.asServiceRole.entities.CourseExterne.update(course.id, {
-              dispatch_status: 'redispatch',
-              dispatch_wave: nextWave,
-            });
-          } else {
-            // Mode direct (wave=0) — reset notifiés pour re-notifier tout le monde
-            console.log(`[DISPATCH] ⚡ Mode direct — reset notifiés + redispatch course ${course.id}`);
-            await base44.asServiceRole.entities.CourseExterne.update(course.id, {
-              dispatch_status: 'redispatch',
-              dispatch_notified_ids: '[]',
-            });
-          }
-
-          const result = await lancerDispatchMulti(base44, course.id, [], cachedConfig);
-          resultats.push({ course_id: course.id, wave: `${currentWave}→${currentWave + 1}`, ...result });
-        } catch (err) {
-          console.error(`[DISPATCH] ❌ Erreur sur course ${course.id}:`, err.message);
-          resultats.push({ course_id: course.id, error: err.message });
-        }
-        // Délai minimal entre courses (les notifications sont fire-and-forget)
-        await new Promise(r => setTimeout(r, 100));
-      }
-
-      // ── FILET DE SÉCURITÉ — corriger les statuts "en_course" fantômes ──
-      // Un livreur peut rester bloqué à "en_course" sans course active si :
-      // - Sa course a été annulée/refusée sans déclencher syncStatutLivreurOnCourse
-      // - Une erreur réseau a interrompu le flux normal de libération
-      // Ce filet tourne à chaque tick et garantit qu'aucun statut fantôme ne persiste.
-      try {
-        const livreursEnCourse = await base44.asServiceRole.entities.Livreur.filter(
-          { type_livreur: 'externe', statut: 'en_course' },
-          '-updated_date', 50
-        );
-
-        if (livreursEnCourse.length > 0) {
-          // ⚡ OPTIMISATION: On ne fait plus de CourseExterne.filter par livreur individuellement.
-          // On utilise les courses déjà chargées dans ce tick (recherche_livreur + nouvelle)
-          // + on charge une seule fois les courses actives (statuts actifs) pour tous les livreurs.
-          const livreurIdsAvecCourseActive = new Set(
-            courses.filter(c => STATUTS_ACTIFS_VERIF.includes(c.statut) && c.livreur_id).map(c => c.livreur_id)
-          );
-
-          // Les livreurs "en_course" non trouvés dans courses sont potentiellement fantômes.
-          // On les corrige directement — la probabilité qu'ils aient une course active
-          // non-visible dans les statuts recherche_livreur/nouvelle est quasi nulle
-          // (une course active a un statut comme livreur_en_route, en_livraison, etc.).
-          const livreursFantomes = livreursEnCourse.filter(l => !livreurIdsAvecCourseActive.has(l.id));
-          for (const l of livreursFantomes) {
-            const nouveauStatut = l.manual_hors_ligne === true ? 'hors_ligne' : 'disponible';
-            await base44.asServiceRole.entities.Livreur.update(l.id, { statut: nouveauStatut });
-            console.log(`[DISPATCH] 🔄 Filet sécurité: ${l.prenom || ''} ${l.nom || ''} → "${nouveauStatut}" (en_course sans course active)`);
-          }
-          if (livreursFantomes.length > 0) {
-            console.log(`[DISPATCH] 🔄 Filet sécurité: ${livreursFantomes.length} statut(s) fantôme(s) corrigé(s)`);
-          }
-        }
-      } catch (err) {
-        console.warn('[DISPATCH] ⚠️ Erreur filet sécurité statut livreur:', err.message);
-      }
-
-      // 🚨 Détection des courses bloquées > 10 min (dispatch en panne)
-      // ⚡ OPTIMISATION: On ne vérifie plus les notifications existantes par course
-      // (1 lecture par course = trop cher). On crée l'alerte à chaque fois — le modal
-      // frontend déduplique via le champ course_id.
-      const stuckCourses = courses.filter(c => {
-        if (c.dispatch_status !== 'propose') return false;
-        if (!c.timeout_expires_at) return false;
-        const expiredTime = new Date(c.timeout_expires_at);
-        return expiredTime < now && (now.getTime() - expiredTime.getTime()) > 10 * 60 * 1000;
-      });
-      for (const course of stuckCourses) {
-        try {
-          const stuckMin = Math.round((now.getTime() - new Date(course.timeout_expires_at).getTime()) / 60000);
-          await base44.asServiceRole.entities.Notification.create({
-            titre: '🚨 Course bloquée — dispatch en panne ?',
-            message: `Course ${course.adresse_depart || '?'} → ${course.adresse_arrivee || '?'} — bloquée depuis ${stuckMin} min sans relance automatique. Le moteur de dispatch semble ne pas fonctionner.`,
-            type: 'alerte_critique_dispatch', course_id: course.id, lue: false,
-          });
-          console.error(`[DISPATCH] 🚨 ALERTE ADMIN: Course ${course.id} bloquée depuis ${stuckMin} min — dispatch en panne`);
-        } catch (e) { console.error('[DISPATCH] Erreur création alerte bloquée:', e.message); }
-      }
-
-      // ⚠️ Détection des courses sans aucun livreur disponible (> 5 min de recherche)
-      // ⚡ OPTIMISATION: On ne vérifie plus les notifications existantes par course.
-      try {
-        const coursesSansLivreur = courses.filter(c =>
-          c.statut === 'recherche_livreur' && c.dispatch_status === 'en_attente'
-        );
-        for (const course of coursesSansLivreur) {
-          const updatedTime = new Date(course.updated_date);
-          if (now.getTime() - updatedTime.getTime() < 5 * 60 * 1000) continue;
-
-          let notifiedIds = [];
-          try { notifiedIds = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
-          if (notifiedIds.length > 0) continue;
-
-          const searchMin = Math.round((now.getTime() - updatedTime.getTime()) / 60000);
-          await base44.asServiceRole.entities.Notification.create({
-            titre: '⚠️ Aucun livreur disponible',
-            message: `Course ${course.client_nom || '?'} — ${course.adresse_depart || '?'} → ${course.adresse_arrivee || '?'} — en recherche depuis ${searchMin} min sans aucun livreur trouvé. Les livreurs sont peut-être tous hors ligne ou trop loin.`,
-            type: 'alerte_aucun_livreur', course_id: course.id, lue: false,
-          });
-          console.warn(`[DISPATCH] ⚠️ ALERTE ADMIN: Course ${course.id} sans livreur depuis ${searchMin} min`);
-        }
-      } catch (e) { console.error('[DISPATCH] Erreur détection sans livreur:', e.message); }
-
-      return Response.json({ success: true, traitees: resultats.length, resultats: resultats.slice(0, 20) });
+    // ─── 6. Watchdog — détection et correction d'anomalies (tick de secours 10 min) ──
+    if (action === 'watchdog' || action === 'avancer_vagues_expirees') {
+      const result = await runWatchdog(base44, body);
+      return Response.json(result);
     }
 
     // ─── 7. Retry courses en attente / redispatch (hors vagues) ────────────
@@ -1126,7 +847,7 @@ Deno.serve(async (req) => {
       const base44 = createClientFromRequest(req);
       // 🛡️ Anti-spam : ne créer une alerte que si aucune alerte récente (< 30 min) n'existe
       // Délai augmenté à 30 min pour les rate limits (transitoires) vs 5 min pour les autres erreurs
-      const alertWindow = isRateLimit ? 30 * 60 * 1000 : 5 * 60 * 1000;
+      const alertWindow = isRateLimit ? 60 * 60 * 1000 : 5 * 60 * 1000;
       const recentAlerts = await base44.asServiceRole.entities.Notification.filter({
         type: 'alerte_critique_dispatch', lue: false,
       }, '-created_date', 1);

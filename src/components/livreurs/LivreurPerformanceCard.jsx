@@ -29,9 +29,8 @@ export default function LivreurPerformanceCard({ livreur, courses, onVoirDetails
   );
   
   const totalEncaisse = coursesLivrees.reduce((sum, c) => sum + (c.prix_reel || 0), 0);
-  // Utiliser le montant calculé sur la période sélectionnée (passé par le parent)
-  // Fallback sur le montant du jour si non fourni
-  const montantDu = montantDuOverride !== undefined ? montantDuOverride : totalEncaisse;
+  // ── Source de vérité unique : montant_du_silga (champ stocké sur le livreur) ──
+  const montantDu = Number(livreur.montant_du_silga) || 0;
   const isPaye = livreur.statut_paiement === "paye";
   
   const nomComplet = `${livreur.prenom || ""} ${livreur.nom}`.trim();

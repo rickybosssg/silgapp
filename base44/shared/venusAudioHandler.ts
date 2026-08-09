@@ -6,6 +6,7 @@ import {
   evaluerConfianceTranscription,
 } from './venusAudioEngine.ts';
 import { TWILIO_API_BASE } from './venusTwilioUtils.ts';
+import { invokeLLMTracked } from './integrationCreditTracker.ts';
 
 export async function transcrireAudio(base44, audioUrl, mediaContentType = '') {
   const startTime = Date.now();
@@ -38,7 +39,7 @@ export async function transcrireAudio(base44, audioUrl, mediaContentType = '') {
     let usedFallback = false;
 
     try {
-      const llmResult = await base44.asServiceRole.integrations.Core.InvokeLLM({
+      const llmResult = await invokeLLMTracked(base44, {
         prompt: `Tu es un expert en transcription audio. Transcris ce message vocal en français. L'audio est en français (parlé possiblement avec un accent africain burkinabè). Le texte peut contenir des noms de quartiers de Ouagadougou (Karpala, Pissy, Tampouy, Ouaga 2000, Zone du Bois, Patte d'Oie, Gounghin, Dassasgho, Cissin, Samandin, Wemtenga, Bendogo, Larle, Somgande, Saaba, Tanghin, Kossodo), des numéros de téléphone, ou des demandes de livraison. Réponds UNIQUEMENT avec le texte transcrit en français, sans commentaire. Si l'audio est inaudible, réponds "INAUDIBLE".`,
         file_urls: [audioUrl],
         model: 'gemini_3_flash',

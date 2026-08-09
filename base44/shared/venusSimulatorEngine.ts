@@ -1,5 +1,9 @@
 /**
  * ═══════════════════════════════════════════════════════════════════
+import { invokeLLMTracked } from './integrationCreditTracker.ts';
+
+/**
+ * ════════════════════════════════════════════════════════════════════
  * MOTEUR DE SIMULATION VENUS — Mode dry-run / 0 crédit
  * ═══════════════════════════════════════════════════════════════════
  *
@@ -317,7 +321,7 @@ export async function simulerMessage(base44: any, opts: {
     });
     try {
       const systemPrompt = opts.contenu_prompt || "Tu es VENUS, l'assistante SILGAPP.";
-      const llmResult = await base44.asServiceRole.integrations.Core.InvokeLLM({
+      const llmResult = await invokeLLMTracked(base44, {
         prompt: `${systemPrompt}\n\n═══ MESSAGE CLIENT (SIMULATION DRY-RUN) ═══\nTéléphone: ${telephone}\nPays: ${countryCode}\nMessage: "${message}"\n\nRéponds comme VENUS. AUCUNE action réelle ne sera exécutée. Réponds en texte plain, sans markdown.`,
         model: 'automatic',
       });

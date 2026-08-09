@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { invokeLLMTracked } from '../../shared/integrationCreditTracker.ts';
 
 const CATEGORIES = [
   "tarifs", "expedition_colis", "reception_colis", "suivi_colis", "gps",
@@ -254,7 +255,7 @@ Génère un rapport ${type_rapport} structuré avec:
 
 Sois concis, professionnel et orienté action. Réponds en français.`;
 
-      const llmRes = await base44.asServiceRole.integrations.Core.InvokeLLM({ prompt });
+      const llmRes = await invokeLLMTracked(base44, { prompt });
 
       const rapport = await base44.asServiceRole.entities.VenusRapport.create({
         type_rapport,

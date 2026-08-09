@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,6 @@ import { Plus, MapPin, Package, Truck, Clock, CheckCircle2, XCircle, AlertTriang
 import { format, isToday } from "date-fns";
 import { fr } from "date-fns/locale";
 import StatCard from "@/components/dashboard/StatCard";
-import { useQueryClient } from "@tanstack/react-query";
 import LivreursEnLigne from "@/components/dashboard/LivreursEnLigne";
 import CoursesADispatcher from "@/components/dashboard/CoursesADispatcher";
 import CoursesEnTraitement from "@/components/dashboard/CoursesEnTraitement";

@@ -3,12 +3,14 @@ import { base44 } from "@/api/base44Client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import {
   TrendingUp, Users, AlertTriangle,
   BarChart3, Download, FileText, Wallet,
-  Calendar, MapPin, TrendingDown, Minus, Store, UtensilsCrossed
+  Calendar, MapPin, TrendingDown, Minus, Store, UtensilsCrossed,
+  Search, ArrowUpDown, ChevronLeft, ChevronRight
 } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
@@ -42,6 +44,11 @@ export default function Comptabilite() {
   const [selectedCountry, setSelectedCountry] = useState("all");
   const [periodPreset, setPeriodPreset] = useState("month");
   const [selectedLivreur, setSelectedLivreur] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortField, setSortField] = useState("montant_du_silga");
+  const [sortDir, setSortDir] = useState("desc");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   const now = new Date();
   const periodDates = useMemo(() => {
@@ -76,6 +83,8 @@ export default function Comptabilite() {
   const topLivreurs = compta?.top_livreurs || [];
   const topPartenaires = compta?.top_partenaires || [];
   const paysConfig = compta?.pays_config || {};
+  const hasData = compta !== null;
+  const isRefreshing = isLoading && hasData;
 
   const devisePays = selectedCountry !== "all" && paysConfig[selectedCountry]
     ? paysConfig[selectedCountry].devise : "FCFA";
@@ -92,9 +101,9 @@ export default function Comptabilite() {
 
   const handleExportCSV = () => {
     if (!topLivreurs.length) return;
-    const headers = "Livreur,Téléphone,CA,Commission,Gain,Courses,Encours\n";
+    const headers = "Livreur,Téléphone,CA,Commission,Gain,Courses,Dû SILGAPP\n";
     const rows = topLivreurs.map(l =>
-      `"${l.livreur_nom}","${l.livreur_telephone}",${l.ca},${l.commission},${l.gain},${l.nb_courses},${l.encours}`
+      `"${l.livreur_nom}","${l.livreur_telephone}",${l.ca},${l.commission},${l.gain},${l.nb_courses},${l.montant_du_silga ?? l.encours ?? 0}`
     ).join("\n");
     const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -125,7 +134,7 @@ export default function Comptabilite() {
       topLivreurs.slice(0, 25).forEach((l, i) => {
         if (y > 270) { doc.addPage(); y = 20; }
         doc.setFontSize(8);
-        doc.text(`${i+1}. ${l.livreur_nom} - CA: ${formatMontant(l.ca)} ${devisePays} - Gain: ${formatMontant(l.gain)} ${devisePays} - Encours: ${formatMontant(l.encours)}`, 14, y);
+        doc.text(`${i+1}. ${l.livreur_nom} - CA: ${formatMontant(l.ca)} ${devisePays} - Gain: ${formatMontant(l.gain)} ${devisePays} - Dû SILGAPP: ${formatMontant(l.montant_du_silga ?? l.encours ?? 0)}`, 14, y);
         y += 8;
       });
     }
@@ -136,6 +145,50 @@ export default function Comptabilite() {
     queryClient.invalidateQueries({ queryKey: ["comptabilite"] });
     setSelectedLivreur(null);
   };
+
+  // ── Tri, recherche et pagination des top livreurs ──
+  const filteredLivreurs = useMemo(() => {
+    let list = [...topLivreurs];
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      list = list.filter(l =>
+        (l.livreur_nom || '').toLowerCase().includes(q) ||
+        (l.livreur_telephone || '').toLowerCase().includes(q)
+      );
+    }
+    list.sort((a, b) => {
+      let av = a[sortField], bv = b[sortField];
+      if (typeof av === 'string') av = av.toLowerCase();
+      if (typeof bv === 'string') bv = bv.toLowerCase();
+      if (av < bv) return sortDir === 'asc' ? -1 : 1;
+      if (av > bv) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+    return list;
+  }, [topLivreurs, searchQuery, sortField, sortDir]);
+
+  const totalPages = Math.ceil(filteredLivreurs.length / itemsPerPage);
+  const paginatedLivreurs = filteredLivreurs.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDir('desc');
+    }
+    setCurrentPage(1);
+  };
+
+  const SortHeader = ({ field, label, className = "" }) => (
+    <th className={`py-2 text-xs text-gray-500 font-medium cursor-pointer hover:text-gray-700 select-none ${className}`}
+        onClick={() => handleSort(field)}>
+      <span className="inline-flex items-center gap-1">
+        {label}
+        <ArrowUpDown className={`w-3 h-3 ${sortField === field ? 'text-primary' : 'text-gray-300'}`} />
+      </span>
+    </th>
+  );
 
   if (isLoading && !compta) {
     return (
@@ -155,7 +208,15 @@ export default function Comptabilite() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-gray-900"> Comptabilité</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-black text-gray-900"> Comptabilité</h1>
+            {isRefreshing && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+                <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-pulse" />
+                Mise à jour...
+              </span>
+            )}
+          </div>
           <p className="text-sm text-gray-500 mt-1">
             {format(new Date(periodDates.debut), 'dd MMM yyyy', { locale: fr })} → {format(new Date(periodDates.fin), 'dd MMM yyyy', { locale: fr })}
           </p>
@@ -370,61 +431,113 @@ export default function Comptabilite() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {topLivreurs.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-100">
-                    <th className="text-left py-2 text-xs text-gray-500 font-medium">#</th>
-                    <th className="text-left py-2 text-xs text-gray-500 font-medium">Livreur</th>
-                    <th className="text-right py-2 text-xs text-gray-500 font-medium">Courses</th>
-                    <th className="text-right py-2 text-xs text-gray-500 font-medium">CA</th>
-                    <th className="text-right py-2 text-xs text-gray-500 font-medium">Commission</th>
-                    <th className="text-right py-2 text-xs text-gray-500 font-medium">Gain</th>
-                    <th className="text-right py-2 text-xs text-gray-500 font-medium">Encours</th>
-                    <th className="text-center py-2 text-xs text-gray-500 font-medium">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {topLivreurs.map((l, i) => (
-                    <tr key={l.id} className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer"
-                      onClick={() => setSelectedLivreur({ id: l.id, nom: l.livreur_nom })}>
-                      <td className="py-2.5">
-                        <Badge variant={i < 3 ? "default" : "outline"} className="text-[10px] w-6 h-5 flex items-center justify-center">
-                          {i + 1}
-                        </Badge>
-                      </td>
-                      <td className="py-2.5">
-                        <div className="flex items-center gap-1.5">
-                          {l.bloque_encours && <AlertTriangle className="w-3 h-3 text-red-500 flex-shrink-0" />}
-                          <div>
-                            <p className="font-semibold text-gray-900">{l.livreur_nom || '—'}</p>
-                            <p className="text-[10px] text-gray-400">{l.livreur_telephone}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-2.5 text-right text-gray-600">{l.nb_courses}</td>
-                      <td className="py-2.5 text-right font-bold text-emerald-700">{formatMontant(l.ca)}</td>
-                      <td className="py-2.5 text-right text-blue-600">{formatMontant(l.commission)}</td>
-                      <td className="py-2.5 text-right text-violet-600">{formatMontant(l.gain)}</td>
-                      <td className="py-2.5 text-right">
-                        <span className={l.bloque_encours ? "text-red-600 font-bold" : "text-amber-600"}>
-                          {formatMontant(l.encours)}
-                        </span>
-                      </td>
-                      <td className="py-2.5 text-center" onClick={e => e.stopPropagation()}>
-                        <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 text-green-600 hover:text-green-700 hover:bg-green-50"
-                          onClick={() => setSelectedLivreur({ id: l.id, nom: l.livreur_nom })}>
-                          <Wallet className="w-3 h-3" /> Détail
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          {/* Barre de recherche */}
+          {topLivreurs.length > 0 && (
+            <div className="mb-3 flex items-center gap-2">
+              <div className="relative flex-1 max-w-xs">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                <Input
+                  value={searchQuery}
+                  onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                  placeholder="Rechercher un livreur..."
+                  className="h-8 pl-8 text-xs"
+                />
+              </div>
+              <span className="text-[10px] text-gray-400">
+                {filteredLivreurs.length} livreur(s)
+              </span>
             </div>
+          )}
+          {topLivreurs.length > 0 ? (
+            paginatedLivreurs.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-100">
+                      <th className="text-left py-2 text-xs text-gray-500 font-medium">#</th>
+                      <SortHeader field="livreur_nom" label="Livreur" />
+                      <SortHeader field="nb_courses" label="Courses" className="text-right" />
+                      <SortHeader field="ca" label="CA" className="text-right" />
+                      <SortHeader field="commission" label="Commission" className="text-right" />
+                      <SortHeader field="gain" label="Gain" className="text-right" />
+                      <SortHeader field="montant_du_silga" label="Dû SILGAPP" className="text-right" />
+                      <th className="text-center py-2 text-xs text-gray-500 font-medium">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginatedLivreurs.map((l, i) => {
+                      const rank = (currentPage - 1) * itemsPerPage + i + 1;
+                      return (
+                        <tr key={l.id} className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer"
+                          onClick={() => setSelectedLivreur({ id: l.id, nom: l.livreur_nom })}>
+                          <td className="py-2.5">
+                            <Badge variant={rank <= 3 ? "default" : "outline"} className="text-[10px] w-6 h-5 flex items-center justify-center">
+                              {rank}
+                            </Badge>
+                          </td>
+                          <td className="py-2.5">
+                            <div className="flex items-center gap-1.5">
+                              {l.bloque_encours && <AlertTriangle className="w-3 h-3 text-red-500 flex-shrink-0" />}
+                              <div>
+                                <p className="font-semibold text-gray-900">{l.livreur_nom || '—'}</p>
+                                <p className="text-[10px] text-gray-400">{l.livreur_telephone}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-2.5 text-right text-gray-600">{l.nb_courses}</td>
+                          <td className="py-2.5 text-right font-bold text-emerald-700">{formatMontant(l.ca)}</td>
+                          <td className="py-2.5 text-right text-blue-600">{formatMontant(l.commission)}</td>
+                          <td className="py-2.5 text-right text-violet-600">{formatMontant(l.gain)}</td>
+                          <td className="py-2.5 text-right">
+                            <span className={l.bloque_encours ? "text-red-600 font-bold" : "text-amber-600"}>
+                              {formatMontant(l.montant_du_silga ?? l.encours ?? 0)}
+                            </span>
+                          </td>
+                          <td className="py-2.5 text-center" onClick={e => e.stopPropagation()}>
+                            <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 text-green-600 hover:text-green-700 hover:bg-green-50"
+                              onClick={() => setSelectedLivreur({ id: l.id, nom: l.livreur_nom })}>
+                              <Wallet className="w-3 h-3" /> Détail
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between mt-3 px-1">
+                    <span className="text-[10px] text-gray-400">
+                      Page {currentPage} sur {totalPages}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <Button variant="outline" size="sm" className="h-7 w-7 p-0" disabled={currentPage <= 1}
+                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}>
+                        <ChevronLeft className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button variant="outline" size="sm" className="h-7 w-7 p-0" disabled={currentPage >= totalPages}
+                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-8 space-y-2">
+                <AlertTriangle className="w-8 h-8 text-gray-300 mx-auto" />
+                <p className="text-gray-400 text-sm">Aucun livreur ne correspond à votre recherche</p>
+                <Button variant="outline" size="sm" className="text-xs" onClick={() => { setSearchQuery(""); setCurrentPage(1); }}>
+                  Réinitialiser la recherche
+                </Button>
+              </div>
+            )
           ) : (
-            <p className="text-center text-gray-400 text-sm py-4">Aucune course sur la période</p>
+            <div className="text-center py-8 space-y-2">
+              <AlertTriangle className="w-8 h-8 text-gray-300 mx-auto" />
+              <p className="text-gray-400 text-sm">Aucune course sur la période sélectionnée</p>
+              <p className="text-[10px] text-gray-400">Essayez de changer la période ou le pays ci-dessus</p>
+            </div>
           )}
         </CardContent>
       </Card>

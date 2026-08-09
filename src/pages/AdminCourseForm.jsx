@@ -1,16 +1,19 @@
 import React, { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { ArrowLeft, Send, Loader2, Sparkles, Navigation, Check } from "lucide-react";
+import { ArrowLeft, Send, Loader2, Sparkles, Navigation, Check, Zap } from "lucide-react";
 import { useAdminContext } from "@/hooks/useAdminContext";
 import { useAdminCourseWindows } from "@/context/AdminCourseWindowsContext";
-import AdminAddressAutocomplete from "@/components/admin/AdminAddressAutocomplete";
 import MapPickerModal from "@/components/admin/MapPickerModal";
 import CourseWindowStack from "@/components/admin/CourseWindowStack";
+import ClientPhoneDetector from "@/components/crm/ClientPhoneDetector";
+import SmartAddressPicker from "@/components/crm/SmartAddressPicker";
+import { upsertCourseAddresses } from "@/lib/addressBook";
+import { upsertClientsFromCourseContacts, normalizePhone } from "@/lib/crmUtils";
 
 function generarQRData() {
   const pickupQrToken = crypto.randomUUID().replace(/-/g, "");
@@ -43,22 +46,6 @@ function cleanPhone(phone, countryCode) {
   return digits;
 }
 
-function waLink(phone, message, countryCode) {
-  const normalized = cleanPhone(phone, countryCode);
-  return `https://wa.me/${normalized}?text=${encodeURIComponent(message)}`;
-}
-
-function buildTrackingUrl(token) {
-  return `https://silga-dispatch-go.base44.app/suivi-public/${token}`;
-}
-
-function buildQrUrl(token) {
-  return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(token)}`;
-}
-
-const SILGAPP_PLAYSTORE = "https://play.google.com/store/apps/details?id=com.base6a0ec08f3af5e1d1284254c1.app";
-const SILGAPP_APPLE = "https://apps.apple.com/bf/app/silgapp/id6782046749?l=fr-FR";
-
 const PAYS = [
   { code: "BF", nom: "Burkina Faso", drapeau: "🇧🇫" },
   { code: "CI", nom: "Côte d'Ivoire", drapeau: "🇨🇮" },
@@ -79,7 +66,6 @@ const TYPE_OPTIONS = [
 
 // ── Main form component ──
 export default function AdminCourseForm() {
-  const navigate = useNavigate();
   const { countryCode: adminCountryCode } = useAdminContext();
   const { addWindow } = useAdminCourseWindows();
 
@@ -91,7 +77,6 @@ export default function AdminCourseForm() {
   const [countryCode, setCountryCode] = useState(adminCountryCode || "BF");
 
   const [clientNom, setClientNom] = useState("");
-  const [clientPrenom, setClientPrenom] = useState("");
   const [clientTelephone, setClientTelephone] = useState("");
   const [expediteurNom, setExpediteurNom] = useState("");
   const [expediteurTelephone, setExpediteurTelephone] = useState("");
@@ -104,8 +89,17 @@ export default function AdminCourseForm() {
   const [gpsDepart, setGpsDepart] = useState(null);
   const [gpsArrivee, setGpsArrivee] = useState(null);
   const [mapModal, setMapModal] = useState(null); // null | 'depart' | 'arrivee'
+  const [detectedClient, setDetectedClient] = useState(null);
+  const [quickMode, setQuickMode] = useState(false);
 
   const selectedPays = PAYS.find(p => p.code === countryCode);
+
+  const fillFromTemplate = (template) => {
+    setTypeCourse(template.type_course);
+    setTypeColis(template.type_colis);
+    if (template.notes) setNotes(template.notes);
+    toast.info(`Modèle « ${template.label} » appliqué`);
+  };
 
   const resetForm = () => {
     setAdresseDepart("");
@@ -115,7 +109,6 @@ export default function AdminCourseForm() {
     setGpsDepart(null);
     setGpsArrivee(null);
     setClientNom("");
-    setClientPrenom("");
     setClientTelephone("");
     setExpediteurNom("");
     setExpediteurTelephone("");
@@ -200,9 +193,26 @@ export default function AdminCourseForm() {
         passager_nom: typeCourse === "deplacement" ? (clientNom.trim() || "Passager") : null,
         passager_telephone: typeCourse === "deplacement" ? (clientTelephone.trim() || null) : null,
         nb_passagers: typeCourse === "deplacement" ? 1 : null,
+        client_phone_normalized: normalizePhone(clientTel, countryCode),
+        expediteur_phone_normalized: finalExpediteurTel ? normalizePhone(finalExpediteurTel, countryCode) : null,
+        destinataire_phone_normalized: finalDestinataireTel ? normalizePhone(finalDestinataireTel, countryCode) : null,
       };
 
       const course = await base44.entities.CourseExterne.create(courseData);
+
+      // CRM - Créer ou mettre à jour les fiches pour les 3 contacts (sans stats)
+      try {
+        await upsertClientsFromCourseContacts(courseData, countryCode);
+      } catch (crmErr) {
+        console.warn("[CRM] Erreur enrichissement fiches client:", crmErr?.message);
+      }
+
+      // Carnet d'adresses intelligent — upsert les adresses de départ et d'arrivée
+      try {
+        await upsertCourseAddresses(courseData, countryCode);
+      } catch (addrErr) {
+        console.warn("[AddressBook] Erreur upsert adresses:", addrErr?.message);
+      }
 
       // 📦 Pousser la course dans la pile de fenêtres persistantes
       addWindow(course, formData);
@@ -239,19 +249,32 @@ export default function AdminCourseForm() {
               </div>
               <p className="text-xs text-white/60 mt-0.5">Création manuelle administrateur</p>
             </div>
-            <div className="flex flex-col items-end">
-              <span className="text-2xl font-black text-white/90 leading-none">
-                {String(new Date().getDate()).padStart(2, '0')}
-              </span>
-              <span className="text-[10px] text-white/50 uppercase tracking-wider">
-                {new Date().toLocaleDateString('fr-FR', { month: 'short' })}
-              </span>
-            </div>
+            <button
+              type="button"
+              onClick={() => setQuickMode(!quickMode)}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-bold transition-all ${
+                quickMode
+                  ? "bg-emerald-400 text-white shadow-lg shadow-emerald-300/30"
+                  : "bg-white/15 text-white hover:bg-white/30 border border-white/25"
+              }`}
+            >
+              <Zap className="w-3.5 h-3.5" />
+              Mode rapide
+            </button>
           </div>
         </div>
 
+        {quickMode && (
+          <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-50 border border-emerald-200">
+            <Zap className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+            <span className="text-[11px] font-semibold text-emerald-700">
+              Mode rapide — tapez le numéro du client, sélectionnez une course dans l'historique, puis cliquez sur Créer
+            </span>
+          </div>
+        )}
+
         {/* Type de course — cartes raffinées */}
-        <div className="force-light bg-white rounded-[1.5rem] border border-gray-100 shadow-lg shadow-gray-100/50 overflow-hidden">
+        <div className="bg-white rounded-[1.5rem] border border-gray-100 shadow-lg shadow-gray-100/50 overflow-hidden">
           <div className="px-5 pt-4 pb-1">
             <div className="flex items-center gap-2 mb-1">
               <div className="w-1 h-4 bg-gradient-to-b from-rose-500 to-orange-500 rounded-full" />
@@ -305,8 +328,109 @@ export default function AdminCourseForm() {
           </div>
         </div>
 
+        {/* Contacts */}
+        <div className="bg-white rounded-[1.5rem] border border-gray-100 shadow-lg shadow-gray-100/50 p-5 space-y-4">
+          <div className="flex items-center gap-2">
+            <div className="w-1 h-4 bg-gradient-to-b from-sky-500 to-blue-500 rounded-full" />
+            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Contacts</p>
+            <span className="text-[10px] bg-sky-50 text-sky-600 px-2 py-0.5 rounded-full font-semibold border border-sky-100">Optionnel</span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <p className="text-[10px] text-gray-400 mb-1 font-semibold uppercase tracking-wide">Nom du client</p>
+              <Input
+                value={clientNom}
+                onChange={e => setClientNom(e.target.value)}
+                placeholder="Nom"
+                className="rounded-xl h-11 bg-blue-50 border-blue-200/60 text-sm focus:ring-blue-300/50 focus:border-blue-400"
+              />
+            </div>
+            <div>
+              <p className="text-[10px] text-gray-400 mb-1 font-semibold uppercase tracking-wide">Téléphone</p>
+              <Input
+                value={clientTelephone}
+                onChange={e => setClientTelephone(e.target.value)}
+                placeholder="+226 XX XX XX XX"
+                className="rounded-xl h-11 bg-blue-50 border-blue-200/60 text-sm focus:ring-blue-300/50 focus:border-blue-400"
+              />
+            </div>
+          </div>
+
+          <ClientPhoneDetector
+            phone={clientTelephone}
+            countryCode={countryCode}
+            onClientFound={setDetectedClient}
+            onClientName={(nom, prenom) => {
+              if (!clientNom) setClientNom(prenom ? `${prenom} ${nom}`.trim() : nom);
+            }}
+          />
+
+          {!quickMode && (typeCourse === "recevoir" ? (
+            <>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <p className="text-[10px] text-gray-400 mb-1 font-semibold uppercase tracking-wide">Expéditeur</p>
+                <Input
+                  value={expediteurNom}
+                  onChange={e => setExpediteurNom(e.target.value)}
+                  placeholder="Nom expéditeur"
+                  className="rounded-xl h-11 bg-amber-50/30 border-amber-100/50 text-sm focus:ring-amber-300/50 focus:border-amber-300"
+                />
+              </div>
+              <div>
+                <p className="text-[10px] text-gray-400 mb-1 font-semibold uppercase tracking-wide">Tél. expéditeur</p>
+                <Input
+                  value={expediteurTelephone}
+                  onChange={e => setExpediteurTelephone(e.target.value)}
+                  placeholder="+226 XX XX XX XX"
+                  className="rounded-xl h-11 bg-amber-50/30 border-amber-100/50 text-sm focus:ring-amber-300/50 focus:border-amber-300"
+                />
+              </div>
+            </div>
+            <ClientPhoneDetector phone={expediteurTelephone} countryCode={countryCode} />
+            </>
+          ) : typeCourse === "expedier" ? (
+            <>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <p className="text-[10px] text-gray-400 mb-1 font-semibold uppercase tracking-wide">Destinataire</p>
+                <Input
+                  value={destinataireNom}
+                  onChange={e => setDestinataireNom(e.target.value)}
+                  placeholder="Nom destinataire"
+                  className="rounded-xl h-11 bg-rose-50 border-rose-200/60 text-sm focus:ring-rose-300/50 focus:border-rose-400"
+                />
+              </div>
+              <div>
+                <p className="text-[10px] text-gray-400 mb-1 font-semibold uppercase tracking-wide">Tél. destinataire</p>
+                <Input
+                  value={destinataireTelephone}
+                  onChange={e => setDestinataireTelephone(e.target.value)}
+                  placeholder="+226 XX XX XX XX"
+                  className="rounded-xl h-11 bg-rose-50 border-rose-200/60 text-sm focus:ring-rose-300/50 focus:border-rose-400"
+                />
+              </div>
+            </div>
+            <ClientPhoneDetector phone={destinataireTelephone} countryCode={countryCode} />
+            </>
+          ) : null)}
+
+          {!quickMode && (
+          <div>
+            <p className="text-[10px] text-gray-400 mb-1 font-semibold uppercase tracking-wide">Notes</p>
+            <Input
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              placeholder="Instructions particulières..."
+              className="rounded-xl h-11 bg-gray-50/50 border-gray-200/50 text-sm focus:ring-gray-300/50"
+            />
+          </div>
+          )}
+        </div>
+
         {/* Détails — trajet visuel */}
-        <div className="force-light bg-white rounded-[1.5rem] border border-gray-100 shadow-lg shadow-gray-100/50 p-5 space-y-4">
+        <div className="bg-white rounded-[1.5rem] border border-gray-100 shadow-lg shadow-gray-100/50 p-5 space-y-4">
           <div className="flex items-center gap-2">
             <div className="w-1 h-4 bg-gradient-to-b from-orange-500 to-amber-500 rounded-full" />
             <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Itinéraire</p>
@@ -315,7 +439,7 @@ export default function AdminCourseForm() {
           <div>
             <p className="text-[11px] font-semibold text-gray-500 mb-1.5">Pays de destination</p>
             <Select value={countryCode} onValueChange={setCountryCode}>
-              <SelectTrigger className="rounded-xl h-12 bg-blue-50/40 border-blue-100/50 text-sm font-medium text-slate-900 focus:ring-blue-300/50">
+              <SelectTrigger className="rounded-xl h-12 bg-blue-50/40 border-blue-100/50 text-sm font-medium focus:ring-blue-300/50">
                 <SelectValue>
                   {selectedPays ? `${selectedPays.drapeau}  ${selectedPays.nom}` : "Choisir un pays"}
                 </SelectValue>
@@ -348,7 +472,9 @@ export default function AdminCourseForm() {
                   </span>
                 )}
               </div>
-              <AdminAddressAutocomplete
+              <SmartAddressPicker
+                client={detectedClient}
+                role="depart"
                 value={adresseDepart}
                 onChange={setAdresseDepart}
                 onSelect={(r) => {
@@ -360,7 +486,7 @@ export default function AdminCourseForm() {
                 countryCode={countryCode}
                 placeholder="Ex: Ouaga 2000, face à la mairie"
                 iconColor="text-emerald-500"
-                inputClassName="rounded-xl h-12 pl-10 pr-28 bg-blue-50 border-blue-200/60 text-sm text-slate-900 placeholder:text-slate-400 focus:ring-blue-300/50 focus:border-blue-400"
+                inputClassName="rounded-xl h-12 pl-10 pr-28 bg-blue-50 border-blue-200/60 text-sm focus:ring-blue-300/50 focus:border-blue-400"
               >
                 <button
                   type="button"
@@ -370,7 +496,7 @@ export default function AdminCourseForm() {
                   <Navigation className="w-3.5 h-3.5" />
                   Localiser
                 </button>
-              </AdminAddressAutocomplete>
+              </SmartAddressPicker>
             </div>
 
             {/* Arrivée */}
@@ -386,7 +512,9 @@ export default function AdminCourseForm() {
                   </span>
                 )}
               </div>
-              <AdminAddressAutocomplete
+              <SmartAddressPicker
+                client={detectedClient}
+                role="arrivee"
                 value={adresseArrivee}
                 onChange={setAdresseArrivee}
                 onSelect={(r) => {
@@ -398,7 +526,7 @@ export default function AdminCourseForm() {
                 countryCode={countryCode}
                 placeholder="Ex: Gounghin, derrière le marché"
                 iconColor="text-rose-500"
-                inputClassName="rounded-xl h-12 pl-10 pr-28 bg-rose-50 border-rose-200/60 text-sm text-slate-900 placeholder:text-slate-400 focus:ring-rose-300/50 focus:border-rose-400"
+                inputClassName="rounded-xl h-12 pl-10 pr-28 bg-rose-50 border-rose-200/60 text-sm focus:ring-rose-300/50 focus:border-rose-400"
               >
                 <button
                   type="button"
@@ -408,7 +536,7 @@ export default function AdminCourseForm() {
                   <Navigation className="w-3.5 h-3.5" />
                   Localiser
                 </button>
-              </AdminAddressAutocomplete>
+              </SmartAddressPicker>
             </div>
           </div>
 
@@ -416,7 +544,7 @@ export default function AdminCourseForm() {
             <div>
               <p className="text-[11px] font-semibold text-gray-500 mb-1.5">Type de colis</p>
               <Select value={typeColis} onValueChange={setTypeColis}>
-                <SelectTrigger className="rounded-xl h-12 bg-violet-50/30 border-violet-100/50 text-sm font-medium text-slate-900 focus:ring-violet-300/50">
+                <SelectTrigger className="rounded-xl h-12 bg-violet-50/30 border-violet-100/50 text-sm font-medium focus:ring-violet-300/50">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -430,90 +558,6 @@ export default function AdminCourseForm() {
               </Select>
             </div>
           )}
-        </div>
-
-        {/* Contacts */}
-        <div className="force-light bg-white rounded-[1.5rem] border border-gray-100 shadow-lg shadow-gray-100/50 p-5 space-y-4">
-          <div className="flex items-center gap-2">
-            <div className="w-1 h-4 bg-gradient-to-b from-sky-500 to-blue-500 rounded-full" />
-            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Contacts</p>
-            <span className="text-[10px] bg-sky-50 text-sky-600 px-2 py-0.5 rounded-full font-semibold border border-sky-100">Optionnel</span>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <p className="text-[10px] text-gray-400 mb-1 font-semibold uppercase tracking-wide">Nom du client</p>
-              <Input
-                value={clientNom}
-                onChange={e => setClientNom(e.target.value)}
-                placeholder="Nom"
-                className="rounded-xl h-11 bg-blue-50 border-blue-200/60 text-sm text-slate-900 placeholder:text-slate-400 focus:ring-blue-300/50 focus:border-blue-400"
-              />
-            </div>
-            <div>
-              <p className="text-[10px] text-gray-400 mb-1 font-semibold uppercase tracking-wide">Téléphone</p>
-              <Input
-                value={clientTelephone}
-                onChange={e => setClientTelephone(e.target.value)}
-                placeholder="+226 XX XX XX XX"
-                className="rounded-xl h-11 bg-blue-50 border-blue-200/60 text-sm text-slate-900 placeholder:text-slate-400 focus:ring-blue-300/50 focus:border-blue-400"
-              />
-            </div>
-          </div>
-
-          {typeCourse === "recevoir" ? (
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <p className="text-[10px] text-gray-400 mb-1 font-semibold uppercase tracking-wide">Expéditeur</p>
-                <Input
-                  value={expediteurNom}
-                  onChange={e => setExpediteurNom(e.target.value)}
-                  placeholder="Nom expéditeur"
-                  className="rounded-xl h-11 bg-amber-50/30 border-amber-100/50 text-sm text-slate-900 placeholder:text-slate-400 focus:ring-amber-300/50 focus:border-amber-300"
-                />
-              </div>
-              <div>
-                <p className="text-[10px] text-gray-400 mb-1 font-semibold uppercase tracking-wide">Tél. expéditeur</p>
-                <Input
-                  value={expediteurTelephone}
-                  onChange={e => setExpediteurTelephone(e.target.value)}
-                  placeholder="+226 XX XX XX XX"
-                  className="rounded-xl h-11 bg-amber-50/30 border-amber-100/50 text-sm text-slate-900 placeholder:text-slate-400 focus:ring-amber-300/50 focus:border-amber-300"
-                />
-              </div>
-            </div>
-          ) : typeCourse === "expedier" ? (
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <p className="text-[10px] text-gray-400 mb-1 font-semibold uppercase tracking-wide">Destinataire</p>
-                <Input
-                  value={destinataireNom}
-                  onChange={e => setDestinataireNom(e.target.value)}
-                  placeholder="Nom destinataire"
-                  className="rounded-xl h-11 bg-rose-50 border-rose-200/60 text-sm text-slate-900 placeholder:text-slate-400 focus:ring-rose-300/50 focus:border-rose-400"
-                />
-              </div>
-              <div>
-                <p className="text-[10px] text-gray-400 mb-1 font-semibold uppercase tracking-wide">Tél. destinataire</p>
-                <Input
-                  value={destinataireTelephone}
-                  onChange={e => setDestinataireTelephone(e.target.value)}
-                  placeholder="+226 XX XX XX XX"
-                  className="rounded-xl h-11 bg-rose-50 border-rose-200/60 text-sm text-slate-900 placeholder:text-slate-400 focus:ring-rose-300/50 focus:border-rose-400"
-                />
-              </div>
-            </div>
-          ) : null}
-
-          <div>
-            <p className="text-[10px] text-gray-400 mb-1 font-semibold uppercase tracking-wide">Notes</p>
-            <Input
-              value={notes}
-              onChange={e => setNotes(e.target.value)}
-              placeholder="Instructions particulières..."
-              className="rounded-xl h-11 bg-gray-50/50 border-gray-200/50 text-sm text-slate-900 placeholder:text-slate-400 focus:ring-gray-300/50"
-            />
-          </div>
         </div>
 
         {/* Bouton Créer — premium avec glow */}

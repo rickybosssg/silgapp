@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { envoyerWhatsAppRaw } from '../../shared/twilioWhatsApp.ts';
 
 /**
  * Envoi sécurisé d'un message de messagerie SILGAPP.
@@ -261,6 +262,30 @@ Deno.serve(async (req) => {
       }
     } catch (e) {
       console.error('[envoyerMessage] Push notification error:', e);
+    }
+
+    // ── 6. Si conversation WhatsApp et admin a pris la main, envoyer via WhatsApp ──
+    //    Quand l'admin répond dans une conversation WhatsApp (VENUS désactivée),
+    //    le client ne reçoit pas le message car il communique via WhatsApp, pas l'app.
+    //    On relaye donc le message admin via Twilio WhatsApp vers le client.
+    if (conversation_id && sender_type === 'admin' && message_type === 'text' && content) {
+      try {
+        const convs = await base44.asServiceRole.entities.Conversation.filter({ id: conversation_id });
+        const conv = convs?.[0];
+        if (conv && conv.source === 'whatsapp' && conv.whatsapp_phone) {
+          const clientTel = `+${conv.whatsapp_phone.replace(/\D/g, '')}`;
+          // ── Dual-number: utiliser silgapp_from_number si disponible ──
+          const fromOverride = conv.silgapp_from_number || undefined;
+          const waResult = await envoyerWhatsAppRaw(clientTel, content, fromOverride);
+          if (waResult.success) {
+            console.log(`[envoyerMessage] ✅ Message admin relayé via WhatsApp à ${clientTel}`);
+          } else {
+            console.warn(`[envoyerMessage] ⚠️ Échec envoi WhatsApp à ${clientTel}: ${waResult.error || waResult.code}`);
+          }
+        }
+      } catch (waErr) {
+        console.warn(`[envoyerMessage] ⚠️ Erreur relayage WhatsApp: ${waErr.message}`);
+      }
     }
 
     return Response.json({

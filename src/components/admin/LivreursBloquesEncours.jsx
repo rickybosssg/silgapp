@@ -146,8 +146,8 @@ export default function LivreursBloquesEncours({ countryCode }) {
               {/* Stats */}
               <div className="px-4 py-3 grid grid-cols-3 gap-3">
                 <div className="text-center">
-                  <p className="text-[10px] text-gray-500 uppercase font-semibold">Encours</p>
-                  <p className="text-sm font-black text-red-600">{l.encours.toLocaleString()} {l.devise}</p>
+                  <p className="text-[10px] text-gray-500 uppercase font-semibold">Dû SILGAPP</p>
+                  <p className="text-sm font-black text-red-600">{(l.montant_du_silga ?? l.encours ?? 0).toLocaleString()} {l.devise}</p>
                 </div>
                 <div className="text-center border-x border-gray-100">
                   <p className="text-[10px] text-gray-500 uppercase font-semibold">Plafond</p>
@@ -200,7 +200,7 @@ export default function LivreursBloquesEncours({ countryCode }) {
                         <Input
                           type="number"
                           min={0}
-                          max={l.encours}
+                          max={l.montant_du_silga ?? l.encours ?? 0}
                           placeholder="Ex: 2000"
                           value={reductionMap[l.id] || ""}
                           onChange={(e) => setReductionMap(prev => ({ ...prev, [l.id]: Number(e.target.value) }))}

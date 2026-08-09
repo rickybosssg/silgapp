@@ -40,6 +40,7 @@ import {
 import { genererReferenceCourse } from './venusCourseReference.ts';
 import { isOpenAIEnabled, raisonnerAvecOpenAI, getOpenAIModel } from './venusOpenAIEngine.ts';
 import { logOpenAIUsage, loggerMessageVenus, calculateCost } from './venusOpenAITracker.ts';
+import { invokeLLMTracked } from './integrationCreditTracker.ts';
 
 /**
  * Recherche les scénarios validés pour un pays/langue donnés (Source 3).
@@ -378,28 +379,25 @@ export async function creerCourseDepuisMemoire(
 ): Promise<{ success: boolean; course?: any; error?: string; message?: string }> {
   const cd = { ...memoireCourte };
 
+  // ── RÈGLE: type_course par défaut = expedier ──
+  if (!cd.type_course) cd.type_course = 'expedier';
+
   // Normaliser type_course
-  const normalizedType = normalizeTypeCourse(cd.type_course) || cd.type_course;
+  const normalizedType = normalizeTypeCourse(cd.type_course) || cd.type_course || 'expedier';
   if (!normalizedType || !['expedier', 'recevoir', 'deplacement'].includes(normalizedType)) {
     return { success: false, error: 'MISSING_TYPE' };
   }
 
-  const hasDepart = cd.adresse_depart || cd.gps_depart_lat != null;
-  const hasArrivee = cd.adresse_arrivee || cd.gps_arrivee_lat != null;
-  // ── contact_createur_course : AUTO = numéro WhatsApp du client ──
-  // Le client qui écrit sur WhatsApp EST le créateur de la course. Pas besoin de demander.
+  // ── RÈGLE: contact_createur_course = numéro WhatsApp du client (par défaut, ne pas demander) ──
   if (!cd.contact_createur_course || !cd.contact_createur_course.trim()) {
     cd.contact_createur_course = telephone;
   }
-  // Parcours WhatsApp court: si aucun autre contact n'est fourni, le demandeur
-  // reste le contact opérationnel de la course.
-  if (!cd.contact_telephone && cd.contact_is_client !== true) {
-    cd.contact_is_client = true;
-    cd.contact_telephone = telephone;
-  }
-  const hasCreateurContact = !!(cd.contact_createur_course && cd.contact_createur_course.trim());
 
-  if (!hasDepart || !hasArrivee || !hasCreateurContact) {
+  // ── Fallback GPS: pending_location_lat/lng (partagé via WhatsApp mais non encore assigné) ──
+  const hasDepart = cd.adresse_depart || cd.gps_depart_lat != null || cd.pending_location_lat != null;
+  const hasArrivee = cd.adresse_arrivee || cd.gps_arrivee_lat != null;
+
+  if (!hasDepart || !hasArrivee) {
     return { success: false, error: 'MISSING_INFO' };
   }
 
@@ -417,8 +415,8 @@ export async function creerCourseDepuisMemoire(
     statut: 'recherche_livreur',
     dispatch_status: 'en_attente',
     notes: cd.notes || '',
-    gps_depart_lat: cd.gps_depart_lat,
-    gps_depart_lng: cd.gps_depart_lng,
+    gps_depart_lat: cd.gps_depart_lat != null ? cd.gps_depart_lat : cd.pending_location_lat,
+    gps_depart_lng: cd.gps_depart_lng != null ? cd.gps_depart_lng : cd.pending_location_lng,
     gps_arrivee_lat: cd.gps_arrivee_lat,
     gps_arrivee_lng: cd.gps_arrivee_lng,
     // ── Contact principal — créateur de la course (OBLIGATOIRE) ──
@@ -1027,20 +1025,18 @@ creer_course | suivre_course | contacter_livreur | annuler_course | modifier_inf
 nouvelle_course | course_en_cours | ancienne_course | paiement | livreur | partenaire | general
 
 ═══ INFOS REQUISES POUR creer_course ═══
-type_course, adresse_depart (ou GPS), adresse_arrivee (ou GPS).
-- contact_createur_course = numéro WhatsApp du client (${input.telephone}). AUTOMATIQUE. NE JAMAIS demander.
-- Si aucun autre contact n'est fourni, le numéro WhatsApp du demandeur est utilisé automatiquement.
-- Nom du destinataire/expéditeur FACULTATIF. Plusieurs numéros → utilise le PREMIER. Ne demande PAS lequel choisir.
+SEULES les infos requises: adresse_depart (ou GPS) + adresse_arrivee (ou GPS).
+- type_course: PAR DÉFAUT "expedier" (ne PAS demander). N'utilise "recevoir"/"deplacement" que si le client le précise explicitement.
+- contact_createur_course: numéro WhatsApp du client (automatique, ne PAS demander).
+- contact_telephone (destinataire/expéditeur): FACULTATIF. Ne PAS demander. Laisser vide si non fourni.
+- Nom du destinataire/expéditeur: FACULTATIF.
 
-═══ FLUX CRÉATION DE COURSE — LE PLUS COURT POSSIBLE ═══
-RÈGLE D'OR: DÈS que toutes les infos sont présentes → action=creer_course IMMÉDIATEMENT. PAS de récapitulatif. PAS de confirmation. CRÉE DIRECTEMENT.
-a) Si UNE info manque → action=poser_question (UNE SEULE question, combine plusieurs infos manquantes dans une phrase).
-b) Si TOUTES les infos sont présentes → action=creer_course DIRECTEMENT (sans demander "oui").
-c) Client corrige → mets à jour memoire_courte_update, puis recrée si tout est complet.
-MAXIMUM 2 questions: type → départ+arrivée. Puis CRÉATION DIRECTE.
-Ne JAMAIS demander le numéro du créateur (auto=WhatsApp). Ne JAMAIS demander "quel numéro comme principal".
-Ne JAMAIS demander confirmation ("oui") avant de créer. CRÉE DÈS que les infos sont complètes.
-EXCEPTION: Si audio faible confiance → demande confirmation ("Si j'ai bien compris...") avant de créer.
+═══ FLUX CRÉATION DE COURSE (STRICT) ═══
+Dès que tu as adresse_depart + adresse_arrivee → crée la course IMMÉDIATEMENT (action=creer_course). Ne demande PAS confirmation, ne demande PAS le numéro du destinataire.
+Si une adresse manque → action=poser_question (UNE SEULE question sur l'adresse manquante).
+Client corrige une adresse → mets à jour memoire_courte_update, puis crée la course.
+JAMAIS de "all_info_collected" ou "user_confirmed" (ces champs n'existent pas).
+INTERDICTION: Ne JAMAIS demander le numéro de téléphone du destinataire. Ne JAMAIS dire "je lance la création"/"je crée"/"je valide"/"je finalise" sans créer la course.
 
 ═══ ACTIONS POSSIBLES ═══
 poser_question | creer_course | suivre_course | contacter_livreur | annuler_course | repondre_info | clarifier | saluer
@@ -1054,12 +1050,12 @@ poser_question | creer_course | suivre_course | contacter_livreur | annuler_cour
 3. CORRECTIONS: Si client corrige ("non c'est Y"), mets à jour et confirme.
 4. PAS DE PRIX: Ne JAMAIS inventer un prix. Le livreur confirmera le coût.
 5. SALUTATION simple (Bonjour/Bonsoir/Salut) sans course en cours → accueil chaleureux SANS mentionner de services. Modèle: "Bonjour 👋 Je suis VENUS, l'assistante intelligente de SILGAPP. Comment puis-je vous aider aujourd'hui ?"
-6. CONTINUITÉ: Si VENUS a posé une question, le message actuel est LA RÉPONSE. Ne pas réinterpréter comme nouvelle demande. Ne pas écraser une adresse/type_course déjà connu. Un numéro = contact_telephone, pas nouvelle demande. Ne pas reformuler "Si j'ai bien compris..." si la réponse est directe. DÈS que les infos sont complètes → creer_course SANS confirmation.
+6. CONTINUITÉ: Si VENUS a posé une question, le message actuel est probablement LA RÉPONSE. Ne pas réinterpréter comme nouvelle demande. Ne pas écraser une adresse/type_course déjà connu. Un numéro = contact_telephone, pas nouvelle demande. Ne pas reformuler "Si j'ai bien compris..." si la réponse est directe.
 7. ANTI-FAUX-ANNULATION: "Oui"/"OK"/"D'accord" SEUL ≠ annuler_course. Annulation UNIQUEMENT si mot explicite ("annule", "plus besoin") OU VENUS a posé une question d'annulation et client répond oui.
 8. NOUVELLE COURSE APRÈS FIN: "nouvelle course"/"autre course" sans course active → vide mémoire courte, recommence collecte depuis zéro.
 9. RAG/RÈGLES = CONTEXTE uniquement. C'est TOI qui décides, le RAG ne répond pas à ta place.
-10. Ne JAMAIS confondre: numéro WhatsApp entrant, créateur de course, expéditeur, destinataire.
-11. Récapitulatif DOIT afficher: 📞 Contact principal — créateur : [numéro] + 📞 Contact destinataire : [numéro ou "Non renseigné"]
+10. Ne JAMAIS demander le numéro de téléphone du destinataire. Le contact_createur_course est automatiquement le numéro WhatsApp du client.
+11. Récapitulatif DOIT afficher: 📍 Départ + 🎯 Destination. Le contact destinataire est FACULTATIF ("Non renseigné" si absent).
 
 ═══ MÉMOIRE COURTE À METTRE À JOUR ═══
 Uniquement les champs nouveaux/modifiés. type_course: "expedier"|"recevoir"|"deplacement" uniquement.
@@ -1120,12 +1116,18 @@ Réponds UNIQUEMENT avec un JSON.`;
       }
     }
 
-    // ── Fallback: InvokeLLM (Base44) ──
+    // ── Fallback: InvokeLLM (Base44) — traçé via IntegrationCreditLog ──
     if (!llmRes) {
       const wasOpenAIEnabled = await isOpenAIEnabled(base44);
-      llmRes = await base44.asServiceRole.integrations.Core.InvokeLLM({
+      llmRes = await invokeLLMTracked(base44, {
         prompt,
         response_json_schema: RAISONNEMENT_SCHEMA,
+      }, {
+        function_source: 'raisonnerVenus',
+        endpoint: 'InvokeLLM',
+        model: 'automatic',
+        telephone: input.telephone,
+        country_code: input.countryCode,
       });
       const fallbackTime = Date.now() - tLLMStart;
       console.log(`[ReasoningEngine] ⏱️ LLM (Base44): ${fallbackTime}ms`);
@@ -1187,17 +1189,9 @@ Réponds UNIQUEMENT avec un JSON.`;
         llmUpdateFiltered[k] = v;
       }
     }
-    // ── AUTO-REMPLIR contact_createur_course avec le numéro WhatsApp ──
-    // Le client qui écrit sur WhatsApp EST le créateur de la course. Pas besoin de demander.
-    if (!llmUpdateFiltered.contact_createur_course && !mergedMemoireCourte.contact_createur_course) {
-      llmUpdateFiltered.contact_createur_course = input.telephone;
-    }
     result.memoire_courte_update = llmUpdateFiltered;
     // Fusionner infos_connues avec la mémoire existante
     result.infos_connues = { ...mergedMemoireCourte, ...(result.infos_connues || {}) };
-    if (!result.infos_connues.contact_createur_course) {
-      result.infos_connues.contact_createur_course = input.telephone;
-    }
 
     // Valider le business_rule_id
     if (result.business_rule_id && businessRuleEntries.length > 0) {
@@ -1570,5 +1564,16 @@ export function genererMessageRelance(memoireCourte: any): string {
     return "Bonjour, j'attends toujours l'adresse de livraison pour finaliser votre demande. Vous pouvez m'indiquer le quartier ou partager la localisation.";
   }
 
-  return "Bonjour, votre demande est complète et la recherche d'un livreur peut démarrer.";
+  const hasContact = memoireCourte.contact_telephone || memoireCourte.contact_is_client;
+  if (!hasContact) {
+    const typeLabel = memoireCourte.type_course === 'expedier' ? 'destinataire' : 'expéditeur';
+    return `Bonjour, j'attends toujours le numéro de téléphone du ${typeLabel} pour finaliser votre demande. Si vous êtes vous-même le ${typeLabel}, indiquez-le moi.`;
+  }
+
+  const hasCreateurContact = memoireCourte.contact_createur_course;
+  if (!hasCreateurContact) {
+    return "Bonjour, j'attends toujours le numéro de téléphone de la personne qui crée cette course et que le livreur devra contacter en priorité. Si c'est votre numéro, indiquez-le moi.";
+  }
+
+  return "Bonjour, votre demande est prête. Souhaitez-vous confirmer la création de cette course ? Répondez 'oui' pour confirmer.";
 }

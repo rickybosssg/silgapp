@@ -27,35 +27,35 @@ const REASSURANCE_MESSAGES = [
   { emoji: "🎯", text: "Nous trouvons le livreur le plus proche." },
 ];
 
-function parseNotifiedCount(course) {
-  try {
-    if (course.dispatch_notified_ids) {
-      const ids = JSON.parse(course.dispatch_notified_ids);
-      return Array.isArray(ids) ? ids.length : 0;
-    }
-  } catch {}
-  return 0;
-}
-
-function parseWaveNotifiedCount(course) {
-  try {
-    if (course.dispatch_wave_notified_ids) {
-      const ids = JSON.parse(course.dispatch_wave_notified_ids);
-      return Array.isArray(ids) ? ids.length : 0;
-    }
-  } catch {}
-  return 0;
-}
-
 export default function RechercheLivreurScreen({ course, position, countryCode, onClose }) {
   const [msgIndex, setMsgIndex] = useState(0);
   const [elapsedSec, setElapsedSec] = useState(0);
   const [nearbyLivreurs, setNearbyLivreurs] = useState([]);
+  const [notifiedCount, setNotifiedCount] = useState(0);
+  const [waveNotifiedCount, setWaveNotifiedCount] = useState(0);
   const mapRef = useRef(null);
 
-  const notifiedCount = parseNotifiedCount(course);
-  const waveNotifiedCount = parseWaveNotifiedCount(course);
   const currentWave = course.dispatch_wave || 1;
+
+  // ── Fetch notification counts from DispatchNotification entity ──
+  useEffect(() => {
+    let active = true;
+    const fetchCounts = async () => {
+      try {
+        const notifs = await base44.entities.DispatchNotification.filter(
+          { course_id: course.id }, '-date_notification', 500
+        );
+        if (!active) return;
+        const total = (notifs || []).filter(n => n.statut === 'notifie' || n.statut === 'accepte').length;
+        const wave = (notifs || []).filter(n => (n.vague || 1) === currentWave && (n.statut === 'notifie' || n.statut === 'accepte')).length;
+        setNotifiedCount(total);
+        setWaveNotifiedCount(wave);
+      } catch {}
+    };
+    fetchCounts();
+    const interval = setInterval(fetchCounts, 5000);
+    return () => { active = false; clearInterval(interval); };
+  }, [course.id, currentWave]);
 
   // Départ
   const depart = useMemo(() => ({

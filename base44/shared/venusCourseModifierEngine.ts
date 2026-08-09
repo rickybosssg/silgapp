@@ -1,5 +1,9 @@
 /**
  * ═══════════════════════════════════════════════════════════════════
+import { invokeLLMTracked } from './integrationCreditTracker.ts';
+
+/**
+ * ════════════════════════════════════════════════════════════════════
  * MOTEUR DE MODIFICATION DE COURSE VENUS
  * ═══════════════════════════════════════════════════════════════════
  *
@@ -188,7 +192,7 @@ Règles:
 Réponds UNIQUEMENT avec un JSON:`;
 
   try {
-    const llmRes = await base44.asServiceRole.integrations.Core.InvokeLLM({
+    const llmRes = await invokeLLMTracked(base44, {
       prompt,
       response_json_schema: {
         type: 'object',

@@ -32,14 +32,19 @@ Deno.serve(async (req) => {
 
     const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
     const authToken = Deno.env.get('TWILIO_AUTH_TOKEN');
-    const fromNumber = Deno.env.get('TWILIO_WHATSAPP_FROM') || 'whatsapp:+14155238886';
 
     if (!accountSid || !authToken) {
       return Response.json({ error: 'Configuration Twilio manquante' }, { status: 500 });
     }
 
-    const to = `whatsapp:${conv.whatsapp_phone}`;
-    const from = fromNumber.startsWith('whatsapp:') ? fromNumber : `whatsapp:${fromNumber}`;
+    // ── Dual-number: utiliser silgapp_from_number si disponible (numéro qui a reçu
+    //    le message du client), sinon fallback sur TWILIO_WHATSAPP_FROM ──
+    const fromRaw = conv.silgapp_from_number || Deno.env.get('TWILIO_WHATSAPP_FROM') || '+14155238886';
+    const from = fromRaw.startsWith('whatsapp:') ? fromRaw : `whatsapp:${fromRaw}`;
+
+    // ── Le whatsapp_phone est stocké sans "+" — il faut l'ajouter pour Twilio ──
+    const toDigits = (conv.whatsapp_phone || '').replace(/\D/g, '');
+    const to = `whatsapp:+${toDigits}`;
 
     const twilioUrl = `${TWILIO_API_BASE}/${accountSid}/Messages.json`;
     const credentials = btoa(`${accountSid}:${authToken}`);

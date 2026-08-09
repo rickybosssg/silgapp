@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { invokeLLMTracked } from '../../shared/integrationCreditTracker.ts';
 
 Deno.serve(async (req) => {
   try {
@@ -40,7 +41,7 @@ Priorités: critique | elevee | moyenne | faible
 
 Réponds en français avec un schema JSON.`;
 
-    const llmRaw = await base44.integrations.Core.InvokeLLM({
+    const llmRaw = await invokeLLMTracked(base44, {
       prompt,
       model: 'claude_sonnet_4_6',
       response_json_schema: {

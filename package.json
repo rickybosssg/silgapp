@@ -9,6 +9,7 @@
     "lint": "eslint . --quiet",
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc -p ./jsconfig.json",
+    "test:livreur-course": "node tests/livreur-course-regression.mjs",
     "test:venus-whatsapp": "node --experimental-strip-types tests/venus-whatsapp-regression.mjs",
     "preview": "vite preview"
   },

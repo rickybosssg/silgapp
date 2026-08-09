@@ -1,3 +1,5 @@
+import { invokeLLMTracked } from './integrationCreditTracker.ts';
+
 /**
  * venusAdvisorEngine.ts — Conseiller IA & Analyse Métier VENUS
  *
@@ -330,7 +332,7 @@ export async function answerAdminQuestion(base44, question: string) {
     insights_recents: insights.map(i => ({ titre: i.titre, valeur: i.valeur_principale, tendance: i.tendance })),
   };
 
-  const llmResponse = await base44.integrations.Core.InvokeLLM({
+  const llmResponse = await invokeLLMTracked(base44, {
     prompt: `Tu es VENUS, l'assistant IA de SILGAPP. Un administrateur te pose une question.
 Réponds de manière claire, précise et professionnelle en te basant sur les données fournies.
 
@@ -396,7 +398,7 @@ export async function generateRecommendations(base44) {
 
   // Utiliser le LLM pour prioriser et enrichir
   if (recommendations.length > 0) {
-    const llmResponse = await base44.integrations.Core.InvokeLLM({
+    const llmResponse = await invokeLLMTracked(base44, {
       prompt: `Tu es VENUS, le conseiller IA de SILGAPP. Voici des recommandations générées à partir des analyses métier.
 Priorise-les et propose des actions concrètes.
 

@@ -52,7 +52,8 @@ export default function LivreurDetailDialog({ livreur, open, onClose }) {
           const isPrixManuel = c.pricing_mode === "manual" && c.manual_price_status === "accepted" && Number(c.manual_price) > 0;
           return sum + (isPrixManuel ? Number(c.manual_price) : (c.prix_final || 0));
         }, 0);
-    const montantDu = livrees.filter(c => c.statut_paiement_livreur !== "paye").reduce((sum, c) => sum + (c.commission_silga || 0), 0);
+    // ── Source de vérité : montant_du_silga (champ stocké, mis à jour à chaque paiement)
+    const montantDu = livreur.montant_du_silga ?? livreur.encours ?? 0;
 
     return {
       coursesLivrees: livrees.length,

@@ -14,6 +14,7 @@ import VenusIncidentAlertModal from "@/components/admin/VenusIncidentAlertModal"
 import CourseWindowStack from "@/components/admin/CourseWindowStack";
 import { AdminCourseWindowsProvider, useAdminCourseWindows } from "@/context/AdminCourseWindowsContext";
 
+// AppLayout — layout principal admin (desktop sidebar + mobile nav)
 export default function AppLayout({ reseau }) {
   return (
     <AdminCourseWindowsProvider>

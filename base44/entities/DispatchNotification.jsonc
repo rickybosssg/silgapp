@@ -1,0 +1,70 @@
+{
+  "name": "DispatchNotification",
+  "type": "object",
+  "properties": {
+    "course_id": {
+      "type": "string",
+      "description": "ID de la CourseExterne concern\u00e9e"
+    },
+    "livreur_id": {
+      "type": "string",
+      "description": "ID du livreur notifi\u00e9"
+    },
+    "country_code": {
+      "type": "string",
+      "description": "Code pays (pour filtrage rapide)"
+    },
+    "vague": {
+      "type": "number",
+      "default": 1,
+      "description": "Num\u00e9ro de vague lors de la notification"
+    },
+    "statut": {
+      "type": "string",
+      "enum": [
+        "notifie",
+        "refuse",
+        "expire",
+        "accepte"
+      ],
+      "default": "notifie",
+      "description": "Statut de la notification: notifi\u00e9, refus\u00e9, expir\u00e9 ou accept\u00e9"
+    },
+    "distance_km": {
+      "type": "number",
+      "description": "Distance livreur \u2194 point de d\u00e9part au moment de la notification"
+    },
+    "gps_age_min": {
+      "type": "number",
+      "description": "\u00c2ge du GPS du livreur au moment de la notification"
+    },
+    "priorite_dispatch": {
+      "type": "number",
+      "default": 0,
+      "description": "Priorit\u00e9 du livreur au moment de la notification"
+    },
+    "date_notification": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date/heure de notification"
+    },
+    "date_reponse": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date/heure de r\u00e9ponse (acceptation, refus ou expiration)"
+    },
+    "raison_refus": {
+      "type": "string",
+      "description": "Raison du refus si applicable"
+    },
+    "temps_reponse_sec": {
+      "type": "number",
+      "description": "Temps de r\u00e9ponse en secondes (entre notification et action)"
+    }
+  },
+  "required": [
+    "course_id",
+    "livreur_id",
+    "statut"
+  ]
+}

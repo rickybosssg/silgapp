@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.38';
+import { invokeLLMTracked } from '../../shared/integrationCreditTracker.ts';
 
 /**
  * Gestion du Cerveau Central de VENUS — prompt système versionné.
@@ -224,7 +225,7 @@ Deno.serve(async (req) => {
       let reponse = '';
       let llmCalled = false;
       try {
-        const llmResult = await base44.asServiceRole.integrations.Core.InvokeLLM({
+        const llmResult = await invokeLLMTracked(base44, {
           prompt: `${contenu}\n\n═══ MESSAGE CLIENT (SIMULATION) ═══\nTéléphone: ${telephone}\nPays: ${country_code}\nMessage: "${message_test}"\n\nRéponds comme VENUS. Cette réponse est une SIMULATION — aucune action réelle ne sera exécutée.`,
           model: 'automatic',
         });
