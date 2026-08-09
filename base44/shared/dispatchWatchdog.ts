@@ -232,6 +232,9 @@ export async function runWatchdog(base44, body = {}) {
     if (course.dispatch_status !== 'cycle_epuise' && course.dispatch_status !== 'disponible_push') continue;
     const deadlineMs = course.timeout_expires_at ? new Date(course.timeout_expires_at).getTime() : 0;
     if (deadlineMs > 0 && now.getTime() < deadlineMs) continue;
+    // V2 : pas de timeout sur disponible_push → la logique de secours V2 ci-dessous
+    // gère la progression (top3 → top5 → cycle_epuise). Ne pas passer en en_attente.
+    if (deadlineMs === 0 && course.dispatch_status === 'disponible_push') continue;
 
     if (course.dispatch_status === 'cycle_epuise') {
       // Transition: cycle_epuise → disponible_push
