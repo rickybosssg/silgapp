@@ -185,6 +185,9 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
         livreur_note_moyenne: 0,
         livreur_nombre_avis: 0,
       });
+      // ── Réinitialiser les notifications DispatchNotification pour permettre
+      //    au dispatch engine de re-notifier tous les livreurs ──
+      await base44.entities.DispatchNotification.deleteMany({ course_id: course.id }).catch(() => null);
       // Déclencher le dispatch immédiatement
       await base44.functions.invoke("dispatchExterneAuto", {}).catch(() => null);
       toast.success("Course relancée depuis la vague 0");

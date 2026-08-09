@@ -47,6 +47,23 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess }) {
     staleTime: 5000,
   });
 
+  // ── Récupérer les courses refusées par ce livreur depuis DispatchNotification ──
+  // (remplace l'ancien champ JSON dispatch_refused_ids qui n'est plus mis à jour)
+  const { data: refusedCourseIds = [] } = useQuery({
+    queryKey: ["dispatch-refused-courses", livreurId],
+    queryFn: async () => {
+      if (!livreurId) return [];
+      const refused = await base44.entities.DispatchNotification.filter(
+        { livreur_id: livreurId, statut: "refuse" },
+        "-date_reponse", 50
+      );
+      return (refused || []).map(n => n.course_id);
+    },
+    enabled: !!livreurId,
+    refetchInterval: 30000,
+    staleTime: 15000,
+  });
+
   // Realtime subscription — mise à jour instantanée
   useEffect(() => {
     if (!livreurId) return;
@@ -69,16 +86,11 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess }) {
         const expires = new Date(course.timeout_expires_at);
         if (!isNaN(expires.getTime()) && expires < new Date()) return false;
       }
-      // Exclure si le livreur a déjà refusé cette course
-      if (course.dispatch_refused_ids) {
-        try {
-          const refused = JSON.parse(course.dispatch_refused_ids);
-          if (Array.isArray(refused) && refused.includes(livreurId)) return false;
-        } catch (_) {}
-      }
+      // Exclure si le livreur a déjà refusé cette course (via DispatchNotification)
+      if (refusedCourseIds.includes(course.id)) return false;
       return true;
     });
-  }, [courses, refusedIds, livreurId]);
+  }, [courses, refusedIds, refusedCourseIds, livreurId]);
 
   // Calculer la distance pour chaque course
   const coursesWithDistance = useMemo(() => {
