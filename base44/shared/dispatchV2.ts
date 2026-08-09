@@ -148,6 +148,10 @@ export async function accepterCourseV2(base44: any, courseId: string, livreurId:
   if (course.dispatch_status !== 'disponible_push' && course.dispatch_status !== 'propose' && course.dispatch_status !== 'en_attente') {
     return reponseDejaPrise('not_available', course);
   }
+  // 2b. Refuser les courses en statut terminal (annulee / livree)
+  if (STATUTS_TERMINAUX_COURSE.includes(course.statut)) {
+    return { success: false, accepted: false, reason: 'course_terminal', error: 'Cette course n\'est plus disponible (terminée ou annulée).' };
+  }
   if (course.livreur_id || course.accepted_by_livreur_id) {
     return reponseDejaPrise('already_taken', course);
   }
