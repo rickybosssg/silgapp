@@ -203,19 +203,12 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     staleTime: 4000,
   });
 
-  // ── Vérifier si ce livreur fait partie du pilote V2 ──
-  const { data: isPilotLivreur = false } = useQuery({
-    queryKey: ["dispatch-v2-pilot", livreurProfil?.id],
+  // ── Vérifier si le dispatch V2 est activé (fil de courses disponibles) ──
+  const { data: isV2Enabled = false } = useQuery({
+    queryKey: ["dispatch-v2-enabled", livreurProfil?.id],
     queryFn: async () => {
-      const lid = livreurProfil?.id;
-      if (!lid) return false;
-      const configs = await base44.entities.AppConfig.filter(
-        { cle: { $in: ["DISPATCH_V2_PILOT_ENABLED", "DISPATCH_V2_PILOT_LIVREUR_IDS"] } }
-      );
-      const enabled = configs.find(c => c.cle === "DISPATCH_V2_PILOT_ENABLED")?.valeur === "true";
-      const idsStr = configs.find(c => c.cle === "DISPATCH_V2_PILOT_LIVREUR_IDS")?.valeur || "";
-      const ids = idsStr.split(",").map(s => s.trim()).filter(Boolean);
-      return enabled && ids.includes(lid);
+      const configs = await base44.entities.AppConfig.filter({ cle: "DISPATCH_V2_ENABLED" });
+      return configs?.[0]?.valeur === "true";
     },
     enabled: !!livreurProfil?.id,
     staleTime: 60000,
@@ -562,8 +555,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
           if (livreurProfil?.country_code && course.country_code !== livreurProfil.country_code) return false;
           if (course.timeout_expires_at && new Date(course.timeout_expires_at) <= new Date()) return false;
 
-          // V2 : courses disponible_push visibles par les livreurs pilotes (sans DispatchNotification)
-          if (course.dispatch_status === "disponible_push" && isPilotLivreur) return true;
+          // V2 : courses disponible_push visibles par tous les livreurs (sans DispatchNotification)
+          if (course.dispatch_status === "disponible_push" && isV2Enabled) return true;
 
           // V1 : courses propose nécessitant une DispatchNotification
           if (course.dispatch_status === "propose" && notifiedCourseIds.includes(course.id)) return true;
@@ -587,7 +580,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [livreurId, livreurProfil?.country_code, isPilotLivreur]);
+  }, [livreurId, livreurProfil?.country_code, isV2Enabled]);
 
   const { data: mesCourses = [] } = useQuery({
     queryKey: ["mes-courses-externes", livreurId, livreurEmail, notificationCourseId],
@@ -920,14 +913,14 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     }
   };
 
-  // ── Ouvrir sur l'onglet "Disponibles" au démarrage si pilote V2 ──
+  // ── Ouvrir sur l'onglet "Disponibles" au démarrage si V2 activé ──
   useEffect(() => {
     if (initialTabSetRef.current) return;
-    if (isPilotLivreur && coursesActives.length === 0 && mesCourses !== undefined) {
+    if (isV2Enabled && coursesActives.length === 0 && mesCourses !== undefined) {
       initialTabSetRef.current = true;
       setActiveTab("disponibles");
     }
-  }, [isPilotLivreur, coursesActives.length, mesCourses]);
+  }, [isV2Enabled, coursesActives.length, mesCourses]);
 
   // ── Auto-activation GPS au démarrage (si livreur en ligne) ──
   useEffect(() => {
@@ -1333,8 +1326,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   // ─── Dashboard principal ──────────────────────────────────────────────────
   const TABS = [
     { id: "courses", label: "Courses", emoji: "" },
-    // Onglet "Disponibles" masqué si le livreur a une course active OU s'il n'est pas pilote V2
-    ...(coursesActives.length === 0 && isPilotLivreur ? [{ id: "disponibles", label: "Disponibles", emoji: "" }] : []),
+    // Onglet "Disponibles" masqué si le livreur a une course active OU si V2 désactivé
+    ...(coursesActives.length === 0 && isV2Enabled ? [{ id: "disponibles", label: "Disponibles", emoji: "" }] : []),
     { id: "historique", label: "Historique", emoji: "" },
     { id: "messages", label: "Messages", emoji: "" },
     ...(livreurHasPromoCode ? [{ id: "promo", label: "Code Promo", emoji: "" }] : []),

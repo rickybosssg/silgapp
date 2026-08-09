@@ -34,27 +34,22 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
   const livreurLat = livreurProfil?.latitude;
   const livreurLng = livreurProfil?.longitude;
 
-  // ── Vérifier si ce livreur fait partie du pilote V2 ──
-  const { data: isPilot = false } = useQuery({
-    queryKey: ["dispatch-v2-pilot", livreurId],
+  // ── Vérifier si le dispatch V2 est activé globalement ──
+  const { data: isV2Enabled = false } = useQuery({
+    queryKey: ["dispatch-v2-enabled", livreurId],
     queryFn: async () => {
       if (!livreurId) return false;
-      const configs = await base44.entities.AppConfig.filter(
-        { cle: { $in: ["DISPATCH_V2_PILOT_ENABLED", "DISPATCH_V2_PILOT_LIVREUR_IDS"] } }
-      );
-      const enabled = configs.find(c => c.cle === "DISPATCH_V2_PILOT_ENABLED")?.valeur === "true";
-      const idsStr = configs.find(c => c.cle === "DISPATCH_V2_PILOT_LIVREUR_IDS")?.valeur || "";
-      const ids = idsStr.split(",").map(s => s.trim()).filter(Boolean);
-      return enabled && ids.includes(livreurId);
+      const configs = await base44.entities.AppConfig.filter({ cle: "DISPATCH_V2_ENABLED" });
+      return configs?.[0]?.valeur === "true";
     },
     enabled: !!livreurId,
     staleTime: 60000,
   });
 
   const { data: courses = [], isLoading } = useQuery({
-    queryKey: ["courses-externes-disponibles", livreurId, countryCode, isPilot],
+    queryKey: ["courses-externes-disponibles", livreurId, countryCode, isV2Enabled],
     queryFn: async () => {
-      if (!countryCode || !isPilot) return [];
+      if (!countryCode || !isV2Enabled) return [];
       // Toutes les courses visibles : propose (V1) + disponible_push (V2) + en_attente (admin manuel)
       const all = await base44.entities.CourseExterne.filter(
         { dispatch_status: { $in: ["disponible_push", "propose", "en_attente"] }, country_code: countryCode },
@@ -62,7 +57,7 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
       );
       return all || [];
     },
-    enabled: !!livreurId && !!countryCode && isPilot,
+    enabled: !!livreurId && !!countryCode && isV2Enabled,
     staleTime: 30000,
   });
 
@@ -215,7 +210,7 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
     }).catch(() => null);
   };
 
-  if (!isPilot) {
+  if (!isV2Enabled) {
     return (
       <div className="rounded-3xl bg-gradient-to-br from-[#1a1f2e] via-[#1f2429] to-[#16191d] border border-white/8 p-10 text-center space-y-4 shadow-xl">
         <div className="relative w-20 h-20 rounded-3xl bg-gradient-to-br from-orange-500/20 to-amber-500/10 flex items-center justify-center mx-auto border border-orange-500/20">
@@ -224,7 +219,7 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
         </div>
         <p className="text-base font-black text-white/80">Fil non disponible</p>
         <p className="text-xs text-white/40 leading-relaxed max-w-[220px] mx-auto">
-          Le fil de courses disponibles est actuellement en phase de test pilote.
+          Le fil de courses disponibles est actuellement désactivé. L'administrateur peut l'activer depuis le panneau de configuration.
         </p>
       </div>
     );

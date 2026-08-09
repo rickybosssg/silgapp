@@ -42,14 +42,6 @@ Deno.serve(async (req) => {
 
     // ─── 0b. V2 : Accepter une course (updateMany + update single) ──────
     if (action === 'accepter_course_v2') {
-      // 🛡️ Sécurité : seul un livreur pilote peut utiliser V2 pendant la phase de test
-      const isPilot = await isPilotLivreur(base44, livreur_id);
-      if (!isPilot) {
-        return Response.json(
-          { success: false, accepted: false, reason: 'not_pilot', error: 'V2 non disponible pour ce livreur' },
-          { status: 403 }
-        );
-      }
       const { pricing_mode, manual_price, override_pricing_mode } = body;
       const result = await accepterCourseV2(base44, course_id, livreur_id, { pricing_mode, manual_price, override_pricing_mode });
       return Response.json(result);
@@ -108,6 +100,14 @@ Deno.serve(async (req) => {
         console.warn(`[DISPATCH] ⚠️ Course ${course_id} sans GPS`);
       }
 
+      // ── V2 : publier dans le fil de courses disponibles ──
+      const v2Enabled = await isV2Enabled(base44);
+      if (v2Enabled) {
+        const result = await publierCourseDansFil(base44, course);
+        return Response.json({ success: true, v2: true, published: true, ...result });
+      }
+
+      // ── V1 : dispatch par vagues (notifications ciblées) ──
       const result = await lancerDispatchMulti(base44, course_id, []);
       if (result.erreur) return Response.json({ error: result.erreur }, { status: 404 });
       if (result.ignore) return Response.json({ success: true, message: `Dispatch ignoré: ${result.statut}` });
