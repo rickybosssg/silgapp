@@ -102,6 +102,32 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
     staleTime: 15000,
   });
 
+  // ── Enregistrer les vues de courses dans DispatchNotification ──
+  // Crée un enregistrement "notifie" par livreur+course (idempotent) pour
+  // que les compteurs admin (Notifiés/Refusés/Expirés) reflètent la réalité.
+  useEffect(() => {
+    if (!livreurId || courses.length === 0) return;
+    (async () => {
+      // Récupérer les notifications déjà existantes pour ce livreur
+      const existing = await base44.entities.DispatchNotification.filter(
+        { livreur_id: livreurId }, "-date_notification", 200
+      ).catch(() => []);
+      const existingCourseIds = new Set((existing || []).map(n => n.course_id));
+      // Créer uniquement pour les courses pas encore notifiées
+      courses.forEach((course) => {
+        if (existingCourseIds.has(course.id)) return;
+        base44.entities.DispatchNotification.create({
+          course_id: course.id,
+          livreur_id: livreurId,
+          country_code: course.country_code,
+          statut: "notifie",
+          date_notification: new Date().toISOString(),
+          priorite_dispatch: course.priorite_dispatch || 0,
+        }).catch(() => {});
+      });
+    })();
+  }, [courses, livreurId]);
+
   // Realtime subscription — mise à jour instantanée
   useEffect(() => {
     if (!livreurId) return;
