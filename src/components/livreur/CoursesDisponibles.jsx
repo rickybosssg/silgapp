@@ -55,9 +55,9 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
     queryKey: ["courses-externes-disponibles", livreurId, countryCode, isPilot],
     queryFn: async () => {
       if (!countryCode || !isPilot) return [];
-      // Pilote : voir les courses en propose (V1) + disponible_push (V2)
+      // Toutes les courses visibles : propose (V1) + disponible_push (V2) + en_attente (admin manuel)
       const all = await base44.entities.CourseExterne.filter(
-        { dispatch_status: { $in: ["disponible_push", "propose"] }, country_code: countryCode },
+        { dispatch_status: { $in: ["disponible_push", "propose", "en_attente"] }, country_code: countryCode },
         "-created_date", 50
       );
       return all || [];
@@ -217,12 +217,13 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
 
   if (!isPilot) {
     return (
-      <div className="rounded-2xl bg-[#1f2429] border border-white/8 p-8 text-center space-y-3">
-        <div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center mx-auto">
-          <Flame className="w-7 h-7 text-white/30" />
+      <div className="rounded-3xl bg-gradient-to-br from-[#1a1f2e] via-[#1f2429] to-[#16191d] border border-white/8 p-10 text-center space-y-4 shadow-xl">
+        <div className="relative w-20 h-20 rounded-3xl bg-gradient-to-br from-orange-500/20 to-amber-500/10 flex items-center justify-center mx-auto border border-orange-500/20">
+          <Flame className="w-10 h-10 text-orange-400/50" />
+          <div className="absolute inset-0 rounded-3xl bg-orange-500/5 animate-pulse" />
         </div>
-        <p className="text-sm font-bold text-white/70">Fil V2 non disponible</p>
-        <p className="text-xs text-white/40">
+        <p className="text-base font-black text-white/80">Fil non disponible</p>
+        <p className="text-xs text-white/40 leading-relaxed max-w-[220px] mx-auto">
           Le fil de courses disponibles est actuellement en phase de test pilote.
         </p>
       </div>

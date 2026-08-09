@@ -92,8 +92,8 @@ export async function accepterCourseV2(base44: any, courseId: string, livreurId:
   const course = await base44.asServiceRole.entities.CourseExterne.get(courseId);
   if (!course) return { error: 'Course introuvable' };
 
-  // 2. Check course still available
-  if (course.dispatch_status !== 'disponible_push' && course.dispatch_status !== 'propose') {
+  // 2. Check course still available (disponible_push V2, propose V1, en_attente = admin manuel)
+  if (course.dispatch_status !== 'disponible_push' && course.dispatch_status !== 'propose' && course.dispatch_status !== 'en_attente') {
     return reponseDejaPrise('not_available', course);
   }
   if (course.livreur_id || course.accepted_by_livreur_id) {
@@ -166,7 +166,7 @@ export async function accepterCourseV2(base44: any, courseId: string, livreurId:
 
   // 🛡️ Atomic lock : seul le premier updateMany qui matche modifie l'enregistrement
   await base44.asServiceRole.entities.CourseExterne.updateMany(
-    { id: courseId, dispatch_status: { $in: ['propose', 'disponible_push'] }, livreur_id: '' },
+    { id: courseId, dispatch_status: { $in: ['propose', 'disponible_push', 'en_attente'] }, livreur_id: '' },
     { $set: updateData }
   );
 
