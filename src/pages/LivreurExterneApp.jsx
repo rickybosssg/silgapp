@@ -139,6 +139,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   const [prixManuelReponse, setPrixManuelReponse] = useState(null); // { accepted, prix, devise }
   const [showMessages, setShowMessages] = useState(false);
   const [hasNewAvailableCourse, setHasNewAvailableCourse] = useState(false);
+  const initialTabSetRef = useRef(false);
   const [sessionId, setSessionId] = useState(() => {
     try { return localStorage.getItem("silgapp_livreur_session_id") || null; } catch { return null; }
   });
@@ -918,6 +919,15 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       toast.error("Impossible d'obtenir votre position. Vérifiez que le GPS de votre téléphone est activé.");
     }
   };
+
+  // ── Ouvrir sur l'onglet "Disponibles" au démarrage si pilote V2 ──
+  useEffect(() => {
+    if (initialTabSetRef.current) return;
+    if (isPilotLivreur && coursesActives.length === 0 && mesCourses !== undefined) {
+      initialTabSetRef.current = true;
+      setActiveTab("disponibles");
+    }
+  }, [isPilotLivreur, coursesActives.length, mesCourses]);
 
   // ── Auto-activation GPS au démarrage (si livreur en ligne) ──
   useEffect(() => {
