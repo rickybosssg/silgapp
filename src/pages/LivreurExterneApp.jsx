@@ -125,35 +125,6 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   const [hasNewAvailableCourse, setHasNewAvailableCourse] = useState(false);
   const initialTabSetRef = useRef(false);
 
-  // ── Compteur de courses disponibles (pilote le point rouge) ──
-  const { data: availableCoursesCount = 0 } = useQuery({
-    queryKey: ["courses-disponibles-count", livreurProfil?.id, livreurProfil?.country_code, isV2Enabled],
-    queryFn: async () => {
-      if (!livreurProfil?.country_code || !isV2Enabled) return 0;
-      const all = await base44.entities.CourseExterne.filter(
-        { dispatch_status: { $in: ["disponible_push", "propose", "en_attente"] }, country_code: livreurProfil.country_code },
-        "-created_date", 50
-      );
-      return (all || []).filter(c =>
-        !FINAL_COURSE_STATUSES.has(c.statut) &&
-        !c.livreur_id &&
-        !c.accepted_by_livreur_id
-      ).length;
-    },
-    enabled: !!livreurProfil?.id && !!livreurProfil?.country_code && isV2Enabled,
-    refetchInterval: 10000,
-    staleTime: 5000,
-  });
-
-  // Le point rouge s'affiche dès qu'il y a des courses disponibles ET que le livreur
-  // n'est pas sur l'onglet "Disponibles"
-  useEffect(() => {
-    if (availableCoursesCount > 0 && activeTab !== "disponibles") {
-      setHasNewAvailableCourse(true);
-    } else if (availableCoursesCount === 0) {
-      setHasNewAvailableCourse(false);
-    }
-  }, [availableCoursesCount, activeTab]);
   const [sessionId, setSessionId] = useState(() => {
     try { return localStorage.getItem("silgapp_livreur_session_id") || null; } catch { return null; }
   });
@@ -237,6 +208,66 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     enabled: !!livreurProfil?.id,
     staleTime: 60000,
   });
+
+  const livreurCanReceiveV2 =
+    livreurProfil?.type_livreur === "externe" &&
+    livreurProfil?.validation === "valide" &&
+    livreurProfil?.actif === true &&
+    livreurProfil?.statut === "disponible" &&
+    livreurProfil?.bloque_encours !== true &&
+    livreurProfil?.manual_hors_ligne !== true &&
+    livreurProfil?.admin_hors_ligne !== true;
+
+  // Compteur du badge, avec exactement les mêmes exclusions que le fil V2.
+  const { data: availableCoursesCount = 0 } = useQuery({
+    queryKey: ["courses-disponibles-count", livreurProfil?.id, livreurProfil?.country_code, isV2Enabled],
+    queryFn: async () => {
+      if (!livreurProfil?.id || !livreurProfil?.country_code || !isV2Enabled) return 0;
+      const [all, refused] = await Promise.all([
+        base44.entities.CourseExterne.filter(
+          { dispatch_status: { $in: ["disponible_push", "propose", "en_attente"] }, country_code: livreurProfil.country_code },
+          "-created_date", 50
+        ),
+        base44.entities.DispatchNotification.filter(
+          { livreur_id: livreurProfil.id, statut: "refuse" },
+          "-date_reponse", 50
+        ).catch(() => []),
+      ]);
+      const refusedIds = new Set((refused || []).map(item => item.course_id));
+      let dismissedIds = new Set();
+      try {
+        const dismissed = JSON.parse(localStorage.getItem("silgapp_dismissed_courses") || "{}");
+        const now = Date.now();
+        dismissedIds = new Set(
+          Object.entries(dismissed)
+            .filter(([, dismissedAt]) => now - Number(dismissedAt) < DISMISS_TTL_MS)
+            .map(([courseId]) => courseId)
+        );
+      } catch {}
+
+      return (all || []).filter(course => {
+        if (FINAL_COURSE_STATUSES.has(course.statut)) return false;
+        if (course.livreur_id || course.accepted_by_livreur_id) return false;
+        if (refusedIds.has(course.id) || dismissedIds.has(course.id)) return false;
+        if (course.timeout_expires_at) {
+          const expiresAt = new Date(course.timeout_expires_at).getTime();
+          if (Number.isFinite(expiresAt) && expiresAt < Date.now()) return false;
+        }
+        return true;
+      }).length;
+    },
+    enabled: !!livreurProfil?.id && !!livreurProfil?.country_code && isV2Enabled && livreurCanReceiveV2,
+    refetchInterval: 10000,
+    staleTime: 5000,
+  });
+
+  useEffect(() => {
+    if (availableCoursesCount > 0 && activeTab !== "disponibles") {
+      setHasNewAvailableCourse(true);
+    } else if (availableCoursesCount === 0 || activeTab === "disponibles") {
+      setHasNewAvailableCourse(false);
+    }
+  }, [availableCoursesCount, activeTab]);
 
   const { data: countryCommissionRows = [] } = useQuery({
     queryKey: ["country-commission", livreurProfil?.country_code],

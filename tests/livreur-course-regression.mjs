@@ -77,7 +77,18 @@ const dispatchV2Source = readFileSync(
   new URL("../base44/shared/dispatchV2.ts", import.meta.url),
   "utf8",
 );
+const dispatchWatchdogSource = readFileSync(
+  new URL("../base44/shared/dispatchWatchdog.ts", import.meta.url),
+  "utf8",
+);
+const v2DeclarationIndex = livreurAppSource.indexOf("const { data: isV2Enabled");
+const availableCountIndex = livreurAppSource.indexOf("const { data: availableCoursesCount");
+assert.ok(v2DeclarationIndex >= 0 && availableCountIndex > v2DeclarationIndex, "isV2Enabled doit etre declare avant le compteur de courses");
+assert.match(livreurAppSource, /DispatchNotification\.filter\([\s\S]*statut:\s*"refuse"/, "le badge doit exclure les refus persistants");
+assert.match(livreurAppSource, /dismissedIds\.has\(course\.id\)/, "le badge doit exclure les courses masquees localement");
 assert.doesNotMatch(dispatchV2Source, /dispatch_status:[^\n]+livreur_id:\s*''/, "le verrou V2 doit accepter un livreur_id null");
+assert.match(dispatchV2Source, /STATUTS_TERMINAUX_COURSE\.includes\(course\.statut\)/, "V2 doit refuser une course terminee ou annulee");
+assert.match(dispatchWatchdogSource, /deadlineMs === 0 && course\.dispatch_status === 'disponible_push'/, "le watchdog ne doit pas retirer prematurement une course V2");
 assert.match(nativePushSource, /DISPATCH_V2_ALERT_DURATION_MS\s*=\s*10000L/, "l'alerte native V2 doit durer dix secondes");
 assert.match(nativePushSource, /playNotificationSound\(context, false\)/, "la sonnerie native V2 ne doit pas boucler");
 
