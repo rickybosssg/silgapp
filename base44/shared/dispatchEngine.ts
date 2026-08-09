@@ -158,12 +158,15 @@ export async function trouverLivreursCandidats(base44, course, exclusions = [], 
 
     // ── Les livreurs prioritaires (priorite_dispatch > 0) ne sont JAMAIS exclus
     //    pour cause de GPS absent ou expiré. La priorité prime sur le GPS. ──
+    // 🛡️ MAIS: un seuil maximum de 2h empêche de notifier des livreurs clairement
+    //    hors ligne (GPS de 14-45h), ce qui gaspille des crédits d'intégration.
+    const GPS_MAX_STALE_MIN = 120; // 2h — au-delà, même les prioritaires sont exclus
     const isPriority = (l.priorite_dispatch || 0) > 0;
-    if (!skipGpsFilter && !isPriority && (gpsAgeMin === null || gpsAgeMin >= GPS_EXPIRE_SEUIL_MIN)) {
+    if (!skipGpsFilter && (gpsAgeMin === null || gpsAgeMin >= GPS_MAX_STALE_MIN)) {
       raisonsExclusion.push({
         livreur_id: l.id,
         nom: `${l.prenom || ''} ${l.nom || ''}`.trim(),
-        raison: gpsAgeMin === null ? 'gps_absent' : `gps_expire_${Math.round(gpsAgeMin)}min`,
+        raison: gpsAgeMin === null ? 'gps_absent' : `gps_expire_${Math.round(gpsAgeMin)}min${isPriority ? '_prioritaire' : ''}`,
       });
       return;
     }
