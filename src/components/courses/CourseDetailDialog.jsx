@@ -168,7 +168,7 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
     setRelaunching(true);
     try {
       await base44.entities.CourseExterne.update(course.id, {
-        statut: "nouvelle",
+        statut: "recherche_livreur",
         dispatch_status: "en_attente",
         dispatch_wave: 0,
         dispatch_cycle_count: 0,
