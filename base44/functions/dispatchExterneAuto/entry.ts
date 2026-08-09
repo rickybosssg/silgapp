@@ -6,6 +6,7 @@ import { chargerConfigDispatch, chargerConfigVaguesGPS, CYCLE_EPUISE_TIMEOUT_MS 
 import { lancerDispatchMulti } from '../../shared/dispatchEngine.ts';
 import { runWatchdog } from '../../shared/dispatchWatchdog.ts';
 import { marquerRefuse, marquerAccepte, getLivreursNotifies, resetNotifications as resetNotifsEntity } from '../../shared/dispatchNotifications.ts';
+import { accepterCourseV2, publierCourseDansFil, isV2Enabled, secoursDispatchV2 } from '../../shared/dispatchV2.ts';
 
 // ============================================================================
 // HANDLER PRINCIPAL
@@ -25,6 +26,34 @@ Deno.serve(async (req) => {
     // Déclenchement depuis automation scheduled (tick de secours) — sans action = watchdog
     if (!action) {
       action = 'watchdog';
+    }
+
+    // ─── 0. V2 : Publier une course dans le fil ──────────────────────────
+    if (action === 'publier_fil_v2') {
+      if (!course_id) return Response.json({ error: 'course_id requis' }, { status: 400 });
+      let course;
+      try { course = await base44.asServiceRole.entities.CourseExterne.get(course_id); } catch (e) {
+        return Response.json({ error: 'Course introuvable' }, { status: 404 });
+      }
+      if (!course) return Response.json({ error: 'Course introuvable' }, { status: 404 });
+      const result = await publierCourseDansFil(base44, course);
+      return Response.json(result);
+    }
+
+    // ─── 0b. V2 : Accepter une course (updateMany + update single) ──────
+    if (action === 'accepter_course_v2') {
+      const { pricing_mode, manual_price, override_pricing_mode } = body;
+      const result = await accepterCourseV2(base44, course_id, livreur_id, { pricing_mode, manual_price, override_pricing_mode });
+      return Response.json(result);
+    }
+
+    // ─── 0c. V2 : Secours dispatch (top N) ──────────────────────────────
+    if (action === 'secours_v2') {
+      const { nb_livreurs } = body;
+      const course = await base44.asServiceRole.entities.CourseExterne.get(course_id);
+      if (!course) return Response.json({ error: 'Course introuvable' }, { status: 404 });
+      const result = await secoursDispatchV2(base44, course, nb_livreurs || 3);
+      return Response.json(result);
     }
 
     // ─── 1. Lancer la recherche automatique (multi-livreurs) ──────────────

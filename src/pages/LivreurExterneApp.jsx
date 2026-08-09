@@ -1300,7 +1300,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   // ─── Dashboard principal ──────────────────────────────────────────────────
   const TABS = [
     { id: "courses", label: "Courses", emoji: "" },
-    { id: "disponibles", label: "Disponibles", emoji: "" },
+    // Onglet "Disponibles" masqué si le livreur a une course active (règle absolue V2)
+    ...(coursesActives.length === 0 ? [{ id: "disponibles", label: "Disponibles", emoji: "" }] : []),
     { id: "historique", label: "Historique", emoji: "" },
     { id: "messages", label: "Messages", emoji: "" },
     ...(livreurHasPromoCode ? [{ id: "promo", label: "Code Promo", emoji: "" }] : []),

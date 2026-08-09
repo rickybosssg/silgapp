@@ -43,9 +43,27 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess }) {
       return all || [];
     },
     enabled: !!livreurId && !!countryCode,
-    refetchInterval: 10000,
-    staleTime: 5000,
+    staleTime: 30000,
   });
+
+  // ── Rechargement ponctuel (pas de polling permanent) ──
+  // Se déclenche au retour au premier plan ou après reconnexion réseau
+  useEffect(() => {
+    if (!livreurId) return;
+    const reload = () => {
+      queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles", livreurId, countryCode] });
+    };
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") reload();
+    };
+    const handleOnline = () => reload();
+    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("online", handleOnline);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("online", handleOnline);
+    };
+  }, [livreurId, countryCode, queryClient]);
 
   // ── Récupérer les courses refusées par ce livreur depuis DispatchNotification ──
   // (remplace l'ancien champ JSON dispatch_refused_ids qui n'est plus mis à jour)
@@ -116,7 +134,7 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess }) {
     setAcceptingId(course.id);
     try {
       const res = await base44.functions.invoke("dispatchExterneAuto", {
-        action: "accepter_course",
+        action: "accepter_course_v2",
         course_id: course.id,
         livreur_id: livreurId,
       });

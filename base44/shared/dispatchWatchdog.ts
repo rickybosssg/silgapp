@@ -8,6 +8,7 @@ import { journaliserDispatch } from './dispatchUtils.ts';
 import { getLivreursNotifies } from './dispatchNotifications.ts';
 import { lancerDispatchMulti } from './dispatchEngine.ts';
 import { chargerConfigDispatch, chargerConfigVaguesGPS, CYCLE_EPUISE_TIMEOUT_MS } from './dispatchConfig.ts';
+import { isV2Enabled, secoursDispatchV2 } from './dispatchV2.ts';
 
 const WATCHDOG_GRACE_MS = 2 * 60 * 1000;        // 2 min de grâce pour les automations événementielles
 const PROPOSE_TIMEOUT_GRACE_MS = 5 * 60 * 1000; // 5 min de grâce après expiration du timeout
@@ -263,6 +264,58 @@ export async function runWatchdog(base44, body = {}) {
       raison_blocage: a.type,
       raison_passage: `severity:${a.severity} | ${a.description || ''}`,
     });
+  }
+
+  // ═══ V2 SECOURS : courses en disponible_push sans acceptation ═══
+  // Phase 1 (5-10 min) : push top 3
+  // Phase 2 (10-15 min) : push top 5
+  // Phase 3 (>15 min) : cycle_epuise
+  const v2Enabled = await isV2Enabled(base44);
+  if (v2Enabled) {
+    const coursesFil = courses.filter(c => c.dispatch_status === 'disponible_push' && c.statut === 'recherche_livreur');
+    for (const course of coursesFil) {
+      const sollicitationMs = course.heure_sollicitation
+        ? new Date(course.heure_sollicitation).getTime()
+        : new Date(course.created_date).getTime();
+      const ageMin = (now.getTime() - sollicitationMs) / 60000;
+
+      if (ageMin >= 5 && ageMin < 10) {
+        // Phase 1 : push top 3
+        try {
+          const result = await secoursDispatchV2(base44, course, 3);
+          corrections.push({ course_id: course.id, action: 'secours_v2_top3', ...result });
+        } catch (err) {
+          corrections.push({ course_id: course.id, action: 'secours_v2_top3', error: err.message });
+        }
+        await new Promise(r => setTimeout(r, 100));
+      } else if (ageMin >= 10 && ageMin < 15) {
+        // Phase 2 : push top 5
+        try {
+          const result = await secoursDispatchV2(base44, course, 5);
+          corrections.push({ course_id: course.id, action: 'secours_v2_top5', ...result });
+        } catch (err) {
+          corrections.push({ course_id: course.id, action: 'secours_v2_top5', error: err.message });
+        }
+        await new Promise(r => setTimeout(r, 100));
+      } else if (ageMin >= 15) {
+        // Phase 3 : cycle_epuise
+        const cycleEpuiseDeadline = new Date(now.getTime() + CYCLE_EPUISE_TIMEOUT_MS).toISOString();
+        await base44.asServiceRole.entities.CourseExterne.update(course.id, {
+          dispatch_status: 'cycle_epuise',
+          timeout_expires_at: cycleEpuiseDeadline,
+        });
+        corrections.push({ course_id: course.id, action: 'secours_v2_cycle_epuise' });
+
+        // Notifier VENUS
+        try {
+          const { notifierRedispatchClient } = await import('./venusRedispatchNotifier.ts');
+          const messageVenus = `📍 Nous avons sollicité tous les livreurs disponibles autour de vous, mais aucun n'a accepté votre course pour le moment.\n\nVoulez-vous que je relance la recherche ?\n\nRépondez 'oui' pour relancer ou 'non' pour annuler.`;
+          await notifierRedispatchClient({ base44, course, messageVenus, motif: 'cycle_epuise' });
+        } catch (err) {
+          console.error('[WATCHDOG] ❌ VENUS notif cycle_epuise V2:', err.message);
+        }
+      }
+    }
   }
 
   console.log(`[WATCHDOG] 📋 ${anomalies.length} anomalie(s) détectée(s), ${corrections.length} correction(s) appliquée(s)`);
