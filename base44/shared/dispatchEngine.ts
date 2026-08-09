@@ -467,7 +467,13 @@ export async function lancerDispatchMulti(base44, courseId, exclusions = [], cac
   // ═══ VAGUE PRIORITAIRE — les livreurs prioritaires sont notifiés EN PREMIER ═══
   // Avant toute vague GPS, on notifie TOUS les livreurs prioritaires disponibles.
   // Une fois leur vague expirée, le dispatch passe aux vagues GPS normales.
-  const priorityCandidats = candidats.filter(l => (l.priorite_dispatch || 0) > 0);
+  //
+  // 🛡️ EXCEPTION: en dernière vague (wave >= gpsConfig.waves.length), on notifie
+  // TOUS les candidats (prioritaires + non-prioritaires + GPS expirés) ENSEMBLE.
+  // Sans cette exception, les livreurs non-prioritaires au GPS expiré ne sont
+  // JAMAIS notifiés — le code notifie uniquement les prioritaires puis retourne.
+  const isLastWave = wave >= gpsConfig.waves.length;
+  const priorityCandidats = isLastWave ? [] : candidats.filter(l => (l.priorite_dispatch || 0) > 0);
   let priorityNotYetNotified = priorityCandidats.filter(l => !dejaNotifies.includes(l.id));
 
   // 🛡️ NIVEAU 2 — RE-VÉRIFICATION FINALE avant notification vague prioritaire
