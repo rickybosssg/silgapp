@@ -6,7 +6,7 @@ import { chargerConfigDispatch, chargerConfigVaguesGPS, CYCLE_EPUISE_TIMEOUT_MS 
 import { lancerDispatchMulti } from '../../shared/dispatchEngine.ts';
 import { runWatchdog } from '../../shared/dispatchWatchdog.ts';
 import { marquerRefuse, marquerAccepte, getLivreursNotifies, resetNotifications as resetNotifsEntity } from '../../shared/dispatchNotifications.ts';
-import { accepterCourseV2, publierCourseDansFil, isV2Enabled, secoursDispatchV2 } from '../../shared/dispatchV2.ts';
+import { accepterCourseV2, publierCourseDansFil, isV2Enabled, secoursDispatchV2, isPilotLivreur } from '../../shared/dispatchV2.ts';
 
 // ============================================================================
 // HANDLER PRINCIPAL
@@ -42,6 +42,14 @@ Deno.serve(async (req) => {
 
     // ─── 0b. V2 : Accepter une course (updateMany + update single) ──────
     if (action === 'accepter_course_v2') {
+      // 🛡️ Sécurité : seul un livreur pilote peut utiliser V2 pendant la phase de test
+      const isPilot = await isPilotLivreur(base44, livreur_id);
+      if (!isPilot) {
+        return Response.json(
+          { success: false, accepted: false, reason: 'not_pilot', error: 'V2 non disponible pour ce livreur' },
+          { status: 403 }
+        );
+      }
       const { pricing_mode, manual_price, override_pricing_mode } = body;
       const result = await accepterCourseV2(base44, course_id, livreur_id, { pricing_mode, manual_price, override_pricing_mode });
       return Response.json(result);

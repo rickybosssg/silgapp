@@ -201,6 +201,24 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     staleTime: 4000,
   });
 
+  // ── Vérifier si ce livreur fait partie du pilote V2 ──
+  const { data: isPilotLivreur = false } = useQuery({
+    queryKey: ["dispatch-v2-pilot", livreurProfil?.id],
+    queryFn: async () => {
+      const lid = livreurProfil?.id;
+      if (!lid) return false;
+      const configs = await base44.entities.AppConfig.filter(
+        { cle: { $in: ["DISPATCH_V2_PILOT_ENABLED", "DISPATCH_V2_PILOT_LIVREUR_IDS"] } }
+      );
+      const enabled = configs.find(c => c.cle === "DISPATCH_V2_PILOT_ENABLED")?.valeur === "true";
+      const idsStr = configs.find(c => c.cle === "DISPATCH_V2_PILOT_LIVREUR_IDS")?.valeur || "";
+      const ids = idsStr.split(",").map(s => s.trim()).filter(Boolean);
+      return enabled && ids.includes(lid);
+    },
+    enabled: !!livreurProfil?.id,
+    staleTime: 60000,
+  });
+
   const { data: countryCommissionRows = [] } = useQuery({
     queryKey: ["country-commission", livreurProfil?.country_code],
     queryFn: () => base44.entities.Country.filter({ code: livreurProfil.country_code, actif: true }),
@@ -1300,8 +1318,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   // ─── Dashboard principal ──────────────────────────────────────────────────
   const TABS = [
     { id: "courses", label: "Courses", emoji: "" },
-    // Onglet "Disponibles" masqué si le livreur a une course active (règle absolue V2)
-    ...(coursesActives.length === 0 ? [{ id: "disponibles", label: "Disponibles", emoji: "" }] : []),
+    // Onglet "Disponibles" masqué si le livreur a une course active OU s'il n'est pas pilote V2
+    ...(coursesActives.length === 0 && isPilotLivreur ? [{ id: "disponibles", label: "Disponibles", emoji: "" }] : []),
     { id: "historique", label: "Historique", emoji: "" },
     { id: "messages", label: "Messages", emoji: "" },
     ...(livreurHasPromoCode ? [{ id: "promo", label: "Code Promo", emoji: "" }] : []),

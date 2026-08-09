@@ -32,17 +32,35 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess }) {
   const livreurLat = livreurProfil?.latitude;
   const livreurLng = livreurProfil?.longitude;
 
-  const { data: courses = [], isLoading } = useQuery({
-    queryKey: ["courses-externes-disponibles", livreurId, countryCode],
+  // ── Vérifier si ce livreur fait partie du pilote V2 ──
+  const { data: isPilot = false } = useQuery({
+    queryKey: ["dispatch-v2-pilot", livreurId],
     queryFn: async () => {
-      if (!countryCode) return [];
+      if (!livreurId) return false;
+      const configs = await base44.entities.AppConfig.filter(
+        { cle: { $in: ["DISPATCH_V2_PILOT_ENABLED", "DISPATCH_V2_PILOT_LIVREUR_IDS"] } }
+      );
+      const enabled = configs.find(c => c.cle === "DISPATCH_V2_PILOT_ENABLED")?.valeur === "true";
+      const idsStr = configs.find(c => c.cle === "DISPATCH_V2_PILOT_LIVREUR_IDS")?.valeur || "";
+      const ids = idsStr.split(",").map(s => s.trim()).filter(Boolean);
+      return enabled && ids.includes(livreurId);
+    },
+    enabled: !!livreurId,
+    staleTime: 60000,
+  });
+
+  const { data: courses = [], isLoading } = useQuery({
+    queryKey: ["courses-externes-disponibles", livreurId, countryCode, isPilot],
+    queryFn: async () => {
+      if (!countryCode || !isPilot) return [];
+      // Pilote : voir les courses en propose (V1) + disponible_push (V2)
       const all = await base44.entities.CourseExterne.filter(
-        { dispatch_status: "disponible_push", country_code: countryCode },
+        { dispatch_status: { $in: ["disponible_push", "propose"] }, country_code: countryCode },
         "-created_date", 50
       );
       return all || [];
     },
-    enabled: !!livreurId && !!countryCode,
+    enabled: !!livreurId && !!countryCode && isPilot,
     staleTime: 30000,
   });
 
@@ -172,6 +190,20 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess }) {
       raison: "Refusé depuis Courses disponibles",
     }).catch(() => null);
   };
+
+  if (!isPilot) {
+    return (
+      <div className="rounded-2xl bg-[#1f2429] border border-white/8 p-8 text-center space-y-3">
+        <div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center mx-auto">
+          <Flame className="w-7 h-7 text-white/30" />
+        </div>
+        <p className="text-sm font-bold text-white/70">Fil V2 non disponible</p>
+        <p className="text-xs text-white/40">
+          Le fil de courses disponibles est actuellement en phase de test pilote.
+        </p>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (

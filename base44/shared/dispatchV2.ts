@@ -22,6 +22,29 @@ export async function isV2Enabled(base44: any): Promise<boolean> {
   }
 }
 
+// ── Pilote par livreur (cache TTL 60s) ──
+let PILOT_CACHE: { ids: string[]; enabled: boolean; expires: number } | null = null;
+const PILOT_TTL_MS = 60 * 1000;
+
+export async function isPilotLivreur(base44: any, livreurId: string): Promise<boolean> {
+  if (!livreurId) return false;
+  if (PILOT_CACHE && Date.now() < PILOT_CACHE.expires) {
+    return PILOT_CACHE.enabled && PILOT_CACHE.ids.includes(livreurId);
+  }
+  try {
+    const configs = await base44.asServiceRole.entities.AppConfig.filter(
+      { cle: { $in: ['DISPATCH_V2_PILOT_ENABLED', 'DISPATCH_V2_PILOT_LIVREUR_IDS'] } }
+    );
+    const enabled = configs.find((c: any) => c.cle === 'DISPATCH_V2_PILOT_ENABLED')?.valeur === 'true';
+    const idsStr = configs.find((c: any) => c.cle === 'DISPATCH_V2_PILOT_LIVREUR_IDS')?.valeur || '';
+    const ids = idsStr.split(',').map((s: string) => s.trim()).filter(Boolean);
+    PILOT_CACHE = { ids, enabled, expires: Date.now() + PILOT_TTL_MS };
+    return enabled && ids.includes(livreurId);
+  } catch {
+    return false;
+  }
+}
+
 // ── Publier une course dans le fil (V2) ──
 export async function publierCourseDansFil(base44: any, course: any) {
   if (!course?.id) return { error: 'no_course_id' };
