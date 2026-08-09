@@ -118,6 +118,8 @@ export default function CourseExterneFormSync() {
     expediteur_gps_available: false,
     expediteur_gps_lat: null,
     expediteur_gps_lng: null,
+    // Prix proposé par le client (pré-rempli avec l'estimation GPS)
+    prix_propose: 0,
   };
 
   const [formData, setFormData] = useState(initialData);
@@ -668,6 +670,8 @@ export default function CourseExterneFormSync() {
       gps_arrivee_lng: isMulti ? null : gpsArriveLng,
       destination_inconnue: destInconnue,
       prix_estimate: isMulti ? 0 : prixEstime,
+      prix_propose_admin: isMulti ? 0 : (formData.prix_propose || prixEstime),
+      pricing_mode: isMulti ? "automatic" : "admin_manuel",
       statut: formData.date_souhaitee ? "programmee" : "recherche_livreur",
       dispatch_status: "en_attente",
       date_souhaitee: formData.date_souhaitee || null,

@@ -33,7 +33,6 @@ import VenusFloatingButton from "@/components/client/VenusFloatingButton";
 import AlertesLivreurModal from "@/components/livreur/AlertesLivreurModal";
 import PubliciteCarousel from "@/components/publicite/PubliciteCarousel";
 import PubliciteFullscreen from "@/components/publicite/PubliciteFullscreen";
-import PricingModeSelector from "@/components/livreur/PricingModeSelector";
 import PrixManuelReponseAlert from "@/components/livreur/PrixManuelReponseAlert";
 import { normalizeCommissionPct, splitAmountByCommission } from "@/lib/commissionUtils";
 import MessagesPage from "@/components/chat/MessagesPage";
@@ -1510,9 +1509,6 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
                 </button>
               </div>
             )}
-
-            {/* ── MODE TARIFAIRE ── */}
-            <PricingModeSelector pricingMode={pricingMode} onChange={handlePricingModeChange} />
 
             <LivreurStatsBanner
               mesCourses={mesCourses}
