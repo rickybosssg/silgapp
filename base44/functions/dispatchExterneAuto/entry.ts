@@ -421,10 +421,11 @@ Deno.serve(async (req) => {
 
       // 🔐 MISE À JOUR ATOMIQUE CONDITIONNELLE — empêche la course condition (race condition)
       // où deux livreurs passent le double-check simultanément. Le updateMany ne modifie
-      // la course QUE si dispatch_status est toujours 'propose' ET livreur_id toujours vide.
-      // Si un autre livreur a déjà verrouillé la course, 0 enregistrement sera modifié.
+      // la course QUE si dispatch_status est toujours 'propose' ou 'disponible_push'.
+      // ⚠️ Ne pas filtrer livreur_id avec une chaîne vide : Base44 stocke aussi l'absence
+      // de livreur avec null, ce qui empêchait toute acceptation de ces courses.
       await base44.asServiceRole.entities.CourseExterne.updateMany(
-        { id: course_id, dispatch_status: { $in: ['propose', 'disponible_push'] }, livreur_id: '' },
+        { id: course_id, dispatch_status: { $in: ['propose', 'disponible_push'] } },
         { $set: updateData }
       );
 
