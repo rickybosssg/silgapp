@@ -55,9 +55,20 @@ export async function trouverLivreursCandidats(base44, course, exclusions = [], 
         { country_code: course.country_code },
         '-created_date', 200
       );
+      // 🛡️ EXCLUSION À 3 NIVEAUX : un livreur est exclu s'il a une course :
+      //  1. avec statut actif (livreur_en_route, en_livraison, etc.) — livreur_id OU accepted_by_livreur_id
+      //  2. avec dispatch_status='propose' (vague en cours ou prix manuel en attente) — livreur_id OU accepted_by_livreur_id
+      //  3. avec dispatch_status='accepte' (prix manuel accepté) — livreur_id OU accepted_by_livreur_id
       for (const c of coursesActives || []) {
-        if (c.livreur_id && tousLivreursIds.includes(c.livreur_id) && STATUTS_ACTIFS_COURSE.includes(c.statut)) {
+        const isStatutActif = STATUTS_ACTIFS_COURSE.includes(c.statut);
+        const isPropose = c.dispatch_status === 'propose' && c.statut === 'recherche_livreur';
+        const isAccepte = c.dispatch_status === 'accepte';
+        if (!isStatutActif && !isPropose && !isAccepte) continue;
+        if (c.livreur_id && tousLivreursIds.includes(c.livreur_id)) {
           livreurIdsAvecCourseActive.add(c.livreur_id);
+        }
+        if (c.accepted_by_livreur_id && tousLivreursIds.includes(c.accepted_by_livreur_id)) {
+          livreurIdsAvecCourseActive.add(c.accepted_by_livreur_id);
         }
       }
     } catch (err) {
@@ -454,7 +465,30 @@ export async function lancerDispatchMulti(base44, courseId, exclusions = [], cac
   // Avant toute vague GPS, on notifie TOUS les livreurs prioritaires disponibles.
   // Une fois leur vague expirée, le dispatch passe aux vagues GPS normales.
   const priorityCandidats = candidats.filter(l => (l.priorite_dispatch || 0) > 0);
-  const priorityNotYetNotified = priorityCandidats.filter(l => !dejaNotifies.includes(l.id));
+  let priorityNotYetNotified = priorityCandidats.filter(l => !dejaNotifies.includes(l.id));
+
+  // 🛡️ NIVEAU 2 — RE-VÉRIFICATION FINALE avant notification vague prioritaire
+  if (priorityNotYetNotified.length > 0) {
+    const selectionIds = new Set(priorityNotYetNotified.map(l => l.id));
+    const coursesVerif = await base44.asServiceRole.entities.CourseExterne.filter(
+      { country_code: course.country_code },
+      '-created_date', 200
+    );
+    const exclusFinal = new Set();
+    for (const c of coursesVerif || []) {
+      if (c.id === courseId) continue;
+      const isActif = STATUTS_ACTIFS_COURSE.includes(c.statut);
+      const isPropose = c.dispatch_status === 'propose' && c.statut === 'recherche_livreur';
+      const isAccepte = c.dispatch_status === 'accepte';
+      if (!isActif && !isPropose && !isAccepte) continue;
+      if (c.livreur_id && selectionIds.has(c.livreur_id)) exclusFinal.add(c.livreur_id);
+      if (c.accepted_by_livreur_id && selectionIds.has(c.accepted_by_livreur_id)) exclusFinal.add(c.accepted_by_livreur_id);
+    }
+    if (exclusFinal.size > 0) {
+      priorityNotYetNotified = priorityNotYetNotified.filter(l => !exclusFinal.has(l.id));
+      dispatchLog(`[DISPATCH] 🛡️ ${exclusFinal.size} livreur(s) prioritaire(s) exclu(s) au dernier moment pour course ${courseId}`);
+    }
+  }
 
   if (priorityNotYetNotified.length > 0) {
     const pTimeoutSec = (gpsConfig.waves[0]?.timeout_sec || 60);
@@ -547,6 +581,31 @@ export async function lancerDispatchMulti(base44, courseId, exclusions = [], cac
   timeoutSec = waveCfg.timeout_sec;
   waveLabel = `GPS vague ${wave}/${gpsConfig.waves.length}`;
   dispatchLog(`[DISPATCH] 🎯 ${waveLabel} — ${selection.length}/${candidats.length} livreurs pour course ${courseId}`);
+
+  // 🛡️ NIVEAU 2 — RE-VÉRIFICATION FINALE avant notification : entre la sélection
+  // des candidats et l'envoi des notifications, un livreur a pu accepter une
+  // autre course. On re-vérifie fraîchement que chaque livreur est toujours libre.
+  if (selection.length > 0) {
+    const selectionIds = new Set(selection.map(l => l.id));
+    const coursesVerif = await base44.asServiceRole.entities.CourseExterne.filter(
+      { country_code: course.country_code },
+      '-created_date', 200
+    );
+    const exclusFinal = new Set();
+    for (const c of coursesVerif || []) {
+      if (c.id === courseId) continue;
+      const isActif = STATUTS_ACTIFS_COURSE.includes(c.statut);
+      const isPropose = c.dispatch_status === 'propose' && c.statut === 'recherche_livreur';
+      const isAccepte = c.dispatch_status === 'accepte';
+      if (!isActif && !isPropose && !isAccepte) continue;
+      if (c.livreur_id && selectionIds.has(c.livreur_id)) exclusFinal.add(c.livreur_id);
+      if (c.accepted_by_livreur_id && selectionIds.has(c.accepted_by_livreur_id)) exclusFinal.add(c.accepted_by_livreur_id);
+    }
+    if (exclusFinal.size > 0) {
+      selection = selection.filter(l => !exclusFinal.has(l.id));
+      dispatchLog(`[DISPATCH] 🛡️ ${exclusFinal.size} livreur(s) exclu(s) au dernier moment (course acceptée entre-temps) pour course ${courseId}`);
+    }
+  }
 
   const timeoutAt = new Date(Date.now() + timeoutSec * 1000).toISOString();
   const nouveauxNotifiedIds = selection.map(l => l.id);

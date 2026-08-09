@@ -104,6 +104,39 @@ Deno.serve(async (req) => {
       });
     }
 
+    // 🛡️ NIVEAU 0 — VÉRIFICATION DE COURSE ACTIVE : un livreur ayant déjà une
+    // course active ne doit JAMAIS voir ou accepter une nouvelle proposition.
+    // Cette vérification est la première barrière du cas "Amidou Ouédraogo".
+    if (countryGuard.ok) {
+      const coursesActivesLivreur = await base44.asServiceRole.entities.CourseExterne.filter({
+        livreur_id: livreur_id,
+      }, '-created_date', 10);
+      const coursesAccepteesLivreur = await base44.asServiceRole.entities.CourseExterne.filter({
+        accepted_by_livreur_id: livreur_id,
+      }, '-created_date', 10);
+      const toutesCoursesLivreur = [...coursesActivesLivreur, ...coursesAccepteesLivreur];
+      const courseActiveExistante = toutesCoursesLivreur.find(c =>
+        STATUTS_ACTIFS_COURSE.includes(c.statut) && c.id !== course_id
+      );
+      const coursePrixManuelEnAttente = toutesCoursesLivreur.find(c =>
+        c.id !== course_id && c.dispatch_status === 'propose' &&
+        (c.livreur_id === livreur_id || c.accepted_by_livreur_id === livreur_id)
+      );
+      if (courseActiveExistante) {
+        console.warn(`[DISPATCH] 🚫 check_course_pour_livreur — Livreur ${livreur_id} a déjà la course ${courseActiveExistante.id} active (${courseActiveExistante.statut}) — proposition masquée`);
+        return Response.json({ 
+          found: false, deja_en_course: true,
+          error: 'Vous avez déjà une course en cours. Terminez-la avant d\'en voir une nouvelle.',
+        });
+      }
+      if (coursePrixManuelEnAttente) {
+        return Response.json({ 
+          found: false, prix_manuel_en_attente: true,
+          error: 'Vous avez déjà proposé un prix sur une course en attente de validation.',
+        });
+      }
+    }
+
     if (course.statut === 'annulee' || course.statut === 'livree') {
         try {
           const livreurData = countryGuard.livreur;
