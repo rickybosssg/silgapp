@@ -64,7 +64,7 @@ public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
                 && courseId != null && !courseId.isEmpty()) {
             String title = valueOrDefault(data.get("title"), "Nouvelle course SILGAPP");
             String body = valueOrDefault(data.get("body"), "Une course est disponible. Ouvrez l'app pour accepter.");
-            long durationMs = parseSeconds(data.get("alert_duration_seconds"), DEFAULT_DURATION_MS / 1000L, 10L, 180L) * 1000L;
+            long durationMs = parseSeconds(data.get("alert_duration_seconds"), DEFAULT_DURATION_MS / 1000L, 5L, 180L) * 1000L;
             long intervalMs = parseSeconds(data.get("alert_interval_seconds"), DEFAULT_INTERVAL_MS / 1000L, 3L, 30L) * 1000L;
             String alertKey = buildAlertKey(courseId, data.get("notification_id"));
 
@@ -107,6 +107,10 @@ public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
 
     public static synchronized void stopUrgentCourseAlert() {
         stopUrgentCourseAlert(true);
+    }
+
+    public static synchronized void stopUrgentCourseSound() {
+        stopUrgentCourseAlert(false);
     }
 
     public static synchronized void startUrgentCourseAlertFromPlugin(
@@ -155,14 +159,14 @@ public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
         stopUrgentCourseAlert(false);
         activeAlertKey = alertKey != null ? alertKey : "";
         alertHandler = new Handler(Looper.getMainLooper());
-        alertEndAtMs = now + Math.max(durationMs, 10000L);
-        playNotificationSound(context);
+        alertEndAtMs = now + Math.max(durationMs, 5000L);
+        playNotificationSound(context, durationMs > 5000L);
 
         alertRunnable = new Runnable() {
             @Override
             public void run() {
                 if (SystemClock.elapsedRealtime() >= alertEndAtMs) {
-                    stopUrgentCourseAlert();
+                    stopUrgentCourseAlert(false);
                     return;
                 }
                 vibrate(context);
@@ -344,7 +348,7 @@ public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
         } catch (Exception ignored) {}
     }
 
-    private static void playNotificationSound(Context context) {
+    private static void playNotificationSound(Context context, boolean loopSound) {
         try {
             stopRingtone();
             AssetFileDescriptor afd = context.getResources().openRawResourceFd(R.raw.silgapp_alert);
@@ -360,7 +364,7 @@ public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
                 }
                 player.setDataSource(afd.getFileDescriptor(), afd.getStartOffset(), afd.getLength());
                 afd.close();
-                player.setLooping(true);
+                player.setLooping(loopSound);
                 player.prepare();
                 player.start();
                 activeMediaPlayer = player;

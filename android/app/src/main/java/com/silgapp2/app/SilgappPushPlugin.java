@@ -211,6 +211,12 @@ public class SilgappPushPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void stopUrgentCourseSound(PluginCall call) {
+        SilgappFirebaseMessagingService.stopUrgentCourseSound();
+        call.resolve();
+    }
+
+    @PluginMethod
     public void startUrgentCourseAlert(PluginCall call) {
         String courseId = call.getString("courseId", "");
         if (courseId == null || courseId.trim().isEmpty()) {

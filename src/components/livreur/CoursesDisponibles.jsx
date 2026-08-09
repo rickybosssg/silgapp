@@ -1,8 +1,9 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Check, X, MapPin, Clock, Package, Flame, Navigation } from "lucide-react";
 import { toast } from "sonner";
+import { startUrgentCourseAlert, stopUrgentCourseAlert } from "@/lib/livreurUrgentAlert";
 
 function calculerDistance(lat1, lng1, lat2, lng2) {
   if ([lat1, lng1, lat2, lng2].some(value => value == null || Number.isNaN(Number(value)))) return null;
@@ -17,9 +18,10 @@ function calculerDistance(lat1, lng1, lat2, lng2) {
 
 const FINAL_COURSE_STATUSES = new Set(["livree", "annulee", "completed", "delivered", "canceled"]);
 
-export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess }) {
+export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onNewCourse }) {
   const queryClient = useQueryClient();
   const [acceptingId, setAcceptingId] = useState(null);
+  const knownCourseIdsRef = useRef(new Set());
   const [refusedIds, setRefusedIds] = useState(() => {
     try {
       const stored = localStorage.getItem("silgapp_dismissed_courses");
@@ -40,17 +42,27 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess }) {
     livreurProfil?.manual_hors_ligne !== true &&
     livreurProfil?.admin_hors_ligne !== true;
 
-  const { data: courses = [], isLoading } = useQuery({
-    queryKey: ["courses-externes-disponibles", livreurId, countryCode],
+  const { data: isV2Enabled = true } = useQuery({
+    queryKey: ["dispatch-v2-enabled", livreurId],
     queryFn: async () => {
-      if (!countryCode) return [];
+      const configs = await base44.entities.AppConfig.filter({ cle: "DISPATCH_V2_ENABLED" });
+      return configs?.[0] ? configs[0].valeur !== "false" : true;
+    },
+    enabled: !!livreurId,
+    staleTime: 60000,
+  });
+
+  const { data: courses = [], isLoading } = useQuery({
+    queryKey: ["courses-externes-disponibles", livreurId, countryCode, isV2Enabled],
+    queryFn: async () => {
+      if (!countryCode || !isV2Enabled) return [];
       const all = await base44.entities.CourseExterne.filter(
-        { dispatch_status: "disponible_push", country_code: countryCode },
+        { dispatch_status: { $in: ["disponible_push", "propose", "en_attente"] }, country_code: countryCode },
         "-created_date", 50
       );
       return all || [];
     },
-    enabled: !!livreurId && !!countryCode && livreurDisponible,
+    enabled: !!livreurId && !!countryCode && livreurDisponible && isV2Enabled,
     refetchInterval: 10000,
     staleTime: 5000,
   });
@@ -76,7 +88,7 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess }) {
   useEffect(() => {
     if (!livreurId) return;
     const unsubscribe = base44.entities.CourseExterne.subscribe((event) => {
-      if (event.type === "update" || event.type === "delete") {
+      if (event.type === "create" || event.type === "update" || event.type === "delete") {
         queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles", livreurId, countryCode] });
       }
     });
@@ -99,6 +111,32 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess }) {
       return true;
     });
   }, [courses, refusedIds, refusedCourseIds, livreurId]);
+
+  useEffect(() => {
+    const currentIds = new Set(eligibleCourses.map(course => course.id));
+    if (currentIds.size === 0) return;
+
+    if (knownCourseIdsRef.current.size === 0) {
+      knownCourseIdsRef.current = currentIds;
+      return;
+    }
+
+    const newCourses = eligibleCourses.filter(course => !knownCourseIdsRef.current.has(course.id));
+    knownCourseIdsRef.current = new Set([...knownCourseIdsRef.current, ...currentIds]);
+    if (newCourses.length === 0) return;
+
+    const newestCourse = newCourses[0];
+    startUrgentCourseAlert({
+      courseId: newestCourse.id,
+      source: "dispatch-v2-available",
+      durationSeconds: 5,
+      intervalSeconds: 5,
+      showNotification: true,
+      title: "Nouvelle course SILGAPP",
+      body: `${newestCourse.quartier_depart || newestCourse.adresse_depart || "Départ"} vers ${newestCourse.quartier_arrivee || newestCourse.adresse_arrivee || "destination"}`,
+    });
+    onNewCourse?.(newCourses.length);
+  }, [eligibleCourses, onNewCourse]);
 
   // Calculer la distance pour chaque course
   const coursesWithDistance = useMemo(() => {
@@ -124,12 +162,13 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess }) {
     setAcceptingId(course.id);
     try {
       const res = await base44.functions.invoke("dispatchExterneAuto", {
-        action: "accepter_course",
+        action: "accepter_course_v2",
         course_id: course.id,
         livreur_id: livreurId,
       });
       const data = res?.data;
       if (data?.success && data?.accepted !== false) {
+        stopUrgentCourseAlert("v2-course-accepted");
         toast.success("Course acceptée !");
         queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles"] });
         queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
@@ -153,6 +192,7 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess }) {
   };
 
   const handleRefuser = (course) => {
+    stopUrgentCourseAlert("v2-course-refused");
     setRefusedIds(prev => [...prev, course.id]);
     // Appel backend en arrière-plan
     base44.functions.invoke("dispatchExterneAuto", {

@@ -40,7 +40,7 @@ export function normalizeLivreurAlertConfig(config = {}) {
   );
 
   return {
-    durationSeconds: clamp(Math.round(duration), 10, 180),
+    durationSeconds: clamp(Math.round(duration), 5, 180),
     intervalSeconds: clamp(Math.round(interval), 3, 30),
   };
 }
@@ -101,9 +101,13 @@ function vibrateUrgentPattern() {
   } catch (_) {}
 }
 
-function stopNativeUrgentAlert() {
+function stopNativeUrgentAlert(cancelNotification = true) {
   if (!Capacitor.isNativePlatform()) return;
-  SilgappPush.stopUrgentCourseAlert?.().catch(() => null);
+  if (cancelNotification) {
+    SilgappPush.stopUrgentCourseAlert?.().catch(() => null);
+    return;
+  }
+  SilgappPush.stopUrgentCourseSound?.().catch(() => null);
 }
 
 function startNativeUrgentAlert(options = {}, config = {}) {
@@ -127,7 +131,7 @@ export function stopUrgentCourseAlert(reason = "stopped") {
   try {
     navigator.vibrate?.(0);
   } catch (_) {}
-  stopNativeUrgentAlert();
+  stopNativeUrgentAlert(reason !== "timeout");
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent("silgapp:livreur-urgent-alert-stopped", {
       detail: { reason },

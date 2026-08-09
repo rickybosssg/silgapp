@@ -216,6 +216,11 @@
       "type": "number",
       "default": 0
     },
+    "dispatch_v2_secours_phase": {
+      "type": "number",
+      "default": 0,
+      "description": "Derniere phase de secours V2 executee; empeche les notifications repetees"
+    },
     "dispatch_wave_started_at": {
       "type": "string",
       "format": "date-time",

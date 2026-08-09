@@ -5,6 +5,7 @@ import { Users, Phone, Clock, CheckCircle2, Timer, RefreshCw, Radio, Zap, XCircl
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";
+import ProposedLivreursListV2 from "./ProposedLivreursListV2";
 
 function fmtSec(sec) {
   if (sec <= 0) return "00:00";
@@ -19,6 +20,18 @@ export default function ProposedLivreursList({ course }) {
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(Date.now());
   const [assigningId, setAssigningId] = useState(null);
+
+  // ── Vérifier si V2 (fil de courses) est activé ──
+  const [isV2Enabled, setIsV2Enabled] = useState(true);
+  useEffect(() => {
+    let mounted = true;
+    base44.entities.AppConfig.filter({ cle: "DISPATCH_V2_ENABLED" })
+      .then((configs) => {
+        if (mounted) setIsV2Enabled(configs?.[0] ? configs[0].valeur !== "false" : true);
+      })
+      .catch(() => {});
+    return () => { mounted = false; };
+  }, []);
 
   const handleForceAssign = async (livreur) => {
     setAssigningId(livreur.id);
@@ -102,6 +115,11 @@ export default function ProposedLivreursList({ course }) {
     fetchLivreurs();
     return () => { mounted = false; };
   }, [course?.id, course?.dispatch_wave, course?.updated_date]);
+
+  // ── En V2, afficher la vue fil de courses (après tous les hooks) ──
+  if (isV2Enabled) {
+    return <ProposedLivreursListV2 course={course} />;
+  }
 
   if (loading) {
     return (

@@ -25,6 +25,8 @@ export default function DispatchConfigPanel() {
   const [timeoutSec, setTimeoutSec] = useState("60");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [v2Enabled, setV2Enabled] = useState(true);
+  const [v2Saving, setV2Saving] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -35,6 +37,8 @@ export default function DispatchConfigPanel() {
           setNbLivreurs(config.nb >= 999 ? "tous" : String(config.nb));
           setTimeoutSec(String(config.timeout));
         }
+        const v2Configs = await base44.entities.AppConfig.filter({ cle: "DISPATCH_V2_ENABLED" });
+        setV2Enabled(v2Configs?.[0] ? v2Configs[0].valeur !== "false" : true);
       } catch (err) {
         console.error("Erreur chargement config dispatch:", err);
       } finally {
@@ -43,6 +47,28 @@ export default function DispatchConfigPanel() {
     };
     load();
   }, []);
+
+  const handleToggleV2 = async (enabled) => {
+    setV2Saving(true);
+    try {
+      const existing = await base44.entities.AppConfig.filter({ cle: "DISPATCH_V2_ENABLED" });
+      if (existing?.[0]?.id) {
+        await base44.entities.AppConfig.update(existing[0].id, { valeur: enabled ? "true" : "false" });
+      } else {
+        await base44.entities.AppConfig.create({
+          cle: "DISPATCH_V2_ENABLED",
+          valeur: enabled ? "true" : "false",
+          description: "Feature flag for V2 dispatch (Fil de courses disponibles)",
+        });
+      }
+      setV2Enabled(enabled);
+      toast.success(enabled ? "Dispatch V2 activé — Fil de courses" : "Dispatch V1 activé — Vagues par proximité");
+    } catch (err) {
+      toast.error("Erreur bascule dispatch: " + (err?.message || "inconnue"));
+    } finally {
+      setV2Saving(false);
+    }
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -77,6 +103,88 @@ export default function DispatchConfigPanel() {
           Les modifications sont appliquées <strong>immédiatement</strong> sans mise à jour APK.
           Le dispatch recalcule les meilleurs candidats disponibles à chaque nouvelle vague.
         </p>
+      </div>
+
+      {/* ── Bascule V1 / V2 ── */}
+      <div className="rounded-2xl border-2 overflow-hidden shadow-lg">
+        <div className={`px-4 py-3 flex items-center justify-between ${
+          v2Enabled
+            ? "bg-gradient-to-r from-emerald-500 to-teal-500"
+            : "bg-gradient-to-r from-indigo-500 to-blue-500"
+        }`}>
+          <div className="flex items-center gap-2.5">
+            <Flame className="w-5 h-5 text-white" />
+            <div>
+              <p className="text-sm font-black text-white">
+                Mode Dispatch : {v2Enabled ? "V2 — Fil de courses" : "V1 — Vagues par proximité"}
+              </p>
+              <p className="text-[11px] text-white/80">
+                {v2Enabled
+                  ? "Toutes les courses sont publiées dans un fil visible par tous les livreurs"
+                  : "Les courses sont notifiées par vagues successives aux livreurs les plus proches"}
+              </p>
+            </div>
+          </div>
+          {v2Saving && <Loader2 className="w-4 h-4 text-white animate-spin" />}
+        </div>
+        <div className="p-4 bg-white space-y-2">
+          <button
+            onClick={() => handleToggleV2(true)}
+            disabled={v2Saving || v2Enabled}
+            className={`w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-all ${
+              v2Enabled
+                ? "border-emerald-400 bg-emerald-50 shadow-sm"
+                : "border-gray-200 bg-white hover:border-emerald-300"
+            }`}
+          >
+            <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
+              v2Enabled ? "border-emerald-500" : "border-gray-300"
+            }`}>
+              {v2Enabled && <div className="w-2 h-2 rounded-full bg-emerald-500" />}
+            </div>
+            <div className="flex-1">
+              <p className={`text-sm font-bold ${v2Enabled ? "text-emerald-700" : "text-foreground"}`}>
+                V2 — Fil de courses disponibles
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Toutes les courses (standard + admin) apparaissent dans un fil commun. Les livreurs acceptent en temps réel.
+              </p>
+            </div>
+            {v2Enabled && (
+              <span className="text-[10px] font-bold text-white bg-emerald-500 px-2 py-0.5 rounded-full">
+                ACTIF
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => handleToggleV2(false)}
+            disabled={v2Saving || !v2Enabled}
+            className={`w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-all ${
+              !v2Enabled
+                ? "border-indigo-400 bg-indigo-50 shadow-sm"
+                : "border-gray-200 bg-white hover:border-indigo-300"
+            }`}
+          >
+            <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
+              !v2Enabled ? "border-indigo-500" : "border-gray-300"
+            }`}>
+              {!v2Enabled && <div className="w-2 h-2 rounded-full bg-indigo-500" />}
+            </div>
+            <div className="flex-1">
+              <p className={`text-sm font-bold ${!v2Enabled ? "text-indigo-700" : "text-foreground"}`}>
+                V1 — Vagues par proximité
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Les courses sont notifiées par vagues successives aux livreurs les plus proches (GPS, priorité).
+              </p>
+            </div>
+            {!v2Enabled && (
+              <span className="text-[10px] font-bold text-white bg-indigo-500 px-2 py-0.5 rounded-full">
+                ACTIF
+              </span>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Nb livreurs */}

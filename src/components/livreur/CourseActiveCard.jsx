@@ -474,16 +474,21 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   return (
     <>
       {/* Modal scan QR (externe) */}
-      {showQRScanner && (
-        <QRScannerModal
-          course={course}
-          type={showQRScanner}
-          onSuccess={showQRScanner === "pickup" ? handleQRPickupSuccess : handleQRDeliverySuccess}
-          onClose={() => setShowQRScanner(null)}
-          livreurLat={livreurLat}
-          livreurLng={livreurLng}
-        />
-      )}
+      {showQRScanner && (() => {
+        const scanType = typeof showQRScanner === "string" ? showQRScanner : showQRScanner.type;
+        const scanMode = typeof showQRScanner === "string" ? "camera" : (showQRScanner.mode || "camera");
+        return (
+          <QRScannerModal
+            course={course}
+            type={scanType}
+            initialMode={scanMode}
+            onSuccess={scanType === "pickup" ? handleQRPickupSuccess : handleQRDeliverySuccess}
+            onClose={() => setShowQRScanner(null)}
+            livreurLat={livreurLat}
+            livreurLng={livreurLng}
+          />
+        );
+      })()}
 
       {/* Modal annulation livreur (unifié colis + déplacement) */}
       {showAnnulerCourse && (
@@ -1212,14 +1217,24 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                        Colis récupérés ({course.nb_colis} colis)
                     </button>
                   ) : (
-                    <button
-                      className="w-full h-14 rounded-2xl bg-gradient-to-b from-amber-500 to-amber-600 text-white font-black text-base shadow-lg shadow-amber-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
-                      onClick={() => setShowQRScanner("pickup")}
-                      disabled={isPending}
-                    >
-                      <QrCode className="w-6 h-6" />
-                      {isPartnerCourse ? "Scanner QR/PIN partenaire" : "Scanner pour récupérer le colis"}
-                    </button>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        className="h-14 rounded-2xl bg-gradient-to-b from-amber-500 to-amber-600 text-white font-black text-sm shadow-lg shadow-amber-200 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                        onClick={() => setShowQRScanner({ type: "pickup", mode: "camera" })}
+                        disabled={isPending}
+                      >
+                        <QrCode className="w-5 h-5" />
+                        QR Code
+                      </button>
+                      <button
+                        className="h-14 rounded-2xl bg-gradient-to-b from-amber-600 to-amber-700 text-white font-black text-sm shadow-lg shadow-amber-200 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                        onClick={() => setShowQRScanner({ type: "pickup", mode: "code" })}
+                        disabled={isPending}
+                      >
+                        <span className="text-lg"></span>
+                        PIN Code
+                      </button>
+                    </div>
                   )
                 ) : (
                   /* ── INTERNE : bouton classique ── */
@@ -1242,14 +1257,24 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                   /* ── EXTERNE multi-colis : géré par MultiColisLivreurView ci-dessus ── */
                   /* ── EXTERNE colis unique : Scanner QR ou PIN pour livrer ── */
                   !course.is_multi_colis && (
-                    <button
-                      className="w-full h-14 rounded-2xl bg-gradient-to-b from-primary to-red-700 text-white font-black text-base shadow-lg shadow-red-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
-                      onClick={() => setShowQRScanner("delivery")}
-                      disabled={isPending}
-                    >
-                      <QrCode className="w-6 h-6" />
-                      {isPartnerCourse ? "Scanner QR/PIN client" : "Scanner pour livrer"}
-                    </button>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        className="h-14 rounded-2xl bg-gradient-to-b from-primary to-red-700 text-white font-black text-sm shadow-lg shadow-red-200 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                        onClick={() => setShowQRScanner({ type: "delivery", mode: "camera" })}
+                        disabled={isPending}
+                      >
+                        <QrCode className="w-5 h-5" />
+                        QR Code
+                      </button>
+                      <button
+                        className="h-14 rounded-2xl bg-gradient-to-b from-red-600 to-red-800 text-white font-black text-sm shadow-lg shadow-red-200 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                        onClick={() => setShowQRScanner({ type: "delivery", mode: "code" })}
+                        disabled={isPending}
+                      >
+                        <span className="text-lg"></span>
+                        PIN Code
+                      </button>
+                    </div>
                   )
                 ) : (
                   /* ── INTERNE : bouton classique avec GPS + récapitulatif ── */

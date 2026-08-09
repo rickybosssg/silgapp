@@ -60,7 +60,7 @@ function calculerDistance(lat1, lng1, lat2, lng2) {
 
 const saveLivreur = (id, data) => base44.functions.invoke('updateLivreur', { id, data });
 
-const PROPOSED_DISPATCH_STATUSES = new Set(["propose", "assigne_manuel", "en_attente_reponse"]);
+const PROPOSED_DISPATCH_STATUSES = new Set(["propose", "assigne_manuel", "en_attente_reponse", "disponible_push"]);
 const PROPOSED_COURSE_STATUSES = new Set(["nouvelle", "recherche_livreur", "en_attente_livreur", "en_attente"]);
 const FINAL_COURSE_STATUSES = new Set(["livree", "annulee", "completed", "delivered", "canceled"]);
 
@@ -123,6 +123,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   // Réponse du client à une proposition de prix manuel
   const [prixManuelReponse, setPrixManuelReponse] = useState(null); // { accepted, prix, devise }
   const [showMessages, setShowMessages] = useState(false);
+  const [hasNewAvailableCourse, setHasNewAvailableCourse] = useState(false);
+  const initialTabSetRef = useRef(false);
   const [sessionId, setSessionId] = useState(() => {
     try { return localStorage.getItem("silgapp_livreur_session_id") || null; } catch { return null; }
   });
@@ -194,6 +196,17 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     enabled: !!initialProfil?.id,
     refetchInterval: 8000, // 2s → 8s : profil change rarement
     staleTime: 4000,
+  });
+
+  // ── Vérifier si le dispatch V2 est activé (fil de courses disponibles) ──
+  const { data: isV2Enabled = true } = useQuery({
+    queryKey: ["dispatch-v2-enabled", livreurProfil?.id],
+    queryFn: async () => {
+      const configs = await base44.entities.AppConfig.filter({ cle: "DISPATCH_V2_ENABLED" });
+      return configs?.[0] ? configs[0].valeur !== "false" : true;
+    },
+    enabled: !!livreurProfil?.id,
+    staleTime: 60000,
   });
 
   const { data: countryCommissionRows = [] } = useQuery({
@@ -530,17 +543,21 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
           notifiedCourseIds = (myNotifs || []).map(n => n.course_id);
         } catch {}
 
-        const found = (allCourses || []).find((course) => (
-          course.dispatch_status === "propose" &&
-          !course.livreur_id &&
-          !course.accepted_by_livreur_id &&
-          !FINAL_COURSE_STATUSES.has(course.statut) &&
-          course.manual_price_status !== "pending_client_validation" &&
-          (!livreurProfil?.country_code || course.country_code === livreurProfil.country_code) &&
-          notifiedCourseIds.includes(course.id) &&
-          // 🛡️ Ignorer les courses expirées (timeout dépassé)
-          (!course.timeout_expires_at || new Date(course.timeout_expires_at) > new Date())
-        )) || null;
+        const found = (allCourses || []).find((course) => {
+          if (course.livreur_id || course.accepted_by_livreur_id) return false;
+          if (FINAL_COURSE_STATUSES.has(course.statut)) return false;
+          if (course.manual_price_status === "pending_client_validation") return false;
+          if (livreurProfil?.country_code && course.country_code !== livreurProfil.country_code) return false;
+          if (course.timeout_expires_at && new Date(course.timeout_expires_at) <= new Date()) return false;
+
+          // V2 : courses disponible_push visibles par tous les livreurs (sans DispatchNotification)
+          if (course.dispatch_status === "disponible_push" && isV2Enabled) return true;
+
+          // V1 : courses propose nécessitant une DispatchNotification
+          if (course.dispatch_status === "propose" && notifiedCourseIds.includes(course.id)) return true;
+
+          return false;
+        }) || null;
 
         setCourseProposeeDirecte(
           found ? { ...found, __notifiedForCurrentLivreur: true } : null
@@ -558,7 +575,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [livreurId, livreurProfil?.country_code]);
+  }, [livreurId, livreurProfil?.country_code, isV2Enabled]);
 
   const { data: mesCourses = [] } = useQuery({
     queryKey: ["mes-courses-externes", livreurId, livreurEmail, notificationCourseId],
@@ -904,6 +921,15 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       toast.error("Impossible d'obtenir votre position. Vérifiez que le GPS de votre téléphone est activé.");
     }
   };
+
+  // ── Ouvrir sur l'onglet "Disponibles" au démarrage si V2 activé ──
+  useEffect(() => {
+    if (initialTabSetRef.current) return;
+    if (isV2Enabled && coursesActives.length === 0 && mesCourses !== undefined) {
+      initialTabSetRef.current = true;
+      setActiveTab("disponibles");
+    }
+  }, [isV2Enabled, coursesActives.length, mesCourses]);
 
   // ── Auto-activation GPS au démarrage (si livreur en ligne) ──
   useEffect(() => {
@@ -1309,7 +1335,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   // ─── Dashboard principal ──────────────────────────────────────────────────
   const TABS = [
     { id: "courses", label: "Courses", emoji: "" },
-    { id: "disponibles", label: "Disponibles", emoji: "" },
+    // Onglet "Disponibles" masqué si le livreur a une course active OU si V2 désactivé
+    ...(coursesActives.length === 0 && isV2Enabled ? [{ id: "disponibles", label: "Disponibles", emoji: "" }] : []),
     { id: "historique", label: "Historique", emoji: "" },
     { id: "messages", label: "Messages", emoji: "" },
     ...(livreurHasPromoCode ? [{ id: "promo", label: "Code Promo", emoji: "" }] : []),
@@ -1378,8 +1405,11 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
           {TABS.map(tab => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+              onClick={() => {
+                setActiveTab(tab.id);
+                if (tab.id === "disponibles") setHasNewAvailableCourse(false);
+              }}
+              className={`relative flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
                 activeTab === tab.id
                   ? "bg-[#007aff] text-white shadow-sm"
                   : "text-slate-500 hover:text-slate-900"
@@ -1392,6 +1422,10 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
                 <span className="w-4 h-4 rounded-full bg-primary text-white text-[9px] font-black flex items-center justify-center">
                   {coursesActives.length}
                 </span>
+              )}
+              {/* Point rouge : nouvelle course disponible */}
+              {tab.id === "disponibles" && hasNewAvailableCourse && activeTab !== "disponibles" && (
+                <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-red-500 border border-[#16191d] animate-pulse" />
               )}
             </button>
           ))}
@@ -1585,6 +1619,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         {activeTab === "disponibles" && (
           <CoursesDisponibles
             livreurProfil={livreurProfil}
+            onNewCourse={() => setHasNewAvailableCourse(true)}
             onAcceptSuccess={() => {
               setActiveTab("courses");
               statutMutation.mutate("en_course");

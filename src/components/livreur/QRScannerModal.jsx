@@ -6,8 +6,8 @@ import { base44 } from "@/api/base44Client";
 import { getNativeCurrentPosition, scanNativeQrCode } from "@/lib/nativeAndroid";
 import { normalizeFourDigitPin } from "@/lib/livreurCourseState";
 
-export default function QRScannerModal({ course, type, onSuccess, onClose, livreurLat, livreurLng }) {
-  const [mode, setMode] = useState("camera");
+export default function QRScannerModal({ course, type, onSuccess, onClose, livreurLat, livreurLng, initialMode = "camera" }) {
+  const [mode, setMode] = useState(initialMode);
   const [code4, setCode4] = useState("");
   const [scanning, setScanning] = useState(false);
   const [verifying, setVerifying] = useState(false);
