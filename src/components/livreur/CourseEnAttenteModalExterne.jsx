@@ -147,7 +147,7 @@ export default function CourseEnAttenteModalExterne({
     setIsSubmitting(true);
     try {
       const res = await base44.functions.invoke('dispatchExterneAuto', {
-        action: 'accepter_course',
+        action: 'accepter_course_v2',
         course_id: course.id,
         livreur_id: livreurId,
         override_pricing_mode: "admin_manuel",
@@ -175,7 +175,7 @@ export default function CourseEnAttenteModalExterne({
     setIsSubmitting(true);
     try {
       const res = await base44.functions.invoke('dispatchExterneAuto', {
-        action: 'accepter_course',
+        action: 'accepter_course_v2',
         course_id: course.id,
         livreur_id: livreurId,
       });
@@ -209,7 +209,7 @@ export default function CourseEnAttenteModalExterne({
     try {
       // 1. Accepter la course côté dispatch (livreur assigné, statuts mis à jour)
       const res = await base44.functions.invoke('dispatchExterneAuto', {
-        action: 'accepter_course',
+        action: 'accepter_course_v2',
         course_id: course.id,
         livreur_id: livreurId,
         pricing_mode: "manual",
