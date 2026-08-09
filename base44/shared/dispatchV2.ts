@@ -1,6 +1,7 @@
 // ── Dispatch V2 : Fil de courses disponibles + secours ciblé ────────────────
 // Nouveau système derrière le feature flag DISPATCH_V2_ENABLED.
 // V1 (vagues) reste intact et utilisé quand le flag est désactivé.
+// VERSION: 2026-08-09 — Correctif updateMany sans filtre livreur_id vide.
 
 import { STATUTS_ACTIFS_COURSE, STATUTS_TERMINAUX_COURSE, calculerDistance } from './dispatchConstants.ts';
 import { dispatchLog, reponseDejaPrise, generateToken, generatePIN, journaliserDispatch } from './dispatchUtils.ts';
@@ -146,6 +147,10 @@ export async function accepterCourseV2(base44: any, courseId: string, livreurId:
   // 2. Check course still available (disponible_push V2, propose V1, en_attente = admin manuel)
   if (course.dispatch_status !== 'disponible_push' && course.dispatch_status !== 'propose' && course.dispatch_status !== 'en_attente') {
     return reponseDejaPrise('not_available', course);
+  }
+  // 2b. Refuser les courses en statut terminal (annulee / livree)
+  if (STATUTS_TERMINAUX_COURSE.includes(course.statut)) {
+    return { success: false, accepted: false, reason: 'course_terminal', error: 'Cette course n\'est plus disponible (terminée ou annulée).' };
   }
   if (course.livreur_id || course.accepted_by_livreur_id) {
     return reponseDejaPrise('already_taken', course);

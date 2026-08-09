@@ -124,6 +124,36 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   const [showMessages, setShowMessages] = useState(false);
   const [hasNewAvailableCourse, setHasNewAvailableCourse] = useState(false);
   const initialTabSetRef = useRef(false);
+
+  // ── Compteur de courses disponibles (pilote le point rouge) ──
+  const { data: availableCoursesCount = 0 } = useQuery({
+    queryKey: ["courses-disponibles-count", livreurProfil?.id, livreurProfil?.country_code, isV2Enabled],
+    queryFn: async () => {
+      if (!livreurProfil?.country_code || !isV2Enabled) return 0;
+      const all = await base44.entities.CourseExterne.filter(
+        { dispatch_status: { $in: ["disponible_push", "propose", "en_attente"] }, country_code: livreurProfil.country_code },
+        "-created_date", 50
+      );
+      return (all || []).filter(c =>
+        !FINAL_COURSE_STATUSES.has(c.statut) &&
+        !c.livreur_id &&
+        !c.accepted_by_livreur_id
+      ).length;
+    },
+    enabled: !!livreurProfil?.id && !!livreurProfil?.country_code && isV2Enabled,
+    refetchInterval: 10000,
+    staleTime: 5000,
+  });
+
+  // Le point rouge s'affiche dès qu'il y a des courses disponibles ET que le livreur
+  // n'est pas sur l'onglet "Disponibles"
+  useEffect(() => {
+    if (availableCoursesCount > 0 && activeTab !== "disponibles") {
+      setHasNewAvailableCourse(true);
+    } else if (availableCoursesCount === 0) {
+      setHasNewAvailableCourse(false);
+    }
+  }, [availableCoursesCount, activeTab]);
   const [sessionId, setSessionId] = useState(() => {
     try { return localStorage.getItem("silgapp_livreur_session_id") || null; } catch { return null; }
   });

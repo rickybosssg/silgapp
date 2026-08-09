@@ -421,10 +421,11 @@ Deno.serve(async (req) => {
 
       // 🔐 MISE À JOUR ATOMIQUE CONDITIONNELLE — empêche la course condition (race condition)
       // où deux livreurs passent le double-check simultanément. Le updateMany ne modifie
-      // la course QUE si dispatch_status est toujours 'propose' ET livreur_id toujours vide.
-      // Si un autre livreur a déjà verrouillé la course, 0 enregistrement sera modifié.
+      // la course QUE si dispatch_status est toujours 'propose' ou 'disponible_push'.
+      // ⚠️ Ne pas filtrer livreur_id avec une chaîne vide : Base44 stocke aussi l'absence
+      // de livreur avec null, ce qui empêchait toute acceptation de ces courses.
       await base44.asServiceRole.entities.CourseExterne.updateMany(
-        { id: course_id, dispatch_status: { $in: ['propose', 'disponible_push'] }, livreur_id: '' },
+        { id: course_id, dispatch_status: { $in: ['propose', 'disponible_push'] } },
         { $set: updateData }
       );
 
@@ -633,15 +634,8 @@ Deno.serve(async (req) => {
               dispatch_wave: maxWave,
               timeout_expires_at: cycleEpuiseDeadline,
             });
-            // ── Notifier VENUS WhatsApp au client ──
-            const messageVenus = `📍 Nous avons sollicité tous les livreurs disponibles autour de vous, mais aucun n'a accepté votre course pour le moment.\n\nVoulez-vous que je relance la recherche ?\n\nRépondez 'oui' pour relancer ou 'non' pour annuler.`;
-            const notifie = await notifierRedispatchClient({
-              base44,
-              course,
-              messageVenus,
-              motif: 'cycle_epuise',
-            });
-            return Response.json({ expired: true, wave_epuise: true, venus_notifie: notifie });
+            // Notification WhatsApp VENUS désactivée — le client peut relancer via l'app
+            return Response.json({ expired: true, wave_epuise: true, venus_notifie: false });
           }
           console.log(`[DISPATCH] 📍 GPS avancement vague ${currentWave} → ${nextWave} pour course ${course_id}`);
           await base44.asServiceRole.entities.CourseExterne.update(course_id, {
