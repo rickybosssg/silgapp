@@ -240,87 +240,115 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess }) {
       {coursesWithDistance.map(course => (
         <div
           key={course.id}
-          className="rounded-2xl bg-[#1f2429] border border-white/8 p-4 space-y-3 shadow-sm"
+          className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#1f2429] to-[#181b20] border border-white/8 shadow-lg"
         >
-          {/* Priorité badge */}
-          {course.priority === "urgente" && (
-            <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 text-[10px] font-black">
-              URGENTE
+          {/* Bandeau priorité */}
+          {(course.priority === "urgente" || course.priority === "haute") && (
+            <div className={`flex items-center gap-1.5 px-4 py-1.5 ${
+              course.priority === "urgente"
+                ? "bg-gradient-to-r from-red-600 to-red-500"
+                : "bg-gradient-to-r from-orange-600 to-orange-500"
+            }`}>
+              <Flame className="w-3.5 h-3.5 text-white" />
+              <span className="text-[10px] font-black text-white tracking-wider uppercase">
+                {course.priority === "urgente" ? "URGENTE" : "PRIORITÉ HAUTE"}
+              </span>
             </div>
           )}
-          {course.priority === "haute" && (
-            <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-400 text-[10px] font-black">
-              PRIORITÉ HAUTE
+
+          <div className="p-4 space-y-3.5">
+            {/* Trajet */}
+            <div className="space-y-2.5">
+              {/* Départ */}
+              <div className="flex items-start gap-3">
+                <div className="relative flex-shrink-0 mt-0.5">
+                  <div className="w-8 h-8 rounded-xl bg-[#00a86b]/15 border border-[#00a86b]/30 flex items-center justify-center">
+                    <MapPin className="w-4 h-4 text-[#00a86b]" />
+                  </div>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[9px] text-white/40 font-bold uppercase tracking-wider">Récupération</p>
+                  <p className="text-sm text-white font-bold leading-tight">
+                    {course.quartier_depart || course.adresse_depart || "Adresse à confirmer"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Ligne de liaison */}
+              <div className="flex justify-start pl-4">
+                <div className="w-0.5 h-4 bg-gradient-to-b from-[#00a86b]/40 to-blue-400/40" />
+              </div>
+
+              {/* Arrivée */}
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-xl bg-blue-500/15 border border-blue-400/30 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <Navigation className="w-4 h-4 text-blue-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[9px] text-white/40 font-bold uppercase tracking-wider">Livraison</p>
+                  <p className="text-sm text-white font-bold leading-tight">
+                    {course.quartier_arrivee || course.adresse_arrivee || "Adresse à confirmer"}
+                  </p>
+                </div>
+              </div>
             </div>
-          )}
 
-          {/* Départ */}
-          <div className="flex items-start gap-2">
-            <MapPin className="w-4 h-4 text-[#00a86b] flex-shrink-0 mt-0.5" />
-            <div className="flex-1 min-w-0">
-              <p className="text-[10px] text-white/40 font-semibold uppercase">Récupération</p>
-              <p className="text-sm text-white font-semibold truncate">
-                {course.quartier_depart || course.adresse_depart || "Adresse à confirmer"}
-              </p>
-            </div>
-          </div>
-
-          {/* Arrivée */}
-          <div className="flex items-start gap-2">
-            <Navigation className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
-            <div className="flex-1 min-w-0">
-              <p className="text-[10px] text-white/40 font-semibold uppercase">Livraison</p>
-              <p className="text-sm text-white font-semibold truncate">
-                {course.quartier_arrivee || course.adresse_arrivee || "Adresse à confirmer"}
-              </p>
-            </div>
-          </div>
-
-          {/* Métadonnées */}
-          <div className="flex items-center gap-3 text-[11px] text-white/50">
-            {course.__distance !== null && (
-              <span className="flex items-center gap-1">
-                <Navigation className="w-3 h-3" />
-                {course.__distance.toFixed(1)} km
-              </span>
-            )}
-            {course.type_colis && (
-              <span className="flex items-center gap-1">
-                <Package className="w-3 h-3" />
-                {course.type_colis.replace("_", " ")}
-              </span>
-            )}
-            <span className="flex items-center gap-1">
-              <Clock className="w-3 h-3" />
-              {new Date(course.created_date).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
-            </span>
-          </div>
-
-          {/* Boutons */}
-          <div className="grid grid-cols-3 gap-2 pt-1">
-            <button
-              type="button"
-              onClick={() => handleAccept(course)}
-              disabled={acceptingId === course.id}
-              className="col-span-2 h-11 rounded-xl bg-[#00a86b] text-white text-sm font-black flex items-center justify-center gap-1.5 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {acceptingId === course.id ? (
-                <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
-              ) : (
-                <>
-                  <Check className="w-4 h-4" />
-                  Accepter
-                </>
+            {/* Métadonnées */}
+            <div className="flex items-center gap-3 flex-wrap pt-1">
+              {course.__distance !== null && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#00a86b]/10 text-[#00a86b] text-[11px] font-bold">
+                  <Navigation className="w-3 h-3" />
+                  {course.__distance.toFixed(1)} km
+                </span>
               )}
-            </button>
-            <button
-              type="button"
-              onClick={() => handleRefuser(course)}
-              disabled={acceptingId === course.id}
-              className="h-11 rounded-xl bg-white/5 text-white/60 text-sm font-bold flex items-center justify-center active:scale-95 transition-all border border-white/8 disabled:opacity-50"
-            >
-              <X className="w-4 h-4" />
-            </button>
+              {course.type_colis && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/5 text-white/70 text-[11px] font-semibold border border-white/8">
+                  <Package className="w-3 h-3" />
+                  {course.type_colis.replace(/_/g, " ")}
+                </span>
+              )}
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/5 text-white/70 text-[11px] font-semibold border border-white/8">
+                <Clock className="w-3 h-3" />
+                {new Date(course.created_date).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+              </span>
+            </div>
+
+            {/* Prix estimé */}
+            {course.prix_estimate > 0 && (
+              <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-[#00a86b]/8 border border-[#00a86b]/15">
+                <span className="text-[11px] text-white/50 font-semibold">Prix estimé</span>
+                <span className="text-base font-black text-[#00a86b]">
+                  {course.prix_estimate.toLocaleString()} <span className="text-[10px]">FCFA</span>
+                </span>
+              </div>
+            )}
+
+            {/* Boutons */}
+            <div className="grid grid-cols-3 gap-2 pt-0.5">
+              <button
+                type="button"
+                onClick={() => handleAccept(course)}
+                disabled={acceptingId === course.id}
+                className="col-span-2 h-12 rounded-2xl bg-gradient-to-r from-[#00a86b] to-[#008f5a] text-white text-sm font-black flex items-center justify-center gap-2 active:scale-[0.97] transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-green-500/20"
+              >
+                {acceptingId === course.id ? (
+                  <div className="w-5 h-5 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                ) : (
+                  <>
+                    <Check className="w-5 h-5" />
+                    Accepter
+                  </>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleRefuser(course)}
+                disabled={acceptingId === course.id}
+                className="h-12 rounded-2xl bg-white/5 text-white/50 text-sm font-bold flex items-center justify-center active:scale-[0.97] transition-all border border-white/8 disabled:opacity-50 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/20"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
           </div>
         </div>
       ))}

@@ -569,17 +569,6 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
           return false;
         }) || null;
 
-        // DEBUG V2
-        console.log('[V2-DEBUG] courseProposeeDirecte poll:', {
-          livreurId,
-          isPilotLivreur,
-          allCoursesCount: allCourses?.length || 0,
-          notifiedCount: notifiedCourseIds.length,
-          foundId: found?.id || null,
-          foundDispatchStatus: found?.dispatch_status || null,
-          foundStatut: found?.statut || null,
-        });
-
         setCourseProposeeDirecte(
           found ? { ...found, __notifiedForCurrentLivreur: true } : null
         );
@@ -717,20 +706,6 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       if (isCourseDismissed(course.id)) return false; // déjà écartée par le livreur
       return isCourseWaitingForLivreur(course, livreurId);
     }) || null;
-    // DEBUG V2
-    console.log('[V2-DEBUG] courseEnAttente:', {
-      livreurId,
-      candidatesCount: courseCandidates.length,
-      waitingId: waiting?.id || null,
-      candidates: courseCandidates.map(c => ({
-        id: c.id,
-        statut: c.statut,
-        dispatch_status: c.dispatch_status,
-        notified: c.__notifiedForCurrentLivreur,
-        dismissed: isCourseDismissed(c.id),
-        waiting: isCourseWaitingForLivreur(c, livreurId),
-      })),
-    });
     if (waiting) {
       logAcceptationLivreur("modal-triggered", {
         course_id: waiting.id,
