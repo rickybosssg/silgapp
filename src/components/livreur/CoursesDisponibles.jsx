@@ -342,15 +342,18 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
               </span>
             </div>
 
-            {/* Prix estimé */}
-            {course.prix_estimate > 0 && (
-              <div className="flex items-center justify-between px-3.5 py-2.5 rounded-2xl bg-gradient-to-r from-[#00a86b]/12 to-emerald-500/8 border border-[#00a86b]/20">
-                <span className="text-[11px] text-white/50 font-semibold">Prix estimé</span>
-                <span className="text-lg font-black text-[#00a86b]">
-                  {course.prix_estimate.toLocaleString()} <span className="text-[10px] font-bold">FCFA</span>
-                </span>
-              </div>
-            )}
+            {/* Prix proposé */}
+            {(() => {
+              const prix = course.prix_propose_admin || course.prix_estimate;
+              return prix > 0 ? (
+                <div className="flex items-center justify-between px-3.5 py-2.5 rounded-2xl bg-gradient-to-r from-[#00a86b]/12 to-emerald-500/8 border border-[#00a86b]/20">
+                  <span className="text-[11px] text-white/50 font-semibold">Prix proposé</span>
+                  <span className="text-lg font-black text-[#00a86b]">
+                    {prix.toLocaleString()} <span className="text-[10px] font-bold">FCFA</span>
+                  </span>
+                </div>
+              ) : null;
+            })()}
 
             {/* Boutons */}
             <div className="grid grid-cols-3 gap-2 pt-0.5">

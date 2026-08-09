@@ -164,6 +164,13 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   // Messagerie d'explication apres annulation
   const [showAnnulationChat, setShowAnnulationChat] = useState(false);
 
+  // ── Pré-remplir le prix avec la proposition admin si disponible ──
+  useEffect(() => {
+    if (showPrixModal && (course.pricing_mode === "admin_manuel" || course.source === "admin") && course.prix_propose_admin) {
+      setPrixReel(String(course.prix_propose_admin));
+    }
+  }, [showPrixModal]);
+
   const effectiveStatut = optimisticStatut || course.statut;
   const isDeplacement = course.type_course === "deplacement";
   const isPartnerCourse = !!(course.commande_boutique_id || course.commande_restaurant_id);
@@ -648,7 +655,9 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
               </p>
               <p className="text-sm text-gray-500 mt-1">
                 {(course.pricing_mode === "admin_manuel" || course.source === "admin")
-                  ? "Saisissez le montant payé par le client"
+                  ? (course.prix_propose_admin
+                    ? "Montant fixé par l'admin — modifiable si nécessaire"
+                    : "Saisissez le montant payé par le client")
                   : "Quel montant avez-vous reçu du client ?"}
               </p>
             </div>
@@ -925,7 +934,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
           {isExterne ? (
             (() => {
               const isPrixManuel = course.pricing_mode === "manual" && course.manual_price_status === "accepted" && Number(course.manual_price) > 0;
-              const prixBase = isPrixManuel ? Number(course.manual_price) : (course.prix_estimate || 0);
+              const prixBase = isPrixManuel ? Number(course.manual_price) : (course.prix_propose_admin || course.prix_estimate || 0);
               const split = splitAmountByCommission(prixBase, commissionPct);
               const gain = split.montant_livreur;
 
@@ -940,7 +949,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                 )}>
                   <div className="flex items-center justify-between mb-1">
                     <span className={cn("text-xs font-semibold", isPrixManuel ? "text-green-700" : "text-blue-700")}>
-                      {isPrixManuel ? "Prix validé " : "Prix estimé"}
+                      {isPrixManuel ? "Prix validé " : (course.prix_propose_admin ? "Prix proposé" : "Prix estimé")}
                     </span>
                     <span className={cn("text-lg font-black", isPrixManuel ? "text-green-900" : "text-blue-900")}>
                       {isPrixManuel
