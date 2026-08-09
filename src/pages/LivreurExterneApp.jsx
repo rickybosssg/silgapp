@@ -138,6 +138,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   // Réponse du client à une proposition de prix manuel
   const [prixManuelReponse, setPrixManuelReponse] = useState(null); // { accepted, prix, devise }
   const [showMessages, setShowMessages] = useState(false);
+  const [hasNewAvailableCourse, setHasNewAvailableCourse] = useState(false);
   const [sessionId, setSessionId] = useState(() => {
     try { return localStorage.getItem("silgapp_livreur_session_id") || null; } catch { return null; }
   });
@@ -1392,8 +1393,11 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
           {TABS.map(tab => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+              onClick={() => {
+                setActiveTab(tab.id);
+                if (tab.id === "disponibles") setHasNewAvailableCourse(false);
+              }}
+              className={`relative flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
                 activeTab === tab.id
                   ? "bg-[#00a86b] text-white shadow-md shadow-green-500/20"
                   : "text-white/50 hover:text-white/80"
@@ -1406,6 +1410,10 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
                 <span className="w-4 h-4 rounded-full bg-primary text-white text-[9px] font-black flex items-center justify-center">
                   {coursesActives.length}
                 </span>
+              )}
+              {/* Point rouge : nouvelle course disponible */}
+              {tab.id === "disponibles" && hasNewAvailableCourse && activeTab !== "disponibles" && (
+                <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-red-500 border border-[#16191d] animate-pulse" />
               )}
             </button>
           ))}
@@ -1599,6 +1607,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         {activeTab === "disponibles" && (
           <CoursesDisponibles
             livreurProfil={livreurProfil}
+            onNewCourse={() => setHasNewAvailableCourse(true)}
             onAcceptSuccess={() => {
               setActiveTab("courses");
               statutMutation.mutate("en_course");

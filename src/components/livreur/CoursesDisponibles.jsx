@@ -1,8 +1,9 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Check, X, MapPin, Clock, Package, Flame, Navigation } from "lucide-react";
 import { toast } from "sonner";
+import { playNotificationSound } from "@/hooks/useSonEtVibration";
 
 function calculerDistance(lat1, lng1, lat2, lng2) {
   if (!lat1 || !lng1 || !lat2 || !lng2) return null;
@@ -17,9 +18,10 @@ function calculerDistance(lat1, lng1, lat2, lng2) {
 
 const FINAL_COURSE_STATUSES = new Set(["livree", "annulee", "completed", "delivered", "canceled"]);
 
-export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess }) {
+export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onNewCourse }) {
   const queryClient = useQueryClient();
   const [acceptingId, setAcceptingId] = useState(null);
+  const knownCourseIdsRef = useRef(new Set());
   const [refusedIds, setRefusedIds] = useState(() => {
     try {
       const stored = localStorage.getItem("silgapp_dismissed_courses");
@@ -99,6 +101,28 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess }) {
     refetchInterval: 30000,
     staleTime: 15000,
   });
+
+  // ── Détection de nouvelles courses → sonnerie + notification ──
+  useEffect(() => {
+    const currentIds = new Set(courses.map(c => c.id));
+    if (currentIds.size === 0) return;
+
+    const newIds = [...currentIds].filter(id => !knownCourseIdsRef.current.has(id));
+
+    // Premier chargement — juste enregistrer, pas de son
+    if (knownCourseIdsRef.current.size === 0) {
+      knownCourseIdsRef.current = currentIds;
+      return;
+    }
+
+    // Nouvelles courses détectées
+    if (newIds.length > 0) {
+      knownCourseIdsRef.current = new Set([...knownCourseIdsRef.current, ...currentIds]);
+      playNotificationSound();
+      if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+      if (onNewCourse) onNewCourse(newIds.length);
+    }
+  }, [courses, onNewCourse]);
 
   // Realtime subscription — mise à jour instantanée
   useEffect(() => {
