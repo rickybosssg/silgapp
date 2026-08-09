@@ -158,6 +158,12 @@ Deno.serve(async (req) => {
         return Response.json({ found: false, already_taken: true, taken_by: course.livreur_id });
       }
 
+      // 🔥 Course en disponible_push → visible par tous les livreurs éligibles (Push-to-Bid)
+      if (course.dispatch_status === 'disponible_push') {
+        const expired = !!(course.timeout_expires_at && new Date(course.timeout_expires_at) < new Date());
+        return Response.json({ found: true, course, expired, disponible_push: true, timeout_expires_at: course.timeout_expires_at });
+      }
+
       const notifiedIds = await getLivreursNotifies(base44, course_id);
       const isNotified = notifiedIds.includes(livreur_id);
       if (!isNotified) return Response.json({ found: false });
@@ -238,7 +244,7 @@ Deno.serve(async (req) => {
         return Response.json(reponseDejaPrise('livreur_lock_already_set', course));
       }
 
-      if (course.dispatch_status !== 'propose') {
+      if (course.dispatch_status !== 'propose' && course.dispatch_status !== 'disponible_push') {
         return Response.json({
           success: false, accepted: false, reason: 'not_available',
           error: "Cette course n'est plus disponible", dispatch_status: course.dispatch_status || '',
@@ -300,7 +306,7 @@ Deno.serve(async (req) => {
         });
       }
       
-      if (courseFinal.dispatch_status !== 'propose' || courseFinal.livreur_id || courseFinal.accepted_by_livreur_id) {
+      if ((courseFinal.dispatch_status !== 'propose' && courseFinal.dispatch_status !== 'disponible_push') || courseFinal.livreur_id || courseFinal.accepted_by_livreur_id) {
         return Response.json(reponseDejaPrise('final_check_already_taken', courseFinal));
       }
 
@@ -370,7 +376,7 @@ Deno.serve(async (req) => {
       // la course QUE si dispatch_status est toujours 'propose' ET livreur_id toujours vide.
       // Si un autre livreur a déjà verrouillé la course, 0 enregistrement sera modifié.
       await base44.asServiceRole.entities.CourseExterne.updateMany(
-        { id: course_id, dispatch_status: 'propose', livreur_id: '' },
+        { id: course_id, dispatch_status: { $in: ['propose', 'disponible_push'] }, livreur_id: '' },
         { $set: updateData }
       );
 

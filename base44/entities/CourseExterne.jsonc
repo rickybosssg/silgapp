@@ -207,9 +207,10 @@
         "accepte",
         "expire",
         "redispatch",
-        "cycle_epuise"
+        "cycle_epuise",
+        "disponible_push"
       ],
-      "description": "Statut detaille du dispatch automatique"
+      "description": "Statut detaille du dispatch automatique. disponible_push = course visible par tous les livreurs eligibles apres epuisement du dispatch (Push-to-Bid)"
     },
     "dispatch_wave": {
       "type": "number",

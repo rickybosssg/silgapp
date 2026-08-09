@@ -38,6 +38,7 @@ import PrixManuelReponseAlert from "@/components/livreur/PrixManuelReponseAlert"
 import { normalizeCommissionPct, splitAmountByCommission } from "@/lib/commissionUtils";
 import MessagesPage from "@/components/chat/MessagesPage";
 import OngletCodePromoLivreur from "@/components/livreur/OngletCodePromoLivreur";
+import CoursesDisponibles from "@/components/livreur/CoursesDisponibles";
 
 // Haversine — utilisée aussi pour le calcul de prix
 function calculerDistance(lat1, lng1, lat2, lng2) {
@@ -1290,6 +1291,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   // ─── Dashboard principal ──────────────────────────────────────────────────
   const TABS = [
     { id: "courses", label: "Courses", emoji: "" },
+    { id: "disponibles", label: "Disponibles", emoji: "" },
     { id: "historique", label: "Historique", emoji: "" },
     { id: "messages", label: "Messages", emoji: "" },
     ...(livreurHasPromoCode ? [{ id: "promo", label: "Code Promo", emoji: "" }] : []),
@@ -1560,6 +1562,16 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
               </div>
             )}
           </div>
+        )}
+
+        {activeTab === "disponibles" && (
+          <CoursesDisponibles
+            livreurProfil={livreurProfil}
+            onAcceptSuccess={() => {
+              setActiveTab("courses");
+              statutMutation.mutate("en_course");
+            }}
+          />
         )}
 
         {activeTab === "historique" && (

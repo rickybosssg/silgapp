@@ -221,20 +221,38 @@ export async function runWatchdog(base44, body = {}) {
     }
   }
 
-  // ═══ ANOMALIE 7: Course cycle_epuise sans réponse trop longue ═══
+  // ═══ ANOMALIE 7: Course cycle_epuise → disponible_push → en_attente ═══
+  // Phase 1: cycle_epuise avec timeout expiré → transition vers disponible_push
+  //          (la course devient visible par tous les livreurs éligibles)
+  // Phase 2: disponible_push avec timeout expiré → transition vers en_attente
+  const DISPONIBLE_PUSH_TIMEOUT_MS = 30 * 60 * 1000; // 30 min en disponible_push
+
   for (const course of courses) {
-    if (course.dispatch_status !== 'cycle_epuise') continue;
+    if (course.dispatch_status !== 'cycle_epuise' && course.dispatch_status !== 'disponible_push') continue;
     const deadlineMs = course.timeout_expires_at ? new Date(course.timeout_expires_at).getTime() : 0;
     if (deadlineMs > 0 && now.getTime() < deadlineMs) continue;
 
-    anomalies.push({ course_id: course.id, type: 'cycle_epuise_sans_reponse', severity: 'moyenne', description: `Cycle épuisé sans réponse client — mise en attente` });
+    if (course.dispatch_status === 'cycle_epuise') {
+      // Transition: cycle_epuise → disponible_push
+      anomalies.push({ course_id: course.id, type: 'cycle_epuise_vers_disponible', severity: 'moyenne', description: `Cycle épuisé → course disponible pour tous les livreurs` });
 
-    await base44.asServiceRole.entities.CourseExterne.update(course.id, {
-      statut: 'en_attente',
-      dispatch_status: 'en_attente',
-      notes: (course.notes || '') + ' | [EN ATTENTE] Cycle dispatch épuisé, client sans réponse sous 15 min',
-    });
-    corrections.push({ course_id: course.id, action: 'cycle_epuise_en_attente' });
+      const pushDeadline = new Date(now.getTime() + DISPONIBLE_PUSH_TIMEOUT_MS).toISOString();
+      await base44.asServiceRole.entities.CourseExterne.update(course.id, {
+        dispatch_status: 'disponible_push',
+        timeout_expires_at: pushDeadline,
+      });
+      corrections.push({ course_id: course.id, action: 'cycle_epuise_vers_disponible_push' });
+    } else {
+      // Transition: disponible_push → en_attente
+      anomalies.push({ course_id: course.id, type: 'disponible_push_expire', severity: 'moyenne', description: `Course disponible sans acceptation — mise en attente` });
+
+      await base44.asServiceRole.entities.CourseExterne.update(course.id, {
+        statut: 'en_attente',
+        dispatch_status: 'en_attente',
+        notes: (course.notes || '') + ' | [EN ATTENTE] Course disponible sans acceptation pendant 30 min',
+      });
+      corrections.push({ course_id: course.id, action: 'disponible_push_en_attente' });
+    }
   }
 
   // ── Journaliser toutes les anomalies ──
