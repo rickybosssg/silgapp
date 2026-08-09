@@ -36,9 +36,9 @@ export default async function (req: Request): Promise<Response> {
       });
     }
 
-    const SEUIL_GPS_STALE_MIN = 5;
-    const SEUIL_GPS_PERDU_MIN = 20;
-    const DELAI_ENTRE_ALERTES_MS = 30 * 60 * 1000; // 30 min entre chaque alerte
+    const SEUIL_GPS_STALE_MIN = 10;
+    const SEUIL_GPS_PERDU_MIN = 60; // 1h — aligné sur la fréquence de l'automation (1h)
+    const DELAI_ENTRE_ALERTES_MS = 60 * 60 * 1000; // 1h entre chaque alerte (anti-spam)
 
     // ── Récupérer tous les livreurs disponibles ──
     const livreurs = await base44.asServiceRole.entities.Livreur.filter({
