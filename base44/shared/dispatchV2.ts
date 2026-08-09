@@ -61,6 +61,7 @@ async function notifierLivreursEligiblesV2(base44: any, course: any) {
       course_id: course.id,
       alert_duration_seconds: 5,
       alert_interval_seconds: 5,
+      dispatch_version: '2',
     });
   }));
 
@@ -226,9 +227,11 @@ export async function accepterCourseV2(base44: any, courseId: string, livreurId:
     updateData.timeout_expires_at = new Date(Date.now() + 5 * 60 * 1000).toISOString();
   }
 
-  // 🛡️ Atomic lock : seul le premier updateMany qui matche modifie l'enregistrement
+  // Le statut constitue le verrou atomique. Ne pas filtrer livreur_id avec une
+  // chaine vide : Base44 stocke aussi l'absence de livreur avec null, ce qui
+  // empêchait toute acceptation de ces courses.
   await base44.asServiceRole.entities.CourseExterne.updateMany(
-    { id: courseId, dispatch_status: { $in: ['propose', 'disponible_push', 'en_attente'] }, livreur_id: '' },
+    { id: courseId, dispatch_status: { $in: ['propose', 'disponible_push', 'en_attente'] } },
     { $set: updateData }
   );
 

@@ -38,6 +38,7 @@ import java.util.Map;
 
 public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
     private static final String CHANNEL_ID = "silgapp_courses_official_v2";
+    private static final long DISPATCH_V2_ALERT_DURATION_MS = 10000L;
     private static final String DEFAULT_CHANNEL_ID = "silgapp_default";
     private static final long DEFAULT_DURATION_MS = 300000L;
     private static final long DEFAULT_INTERVAL_MS = 5000L;
@@ -51,6 +52,9 @@ public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
     private static PowerManager.WakeLock wakeLock;
     private static Context activeAlertContext;
     private static int activeNotificationId = -1;
+    private static String lastStartedAlertKey = "";
+    private static long lastStartedAlertAtMs = 0L;
+    private static final long ALERT_RESTART_GUARD_MS = 30000L;
 
     @Override
     public void onMessageReceived(RemoteMessage remoteMessage) {
@@ -64,7 +68,9 @@ public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
                 && courseId != null && !courseId.isEmpty()) {
             String title = valueOrDefault(data.get("title"), "Nouvelle course SILGAPP");
             String body = valueOrDefault(data.get("body"), "Une course est disponible. Ouvrez l'app pour accepter.");
-            long durationMs = parseSeconds(data.get("alert_duration_seconds"), DEFAULT_DURATION_MS / 1000L, 5L, 180L) * 1000L;
+            // Every nouvelle_course notification now belongs to the V2 flow. Keep the
+            // native alert short even while an older backend payload omits its marker.
+            long durationMs = DISPATCH_V2_ALERT_DURATION_MS;
             long intervalMs = parseSeconds(data.get("alert_interval_seconds"), DEFAULT_INTERVAL_MS / 1000L, 3L, 30L) * 1000L;
             String alertKey = buildAlertKey(courseId, data.get("notification_id"));
 
@@ -124,6 +130,9 @@ public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
             boolean showNotification
     ) {
         if (context == null || courseId == null || courseId.isEmpty()) return;
+        // The active V2 feed uses a single ten-second alert. Do not trust a
+        // cached V1 duration forwarded by the web layer.
+        long effectiveDurationMs = DISPATCH_V2_ALERT_DURATION_MS;
         String alertKey = buildAlertKey(courseId, notificationId);
         Context appContext = context.getApplicationContext();
         if (showNotification) {
@@ -131,9 +140,9 @@ public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
             data.put("type", "nouvelle_course");
             data.put("course_id", courseId);
             if (notificationId != null) data.put("notification_id", notificationId);
-            showUrgentCourseNotification(appContext, valueOrDefault(title, "Nouvelle course SILGAPP"), valueOrDefault(body, "Une course est disponible."), data, durationMs);
+            showUrgentCourseNotification(appContext, valueOrDefault(title, "Nouvelle course SILGAPP"), valueOrDefault(body, "Une course est disponible."), data, effectiveDurationMs);
         }
-        startUrgentCourseAlert(appContext, durationMs, intervalMs, alertKey);
+        startUrgentCourseAlert(appContext, effectiveDurationMs, intervalMs, alertKey);
     }
 
     private static synchronized void stopUrgentCourseAlert(boolean cancelNotification) {
@@ -155,12 +164,20 @@ public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
         if (alertKey != null && alertKey.equals(activeAlertKey) && now < alertEndAtMs) {
             return;
         }
+        if (alertKey != null && alertKey.equals(lastStartedAlertKey)
+                && now - lastStartedAlertAtMs < ALERT_RESTART_GUARD_MS) {
+            return;
+        }
 
         stopUrgentCourseAlert(false);
         activeAlertKey = alertKey != null ? alertKey : "";
+        lastStartedAlertKey = activeAlertKey;
+        lastStartedAlertAtMs = now;
         alertHandler = new Handler(Looper.getMainLooper());
         alertEndAtMs = now + Math.max(durationMs, 5000L);
-        playNotificationSound(context, durationMs > 5000L);
+        // The official SILGAPP sound plays once and is force-stopped after the
+        // V2 duration. It must never loop or overlap another trigger.
+        playNotificationSound(context, false);
 
         alertRunnable = new Runnable() {
             @Override

@@ -11,6 +11,8 @@ const STORAGE_INTERVAL_KEY = "silgapp_livreur_alert_interval_seconds";
 
 let activeAlert = null;
 let sharedAudioCtx = null;
+const recentAlertStarts = new Map();
+const ALERT_RESTART_GUARD_MS = 30_000;
 
 function toPositiveNumber(value, fallback) {
   const n = Number(value);
@@ -149,12 +151,22 @@ export function startUrgentCourseAlert(options = {}) {
   } = options;
   const config = normalizeLivreurAlertConfig(options);
   const key = courseId ? `course:${courseId}` : `notification:${notificationId || "unknown"}`;
+  const now = Date.now();
 
-  if (activeAlert?.key === key && Date.now() < activeAlert.endsAt) {
+  if (activeAlert?.key === key && now < activeAlert.endsAt) {
+    return activeAlert;
+  }
+
+  const lastStartedAt = recentAlertStarts.get(key) || 0;
+  if (now - lastStartedAt < ALERT_RESTART_GUARD_MS) {
     return activeAlert;
   }
 
   if (activeAlert) stopUrgentCourseAlert("restart");
+  recentAlertStarts.set(key, now);
+  for (const [recentKey, startedAt] of recentAlertStarts) {
+    if (now - startedAt > ALERT_RESTART_GUARD_MS * 2) recentAlertStarts.delete(recentKey);
+  }
 
   const durationMs = config.durationSeconds * 1000;
   const intervalMs = config.intervalSeconds * 1000;

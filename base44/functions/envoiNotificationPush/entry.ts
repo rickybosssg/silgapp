@@ -237,6 +237,7 @@ Deno.serve(async (req) => {
       user_type,
       alert_duration_seconds,
       alert_interval_seconds,
+      dispatch_version,
       category,
     } = body;
     const targetEmail = String(destinataire_email || '').trim().toLowerCase();
@@ -411,6 +412,7 @@ Deno.serve(async (req) => {
       click_action: ANDROID_CLICK_ACTION,
       alert_duration_seconds: String(alert_duration_seconds || 300),
       alert_interval_seconds: String(alert_interval_seconds || 5),
+      dispatch_version: String(dispatch_version || ''),
     };
 
     // Payload FCM — notification visible écran verrouillé + son + vibration

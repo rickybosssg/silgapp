@@ -710,6 +710,9 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   const courseEnAttente = useMemo(() => {
     const waiting = courseCandidates.find((course) => {
       if (isCourseDismissed(course)) return false; // déjà écartée, sauf nouvelle sollicitation
+      // Dispatch V2 shows disponible_push courses exclusively in the
+      // "Disponibles" feed. The legacy V1 modal must not open for them.
+      if (isV2Enabled && course.dispatch_status === "disponible_push") return false;
       return isCourseWaitingForLivreur(course, livreurId);
     }) || null;
     if (waiting) {
@@ -735,7 +738,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       });
     }
     return waiting;
-  }, [courseCandidates, livreurId]);
+  }, [courseCandidates, livreurId, isV2Enabled]);
 
   // ─── Course en attente de validation prix par le client ───────────────────
   const courseEnAttenteValidationPrix = useMemo(() => {
@@ -1377,7 +1380,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
           course={courseEnAttente}
           livreurId={livreurProfil.id}
           pricingMode={pricingMode}
-          alertDurationSeconds={livreurAlertConfig.durationSeconds}
+          alertDurationSeconds={courseEnAttente.dispatch_status === "disponible_push" ? 5 : livreurAlertConfig.durationSeconds}
           alertIntervalSeconds={livreurAlertConfig.intervalSeconds}
           onAccepter={handleAccepter}
           onRefuser={handleRefuser}
@@ -1399,8 +1402,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       )}
 
       {/* ── Navigation sticky en haut ──────────────── */}
-      <div className="sticky top-0 z-30 bg-[#f5f5f7]/90 backdrop-blur-xl px-4 pt-3 pb-2 border-b border-black/5">
-        <div className="max-w-lg mx-auto flex gap-1 bg-white/90 rounded-2xl p-1 shadow-[0_8px_30px_rgba(15,23,42,0.06)] border border-black/5">
+      <div className="sticky top-0 z-30 bg-[#f5f5f7]/90 backdrop-blur-xl px-3 pt-3 pb-2 border-b border-black/5">
+        <div className="max-w-lg mx-auto flex w-full gap-0.5 bg-white/90 rounded-2xl p-1 shadow-[0_8px_30px_rgba(15,23,42,0.06)] border border-black/5">
           {TABS.map(tab => (
             <button
               key={tab.id}
@@ -1408,7 +1411,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
                 setActiveTab(tab.id);
                 if (tab.id === "disponibles") setHasNewAvailableCourse(false);
               }}
-              className={`relative flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+              className={`relative min-w-0 flex-1 px-1 flex items-center justify-center py-2.5 rounded-xl text-[10px] font-bold leading-tight text-center transition-all ${
                 activeTab === tab.id
                   ? "bg-[#007aff] text-white shadow-sm"
                   : "text-slate-500 hover:text-slate-900"
