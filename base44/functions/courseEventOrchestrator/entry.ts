@@ -60,6 +60,14 @@ Deno.serve(async (req) => {
       // 1. Dispatch : V2 (fil) ou V1 (vagues) selon feature flag
       const v2Enabled = await isV2Enabled(base44);
       if (v2Enabled) {
+        // V2 : publier dans le fil (disponible_push) + notifier tous les livreurs éligibles
+        // V1 d'abord (crée DispatchNotifications + push), puis V2 (set disponible_push)
+        await fireInvoke('dispatchExterneAuto', {
+          action: 'lancer_recherche_auto',
+          course_id: courseId,
+          event,
+          data,
+        });
         await publierCourseDansFil(base44, data);
         called.push('publierCourseDansFil');
       } else {
@@ -113,6 +121,12 @@ Deno.serve(async (req) => {
     if (statutChanged && newStatut === 'recherche_livreur') {
       const v2Enabled = await isV2Enabled(base44);
       if (v2Enabled) {
+        await fireInvoke('dispatchExterneAuto', {
+          action: 'lancer_recherche_auto',
+          course_id: courseId,
+          event,
+          data,
+        });
         await publierCourseDansFil(base44, data);
         called.push('publierCourseDansFil');
       } else {

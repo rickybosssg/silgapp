@@ -53,7 +53,7 @@ function calculerDistance(lat1, lng1, lat2, lng2) {
 
 const saveLivreur = (id, data) => base44.functions.invoke('updateLivreur', { id, data });
 
-const PROPOSED_DISPATCH_STATUSES = new Set(["propose", "assigne_manuel", "en_attente_reponse"]);
+const PROPOSED_DISPATCH_STATUSES = new Set(["propose", "assigne_manuel", "en_attente_reponse", "disponible_push"]);
 const PROPOSED_COURSE_STATUSES = new Set(["nouvelle", "recherche_livreur", "en_attente_livreur", "en_attente"]);
 const FINAL_COURSE_STATUSES = new Set(["livree", "annulee", "completed", "delivered", "canceled"]);
 

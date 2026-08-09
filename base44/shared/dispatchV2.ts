@@ -53,6 +53,9 @@ export async function publierCourseDansFil(base44: any, course: any) {
     statut: 'recherche_livreur',
     dispatch_status: 'disponible_push',
     heure_sollicitation: new Date().toISOString(),
+    timeout_expires_at: null,
+    dispatch_wave: 0,
+    dispatch_next_wave_at: null,
   });
 
   dispatchLog(`[V2] 📢 Course ${course.id} publiée dans le fil (disponible_push)`);
