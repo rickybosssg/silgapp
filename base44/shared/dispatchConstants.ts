@@ -21,6 +21,10 @@ export const STATUTS_ACTIFS_COURSE = [
 // Statuts actifs élargi (identique à STATUTS_ACTIFS_COURSE — unifié)
 export const STATUTS_ACTIFS_VERIF = STATUTS_ACTIFS_COURSE;
 
+// Statuts terminaux — une course dans ces statuts ne doit JAMAIS bloquer
+// un livreur pour le dispatch, même si dispatch_status est encore 'accepte'.
+export const STATUTS_TERMINAUX_COURSE = ['livree', 'annulee'];
+
 // Map pays → indicatif téléphonique (avec +)
 export const INDICATIFS: Record<string, string> = {
   BF: '+226', CI: '+225', TG: '+228', BJ: '+229', SN: '+221',

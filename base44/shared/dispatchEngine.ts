@@ -2,7 +2,7 @@
 // Extrait de dispatchExterneAuto pour réduire la taille du fichier principal.
 // Aucune logique métier modifiée — uniquement déplacement + console.log → dispatchLog.
 
-import { calculerDistance, INDICATIFS, STATUTS_ACTIFS_COURSE } from './dispatchConstants.ts';
+import { calculerDistance, INDICATIFS, STATUTS_ACTIFS_COURSE, STATUTS_TERMINAUX_COURSE } from './dispatchConstants.ts';
 import { dispatchLog, normalizeNom, supprimerNotificationsCourse, journaliserDispatch } from './dispatchUtils.ts';
 import { chargerConfigDispatch, chargerLivreursEnCourse, chargerConfigVaguesGPS, CYCLE_EPUISE_TIMEOUT_MS } from './dispatchConfig.ts';
 import { envoyerWhatsAppRaw } from './twilioWhatsApp.ts';
@@ -62,7 +62,7 @@ export async function trouverLivreursCandidats(base44, course, exclusions = [], 
       for (const c of coursesActives || []) {
         const isStatutActif = STATUTS_ACTIFS_COURSE.includes(c.statut);
         const isPropose = c.dispatch_status === 'propose' && c.statut === 'recherche_livreur';
-        const isAccepte = c.dispatch_status === 'accepte';
+        const isAccepte = c.dispatch_status === 'accepte' && !STATUTS_TERMINAUX_COURSE.includes(c.statut);
         if (!isStatutActif && !isPropose && !isAccepte) continue;
         if (c.livreur_id && tousLivreursIds.includes(c.livreur_id)) {
           livreurIdsAvecCourseActive.add(c.livreur_id);
@@ -497,7 +497,7 @@ export async function lancerDispatchMulti(base44, courseId, exclusions = [], cac
       if (c.id === courseId) continue;
       const isActif = STATUTS_ACTIFS_COURSE.includes(c.statut);
       const isPropose = c.dispatch_status === 'propose' && c.statut === 'recherche_livreur';
-      const isAccepte = c.dispatch_status === 'accepte';
+      const isAccepte = c.dispatch_status === 'accepte' && !STATUTS_TERMINAUX_COURSE.includes(c.statut);
       if (!isActif && !isPropose && !isAccepte) continue;
       if (c.livreur_id && selectionIds.has(c.livreur_id)) exclusFinal.add(c.livreur_id);
       if (c.accepted_by_livreur_id && selectionIds.has(c.accepted_by_livreur_id)) exclusFinal.add(c.accepted_by_livreur_id);
@@ -614,7 +614,7 @@ export async function lancerDispatchMulti(base44, courseId, exclusions = [], cac
       if (c.id === courseId) continue;
       const isActif = STATUTS_ACTIFS_COURSE.includes(c.statut);
       const isPropose = c.dispatch_status === 'propose' && c.statut === 'recherche_livreur';
-      const isAccepte = c.dispatch_status === 'accepte';
+      const isAccepte = c.dispatch_status === 'accepte' && !STATUTS_TERMINAUX_COURSE.includes(c.statut);
       if (!isActif && !isPropose && !isAccepte) continue;
       if (c.livreur_id && selectionIds.has(c.livreur_id)) exclusFinal.add(c.livreur_id);
       if (c.accepted_by_livreur_id && selectionIds.has(c.accepted_by_livreur_id)) exclusFinal.add(c.accepted_by_livreur_id);
