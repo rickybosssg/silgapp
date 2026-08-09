@@ -634,15 +634,8 @@ Deno.serve(async (req) => {
               dispatch_wave: maxWave,
               timeout_expires_at: cycleEpuiseDeadline,
             });
-            // ── Notifier VENUS WhatsApp au client ──
-            const messageVenus = `📍 Nous avons sollicité tous les livreurs disponibles autour de vous, mais aucun n'a accepté votre course pour le moment.\n\nVoulez-vous que je relance la recherche ?\n\nRépondez 'oui' pour relancer ou 'non' pour annuler.`;
-            const notifie = await notifierRedispatchClient({
-              base44,
-              course,
-              messageVenus,
-              motif: 'cycle_epuise',
-            });
-            return Response.json({ expired: true, wave_epuise: true, venus_notifie: notifie });
+            // Notification WhatsApp VENUS désactivée — le client peut relancer via l'app
+            return Response.json({ expired: true, wave_epuise: true, venus_notifie: false });
           }
           console.log(`[DISPATCH] 📍 GPS avancement vague ${currentWave} → ${nextWave} pour course ${course_id}`);
           await base44.asServiceRole.entities.CourseExterne.update(course_id, {

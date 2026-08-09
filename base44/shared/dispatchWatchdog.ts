@@ -313,14 +313,7 @@ export async function runWatchdog(base44, body = {}) {
         });
         corrections.push({ course_id: course.id, action: 'secours_v2_cycle_epuise' });
 
-        // Notifier VENUS
-        try {
-          const { notifierRedispatchClient } = await import('./venusRedispatchNotifier.ts');
-          const messageVenus = `📍 Nous avons sollicité tous les livreurs disponibles autour de vous, mais aucun n'a accepté votre course pour le moment.\n\nVoulez-vous que je relance la recherche ?\n\nRépondez 'oui' pour relancer ou 'non' pour annuler.`;
-          await notifierRedispatchClient({ base44, course, messageVenus, motif: 'cycle_epuise' });
-        } catch (err) {
-          console.error('[WATCHDOG] ❌ VENUS notif cycle_epuise V2:', err.message);
-        }
+        // Notification WhatsApp VENUS désactivée — le client peut relancer via l'app
       }
     }
   }
