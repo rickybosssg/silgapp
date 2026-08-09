@@ -239,13 +239,14 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
 
   if (coursesWithDistance.length === 0) {
     return (
-      <div className="rounded-2xl bg-[#1f2429] border border-white/8 p-8 text-center space-y-3">
-        <div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center mx-auto">
-          <Flame className="w-7 h-7 text-white/30" />
+      <div className="rounded-3xl bg-gradient-to-br from-[#1a1f2e] via-[#1f2429] to-[#16191d] border border-white/8 p-10 text-center space-y-4 shadow-xl">
+        <div className="relative w-20 h-20 rounded-3xl bg-gradient-to-br from-orange-500/20 to-amber-500/10 flex items-center justify-center mx-auto border border-orange-500/20">
+          <Flame className="w-10 h-10 text-orange-400/50" />
+          <div className="absolute inset-0 rounded-3xl bg-orange-500/5 animate-pulse" />
         </div>
-        <p className="text-sm font-bold text-white/70">Aucune course disponible</p>
-        <p className="text-xs text-white/40">
-          Les courses non acceptées par le dispatch automatique apparaîtront ici.
+        <p className="text-base font-black text-white/80">Aucune course disponible</p>
+        <p className="text-xs text-white/40 leading-relaxed max-w-[220px] mx-auto">
+          Les courses non acceptées par le dispatch automatique apparaîtront ici automatiquement.
         </p>
       </div>
     );
@@ -254,9 +255,11 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2 px-1">
-        <Flame className="w-5 h-5 text-orange-400" />
+        <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center shadow-lg shadow-orange-500/20">
+          <Flame className="w-4 h-4 text-white" />
+        </div>
         <h2 className="text-base font-black text-white">Courses disponibles</h2>
-        <span className="w-5 h-5 rounded-full bg-orange-500 text-white text-[10px] font-black flex items-center justify-center">
+        <span className="w-5 h-5 rounded-full bg-gradient-to-r from-orange-500 to-amber-500 text-white text-[10px] font-black flex items-center justify-center shadow-md shadow-orange-500/30">
           {coursesWithDistance.length}
         </span>
       </div>
@@ -264,7 +267,13 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
       {coursesWithDistance.map(course => (
         <div
           key={course.id}
-          className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#1f2429] to-[#181b20] border border-white/8 shadow-lg"
+          className={`relative overflow-hidden rounded-3xl border shadow-xl ${
+            course.priority === "urgente"
+              ? "bg-gradient-to-br from-red-950/40 via-[#1f2429] to-[#181b20] border-red-500/30"
+              : course.priority === "haute"
+              ? "bg-gradient-to-br from-orange-950/30 via-[#1f2429] to-[#181b20] border-orange-500/25"
+              : "bg-gradient-to-br from-[#1f2429] via-[#1c2128] to-[#181b20] border-white/8"
+          }`}
         >
           {/* Bandeau priorité */}
           {(course.priority === "urgente" || course.priority === "haute") && (
@@ -339,10 +348,10 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
 
             {/* Prix estimé */}
             {course.prix_estimate > 0 && (
-              <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-[#00a86b]/8 border border-[#00a86b]/15">
+              <div className="flex items-center justify-between px-3.5 py-2.5 rounded-2xl bg-gradient-to-r from-[#00a86b]/12 to-emerald-500/8 border border-[#00a86b]/20">
                 <span className="text-[11px] text-white/50 font-semibold">Prix estimé</span>
-                <span className="text-base font-black text-[#00a86b]">
-                  {course.prix_estimate.toLocaleString()} <span className="text-[10px]">FCFA</span>
+                <span className="text-lg font-black text-[#00a86b]">
+                  {course.prix_estimate.toLocaleString()} <span className="text-[10px] font-bold">FCFA</span>
                 </span>
               </div>
             )}
@@ -368,7 +377,7 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
                 type="button"
                 onClick={() => handleRefuser(course)}
                 disabled={acceptingId === course.id}
-                className="h-12 rounded-2xl bg-white/5 text-white/50 text-sm font-bold flex items-center justify-center active:scale-[0.97] transition-all border border-white/8 disabled:opacity-50 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/20"
+                className="h-12 rounded-2xl bg-gradient-to-br from-white/5 to-white/8 text-white/50 text-sm font-bold flex items-center justify-center active:scale-[0.97] transition-all border border-white/10 disabled:opacity-50 hover:from-red-500/15 hover:to-red-600/10 hover:text-red-400 hover:border-red-500/25"
               >
                 <X className="w-5 h-5" />
               </button>
