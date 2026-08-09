@@ -585,7 +585,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [livreurId, livreurProfil?.country_code]);
+  }, [livreurId, livreurProfil?.country_code, isPilotLivreur]);
 
   const { data: mesCourses = [] } = useQuery({
     queryKey: ["mes-courses-externes", livreurId, livreurEmail, notificationCourseId],
