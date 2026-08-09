@@ -34,6 +34,7 @@ import QRCodeDisplay from "@/components/client/QRCodeDisplay";
 import AnnulerCourseDialog from "@/components/client/AnnulerCourseDialog";
 import LivreurAnnulationDialog from "@/components/client/LivreurAnnulationDialog";
 import ChatWindow from "@/components/chat/ChatWindow";
+import CoursePriceEditor from "@/components/courses/CoursePriceEditor";
 import CarteLivreurClient from "@/components/chat/CarteLivreurClient";
 import ETADisplay from "@/components/client/ETADisplay";
 import HistoriqueCoursesClient from "@/components/client/HistoriqueCoursesClient";
@@ -509,6 +510,11 @@ export default function ClientSuiviCourse() {
             </Button>
           )}
         </Card>
+
+        {/* Prix modifiable par le client — uniquement avant acceptation par un livreur */}
+        {!maCourse.livreur_id && !["livree", "annulee"].includes(maCourse.statut) && (
+          <CoursePriceEditor course={maCourse} context="client" />
+        )}
 
         {/* Infos livreur — Card style Uber uniquement si livreur a accepté */}
         {maCourse.livreur_id && maCourse.heure_acceptation && (

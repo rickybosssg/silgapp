@@ -13,6 +13,7 @@ import MultiColisAdminView from "./MultiColisAdminView";
 import ProposedLivreursList from "./ProposedLivreursList";
 import ManualAssignLivreurDialog from "./ManualAssignLivreurDialog";
 import ChatWindow from "@/components/chat/ChatWindow";
+import CoursePriceEditor from "./CoursePriceEditor";
 import { UserPlus } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { genererReferenceCourse } from "@/lib/courseReference";
@@ -271,6 +272,11 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
               <Truck className="w-4 h-4 text-muted-foreground" />
               <span className="text-sm font-medium">{course.livreur_nom}</span>
             </div>
+          )}
+
+          {/* Prix modifiable */}
+          {reseau === "externe" && (
+            <CoursePriceEditor course={course} context="admin" />
           )}
 
           {/* Réattribuer au même livreur (course annulée) — placé ici pour être visible immédiatement */}
