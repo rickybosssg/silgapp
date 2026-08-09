@@ -80,13 +80,13 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
   return (
     <>
       {/* ===== MOBILE HEADER ===== */}
-      <header className="lg:hidden fixed top-0 left-0 right-0 bg-white/90 backdrop-blur-xl border-b border-black/5 z-40 flex items-center justify-between px-4 shadow-sm safe-area-top" style={{ minHeight: '3.5rem' }}>
+      <header className="lg:hidden fixed top-0 left-0 right-0 bg-[#16191d]/95 backdrop-blur-xl border-b border-white/5 z-40 flex items-center justify-between px-4 shadow-sm safe-area-top" style={{ minHeight: '3.5rem' }}>
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-[#007aff] flex items-center justify-center shadow-sm">
+          <div className="w-8 h-8 rounded-xl bg-[#00a86b] flex items-center justify-center shadow-sm">
             <span className="text-white font-black text-sm">S</span>
           </div>
           <div>
-            <h1 className="font-extrabold text-sm text-slate-900 leading-tight">SILGAPP</h1>
+            <h1 className="font-extrabold text-sm text-white leading-tight">SILGAPP</h1>
             <p className="text-[9px] text-slate-400 leading-tight">SILGAPP Livraison</p>
           </div>
         </div>
@@ -108,7 +108,7 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
           )}
           {notificationCount > 0 && (
             <Link to="/notifications" className="relative">
-              <Bell className="w-5 h-5 text-muted-foreground" />
+              <Bell className="w-5 h-5 text-slate-400" />
               <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-destructive text-destructive-foreground text-[9px] font-bold flex items-center justify-center">
                 {notificationCount > 9 ? '9+' : notificationCount}
               </span>
@@ -116,13 +116,13 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
           )}
           {messageCount > 0 && (
             <Link to="/admin/messages" className="relative">
-              <MessageCircle className="w-5 h-5 text-muted-foreground" />
+              <MessageCircle className="w-5 h-5 text-slate-400" />
               <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center animate-pulse">
                 {messageCount > 9 ? '9+' : messageCount}
               </span>
             </Link>
           )}
-          <Button variant="ghost" size="icon" onClick={() => setShowMenu(true)} className="text-muted-foreground">
+          <Button variant="ghost" size="icon" onClick={() => setShowMenu(true)} className="text-slate-400">
             <Menu className="w-5 h-5" />
           </Button>
         </div>
@@ -133,15 +133,15 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
         <div className="lg:hidden fixed inset-0 z-50" onClick={() => setShowMenu(false)}>
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
           <div
-            className="absolute right-0 top-0 bottom-0 w-72 bg-white flex flex-col shadow-2xl border-l border-black/5"
+            className="absolute right-0 top-0 bottom-0 w-72 bg-[#16191d] flex flex-col shadow-2xl border-l border-white/5"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Menu header */}
-            <div className="h-14 flex items-center justify-between px-4 border-b border-black/5 flex-shrink-0">
+            <div className="h-14 flex items-center justify-between px-4 border-b border-white/5 flex-shrink-0">
               <div>
                 {user && (
                   <div>
-                    <p className="text-sm font-semibold text-slate-900">{user.full_name || user.email}</p>
+                    <p className="text-sm font-semibold text-white">{user.full_name || user.email}</p>
                     <p className="text-xs text-slate-400 capitalize">{user.role}</p>
                   </div>
                 )}
@@ -153,30 +153,30 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
 
             {/* Sélecteur de pays — réseau externe uniquement */}
             {showCountryPicker && (
-              <div className="px-3 py-2 border-b border-black/5">
+              <div className="px-3 py-2 border-b border-white/5">
                 <button
                   onClick={() => setCountryOpen(!countryOpen)}
-                  className="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-blue-50 transition-colors"
+                  className="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 transition-colors"
                 >
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="text-base flex-shrink-0">
                       {effectiveCountry ? PAYS_SILGAPP.find(p => p.code === effectiveCountry)?.emoji_flag || "🌍" : "🌍"}
                     </span>
-                    <span className="text-sm font-medium text-slate-700 truncate">
+                    <span className="text-sm font-medium text-slate-300 truncate">
                       {effectiveCountry ? PAYS_SILGAPP.find(p => p.code === effectiveCountry)?.nom : "Choisir un pays"}
                     </span>
                   </div>
                   <ChevronDown className={cn("w-4 h-4 text-slate-400 flex-shrink-0 transition-transform", countryOpen && "rotate-180")} />
                 </button>
                 {countryOpen && (
-                  <div className="mt-1 border border-black/5 rounded-xl bg-white shadow-lg max-h-56 overflow-y-auto">
+                  <div className="mt-1 border border-white/5 rounded-xl bg-[#1e2228] shadow-lg max-h-56 overflow-y-auto">
                     {PAYS_SILGAPP.map((p) => (
                       <button
                         key={p.code}
                         onClick={() => { setSelectedCountry(p.code); setCountryOpen(false); }}
                         className={cn(
-                          "w-full flex items-center gap-3 px-3 py-2.5 text-sm transition-colors hover:bg-blue-50",
-                          effectiveCountry === p.code ? "bg-blue-50 text-[#007aff] font-semibold" : "text-slate-600"
+                          "w-full flex items-center gap-3 px-3 py-2.5 text-sm transition-colors hover:bg-white/5",
+                          effectiveCountry === p.code ? "bg-[#00a86b]/10 text-[#00a86b] font-semibold" : "text-slate-400"
                         )}
                       >
                         <span className="text-base flex-shrink-0">{p.emoji_flag}</span>
@@ -202,8 +202,8 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
                     className={cn(
                       "flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-all",
                       isActive
-                        ? "bg-[#007aff] text-white shadow-sm"
-                        : "text-slate-500 hover:bg-blue-50 hover:text-[#007aff]"
+                        ? "bg-[#00a86b] text-white shadow-sm"
+                        : "text-slate-300 hover:bg-white/5 hover:text-[#00a86b]"
                     )}
                   >
                     <Icon className="w-4 h-4 flex-shrink-0" />
@@ -239,7 +239,7 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
             </nav>
 
             {/* Logout */}
-            <div className="border-t border-black/5 p-3 flex-shrink-0">
+            <div className="border-t border-white/5 p-3 flex-shrink-0">
               <Button
                 variant="outline"
                 className="w-full text-destructive border-destructive/30 hover:bg-destructive/10"
@@ -254,7 +254,7 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
       )}
 
       {/* ===== MOBILE BOTTOM TAB BAR ===== */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-xl border-t border-black/5 z-40 safe-area-bottom shadow-[0_-8px_30px_rgba(15,23,42,0.08)]">
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-[#16191d]/95 backdrop-blur-xl border-t border-white/5 z-40 safe-area-bottom shadow-[0_-8px_30px_rgba(0,0,0,0.3)]">
         <div className="flex items-stretch justify-around">
           {allNavItems.filter(item => bottomTabPaths.includes(item.path)).map((item) => {
             const isActive = location.pathname === item.path;
@@ -276,18 +276,18 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
                 }}
                 className={cn(
                   "flex flex-col items-center justify-center py-2 px-1 flex-1 transition-all min-h-[56px]",
-                  isActive ? "text-[#007aff]" : "text-slate-400"
+                  isActive ? "text-[#00a86b]" : "text-slate-400"
                 )}
               >
                 <div className={cn(
                   "w-10 h-6 flex items-center justify-center rounded-full transition-all",
-                  isActive && "bg-blue-50"
+                  isActive && "bg-[#00a86b]/10"
                 )}>
                   <Icon className="w-5 h-5" />
                 </div>
                 <span className={cn(
                   "text-[10px] font-medium mt-0.5",
-                  isActive ? "text-[#007aff]" : "text-slate-400"
+                  isActive ? "text-[#00a86b]" : "text-slate-400"
                 )}>
                   {item.label}
                 </span>

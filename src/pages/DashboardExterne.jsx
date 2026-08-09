@@ -27,7 +27,7 @@ function KpiCard({ label, value, icon: Icon, color, suffix, onClick }) {
   return (
     <button
       onClick={onClick}
-      className={`group relative overflow-hidden rounded-2xl p-3 lg:p-4 text-left transition-all duration-200 hover:scale-[1.02] hover:shadow-lg ${color} text-white shadow-[0_8px_24px_rgba(15,23,42,0.08)] border border-white/15`}
+      className={`group relative overflow-hidden rounded-2xl p-3 lg:p-4 text-left transition-all duration-200 hover:scale-[1.02] hover:shadow-lg ${color} text-white shadow-[0_8px_24px_rgba(0,0,0,0.2)] border border-white/10`}
     >
       <div className="relative">
         <div className="flex items-center justify-between mb-2 lg:mb-3">
@@ -106,9 +106,6 @@ export default function DashboardExterne() {
     return coursesFiltrees.filter(c => c.type_course === filtreTypeDashboard);
   }, [coursesFiltrees, filtreTypeDashboard]);
 
-  // ⚠️ On utilise heure_livraison || created_date — JAMAIS updated_date
-  // car updated_date est modifié par les tâches de maintenance/correction auto,
-  // ce qui ferait réapparaître d'anciennes courses annulées dans l'historique du jour.
   const coursesTerminees = useMemo(
     () => coursesFiltrees.filter(c =>
       ["livree", "annulee"].includes(c.statut) &&
@@ -117,8 +114,6 @@ export default function DashboardExterne() {
     [coursesFiltrees]
   );
 
-  // Même critère que la carte dispatch : statut actif (disponible ou en_course) + validé + actif
-  // PAS de filtre heartbeat (isON) pour garantir la cohérence avec la carte
   const livreursEnLigne = useMemo(
     () => livreurs.filter(l =>
       (l.statut === "disponible" || l.statut === "en_course") &&
@@ -133,7 +128,6 @@ export default function DashboardExterne() {
     [clients]
   );
 
-  // IDs des livreurs avec une course réellement active (pour les compteurs précis)
   const livreurIdsEnCourseReelle = useMemo(() => {
     const STATUTS_OCCUPE = ["livreur_en_route", "client_contacte", "en_route_expediteur", "colis_recupere", "en_livraison"];
     return new Set(coursesEnTraitement.filter(c => STATUTS_OCCUPE.includes(c.statut) && c.livreur_id).map(c => c.livreur_id));
@@ -164,11 +158,11 @@ export default function DashboardExterne() {
   const taux = stats.total > 0 ? Math.round((stats.livrees / stats.total) * 100) : 0;
 
   return (
-    <div className="min-h-screen bg-[#f5f5f7] text-[#1d1d1f]">
+    <div className="min-h-screen bg-[#16191d] text-slate-100">
       <div className="px-4 py-4 lg:px-6 lg:py-6 space-y-5 max-w-7xl mx-auto">
 
         {/* ── HERO HEADER ─────────────────────────────────── */}
-        <div className="relative overflow-hidden rounded-3xl bg-[#0879e8] p-5 sm:p-6 shadow-[0_18px_45px_rgba(0,122,255,0.24)] border border-white/20">
+        <div className="relative overflow-hidden rounded-3xl bg-[#0d4f3c] p-5 sm:p-6 shadow-[0_18px_45px_rgba(0,168,107,0.2)] border border-white/10">
           <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-4">
               <Link to="/">
@@ -227,7 +221,7 @@ export default function DashboardExterne() {
                 <span className="hidden sm:inline">Codes Promo</span>
               </Button>
               <Link to="/carte">
-                <Button size="sm" className="gap-1.5 bg-primary hover:bg-primary/90 text-white rounded-xl text-xs shadow-lg shadow-primary/30">
+                <Button size="sm" className="gap-1.5 bg-[#00a86b] hover:bg-[#00a86b]/90 text-white rounded-xl text-xs shadow-lg shadow-[#00a86b]/30">
                   <MapPin className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">Carte</span>
                 </Button>
@@ -292,12 +286,12 @@ export default function DashboardExterne() {
 
         {/* ── ACTIVITÉ ─────────────────────────────────────── */}
         <div>
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 px-1">Activité en direct</p>
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 px-1">Activité en direct</p>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div className="bg-white rounded-2xl border border-black/5 shadow-[0_8px_24px_rgba(15,23,42,0.06)] overflow-hidden">
+            <div className="bg-[#1e2228] rounded-2xl border border-white/5 shadow-[0_8px_24px_rgba(0,0,0,0.2)] overflow-hidden">
               <ClientsEnLigne clients={clientsEnLigne} />
             </div>
-            <div className="bg-white rounded-2xl border border-black/5 shadow-[0_8px_24px_rgba(15,23,42,0.06)] overflow-hidden">
+            <div className="bg-[#1e2228] rounded-2xl border border-white/5 shadow-[0_8px_24px_rgba(0,0,0,0.2)] overflow-hidden">
               <LivreursEnLigne livreurs={livreursEnLigne} />
             </div>
           </div>
@@ -305,8 +299,8 @@ export default function DashboardExterne() {
 
         {/* ── COURSES EN COURS ────────────────────────────── */}
         <div>
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 px-1">Courses en cours</p>
-          <div className="bg-white rounded-2xl border border-black/5 shadow-[0_8px_24px_rgba(15,23,42,0.06)] overflow-hidden">
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 px-1">Courses en cours</p>
+          <div className="bg-[#1e2228] rounded-2xl border border-white/5 shadow-[0_8px_24px_rgba(0,0,0,0.2)] overflow-hidden">
             <CoursesEnTraitement
               courses={filtreTypeDashboard === "tous" ? coursesEnTraitement : coursesEnTraitement.filter(c => c.type_course === filtreTypeDashboard)}
               onView={setSelectedCourse}
@@ -317,8 +311,8 @@ export default function DashboardExterne() {
 
         {/* ── HISTORIQUE DU JOUR ──────────────────────────── */}
         <div>
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 px-1">Historique du jour</p>
-          <div className="bg-white rounded-2xl border border-black/5 shadow-[0_8px_24px_rgba(15,23,42,0.06)] overflow-hidden">
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 px-1">Historique du jour</p>
+          <div className="bg-[#1e2228] rounded-2xl border border-white/5 shadow-[0_8px_24px_rgba(0,0,0,0.2)] overflow-hidden">
             <CoursesTerminees
               courses={coursesTerminees}
               onView={setSelectedCourse}
