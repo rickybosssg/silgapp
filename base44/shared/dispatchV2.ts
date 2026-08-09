@@ -1,6 +1,7 @@
 // ── Dispatch V2 : Fil de courses disponibles + secours ciblé ────────────────
 // Nouveau système derrière le feature flag DISPATCH_V2_ENABLED.
 // V1 (vagues) reste intact et utilisé quand le flag est désactivé.
+// VERSION: 2026-08-09 — Correctif updateMany sans filtre livreur_id vide.
 
 import { STATUTS_ACTIFS_COURSE, STATUTS_TERMINAUX_COURSE, calculerDistance } from './dispatchConstants.ts';
 import { dispatchLog, reponseDejaPrise, generateToken, generatePIN, journaliserDispatch } from './dispatchUtils.ts';
