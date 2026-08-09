@@ -553,17 +553,21 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
           notifiedCourseIds = (myNotifs || []).map(n => n.course_id);
         } catch {}
 
-        const found = (allCourses || []).find((course) => (
-          course.dispatch_status === "propose" &&
-          !course.livreur_id &&
-          !course.accepted_by_livreur_id &&
-          !FINAL_COURSE_STATUSES.has(course.statut) &&
-          course.manual_price_status !== "pending_client_validation" &&
-          (!livreurProfil?.country_code || course.country_code === livreurProfil.country_code) &&
-          notifiedCourseIds.includes(course.id) &&
-          // 🛡️ Ignorer les courses expirées (timeout dépassé)
-          (!course.timeout_expires_at || new Date(course.timeout_expires_at) > new Date())
-        )) || null;
+        const found = (allCourses || []).find((course) => {
+          if (course.livreur_id || course.accepted_by_livreur_id) return false;
+          if (FINAL_COURSE_STATUSES.has(course.statut)) return false;
+          if (course.manual_price_status === "pending_client_validation") return false;
+          if (livreurProfil?.country_code && course.country_code !== livreurProfil.country_code) return false;
+          if (course.timeout_expires_at && new Date(course.timeout_expires_at) <= new Date()) return false;
+
+          // V2 : courses disponible_push visibles par les livreurs pilotes (sans DispatchNotification)
+          if (course.dispatch_status === "disponible_push" && isPilotLivreur) return true;
+
+          // V1 : courses propose nécessitant une DispatchNotification
+          if (course.dispatch_status === "propose" && notifiedCourseIds.includes(course.id)) return true;
+
+          return false;
+        }) || null;
 
         setCourseProposeeDirecte(
           found ? { ...found, __notifiedForCurrentLivreur: true } : null
