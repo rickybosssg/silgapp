@@ -89,7 +89,6 @@ function isCourseTargetingLivreur(course, livreurId) {
     sameLivreurId(course.livreur_id, livreurId) ||
     sameLivreurId(course.proposed_by_livreur_id, livreurId) ||
     sameLivreurId(course.proposed_livreur_id, livreurId) ||
-    listIncludesLivreur(course.dispatch_notified_ids, livreurId) ||
     listIncludesLivreur(course.notified_livreur_ids, livreurId)
   );
 }
@@ -526,6 +525,16 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         const allCourses = await base44.entities.CourseExterne.list("-created_date", 50);
         if (cancelled) return;
 
+        // ── Récupérer les notifications actives du livreur depuis DispatchNotification ──
+        // (remplace l'ancien champ JSON dispatch_notified_ids qui n'est plus mis à jour)
+        let notifiedCourseIds = [];
+        try {
+          const myNotifs = await base44.entities.DispatchNotification.filter(
+            { livreur_id: livreurId, statut: 'notifie' }, '-date_notification', 50
+          );
+          notifiedCourseIds = (myNotifs || []).map(n => n.course_id);
+        } catch {}
+
         const found = (allCourses || []).find((course) => (
           course.dispatch_status === "propose" &&
           !course.livreur_id &&
@@ -533,7 +542,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
           !FINAL_COURSE_STATUSES.has(course.statut) &&
           course.manual_price_status !== "pending_client_validation" &&
           (!livreurProfil?.country_code || course.country_code === livreurProfil.country_code) &&
-          listIncludesLivreur(course.dispatch_notified_ids, livreurId) &&
+          notifiedCourseIds.includes(course.id) &&
           // 🛡️ Ignorer les courses expirées (timeout dépassé)
           (!course.timeout_expires_at || new Date(course.timeout_expires_at) > new Date())
         )) || null;

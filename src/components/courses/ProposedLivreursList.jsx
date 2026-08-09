@@ -72,19 +72,23 @@ export default function ProposedLivreursList({ course }) {
   useEffect(() => {
     let mounted = true;
     const fetchLivreurs = async () => {
-      // ── Afficher UNIQUEMENT les livreurs de la vague en cours
-      //    (dispatch_wave_notified_ids est réinitialisé à chaque nouvelle vague par le backend)
-      let notifiedIds = [];
+      // ── Lire les livreurs notifiés depuis l'entité DispatchNotification
+      //    (remplace l'ancien champ JSON dispatch_wave_notified_ids qui n'est plus mis à jour)
       try {
-        notifiedIds = JSON.parse(course.dispatch_wave_notified_ids || "[]");
-      } catch {
-        notifiedIds = [];
-      }
-      if (notifiedIds.length === 0) {
-        if (mounted) { setLivreurs([]); setLoading(false); }
-        return;
-      }
-      try {
+        const notifs = await base44.entities.DispatchNotification.filter(
+          { course_id: course.id },
+          '-date_notification', 100
+        );
+        // Garder uniquement les notifiés/acceptés de la vague en cours (exclure refusés/expirés)
+        const currentWave = course.dispatch_wave || 1;
+        const activeNotifs = (notifs || []).filter(n =>
+          (n.statut === 'notifie' || n.statut === 'accepte') && (n.vague || 1) === currentWave
+        );
+        const notifiedIds = activeNotifs.map(n => n.livreur_id);
+        if (notifiedIds.length === 0) {
+          if (mounted) { setLivreurs([]); setLoading(false); }
+          return;
+        }
         const result = await base44.entities.Livreur.filter({ id: { $in: notifiedIds } });
         // Préserver l'ordre de notification
         const ordered = notifiedIds
@@ -97,7 +101,7 @@ export default function ProposedLivreursList({ course }) {
     };
     fetchLivreurs();
     return () => { mounted = false; };
-  }, [course?.id, course?.dispatch_wave_notified_ids]);
+  }, [course?.id, course?.dispatch_wave, course?.updated_date]);
 
   if (loading) {
     return (
