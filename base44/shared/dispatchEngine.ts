@@ -19,7 +19,7 @@ import {
  * Trouve les livreurs candidats classés par priorité.
  */
 export async function trouverLivreursCandidats(base44, course, exclusions = [], options = {}) {
-  const { skipGpsFilter = false } = options;
+  const { skipGpsFilter = false, skipGpsFilterForPriority = false } = options;
   if (!course.country_code) {
     console.error(`[DISPATCH] ❌ BLOQUÉ — course ${course.id} sans country_code`);
     return { tous: [], niveau1: [], niveau2: [], niveau3: [], pickupSource: 'none' };
@@ -82,7 +82,9 @@ export async function trouverLivreursCandidats(base44, course, exclusions = [], 
 
   const eligibles = tousLivreurs.filter(l => {
     const nomComplet = `${l.prenom || ''} ${l.nom || ''}`.trim();
-    if (!skipGpsFilter && (!l.latitude || !l.longitude)) { raisonsExclusion.push({ livreur_id: l.id, nom: nomComplet, raison: 'sans_gps' }); return false; }
+    const isPriorityDriver = (l.priorite_dispatch || 0) > 0;
+    if (!skipGpsFilter && !skipGpsFilterForPriority && (!l.latitude || !l.longitude)) { raisonsExclusion.push({ livreur_id: l.id, nom: nomComplet, raison: 'sans_gps' }); return false; }
+    if (!skipGpsFilter && skipGpsFilterForPriority && !isPriorityDriver && (!l.latitude || !l.longitude)) { raisonsExclusion.push({ livreur_id: l.id, nom: nomComplet, raison: 'sans_gps' }); return false; }
     if (exclusionSet.has(l.id)) { raisonsExclusion.push({ livreur_id: l.id, nom: nomComplet, raison: 'deja_notifie_ou_refuse' }); return false; }
     if (livreurIdsAvecCourseActive.has(l.id)) { raisonsExclusion.push({ livreur_id: l.id, nom: nomComplet, raison: 'en_course' }); return false; }
     if (l.admin_hors_ligne === true) { raisonsExclusion.push({ livreur_id: l.id, nom: nomComplet, raison: 'admin_hors_ligne' }); return false; }
@@ -160,9 +162,12 @@ export async function trouverLivreursCandidats(base44, course, exclusions = [], 
     //    pour cause de GPS absent ou expiré. La priorité prime sur le GPS. ──
     // 🛡️ MAIS: un seuil maximum de 2h empêche de notifier des livreurs clairement
     //    hors ligne (GPS de 14-45h), ce qui gaspille des crédits d'intégration.
-    const GPS_MAX_STALE_MIN = 120; // 2h — au-delà, même les prioritaires sont exclus
+    const GPS_MAX_STALE_MIN = 120; // 2h — au-delà, les non-prioritaires sont exclus
     const isPriority = (l.priorite_dispatch || 0) > 0;
-    if (!skipGpsFilter && (gpsAgeMin === null || gpsAgeMin >= GPS_MAX_STALE_MIN)) {
+    // 🛡️ En vague 1 (skipGpsFilterForPriority), les livreurs prioritaires ne sont
+    //    JAMAIS exclus pour GPS absent ou ancien. La priorité prime sur le GPS.
+    //    Les non-prioritaires restent soumis au filtre GPS_MAX_STALE_MIN.
+    if (!skipGpsFilter && !(skipGpsFilterForPriority && isPriority) && (gpsAgeMin === null || gpsAgeMin >= GPS_MAX_STALE_MIN)) {
       raisonsExclusion.push({
         livreur_id: l.id,
         nom: `${l.prenom || ''} ${l.nom || ''}`.trim(),
@@ -474,7 +479,6 @@ export async function lancerDispatchMulti(base44, courseId, exclusions = [], cac
   // Sans cette exception, les livreurs non-prioritaires au GPS expiré ne sont
   // JAMAIS notifiés — le code notifie uniquement les prioritaires puis retourne.
   const isLastWave = wave >= gpsConfig.waves.length;
-  const isFirstWave = wave <= 1;
   const priorityCandidats = (isLastWave || !isFirstWave) ? [] : candidats.filter(l => (l.priorite_dispatch || 0) > 0);
   let priorityNotYetNotified = priorityCandidats.filter(l => !dejaNotifies.includes(l.id));
 
