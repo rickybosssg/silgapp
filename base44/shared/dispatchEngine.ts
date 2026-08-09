@@ -347,12 +347,15 @@ export async function lancerDispatchMulti(base44, courseId, exclusions = [], cac
   const config = cachedConfig?.dispatch || await chargerConfigDispatch(base44);
   dispatchLog(`[DISPATCH] ⚙️ Config: ${config.nb} livreurs, ${config.timeout}s`);
 
-  const resultat = await trouverLivreursCandidats(base44, course, exclusions);
-  const { tous: candidatsTous, pickupSource, raisonsExclusion } = resultat;
-
   const gpsConfig = cachedConfig?.gps || await chargerConfigVaguesGPS(base44);
 
   let wave = course.dispatch_wave || 1;
+  // 🛡️ En vague 1, les livreurs prioritaires sont inclus SANS filtre GPS
+  //    (priorité prime sur la fraîcheur GPS). Les non-prioritaires restent filtrés.
+  const isFirstWave = wave <= 1;
+
+  const resultat = await trouverLivreursCandidats(base44, course, exclusions, { skipGpsFilterForPriority: isFirstWave });
+  const { tous: candidatsTous, pickupSource, raisonsExclusion } = resultat;
 
   let candidats = candidatsTous;
 
