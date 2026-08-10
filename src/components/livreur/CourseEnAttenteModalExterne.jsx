@@ -419,21 +419,31 @@ export default function CourseEnAttenteModalExterne({
             <div>
               {(() => {
                 const isPrixManuel = course.pricing_mode === "manual" && course.manual_price_status === "accepted" && Number(course.manual_price) > 0;
-                const prixBase = isPrixManuel ? Number(course.manual_price) : (course.prix_estimate || 0);
+                const prixAdmin = Number(course.prix_propose_admin) > 0 ? Number(course.prix_propose_admin) : null;
+                const prixBase = isPrixManuel ? Number(course.manual_price) : (prixAdmin || course.prix_estimate || 0);
                 if (!prixBase) return null;
+                const isPrixAdmin = !isPrixManuel && prixAdmin !== null;
                 return (
                   <>
-                    <p className={cn("text-2xl font-black", isPrixManuel ? "text-green-700" : "text-gray-900")}>
+                    <p className={cn("text-2xl font-black", isPrixManuel ? "text-green-700" : isPrixAdmin ? "text-blue-700" : "text-gray-900")}>
                       {isPrixManuel
                         ? `${prixBase.toLocaleString()} `
-                        : `~${prixBase.toLocaleString()} `
+                        : isPrixAdmin
+                          ? `${prixBase.toLocaleString()} `
+                          : `~${prixBase.toLocaleString()} `
                       }
-                      <span className={cn("text-base font-semibold", isPrixManuel ? "text-green-600" : "text-gray-600")}>FCFA</span>
+                      <span className={cn("text-base font-semibold", isPrixManuel ? "text-green-600" : isPrixAdmin ? "text-blue-600" : "text-gray-600")}>FCFA</span>
                     </p>
                     {isPrixManuel && (
                       <div className="flex items-center gap-1 mt-0.5">
                         <Check className="w-3.5 h-3.5 text-green-600" />
                         <span className="text-xs text-green-600 font-bold">Prix convenu avec le client</span>
+                      </div>
+                    )}
+                    {isPrixAdmin && (
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <Check className="w-3.5 h-3.5 text-blue-600" />
+                        <span className="text-xs text-blue-600 font-bold">Prix proposé par SILGAPP</span>
                       </div>
                     )}
                     {!isPrixManuel && (
