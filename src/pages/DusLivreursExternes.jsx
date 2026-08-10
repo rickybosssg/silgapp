@@ -625,7 +625,7 @@ export default function DusLivreursExternes() {
                       )}
                     </div>
                     <div className="flex gap-2 mt-3">
-                      <Button variant="outline" size="sm" className="flex-1 h-9 text-xs rounded-xl font-semibold" onClick={() => setDetailEntry(entry)}>
+                      <Button variant="outline" size="sm" className="flex-1 h-9 text-xs rounded-xl font-semibold text-gray-700" onClick={() => setDetailEntry(entry)}>
                         Détails
                       </Button>
                       {entry.montantDu > 0 && (
@@ -741,7 +741,7 @@ export default function DusLivreursExternes() {
                       </div>
                     </div>
                     <div className="flex gap-2 mt-3">
-                      <Button variant="outline" size="sm" className="flex-1 h-9 text-xs rounded-xl font-semibold" onClick={() => setDetailEntry(entry)}>
+                      <Button variant="outline" size="sm" className="flex-1 h-9 text-xs rounded-xl font-semibold text-gray-700" onClick={() => setDetailEntry(entry)}>
                         Détails
                       </Button>
                       {entry.montantDu > 0 && (
@@ -857,7 +857,7 @@ export default function DusLivreursExternes() {
                       </div>
                     </div>
                     <div className="flex gap-2 mt-3">
-                      <Button variant="outline" size="sm" className="flex-1 h-9 text-xs rounded-xl font-semibold" onClick={() => setDetailEntry(entry)}>
+                      <Button variant="outline" size="sm" className="flex-1 h-9 text-xs rounded-xl font-semibold text-gray-700" onClick={() => setDetailEntry(entry)}>
                         Détails
                       </Button>
                       {entry.montantDu > 0 && (
