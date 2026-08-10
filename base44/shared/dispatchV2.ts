@@ -267,22 +267,39 @@ export async function accepterCourseV2(base44: any, courseId: string, livreurId:
     await base44.asServiceRole.entities.Livreur.update(livreurId, { statut: 'en_course' });
     await marquerAccepte(base44, courseId, livreurId);
 
-    // 13. Message code récupération (courses admin/VENUS)
+    // 13. Message code récupération + push notification (courses admin/VENUS)
     if ((course.source === 'admin' || course.created_by_venus === true) && pickupPIN) {
       const idempotencyKey = `pickup-code-${courseId}-${livreurId}`;
       try {
         const existing = await base44.asServiceRole.entities.Message.filter({ client_message_id: idempotencyKey });
         if (!existing || existing.length === 0) {
+          const prixLabel = course.prix_propose_admin
+            ? `Prix de la course : ${Number(course.prix_propose_admin).toLocaleString()} ${course.devise || 'FCFA'}`
+            : (course.prix_estimate ? `Prix estimé : ${Number(course.prix_estimate).toLocaleString()} ${course.devise || 'FCFA'}` : '');
+          const messageContent = `🔑 Code de récupération : ${pickupPIN}\n📦 Code de livraison : ${deliveryPIN}${prixLabel ? `\n💰 ${prixLabel}` : ''}`;
+
           await base44.asServiceRole.entities.Message.create({
             course_id: courseId,
             sender_type: 'admin',
             sender_id: 'silgapp_system',
             sender_name: 'SILGAPP',
             message_type: 'text',
-            content: `🔑 Code de récupération : ${pickupPIN}${course.prix_propose_admin ? `\n💰 Prix de la course : ${Number(course.prix_propose_admin).toLocaleString()} ${course.devise || 'FCFA'}` : (course.prix_estimate ? `\n💰 Prix estimé : ${Number(course.prix_estimate).toLocaleString()} ${course.devise || 'FCFA'}` : '')}`,
+            content: messageContent,
             source: 'app',
             client_message_id: idempotencyKey,
           });
+
+          // 📤 Push notification au livreur avec PIN + prix
+          if (livreur.user_email) {
+            base44.asServiceRole.functions.invoke('envoiNotificationPush', {
+              destinataire_email: livreur.user_email,
+              livreur_id: livreurId,
+              titre: '🔑 Code PIN + Prix de course',
+              message: messageContent,
+              type: 'nouveau_message',
+              course_id: courseId,
+            }).catch((err: any) => console.error('[V2] ❌ Push PIN/prix:', err?.message));
+          }
         }
       } catch (err) { console.error('[V2] ⚠️ Erreur message code récupération:', err?.message); }
     }
