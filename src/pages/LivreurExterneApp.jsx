@@ -1368,8 +1368,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   // ─── Dashboard principal ──────────────────────────────────────────────────
   const TABS = [
     { id: "courses", label: "Courses", emoji: "" },
-    // Onglet "Disponibles" masqué si le livreur a une course active OU si V2 désactivé
-    ...(coursesActives.length === 0 && isV2Enabled ? [{ id: "disponibles", label: "Disponibles", emoji: "" }] : []),
+    // Onglet "Disponibles" toujours visible quand V2 est activé (fixe, ne disparaît jamais)
+    ...(isV2Enabled ? [{ id: "disponibles", label: "Disponibles", emoji: "" }] : []),
     { id: "historique", label: "Historique", emoji: "" },
     { id: "messages", label: "Messages", emoji: "" },
     ...(livreurHasPromoCode ? [{ id: "promo", label: "Code Promo", emoji: "" }] : []),
