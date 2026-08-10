@@ -24,6 +24,10 @@ const COUNTRY_LOCAL_LEN = {
   ML: 8, GN: 9, NE: 8, GH: 9,
 };
 
+function isInternalDispatchNote(value) {
+  return /^Accept(?:e|ee|é|ée)e? par \S+ (?:a|à) \d{4}-\d{2}-\d{2}T/i.test(String(value || "").trim());
+}
+
 // Haversine
 function haversine(lat1, lon1, lat2, lon2) {
   if (!lat1 || !lon1 || !lat2 || !lon2) return null;
@@ -993,7 +997,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
             )
           )}
 
-          {course.notes && (
+          {course.notes && !isInternalDispatchNote(course.notes) && (
             <p className="text-xs text-gray-500 bg-amber-50 border border-amber-100 p-3 rounded-2xl leading-relaxed">
                {course.notes}
             </p>

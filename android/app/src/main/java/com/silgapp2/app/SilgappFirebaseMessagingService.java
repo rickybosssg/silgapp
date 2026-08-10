@@ -256,7 +256,6 @@ public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
             .setVibrate(null)
             .setSound(null)
             .setContentIntent(fullScreenPendingIntent)
-            .setFullScreenIntent(fullScreenPendingIntent, true)
             .setShowWhen(true)
             .setTimeoutAfter(durationMs + 5000L);
 

@@ -252,7 +252,7 @@ export async function accepterCourseV2(base44: any, courseId: string, livreurId:
 
   // 11. V2 : Trigger WebSocket via update single (déclenche la disparition du fil)
   await base44.asServiceRole.entities.CourseExterne.update(courseId, {
-    notes: `Acceptée par ${livreurId} à ${new Date().toISOString()}`,
+    dispatch_status: 'acceptee',
   });
 
   // 12. Update livreur status

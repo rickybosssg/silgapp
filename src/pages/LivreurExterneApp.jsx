@@ -837,6 +837,18 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     [mesCourses, livreurProfil?.id]
   );
 
+  // A profile refresh must never make an assigned courier dispatchable again.
+  // Respect an explicit offline choice, but repair an accidental "disponible"
+  // status while an active course is still attached to this courier.
+  useEffect(() => {
+    if (!livreurProfil?.id || coursesActives.length === 0) return;
+    if (livreurProfil.statut !== "disponible") return;
+
+    saveLivreur(livreurProfil.id, { statut: "en_course" })
+      .then(() => queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] }))
+      .catch(() => null);
+  }, [coursesActives.length, livreurProfil?.id, livreurProfil?.statut, queryClient]);
+
   // Détecter la réponse du client sur une proposition de prix manuel
   // Statuts finaux pour lesquels on n'affiche JAMAIS la modale
   const FINAL_STATUSES = ['livree', 'annulee', 'completed', 'delivered', 'canceled'];

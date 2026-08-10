@@ -77,6 +77,14 @@ const dispatchV2Source = readFileSync(
   new URL("../base44/shared/dispatchV2.ts", import.meta.url),
   "utf8",
 );
+const courseActiveCardSource = readFileSync(
+  new URL("../src/components/livreur/CourseActiveCard.jsx", import.meta.url),
+  "utf8",
+);
+const mainActivitySource = readFileSync(
+  new URL("../android/app/src/main/java/com/silgapp2/app/MainActivity.java", import.meta.url),
+  "utf8",
+);
 const dispatchWatchdogSource = readFileSync(
   new URL("../base44/shared/dispatchWatchdog.ts", import.meta.url),
   "utf8",
@@ -86,10 +94,15 @@ const availableCountIndex = livreurAppSource.indexOf("const { data: availableCou
 assert.ok(v2DeclarationIndex >= 0 && availableCountIndex > v2DeclarationIndex, "isV2Enabled doit etre declare avant le compteur de courses");
 assert.match(livreurAppSource, /DispatchNotification\.filter\([\s\S]*statut:\s*"refuse"/, "le badge doit exclure les refus persistants");
 assert.match(livreurAppSource, /dismissedIds\.has\(course\.id\)/, "le badge doit exclure les courses masquees localement");
+assert.match(livreurAppSource, /coursesActives\.length === 0[\s\S]*livreurProfil\.statut !== "disponible"[\s\S]*statut: "en_course"/, "une course active doit maintenir le livreur en_course");
 assert.doesNotMatch(dispatchV2Source, /dispatch_status:[^\n]+livreur_id:\s*''/, "le verrou V2 doit accepter un livreur_id null");
 assert.match(dispatchV2Source, /STATUTS_TERMINAUX_COURSE\.includes\(course\.statut\)/, "V2 doit refuser une course terminee ou annulee");
+assert.doesNotMatch(dispatchV2Source, /notes:\s*`Accept/, "V2 ne doit pas exposer son journal technique dans les notes utilisateur");
+assert.match(courseActiveCardSource, /!isInternalDispatchNote\(course\.notes\)/, "les anciennes notes techniques doivent rester masquees");
 assert.match(dispatchWatchdogSource, /deadlineMs === 0 && course\.dispatch_status === 'disponible_push'/, "le watchdog ne doit pas retirer prematurement une course V2");
 assert.match(nativePushSource, /DISPATCH_V2_ALERT_DURATION_MS\s*=\s*10000L/, "l'alerte native V2 doit durer dix secondes");
 assert.match(nativePushSource, /playNotificationSound\(context, false\)/, "la sonnerie native V2 ne doit pas boucler");
+assert.doesNotMatch(nativePushSource, /setFullScreenIntent\(/, "la notification V2 ne doit pas ouvrir MainActivity automatiquement");
+assert.doesNotMatch(mainActivitySource, /void onResume\(\)[\s\S]*stopUrgentCourseAlert/, "reprendre l'app ne doit pas tronquer l'alerte V2");
 
 console.log("LIVREUR_COURSE_REGRESSION=PASS");
