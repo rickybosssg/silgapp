@@ -272,7 +272,7 @@ export async function accepterCourseV2(base44: any, courseId: string, livreurId:
             sender_id: 'silgapp_system',
             sender_name: 'SILGAPP',
             message_type: 'text',
-            content: `🔑 Code de récupération : ${pickupPIN}`,
+            content: `🔑 Code de récupération : ${pickupPIN}${course.prix_propose_admin ? `\n💰 Prix de la course : ${Number(course.prix_propose_admin).toLocaleString()} ${course.devise || 'FCFA'}` : (course.prix_estimate ? `\n💰 Prix estimé : ${Number(course.prix_estimate).toLocaleString()} ${course.devise || 'FCFA'}` : '')}`,
             source: 'app',
             client_message_id: idempotencyKey,
           });
