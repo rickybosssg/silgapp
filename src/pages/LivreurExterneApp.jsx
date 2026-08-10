@@ -786,9 +786,10 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     () => mesCourses.filter(c => {
       if (!isCourseAcceptedByLivreur(c, livreurProfil?.id)) return false;
 
-      // GARDE ABSOLUE : une course livrée avec prix_final saisi ET heure_livraison
-      // ne doit JAMAIS apparaître dans les courses actives, quel que soit le mode.
-      if (c.statut === "livree" && c.prix_final > 0 && c.heure_livraison) return false;
+      // GARDE ABSOLUE : une course livrée avec heure_livraison ne doit JAMAIS
+      // apparaître dans les courses actives, quel que soit le mode. Le prix_final
+      // est auto-rempli depuis prix_propose_admin pour les courses admin.
+      if (c.statut === "livree" && c.heure_livraison) return false;
 
       // GARDE ABSOLUE : course annulée = jamais active
       if (c.statut === "annulee") return false;
@@ -797,10 +798,6 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       // Inclut les statuts du workflow administratif (client_contacte, en_route_expediteur)
       // qui sont des étapes intermédiaires entre l'acceptation et la récupération du colis.
       if (ACTIVE_LIVREUR_COURSE_STATUSES.has(c.statut)) return true;
-
-      // Admin_manuel : garder la carte visible tant que le montant n'est pas saisi,
-      // même si le backend a déjà marqué la course "livree" via validateQRCode.
-      if ((c.pricing_mode === "admin_manuel" || c.source === "admin") && c.statut === "livree" && !c.prix_final) return true;
 
       return false;
     }),

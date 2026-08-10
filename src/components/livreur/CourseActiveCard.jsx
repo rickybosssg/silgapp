@@ -201,6 +201,30 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
     return split;
   };
 
+  // ── Auto-appliquer prix_propose_admin comme prix_final pour les courses admin livrées sans prix ──
+  useEffect(() => {
+    if (course.statut !== "livree") return;
+    if (course.prix_final > 0) return;
+    if (course.pricing_mode !== "admin_manuel" && course.source !== "admin") return;
+    if (!course.prix_propose_admin) return;
+
+    const autoSetPrice = async () => {
+      const split = getRequiredSplit(Number(course.prix_propose_admin));
+      if (!split) return;
+      try {
+        await base44.entities.CourseExterne.update(course.id, {
+          prix_final: Number(course.prix_propose_admin),
+          commission_silga: split.commission_silga,
+          montant_livreur: split.montant_livreur,
+        });
+        queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+      } catch (err) {
+        console.error("[CourseActiveCard] Auto-set prix_final error:", err?.message);
+      }
+    };
+    autoSetPrice();
+  }, [course.id, course.statut, course.prix_final, course.prix_propose_admin, course.pricing_mode, course.source]);
+
   // 🔄 Auto-transition : colis_recupere → en_livraison après 10 secondes
   useEffect(() => {
     if (effectiveStatut !== "colis_recupere" || isDeplacement) return;
