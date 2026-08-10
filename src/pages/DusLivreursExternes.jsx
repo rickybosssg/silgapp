@@ -58,7 +58,7 @@ function DetailModal({ entry, livreurInfo, onClose, onPaiement, onBloquer, onDeb
               {(entry.prenom?.[0] || "") + (entry.nom?.[0] || "")}
             </div>
             <div>
-              <p className="font-bold text-foreground">{entry.prenom} {entry.nom}</p>
+              <p className="font-bold text-gray-900">{entry.prenom} {entry.nom}</p>
               {entry.telephone && <p className="text-xs text-gray-500 flex items-center gap-1"><Phone className="w-3 h-3" />{entry.telephone}</p>}
             </div>
           </div>
@@ -113,7 +113,7 @@ function DetailModal({ entry, livreurInfo, onClose, onPaiement, onBloquer, onDeb
           {/* Paiement */}
           {entry.montantDu > 0 && (
             <div className="border-t pt-4">
-              <p className="text-sm font-semibold text-foreground mb-2">Enregistrer un paiement</p>
+              <p className="text-sm font-semibold text-gray-900 mb-2">Enregistrer un paiement</p>
               <div className="flex gap-2">
                 <Input type="number" placeholder="Montant" value={montantSaisi}
                   onChange={e => setMontantSaisi(e.target.value)}
@@ -131,7 +131,7 @@ function DetailModal({ entry, livreurInfo, onClose, onPaiement, onBloquer, onDeb
           {/* Courses — liste simple */}
           {entry.courses.length > 0 && (
             <div className="border-t pt-4">
-              <p className="text-sm font-semibold text-foreground mb-2">Courses ({entry.courses.length})</p>
+              <p className="text-sm font-semibold text-gray-900 mb-2">Courses ({entry.courses.length})</p>
               <div className="space-y-1.5">
                 {entry.courses.map(c => (
                   <div key={c.id} className="flex items-center justify-between text-xs py-1.5 px-2 bg-gray-50 rounded-lg">
@@ -500,7 +500,7 @@ export default function DusLivreursExternes() {
             <Wallet className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h1 className="text-xl font-black text-foreground tracking-tight">Dû Utilisateur</h1>
+            <h1 className="text-xl font-black text-gray-900 tracking-tight">Dû Utilisateur</h1>
             <p className="text-xs text-gray-500">Gestion des commissions & dettes</p>
           </div>
         </div>
@@ -605,14 +605,14 @@ export default function DusLivreursExternes() {
                         </div>
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
-                            <p className="font-bold text-foreground text-sm truncate">{entry.prenom} {entry.nom}</p>
+                            <p className="font-bold text-gray-900 text-sm truncate">{entry.prenom} {entry.nom}</p>
                             <span className={`w-2 h-2 rounded-full shrink-0 ${sf.dot}`} />
                           </div>
                           {entry.telephone && <p className="text-xs text-gray-400 truncate">{entry.telephone}</p>}
                         </div>
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="text-xl font-black text-foreground tracking-tight">{formatMontantCredit(entry.montantDu)}<span className="text-[10px] font-normal text-gray-400 ml-0.5">F</span></p>
+                        <p className="text-xl font-black text-gray-900 tracking-tight">{formatMontantCredit(entry.montantDu)}<span className="text-[10px] font-normal text-gray-400 ml-0.5">F</span></p>
                         <p className={`text-[10px] font-semibold ${entry.montantDu > 0 ? "text-red-500" : entry.montantDu < 0 ? "text-blue-500" : "text-green-500"}`}>{sf.label}</p>
                       </div>
                     </div>
@@ -729,14 +729,14 @@ export default function DusLivreursExternes() {
                         </div>
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
-                            <p className="font-bold text-foreground text-sm truncate">{entry.nom}</p>
+                            <p className="font-bold text-gray-900 text-sm truncate">{entry.nom}</p>
                             <span className={`w-2 h-2 rounded-full shrink-0 ${sf.dot}`} />
                           </div>
                           {entry.telephone && <p className="text-xs text-gray-400 truncate">{entry.telephone}</p>}
                         </div>
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="text-xl font-black text-foreground tracking-tight">{entry.montantDu.toLocaleString()}<span className="text-[10px] font-normal text-gray-400 ml-0.5">F</span></p>
+                        <p className="text-xl font-black text-gray-900 tracking-tight">{entry.montantDu.toLocaleString()}<span className="text-[10px] font-normal text-gray-400 ml-0.5">F</span></p>
                         <p className={`text-[10px] font-semibold ${entry.montantDu > 0 ? "text-red-500" : "text-green-500"}`}>{sf.label}</p>
                       </div>
                     </div>
@@ -845,14 +845,14 @@ export default function DusLivreursExternes() {
                         </div>
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
-                            <p className="font-bold text-foreground text-sm truncate">{entry.nom}</p>
+                            <p className="font-bold text-gray-900 text-sm truncate">{entry.nom}</p>
                             <span className={`w-2 h-2 rounded-full shrink-0 ${sf.dot}`} />
                           </div>
                           {entry.telephone && <p className="text-xs text-gray-400 truncate">{entry.telephone}</p>}
                         </div>
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="text-xl font-black text-foreground tracking-tight">{entry.montantDu.toLocaleString()}<span className="text-[10px] font-normal text-gray-400 ml-0.5">F</span></p>
+                        <p className="text-xl font-black text-gray-900 tracking-tight">{entry.montantDu.toLocaleString()}<span className="text-[10px] font-normal text-gray-400 ml-0.5">F</span></p>
                         <p className={`text-[10px] font-semibold ${entry.montantDu > 0 ? "text-red-500" : "text-green-500"}`}>{sf.label}</p>
                       </div>
                     </div>
