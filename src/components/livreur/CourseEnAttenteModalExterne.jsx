@@ -420,7 +420,7 @@ export default function CourseEnAttenteModalExterne({
               {(() => {
                 const isPrixManuel = course.pricing_mode === "manual" && course.manual_price_status === "accepted" && Number(course.manual_price) > 0;
                 const prixAdmin = Number(course.prix_propose_admin) > 0 ? Number(course.prix_propose_admin) : null;
-                const prixBase = isPrixManuel ? Number(course.manual_price) : (prixAdmin || course.prix_estimate || 0);
+                const prixBase = isPrixManuel ? Number(course.manual_price) : (prixAdmin || (isAdminCourse ? 0 : (course.prix_estimate || 0)));
                 if (!prixBase) return null;
                 const isPrixAdmin = !isPrixManuel && prixAdmin !== null;
                 return (
