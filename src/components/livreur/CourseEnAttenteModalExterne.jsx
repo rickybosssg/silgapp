@@ -443,7 +443,7 @@ export default function CourseEnAttenteModalExterne({
                     {isPrixAdmin && (
                       <div className="flex items-center gap-1 mt-0.5">
                         <Check className="w-3.5 h-3.5 text-blue-600" />
-                        <span className="text-xs text-blue-600 font-bold">Prix proposé par SILGAPP</span>
+                        <span className="text-xs text-blue-600 font-bold">Prix de la course</span>
                       </div>
                     )}
                     {!isPrixManuel && (
