@@ -171,7 +171,7 @@ function ProfilLivreurModal({ livreur, courses, onClose, onAction }) {
 
           {/* Finances */}
           <div className="bg-gray-50 rounded-xl p-4 space-y-2">
-            <p className="text-sm font-bold text-foreground mb-3 flex items-center gap-2">
+            <p className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
               <Banknote className="w-4 h-4 text-primary" /> Situation financière
             </p>
             <div className="flex justify-between text-sm">
@@ -193,7 +193,7 @@ function ProfilLivreurModal({ livreur, courses, onClose, onAction }) {
 
           {/* Gestion statut admin */}
           <div>
-            <p className="text-sm font-bold text-foreground mb-2 flex items-center gap-2">
+            <p className="text-sm font-bold text-gray-900 mb-2 flex items-center gap-2">
               <Power className="w-4 h-4 text-primary" /> Statut administratif
             </p>
             <AdminStatutLivreurPanel
@@ -204,7 +204,7 @@ function ProfilLivreurModal({ livreur, courses, onClose, onAction }) {
 
           {/* Notation */}
           <div>
-            <p className="text-sm font-bold text-foreground mb-2 flex items-center gap-2">
+            <p className="text-sm font-bold text-gray-900 mb-2 flex items-center gap-2">
               <Star className="w-4 h-4 text-yellow-500" /> Réputation
             </p>
             <NotationLivreurPanel livreur={livreur} courses={courses} />
@@ -213,7 +213,7 @@ function ProfilLivreurModal({ livreur, courses, onClose, onAction }) {
           {/* Courses récentes */}
           <div>
             <button
-              className="flex items-center justify-between w-full text-sm font-semibold text-foreground mb-2"
+              className="flex items-center justify-between w-full text-sm font-semibold text-gray-900 mb-2"
               onClick={() => setShowCourses(!showCourses)}
             >
               <span>Historique des courses ({courses.length})</span>
@@ -236,7 +236,7 @@ function ProfilLivreurModal({ livreur, courses, onClose, onAction }) {
                         {c.statut === "livree" ? "Livrée" : c.statut === "annulee" ? "Annulée" : "En cours"}
                       </span>
                     </div>
-                    <p className="text-foreground truncate">{c.adresse_depart} → {c.adresse_arrivee || "?"}</p>
+                    <p className="text-gray-900 truncate">{c.adresse_depart} → {c.adresse_arrivee || "?"}</p>
                     {c.statut === "livree" && (
                       <div className="flex gap-2 mt-1 text-muted-foreground">
                         {c.distance_reelle_km && <span> {Number(c.distance_reelle_km).toFixed(1)} km</span>}
@@ -467,7 +467,7 @@ export default function LivreursExternes() {
             </Button>
           </Link>
           <div>
-            <h1 className="text-xl font-bold text-foreground">Livreurs Externes</h1>
+            <h1 className="text-xl font-bold text-gray-900">Livreurs Externes</h1>
             <p className="text-xs text-muted-foreground">
               {stats.total} livreurs {effectiveCountry ? `(${effectiveCountry})` : "(tous pays)"} • {stats.valide} validés
             </p>
@@ -613,7 +613,7 @@ export default function LivreursExternes() {
                 <div className="flex-1 min-w-0">
                   {/* Nom + badges statut */}
                   <div className="flex items-center gap-1.5 flex-wrap mb-1">
-                    <span className="font-bold text-sm text-foreground truncate">{nomComplet}</span>
+                    <span className="font-bold text-sm text-gray-900 truncate">{nomComplet}</span>
                     {isBloque ? (
                       <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-red-100 text-red-700"> Bloqué</span>
                     ) : (

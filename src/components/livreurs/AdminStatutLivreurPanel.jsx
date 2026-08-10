@@ -154,19 +154,19 @@ export default function AdminStatutLivreurPanel({ livreur, coursesActives = [] }
                     <MapPin className="w-3 h-3 text-blue-500 flex-shrink-0 mt-0.5" />
                     <div className="min-w-0 flex-1">
                       <span className="text-muted-foreground">Départ: </span>
-                      <span className="font-medium text-foreground">{course.adresse_depart || "N/A"}</span>
+                      <span className="font-medium text-gray-900">{course.adresse_depart || "N/A"}</span>
                     </div>
                   </div>
                   <div className="flex items-start gap-1.5 text-xs">
                     <Navigation className="w-3 h-3 text-green-500 flex-shrink-0 mt-0.5" />
                     <div className="min-w-0 flex-1">
                       <span className="text-muted-foreground">Arrivée: </span>
-                      <span className="font-medium text-foreground">{course.adresse_arrivee || "N/A"}</span>
+                      <span className="font-medium text-gray-900">{course.adresse_arrivee || "N/A"}</span>
                     </div>
                   </div>
                   {(course.client_nom || course.contact_createur_course) && (
                     <div className="text-[10px] text-muted-foreground">
-                      Client: <span className="font-medium text-foreground">{course.client_nom || "N/A"}</span>
+                      Client: <span className="font-medium text-gray-900">{course.client_nom || "N/A"}</span>
                       {course.contact_createur_course && (
                         <span> · 📞 {course.contact_createur_course}</span>
                       )}
@@ -242,7 +242,7 @@ export default function AdminStatutLivreurPanel({ livreur, coursesActives = [] }
       {historique.length > 0 && (
         <div>
           <button
-            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground w-full"
+            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-gray-900 w-full"
             onClick={() => setShowHistorique(!showHistorique)}
           >
             <History className="w-3.5 h-3.5" />
@@ -257,7 +257,7 @@ export default function AdminStatutLivreurPanel({ livreur, coursesActives = [] }
                   <span className="text-muted-foreground flex-shrink-0">
                     {format(new Date(entry.date), "dd/MM/yyyy - HH'h'mm", { locale: fr })}
                   </span>
-                  <span className="font-medium text-foreground">{entry.action}</span>
+                  <span className="font-medium text-gray-900">{entry.action}</span>
                 </div>
               ))}
             </div>
