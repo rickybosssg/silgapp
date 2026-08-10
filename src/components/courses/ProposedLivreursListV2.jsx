@@ -95,17 +95,27 @@ export default function ProposedLivreursListV2({ course }) {
     const fetchEligible = async () => {
       try {
         const livreurs = await base44.entities.Livreur.filter(
-          { country_code: course.country_code, statut: "disponible", actif: true, validation: "valide" },
+          {
+            country_code: course.country_code,
+            type_livreur: "externe",
+            statut: "disponible",
+            actif: true,
+            validation: "valide",
+            bloque_encours: false,
+          },
           "-created_date", 500
         );
         if (!mounted) return;
-        // Compter ceux avec GPS récent (< 10 min)
-        const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000);
-        const withGps = (livreurs || []).filter(l => {
+        // Compter ceux avec activité récente (< 15 min) — aligné avec les critères
+        // de dispatch V2 (notifierLivreursEligiblesV2 n'exclut pas par GPS freshness)
+        const fifteenMinAgo = new Date(Date.now() - 15 * 60 * 1000);
+        const eligible = (livreurs || []).filter(l => {
+          if (l.manual_hors_ligne === true) return false;
+          if (l.admin_hors_ligne === true) return false;
           if (!l.last_seen_at) return false;
-          return new Date(l.last_seen_at) > tenMinAgo;
+          return new Date(l.last_seen_at) > fifteenMinAgo;
         });
-        setEligibleCount(withGps.length);
+        setEligibleCount(eligible.length);
       } catch {
         if (mounted) setEligibleCount(0);
       }

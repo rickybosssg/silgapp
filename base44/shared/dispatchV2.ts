@@ -48,6 +48,13 @@ async function notifierLivreursEligiblesV2(base44: any, course: any) {
     getLivreursRefuses(base44, course.id),
   ]);
 
+  // 🛡️ Anti-race-condition : si la course a déjà des notifications, c'est qu'elle
+  // a déjà été publiée dans le fil. Ne pas re-notifier (évite les 82 doublons).
+  if (dejaNotifies && dejaNotifies.length > 0) {
+    dispatchLog(`[V2] ⏭️ Course ${course.id} déjà publiée (${dejaNotifies.length} notifs existantes) — skip re-notification`);
+    return { notified: 0, already_published: true };
+  }
+
   const exclus = new Set([...(dejaNotifies || []), ...(refuses || [])]);
   const candidats = (livreurs || []).filter((livreur: any) => livreur.user_email && !exclus.has(livreur.id));
 
@@ -364,12 +371,15 @@ export async function secoursDispatchV2(base44: any, course: any, nbLivreurs: nu
       .map((c: any) => c.livreur_id)
   );
 
-  // 3. Exclude refused
-  const refused = await getLivreursRefuses(base44, course.id);
+  // 3. Exclude refused + already notified (anti-doublon)
+  const [refused, dejaNotifies] = await Promise.all([
+    getLivreursRefuses(base44, course.id),
+    getLivreursNotifies(base44, course.id),
+  ]);
 
   // 4. Score + sort + slice top N
   const candidats = livreurs
-    .filter((l: any) => !livreursEnCourse.has(l.id) && !refused.includes(l.id))
+    .filter((l: any) => !livreursEnCourse.has(l.id) && !refused.includes(l.id) && !dejaNotifies.includes(l.id))
     .map((l: any) => ({ ...l, score: calculerScore(l, course) }))
     .sort((a: any, b: any) => b.score - a.score)
     .slice(0, nbLivreurs);

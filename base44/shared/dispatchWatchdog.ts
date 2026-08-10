@@ -304,16 +304,13 @@ export async function runWatchdog(base44, body = {}) {
         }
         await new Promise(r => setTimeout(r, 100));
       } else if (ageMin >= 15 && secoursPhase < 3) {
-        // Phase 3 : cycle_epuise
-        const cycleEpuiseDeadline = new Date(now.getTime() + CYCLE_EPUISE_TIMEOUT_MS).toISOString();
+        // Phase 3 : V2 — garder en disponible_push (visible dans le fil indéfiniment)
+        // Ne PAS passer en cycle_epuise : en V2, la course reste visible par tous les
+        // livreurs éligibles jusqu'à assignation ou annulation manuelle.
         await base44.asServiceRole.entities.CourseExterne.update(course.id, {
-          dispatch_status: 'cycle_epuise',
-          timeout_expires_at: cycleEpuiseDeadline,
           dispatch_v2_secours_phase: 3,
         });
-        corrections.push({ course_id: course.id, action: 'secours_v2_cycle_epuise' });
-
-        // Notification WhatsApp VENUS désactivée — le client peut relancer via l'app
+        corrections.push({ course_id: course.id, action: 'secours_v2_phase3_kept_push' });
       }
     }
   }
