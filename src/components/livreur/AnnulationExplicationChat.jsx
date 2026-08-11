@@ -174,7 +174,7 @@ export default function AnnulationExplicationChat({
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex flex-col bg-white">
+    <div className="fixed top-0 left-0 right-0 z-[60] flex flex-col bg-white" style={{ height: '100dvh' }}>
       {/* Header */}
       <div className="flex items-center gap-2 p-3 bg-gradient-to-r from-red-500 to-red-600 text-white safe-area-top">
         <button
