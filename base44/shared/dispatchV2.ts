@@ -30,7 +30,8 @@ export async function isV2Enabled(base44: any): Promise<boolean> {
   }
 }
 
-async function notifierLivreursEligiblesV2(base44: any, course: any) {
+async function notifierLivreursEligiblesV2(base44: any, course: any, options: any = {}) {
+  const { priorityOnly = false, skipAlreadyPublishedCheck = false } = options;
   if (!course?.id || !course?.country_code) return { notified: 0 };
 
   const [livreurs, dejaNotifies, refuses] = await Promise.all([
@@ -50,13 +51,19 @@ async function notifierLivreursEligiblesV2(base44: any, course: any) {
 
   // 🛡️ Anti-race-condition : si la course a déjà des notifications, c'est qu'elle
   // a déjà été publiée dans le fil. Ne pas re-notifier (évite les 82 doublons).
-  if (dejaNotifies && dejaNotifies.length > 0) {
+  // Sauf si skipAlreadyPublishedCheck=true (appel délibéré pour la 2e vague).
+  if (!skipAlreadyPublishedCheck && dejaNotifies && dejaNotifies.length > 0) {
     dispatchLog(`[V2] ⏭️ Course ${course.id} déjà publiée (${dejaNotifies.length} notifs existantes) — skip re-notification`);
     return { notified: 0, already_published: true };
   }
 
   const exclus = new Set([...(dejaNotifies || []), ...(refuses || [])]);
-  const candidats = (livreurs || []).filter((livreur: any) => livreur.user_email && !exclus.has(livreur.id));
+  let candidats = (livreurs || []).filter((livreur: any) => livreur.user_email && !exclus.has(livreur.id));
+
+  // 🎯 Priorité : si priorityOnly=true, ne notifier que les livreurs prioritaires (priorite_dispatch > 0)
+  if (priorityOnly) {
+    candidats = candidats.filter((l: any) => Number(l.priorite_dispatch || 0) > 0);
+  }
 
   await Promise.allSettled(candidats.map(async (livreur: any) => {
     await enregistrerNotification(base44, course.id, livreur, 0, { country_code: course.country_code });
@@ -74,6 +81,23 @@ async function notifierLivreursEligiblesV2(base44: any, course: any) {
   }));
 
   return { notified: candidats.length };
+}
+
+// ── Notifier le reste des livreurs (non-prioritaires) après le délai prioritaire ──
+export async function notifierResteLivreursV2(base44: any, course: any) {
+  const result = await notifierLivreursEligiblesV2(base44, course, {
+    priorityOnly: false,
+    skipAlreadyPublishedCheck: true,
+  });
+
+  // Marquer la vague 2 comme effectuée
+  await base44.asServiceRole.entities.CourseExterne.update(course.id, {
+    dispatch_wave: 2,
+    dispatch_next_wave_at: null,
+  }).catch(() => null);
+
+  dispatchLog(`[V2] 📢 Course ${course.id} — 2e vague: ${result.notified} livreur(s) non-prioritaire(s) notifié(s)`);
+  return result;
 }
 
 // ── Pilote par livreur (cache TTL 60s) ──
@@ -100,6 +124,8 @@ export async function isPilotLivreur(base44: any, livreurId: string): Promise<bo
 }
 
 // ── Publier une course dans le fil (V2) ──
+// Étape 1 : notifier uniquement les livreurs prioritaires (priorite_dispatch > 0)
+// Étape 2 : le watchdog notifie le reste après 60s (voir dispatchWatchdog.ts)
 export async function publierCourseDansFil(base44: any, course: any) {
   if (!course?.id) return { error: 'no_course_id' };
 
@@ -108,16 +134,17 @@ export async function publierCourseDansFil(base44: any, course: any) {
     dispatch_status: 'disponible_push',
     heure_sollicitation: new Date().toISOString(),
     timeout_expires_at: null,
-    dispatch_wave: 0,
-    dispatch_next_wave_at: null,
+    dispatch_wave: 1, // vague 1 = prioritaire
+    dispatch_next_wave_at: new Date(Date.now() + 60 * 1000).toISOString(), // 2e vague dans 60s
     dispatch_v2_secours_phase: 0,
     livreur_id: '',
     accepted_by_livreur_id: '',
   });
 
-  const notificationResult = await notifierLivreursEligiblesV2(base44, course);
+  // 🎯 Notifier d'abord les livreurs prioritaires uniquement
+  const notificationResult = await notifierLivreursEligiblesV2(base44, course, { priorityOnly: true });
 
-  dispatchLog(`[V2] 📢 Course ${course.id} publiée dans le fil (disponible_push)`);
+  dispatchLog(`[V2] 📢 Course ${course.id} publiée dans le fil (disponible_push) — ${notificationResult.notified} livreur(s) prioritaire(s) notifié(s), 2e vague dans 60s`);
   return { success: true, published: true, ...notificationResult };
 }
 
