@@ -1,7 +1,33 @@
+// ═══════════════════════════════════════════════════════════════════════════
+// 📌 DISPATCH V2 — VERSION STABLE FIGÉE (2026-08-11)
+// ═══════════════════════════════════════════════════════════════════════════
+// ⚠️  NE PAS MODIFIER SANS VALIDATION EXPLICITE DU RESPONSABLE PRODUIT.
+//
+// Ce moteur a été audité, testé et validé. Toute modification — même mineure —
+// doit être signalée et validée avant application. Les optimisations automatiques
+// ou refactorisations sont interdites sur ce fichier.
+//
+// Fonctionnement validé (à conserver) :
+//   1. Course publiée dans le fil « Disponibles » (dispatch_status = disponible_push).
+//   2. Tous les livreurs éligibles et libres voient la course, prioritaires ou non.
+//   3. À T=0, seuls les prioritaires libres (priorite_dispatch > 0) reçoivent le push.
+//   4. Notifications envoyées via envoiNotificationPushBatch (1 appel pour N livreurs).
+//   5. Un non-prioritaire peut accepter immédiatement une course visible dans son fil.
+//   6. Un livreur en course ne reçoit pas le push et ne peut pas accepter une 2e course.
+//   7. Acceptation protégée par verrou atomique (updateMany conditionnel) — 1 seul gagnant.
+//   8. Après acceptation, la course disparaît du fil des autres (livreur_id + WebSocket).
+//   9. T+5 min sans acceptation → push batch Top 3 non-prioritaires encore éligibles.
+//  10. T+10 min sans acceptation → push batch Top 5 non-prioritaires encore éligibles.
+//  11. T+15 min → aucun nouveau push ; la course reste en disponible_push indéfiniment.
+//
+// V1 (dispatchEngine.ts) reste intact pour rollback. Feature flags et pilote
+// (DISPATCH_V2_ENABLED, DISPATCH_V2_PILOT_*) inchangés.
+// ═══════════════════════════════════════════════════════════════════════════
+
 // ── Dispatch V2 : Fil de courses disponibles + secours ciblé ────────────────
 // Nouveau système derrière le feature flag DISPATCH_V2_ENABLED.
 // V1 (vagues) reste intact et utilisé quand le flag est désactivé.
-// VERSION: 2026-08-09 — Correctif updateMany sans filtre livreur_id vide.
+// VERSION: 2026-08-11 — Version stable figée. Ne pas modifier sans validation.
 
 import { STATUTS_ACTIFS_COURSE, STATUTS_TERMINAUX_COURSE, calculerDistance } from './dispatchConstants.ts';
 import { dispatchLog, reponseDejaPrise, generateToken, generatePIN, journaliserDispatch } from './dispatchUtils.ts';

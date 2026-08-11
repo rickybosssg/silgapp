@@ -1,3 +1,11 @@
+// ═══════════════════════════════════════════════════════════════════════════
+// 📌 WATCHDOG DISPATCH V2 — SECTION PROTÉGÉE (2026-08-11)
+// ═══════════════════════════════════════════════════════════════════════════
+// ⚠️  Les phases de secours V2 ci-dessous (T+5min, T+10min, T+15min) font partie
+//     de la VERSION STABLE FIGÉE du Dispatch V2. Ne pas modifier sans validation
+//     explicite du responsable produit. Voir en-tête de base44/shared/dispatchV2.ts.
+// ═══════════════════════════════════════════════════════════════════════════
+
 // ── Watchdog de dispatch — détecte et corrige les anomalies de manière idempotente ──
 // Ne relance pas systématiquement le dispatch. Détecte les anomalies, corrige
 // uniquement l'état concerné, et relance le dispatch seulement si nécessaire.
