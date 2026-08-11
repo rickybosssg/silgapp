@@ -83,23 +83,6 @@ async function notifierLivreursEligiblesV2(base44: any, course: any, options: an
   return { notified: candidats.length };
 }
 
-// ── Notifier le reste des livreurs (non-prioritaires) après le délai prioritaire ──
-export async function notifierResteLivreursV2(base44: any, course: any) {
-  const result = await notifierLivreursEligiblesV2(base44, course, {
-    priorityOnly: false,
-    skipAlreadyPublishedCheck: true,
-  });
-
-  // Marquer la vague 2 comme effectuée
-  await base44.asServiceRole.entities.CourseExterne.update(course.id, {
-    dispatch_wave: 2,
-    dispatch_next_wave_at: null,
-  }).catch(() => null);
-
-  dispatchLog(`[V2] 📢 Course ${course.id} — 2e vague: ${result.notified} livreur(s) non-prioritaire(s) notifié(s)`);
-  return result;
-}
-
 // ── Pilote par livreur (cache TTL 60s) ──
 let PILOT_CACHE: { ids: string[]; enabled: boolean; expires: number } | null = null;
 const PILOT_TTL_MS = 60 * 1000;
@@ -124,8 +107,12 @@ export async function isPilotLivreur(base44: any, livreurId: string): Promise<bo
 }
 
 // ── Publier une course dans le fil (V2) ──
-// Étape 1 : notifier uniquement les livreurs prioritaires (priorite_dispatch > 0)
-// Étape 2 : le watchdog notifie le reste après 60s (voir dispatchWatchdog.ts)
+// La course est visible immédiatement dans le fil « Disponibles » de TOUS les
+// livreurs éligibles. Seuls les prioritaires (priorite_dispatch > 0) reçoivent
+// une notification push à T=0. Les non-prioritaires peuvent voir et accepter la
+// course depuis leur fil. Si personne n'a accepté après ~5 min, le watchdog
+// déclenche les phases de secours (secoursDispatchV2) qui envoient un push
+// ciblé aux meilleurs non-prioritaires restants.
 export async function publierCourseDansFil(base44: any, course: any) {
   if (!course?.id) return { error: 'no_course_id' };
 
@@ -134,17 +121,17 @@ export async function publierCourseDansFil(base44: any, course: any) {
     dispatch_status: 'disponible_push',
     heure_sollicitation: new Date().toISOString(),
     timeout_expires_at: null,
-    dispatch_wave: 1, // vague 1 = prioritaire
-    dispatch_next_wave_at: new Date(Date.now() + 60 * 1000).toISOString(), // 2e vague dans 60s
+    dispatch_wave: 0,
+    dispatch_next_wave_at: null,
     dispatch_v2_secours_phase: 0,
     livreur_id: '',
     accepted_by_livreur_id: '',
   });
 
-  // 🎯 Notifier d'abord les livreurs prioritaires uniquement
+  // 🎯 Push uniquement aux livreurs prioritaires — les autres la voient dans leur fil
   const notificationResult = await notifierLivreursEligiblesV2(base44, course, { priorityOnly: true });
 
-  dispatchLog(`[V2] 📢 Course ${course.id} publiée dans le fil (disponible_push) — ${notificationResult.notified} livreur(s) prioritaire(s) notifié(s), 2e vague dans 60s`);
+  dispatchLog(`[V2] 📢 Course ${course.id} publiée dans le fil (disponible_push) — ${notificationResult.notified} livreur(s) prioritaire(s) notifié(s) par push`);
   return { success: true, published: true, ...notificationResult };
 }
 

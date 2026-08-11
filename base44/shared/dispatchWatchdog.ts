@@ -8,7 +8,7 @@ import { journaliserDispatch } from './dispatchUtils.ts';
 import { getLivreursNotifies } from './dispatchNotifications.ts';
 import { lancerDispatchMulti } from './dispatchEngine.ts';
 import { chargerConfigDispatch, chargerConfigVaguesGPS, CYCLE_EPUISE_TIMEOUT_MS } from './dispatchConfig.ts';
-import { isV2Enabled, secoursDispatchV2, notifierResteLivreursV2 } from './dispatchV2.ts';
+import { isV2Enabled, secoursDispatchV2 } from './dispatchV2.ts';
 
 const WATCHDOG_GRACE_MS = 2 * 60 * 1000;        // 2 min de grâce pour les automations événementielles
 const PROPOSE_TIMEOUT_GRACE_MS = 5 * 60 * 1000; // 5 min de grâce après expiration du timeout
@@ -276,21 +276,6 @@ export async function runWatchdog(base44, body = {}) {
   const v2Enabled = await isV2Enabled(base44);
   if (v2Enabled) {
     const coursesFil = courses.filter(c => c.dispatch_status === 'disponible_push' && c.statut === 'recherche_livreur');
-
-    // ── V2 PRIORITÉ : 2e vague — notifier les livreurs non-prioritaires après 60s ──
-    for (const course of coursesFil) {
-      if (Number(course.dispatch_wave) !== 1) continue;
-      const nextWaveAt = course.dispatch_next_wave_at ? new Date(course.dispatch_next_wave_at).getTime() : 0;
-      if (nextWaveAt === 0 || now.getTime() < nextWaveAt) continue;
-
-      try {
-        const result = await notifierResteLivreursV2(base44, course);
-        corrections.push({ course_id: course.id, action: 'v2_2e_vague_non_prioritaires', ...result });
-      } catch (err) {
-        corrections.push({ course_id: course.id, action: 'v2_2e_vague_error', error: err.message });
-      }
-      await new Promise(r => setTimeout(r, 100));
-    }
 
     for (const course of coursesFil) {
       const secoursPhase = Number(course.dispatch_v2_secours_phase || 0);
