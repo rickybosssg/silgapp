@@ -1579,6 +1579,16 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                     Commission SILGAPP : {commission.toLocaleString()} {course.devise || "F"}
                   </p>
                 )}
+                <button
+                  className="w-full h-12 rounded-2xl bg-gradient-to-b from-primary to-green-700 text-white font-black text-sm shadow-lg shadow-green-200 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                  onClick={() => {
+                    onColisLivre({ ...course, statut: "livree" }, null);
+                    navigateToRecap({ statut: "livree", heure_livraison: course.heure_livraison || new Date().toISOString() });
+                  }}
+                >
+                  <Check className="w-5 h-5" />
+                  Terminer
+                </button>
               </div>
             );
           })()}
