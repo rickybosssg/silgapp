@@ -65,22 +65,33 @@ async function notifierLivreursEligiblesV2(base44: any, course: any, options: an
     candidats = candidats.filter((l: any) => Number(l.priorite_dispatch || 0) > 0);
   }
 
-  await Promise.allSettled(candidats.map(async (livreur: any) => {
-    await enregistrerNotification(base44, course.id, livreur, 0, { country_code: course.country_code });
-    await base44.asServiceRole.functions.invoke('envoiNotificationPush', {
-      destinataire_email: livreur.user_email,
-      livreur_id: livreur.id,
+  // Enregistrer les DispatchNotifications (bulk) pour le suivi dispatch
+  await Promise.allSettled(
+    candidats.map((livreur: any) => enregistrerNotification(base44, course.id, livreur, 0, { country_code: course.country_code }))
+  );
+
+  // 📤 Envoi push batch : 1 seule invocation backend pour tous les livreurs prioritaires
+  if (candidats.length > 0) {
+    const batchResult = await base44.asServiceRole.functions.invoke('envoiNotificationPushBatch', {
+      course_id: course.id,
+      livreur_ids: candidats.map((l: any) => l.id),
       titre: 'Nouvelle course SILGAPP',
       message: `${course.quartier_depart || course.adresse_depart || 'Départ'} vers ${course.quartier_arrivee || course.adresse_arrivee || 'destination'}`,
       type: 'nouvelle_course',
-      course_id: course.id,
       alert_duration_seconds: 5,
       alert_interval_seconds: 5,
       dispatch_version: '2',
+    }).catch((err: any) => {
+      dispatchLog(`[V2] ⚠️ Batch push error (T=0): ${err?.message}`);
+      return null;
     });
-  }));
 
-  return { notified: candidats.length };
+    const sent = batchResult?.succes || 0;
+    dispatchLog(`[V2] 📢 Batch push T=0: ${sent} token(s) envoyé(s) pour ${candidats.length} livreur(s) prioritaire(s)`);
+    return { notified: candidats.length, push_sent: sent, push_failed: batchResult?.echecs || 0 };
+  }
+
+  return { notified: 0 };
 }
 
 // ── Pilote par livreur (cache TTL 60s) ──
@@ -415,19 +426,25 @@ export async function secoursDispatchV2(base44: any, course: any, nbLivreurs: nu
     .sort((a: any, b: any) => b.score - a.score)
     .slice(0, nbLivreurs);
 
-  // 5. Push ciblé (pas à tous)
-  for (const l of candidats) {
-    base44.asServiceRole.functions.invoke('envoiNotificationPush', {
-      destinataire_email: l.user_email,
-      livreur_id: l.id,
+  // 5. Push batch ciblé : 1 seule invocation backend pour tous les candidats sélectionnés
+  if (candidats.length > 0) {
+    const batchResult = await base44.asServiceRole.functions.invoke('envoiNotificationPushBatch', {
+      course_id: course.id,
+      livreur_ids: candidats.map((l: any) => l.id),
       titre: '📦 Course disponible près de vous',
       message: `${course.quartier_depart || course.adresse_depart || ''} → ${course.quartier_arrivee || course.adresse_arrivee || '?'}`,
       type: 'nouvelle_course',
-      course_id: course.id,
-    }).catch(() => {});
-  }
+      dispatch_version: '2',
+    }).catch((err: any) => {
+      dispatchLog(`[V2] ⚠️ Batch push secours error: ${err?.message}`);
+      return null;
+    });
 
-  dispatchLog(`[V2] 🚨 Secours: ${candidats.length} livreur(s) notifié(s) pour course ${course.id} (top ${nbLivreurs})`);
+    const sent = batchResult?.succes || 0;
+    dispatchLog(`[V2] 🚨 Secours batch: ${sent} token(s) envoyé(s) pour ${candidats.length} livreur(s) - course ${course.id} (top ${nbLivreurs})`);
+  } else {
+    dispatchLog(`[V2] 🚨 Secours: 0 candidat pour course ${course.id} (top ${nbLivreurs})`);
+  }
 
   journaliserDispatch(base44, {
     course_id: course.id,
