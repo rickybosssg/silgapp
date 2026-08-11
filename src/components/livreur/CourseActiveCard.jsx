@@ -523,10 +523,10 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
 
       {/* Modal annulation livreur (unifié colis + déplacement) */}
       {showAnnulerCourse && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
           style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)" }}
         >
-          <div className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl space-y-5">
+          <div className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
             <div className="text-center">
               <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-3 text-3xl">
 
