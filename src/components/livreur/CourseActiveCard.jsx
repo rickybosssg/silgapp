@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { MapPin, Phone, Navigation, Package, Check, X, AlertTriangle, ChevronRight, QrCode, Clock, Ruler } from "lucide-react";
 import MultiColisProgressBadge from "@/components/multi-colis/MultiColisProgressBadge";
 import MultiColisLivreurView from "@/components/multi-colis/MultiColisLivreurView";
@@ -163,6 +163,8 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   const [motifAnnulationDetail, setMotifAnnulationDetail] = useState("");
   // Messagerie d'explication apres annulation
   const [showAnnulationChat, setShowAnnulationChat] = useState(false);
+  // Ref du modal d'annulation pour scroll auto vers les boutons (iOS keyboard fix)
+  const annulationModalRef = useRef(null);
 
   // ── Pré-remplir le prix avec la proposition admin si disponible ──
   useEffect(() => {
@@ -526,7 +528,11 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
           style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)" }}
         >
-          <div className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
+          <div
+            ref={(el) => { annulationModalRef.current = el; }}
+            className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl space-y-5 overflow-y-auto"
+            style={{ maxHeight: '90dvh' }}
+          >
             <div className="text-center">
               <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-3 text-3xl">
 
@@ -574,6 +580,13 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                   placeholder="Expliquez ce qui s'est passé..."
                   value={motifAnnulationDetail}
                   onChange={(e) => setMotifAnnulationDetail(e.target.value)}
+                  onFocus={() => {
+                    // iOS : scroller vers les boutons quand le clavier s'ouvre
+                    setTimeout(() => {
+                      const modal = annulationModalRef.current;
+                      if (modal) modal.scrollTo({ top: modal.scrollHeight, behavior: 'smooth' });
+                    }, 300);
+                  }}
                   className="w-full h-20 rounded-xl border-2 border-gray-200 p-3 text-sm resize-none focus:border-red-400 focus:outline-none"
                 />
               </div>
