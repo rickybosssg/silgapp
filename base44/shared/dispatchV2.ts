@@ -60,6 +60,10 @@ async function notifierLivreursEligiblesV2(base44: any, course: any, options: an
   const exclus = new Set([...(dejaNotifies || []), ...(refuses || [])]);
   let candidats = (livreurs || []).filter((livreur: any) => livreur.user_email && !exclus.has(livreur.id));
 
+  // 🚫 Exclure les livreurs déjà en course (même définition que aCourseActive)
+  const livreursEnCourse = await getLivreursEnCourse(base44, course.country_code);
+  candidats = candidats.filter((l: any) => !livreursEnCourse.has(l.id));
+
   // 🎯 Priorité : si priorityOnly=true, ne notifier que les livreurs prioritaires (priorite_dispatch > 0)
   if (priorityOnly) {
     candidats = candidats.filter((l: any) => Number(l.priorite_dispatch || 0) > 0);
@@ -92,6 +96,29 @@ async function notifierLivreursEligiblesV2(base44: any, course: any, options: an
   }
 
   return { notified: 0 };
+}
+
+// ── Helper : liste des livreurs en course (même définition que aCourseActive) ──
+async function getLivreursEnCourse(base44: any, countryCode: string): Promise<Set<string>> {
+  if (!countryCode) return new Set();
+  const [courses, coursesAccepted] = await Promise.all([
+    base44.asServiceRole.entities.CourseExterne.filter(
+      { country_code: countryCode, livreur_id: { $ne: null } }, '-created_date', 200
+    ).catch(() => []),
+    base44.asServiceRole.entities.CourseExterne.filter(
+      { country_code: countryCode, accepted_by_livreur_id: { $ne: null } }, '-created_date', 200
+    ).catch(() => []),
+  ]);
+  const ids = new Set<string>();
+  for (const c of [...(courses || []), ...(coursesAccepted || [])]) {
+    if (c.livreur_id && (STATUTS_ACTIFS_COURSE.includes(c.statut) || (c.dispatch_status === 'accepte' && !STATUTS_TERMINAUX_COURSE.includes(c.statut)))) {
+      ids.add(c.livreur_id);
+    }
+    if (c.accepted_by_livreur_id && (STATUTS_ACTIFS_COURSE.includes(c.statut) || (c.dispatch_status === 'accepte' && !STATUTS_TERMINAUX_COURSE.includes(c.statut)))) {
+      ids.add(c.accepted_by_livreur_id);
+    }
+  }
+  return ids;
 }
 
 // ── Pilote par livreur (cache TTL 60s) ──
