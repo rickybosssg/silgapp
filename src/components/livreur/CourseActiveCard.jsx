@@ -442,8 +442,8 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
         source: "livreur",
       });
 
-      if (res?.data?.success) {
-        toast.success(res.data.course_redispatch
+      if (res?.success) {
+        toast.success(res.course_redispatch
           ? "Course remise en dispatch — nouveau livreur recherché"
           : "Course annulée");
         // Libérer le livreur localement
@@ -451,7 +451,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
         // 💬 Ouvrir la messagerie d'explication vers l'admin
         setShowAnnulationChat(true);
       } else {
-        toast.error(res?.data?.error || "Erreur lors de l'annulation");
+        toast.error(res?.error || "Erreur lors de l'annulation");
         setOptimisticStatut(null);
       }
     } catch (error) {
