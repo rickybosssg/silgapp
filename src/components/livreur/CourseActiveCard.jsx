@@ -860,16 +860,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                 heure_contact_client: now,
               }).catch(() => null);
               queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
-              toast.success("Client contacté. Démarrage automatique dans 60s…");
-              // Étape 2 : En route vers l'expéditeur (automatique après 60s)
-              setTimeout(() => {
-                updateOptimisticStatut("en_route_expediteur", {});
-                base44.entities.CourseExterne.update(course.id, {
-                  statut: "en_route_expediteur",
-                }).catch(() => null);
-                queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
-                toast.success("En route vers l'expéditeur !");
-              }, 60000);
+              toast.success("Client contacté. N'oubliez pas de démarrer votre trajet.");
             };
 
             const handleWhatsApp = () => {
