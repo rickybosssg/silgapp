@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
 
 /**
  * Vérifie l'encours d'un livreur après chaque course terminée.
@@ -157,7 +157,7 @@ Deno.serve(async (req) => {
           lue: false,
         });
         try {
-          await base44.functions.invoke('envoiNotificationPush', {
+          await base44.asServiceRole.functions.invoke('envoiNotificationPush', {
             destinataire_email: livreur.user_email,
             livreur_id: livreurId,
             titre: ' Compte bloqué',
@@ -201,7 +201,7 @@ Deno.serve(async (req) => {
             lue: false,
           });
           try {
-            await base44.functions.invoke('envoiNotificationPush', {
+            await base44.asServiceRole.functions.invoke('envoiNotificationPush', {
               destinataire_email: livreur.user_email,
               livreur_id: livreurId,
               titre: ' Alerte encours',
@@ -466,7 +466,7 @@ async function notifierAdmins(base44, countryCode, titre, message) {
         destinataire_email: admin.email, lue: false,
       });
       try {
-        await base44.functions.invoke('envoiNotificationPush', {
+        await base44.asServiceRole.functions.invoke('envoiNotificationPush', {
           destinataire_email: admin.email,
           titre, message, type: 'generic',
         });
