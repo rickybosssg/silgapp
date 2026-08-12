@@ -72,6 +72,32 @@ Deno.serve(async (req) => {
       }
     }
 
+    // 🔔 Rappel push : si statut = client_contacte depuis +60s, rappeler au livreur de démarrer
+    const shouldRappelDemarrage = statut === "client_contacte" && livreurId && old_data?.statut !== "client_contacte";
+    if (shouldRappelDemarrage) {
+      console.log(`[syncStatutLivreur] ⏳ Attente 60s avant rappel démarrage (course ${course.id})`);
+      await new Promise(resolve => setTimeout(resolve, 60000));
+      try {
+        const current = await base44.asServiceRole.entities.CourseExterne.get(course.id);
+        if (current && current.statut === "client_contacte" && current.livreur_id) {
+          const livreur = await base44.asServiceRole.entities.Livreur.get(current.livreur_id).catch(() => null);
+          if (livreur?.user_email) {
+            base44.asServiceRole.functions.invoke('envoiNotificationPush', {
+              destinataire_email: livreur.user_email,
+              livreur_id: livreur.id,
+              titre: '🚗 Démarrez votre trajet',
+              message: 'Vous avez contacté le client. N\'oubliez pas de démarrer votre trajet vers l\'expéditeur.',
+              type: 'rappel_demarrage',
+              course_id: course.id,
+            }).catch(err => console.error('[syncStatutLivreur] ❌ Rappel push error:', err.message));
+            console.log(`[syncStatutLivreur] ✅ Rappel démarrage envoyé au livreur ${livreur.id} (course ${course.id})`);
+          }
+        }
+      } catch (err) {
+        console.error(`[syncStatutLivreur] ❌ Rappel démarrage error:`, err.message);
+      }
+    }
+
     // Cas 1 : Course passée à un statut terminal (annulée ou livrée)
     if (STATUTS_TERMINAUX.includes(statut) && livreurId) {
       // ADMIN_MANUEL sans prix_final : ne PAS libérer le livreur
