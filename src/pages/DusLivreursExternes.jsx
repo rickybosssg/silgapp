@@ -91,6 +91,12 @@ function DetailModal({ entry, livreurInfo, onClose, onPaiement, onBloquer, onDeb
                 <p className="text-xs text-gray-500">Déjà payé</p>
                 <p className="font-bold text-green-600">{entry.montantPaye.toLocaleString()} F</p>
               </div>
+              {entry.montantDu < 0 && (
+                <div className="bg-blue-50 rounded-xl p-3 col-span-2">
+                  <p className="text-xs text-blue-600">Surplus (à rembourser)</p>
+                  <p className="font-bold text-blue-700">{Math.abs(entry.montantDu).toLocaleString()} F</p>
+                </div>
+              )}
             </div>
           )}
 
@@ -620,7 +626,10 @@ export default function DusLivreursExternes() {
                       <span className="text-gray-400">Commission générée :</span>
                       <span className="font-bold text-green-600">{(entry.commissionTotal || 0).toLocaleString()} F</span>
                       {entry.courses.length > 0 && <span className="text-gray-400">· {entry.courses.length} course(s)</span>}
-                      {entry.nbCoursesJour > 0 && (
+                      {entry.montantDu < 0 && (
+                        <span className="text-blue-600 font-bold ml-auto">Surplus : {Math.abs(entry.montantDu).toLocaleString()} F</span>
+                      )}
+                      {entry.nbCoursesJour > 0 && entry.montantDu >= 0 && (
                         <span className="text-gray-300 ml-auto">Aujourd'hui : {(entry.commissionJour || 0).toLocaleString()} F</span>
                       )}
                     </div>
