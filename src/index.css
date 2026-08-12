@@ -229,6 +229,29 @@
   .force-light textarea::placeholder {
     color: #64748b;
   }
+  /* ── Contraste global : texte foncé sur fonds clairs ── */
+  /* text-foreground et text-card-foreground = blanc en :root (thème sombre)
+     Sur fonds clairs, forcer en sombre pour la lisibilité (WCAG AA) */
+  .bg-white, .bg-gray-50, .bg-gray-100, .bg-slate-50, .bg-slate-100,
+  .bg-green-50, .bg-red-50, .bg-blue-50, .bg-amber-50, .bg-orange-50,
+  .bg-purple-50, .bg-sky-50, .bg-violet-50, .bg-rose-50 {
+    color: #1f2937;
+  }
+  .bg-white .text-foreground, .bg-gray-50 .text-foreground, .bg-gray-100 .text-foreground,
+  .bg-slate-50 .text-foreground, .bg-slate-100 .text-foreground,
+  .bg-green-50 .text-foreground, .bg-red-50 .text-foreground, .bg-blue-50 .text-foreground,
+  .bg-amber-50 .text-foreground, .bg-orange-50 .text-foreground,
+  .bg-white .text-card-foreground, .bg-gray-50 .text-card-foreground, .bg-gray-100 .text-card-foreground,
+  .bg-slate-50 .text-card-foreground, .bg-slate-100 .text-card-foreground {
+    color: #1f2937 !important;
+  }
+  /* Boutons outline/ghost sur fonds clairs : texte foncé */
+  .bg-white button.border, .bg-gray-50 button.border, .bg-gray-100 button.border,
+  .bg-slate-50 button.border, .bg-slate-100 button.border,
+  .bg-white button[class*="border-input"], .bg-gray-50 button[class*="border-input"] {
+    color: #374151 !important;
+  }
+
   /* ── Cartes (bg-card) en blanc à l'intérieur de force-light ── */
   .force-light .bg-card {
     background-color: rgb(255 255 255) !important;
