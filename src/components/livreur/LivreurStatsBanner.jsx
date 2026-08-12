@@ -49,7 +49,7 @@ export default function LivreurStatsBanner({ mesCourses, totalEncaisse, montantD
           {[
             { icon: <Package className="w-4 h-4 text-[#007aff]" />, bg: "bg-blue-50", val: coursesAujourdHui, label: "Courses", valClass: "text-[#007aff]" },
             { icon: <CheckCircle className="w-4 h-4 text-[#00a86b]" />, bg: "bg-green-500/10", val: livreesToday.length,    label: "Livrées",   valClass: "text-[#00a86b]" },
-            { icon: <AlertCircle className="w-4 h-4 text-orange-400" />, bg: "bg-orange-500/10", val: null, label: "Dû SILGAPP", valClass: "text-orange-400" },
+            { icon: montantDuSilga < 0 ? <CheckCircle className="w-4 h-4 text-green-500" /> : <AlertCircle className="w-4 h-4 text-orange-400" />, bg: montantDuSilga < 0 ? "bg-green-500/10" : "bg-orange-500/10", val: null, label: montantDuSilga < 0 ? "Surplus" : "Dû SILGAPP", valClass: montantDuSilga < 0 ? "text-green-500" : "text-orange-400" },
           ].map((item, i) => (
             <div key={i} className="bg-white rounded-3xl p-3.5 shadow-[0_8px_24px_rgba(15,23,42,0.06)] border border-black/5 text-center">
               <div className={`w-9 h-9 rounded-2xl ${item.bg} flex items-center justify-center mx-auto mb-1.5`}>
@@ -59,7 +59,7 @@ export default function LivreurStatsBanner({ mesCourses, totalEncaisse, montantD
                 <p className={`text-2xl font-black ${item.valClass}`}>{item.val}</p>
               ) : (
                 <p className={`text-xs font-black ${item.valClass} leading-tight`}>
-                  {montantDuSilga > 0 ? `${montantDuSilga.toLocaleString()}` : "0"}<span className="text-[9px] ml-0.5">F</span>
+                  {montantDuSilga !== 0 ? `${Math.abs(montantDuSilga).toLocaleString()}` : "0"}<span className="text-[9px] ml-0.5">F</span>
                 </p>
               )}
               <p className="text-[10px] text-slate-500 font-medium mt-0.5">{item.label}</p>

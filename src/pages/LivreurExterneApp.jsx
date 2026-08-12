@@ -1560,18 +1560,22 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
             <Link to="/payer-silgapp">
               <div className={`rounded-2xl border p-3.5 flex items-center justify-between shadow-sm active:scale-[0.98] transition ${
-                montantDuSilga > 0 ? "bg-orange-50 border-orange-200" : "bg-white border-black/5"
+                montantDuSilga > 0 ? "bg-orange-50 border-orange-200" : montantDuSilga < 0 ? "bg-green-50 border-green-200" : "bg-white border-black/5"
               }`}>
                 <div className="flex items-center gap-3">
                   <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
-                    montantDuSilga > 0 ? "bg-orange-500/15" : "bg-white/5"
+                    montantDuSilga > 0 ? "bg-orange-500/15" : montantDuSilga < 0 ? "bg-green-500/15" : "bg-white/5"
                   }`}>
-                    <Wallet className={`w-5 h-5 ${montantDuSilga > 0 ? "text-orange-400" : "text-[#00a86b]"}`} />
+                    <Wallet className={`w-5 h-5 ${montantDuSilga > 0 ? "text-orange-400" : montantDuSilga < 0 ? "text-green-500" : "text-[#00a86b]"}`} />
                   </div>
                   <div>
                     <p className="text-sm font-bold text-slate-900">Payer SILGAPP</p>
                     <p className="text-xs text-slate-500">
-                      {montantDuSilga > 0 ? `Total dû : ${montantDuSilga.toLocaleString()} FCFA` : "Aucun dû pour le moment"}
+                      {montantDuSilga > 0
+                        ? `Total dû : ${montantDuSilga.toLocaleString()} FCFA`
+                        : montantDuSilga < 0
+                        ? `Surplus à rembourser : ${Math.abs(montantDuSilga).toLocaleString()} FCFA`
+                        : "Aucun dû pour le moment"}
                     </p>
                   </div>
                 </div>
