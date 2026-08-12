@@ -399,7 +399,13 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   };
 
   // ── Workflow administratif : « Client contacté » puis « En route vers l'expéditeur » ──
+  // ⚠️ Garde anti race-condition : ne pas mettre à jour si la course a été annulée
+  //    ou si le livreur_id a été effacé (annulation concurrente).
   const handleClientContacte = async () => {
+    if (course.statut === "en_attente" || course.statut === "annulee" || !course.livreur_id) {
+      toast.error("Cette course n'est plus assignée.");
+      return;
+    }
     const now = new Date().toISOString();
     updateOptimisticStatut("client_contacte", { heure_contact_client: now });
     await base44.entities.CourseExterne.update(course.id, {
@@ -411,6 +417,10 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   };
 
   const handleDemarrerTrajet = async () => {
+    if (course.statut === "en_attente" || course.statut === "annulee" || !course.livreur_id) {
+      toast.error("Cette course n'est plus assignée.");
+      return;
+    }
     updateOptimisticStatut("en_route_expediteur", {});
     await base44.entities.CourseExterne.update(course.id, {
       statut: "en_route_expediteur",
