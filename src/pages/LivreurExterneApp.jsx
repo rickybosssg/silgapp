@@ -560,7 +560,11 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
     const checkCourseProposee = async () => {
       try {
-        const allCourses = await base44.entities.CourseExterne.list("-created_date", 50);
+        if (!livreurProfil?.country_code) return;
+        const allCourses = await base44.entities.CourseExterne.filter(
+          { country_code: livreurProfil.country_code },
+          "-created_date", 50
+        );
         if (cancelled) return;
 
         // ── Récupérer les notifications actives du livreur depuis DispatchNotification ──
@@ -600,7 +604,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     };
 
     checkCourseProposee();
-    const interval = setInterval(checkCourseProposee, 2000);
+    const interval = setInterval(checkCourseProposee, 5000);
     return () => {
       cancelled = true;
       clearInterval(interval);

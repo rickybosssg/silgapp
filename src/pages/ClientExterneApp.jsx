@@ -105,6 +105,8 @@ export default function ClientExterneApp() {
   const prevHadRecherche = useRef(false);
 
   const [userId, setUserId] = useState(null);
+  const userIdRef = useRef(null);
+  useEffect(() => { userIdRef.current = userId; }, [userId]);
   const queryClient = useQueryClient();
   const clientProfilRef = useRef(null);
   useEffect(() => { clientProfilRef.current = clientProfil; }, [clientProfil]);
@@ -604,7 +606,6 @@ export default function ClientExterneApp() {
   const syncGpsDestinataire = async (pos, profil) => {
     try {
       if (!pos?.latitude || !pos?.longitude || !profil?.id) return;
-      const user = await base44.auth.me();
 
       // Normaliser le téléphone UNE FOIS
       const phoneNorm = profil.telephone ? profil.telephone.replace(/\D/g, "") : null;
@@ -710,10 +711,11 @@ export default function ClientExterneApp() {
 
   const checkStatus = async (pos, profil) => {
     try {
-      const user = await base44.auth.me();
+      const currentUserId = userIdRef.current;
+      if (!currentUserId) return;
 
       // 1. Courses créées par l'utilisateur
-      const coursesClient = await base44.entities.CourseExterne.filter({ created_by_id: user.id }, "-created_date", 20);
+      const coursesClient = await base44.entities.CourseExterne.filter({ created_by_id: currentUserId }, "-created_date", 20);
       const actives = (coursesClient || []).filter(c => !["livree", "annulee"].includes(c.statut));
 
       // 2. Courses où l'utilisateur est destinataire
@@ -722,7 +724,7 @@ export default function ClientExterneApp() {
         const coursesDestinataire = await base44.entities.CourseExterne.filter({ destinataire_client_id: profil.id }, "-created_date", 20);
         activesDestinataire = (coursesDestinataire || []).filter(c =>
           !["livree", "annulee"].includes(c.statut) &&
-          c.created_by_id !== user.id
+          c.created_by_id !== currentUserId
         );
       }
 
@@ -732,7 +734,7 @@ export default function ClientExterneApp() {
         const coursesExpediteur = await base44.entities.CourseExterne.filter({ expediteur_client_id: profil.id }, "-created_date", 20);
         activesExpediteur = (coursesExpediteur || []).filter(c =>
           !["livree", "annulee"].includes(c.statut) &&
-          c.created_by_id !== user.id && // ne pas dupliquer
+          c.created_by_id !== currentUserId && // ne pas dupliquer
           c.type_course === "recevoir" // seulement mode recevoir
         );
       }
@@ -744,7 +746,9 @@ export default function ClientExterneApp() {
       setCoursesActives(toutes);
 
       // Nettoyer les notifications obsolètes (courses supprimées ou terminées)
-      const userNotifications = await base44.entities.Notification.filter({ destinataire_email: user.email, lue: false });
+      const currentUserEmail = clientProfil?.user_email;
+      if (!currentUserEmail) return;
+      const userNotifications = await base44.entities.Notification.filter({ destinataire_email: currentUserEmail, lue: false });
       if (userNotifications && userNotifications.length > 0) {
         const validCourseIds = new Map(toutes.map(c => [c.id, true]));
         const notificationsValides = userNotifications.filter(n =>
