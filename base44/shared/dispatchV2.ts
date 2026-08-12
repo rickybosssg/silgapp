@@ -10,7 +10,8 @@
 // Fonctionnement validé (à conserver) :
 //   1. Course publiée dans le fil « Disponibles » (dispatch_status = disponible_push).
 //   2. Tous les livreurs éligibles et libres voient la course, prioritaires ou non.
-//   3. À T=0, seuls les prioritaires libres (priorite_dispatch > 0) reçoivent le push.
+//   3. À T=0, les prioritaires (priorite_dispatch > 0) reçoivent le push en premier,
+//      puis tous les non-prioritaires éligibles reçoivent également un push.
 //   4. Notifications envoyées via envoiNotificationPushBatch (1 appel pour N livreurs).
 //   5. Un non-prioritaire peut accepter immédiatement une course visible dans son fil.
 //   6. Un livreur en course ne reçoit pas le push et ne peut pas accepter une 2e course.
@@ -192,11 +193,19 @@ export async function publierCourseDansFil(base44: any, course: any) {
     accepted_by_livreur_id: '',
   });
 
-  // 🎯 Push uniquement aux livreurs prioritaires — les autres la voient dans leur fil
-  const notificationResult = await notifierLivreursEligiblesV2(base44, course, { priorityOnly: true });
+  // 🎯 Push aux livreurs prioritaires EN PREMIER
+  const priorityResult = await notifierLivreursEligiblesV2(base44, course, { priorityOnly: true });
 
-  dispatchLog(`[V2] 📢 Course ${course.id} publiée dans le fil (disponible_push) — ${notificationResult.notified} livreur(s) prioritaire(s) notifié(s) par push`);
-  return { success: true, published: true, ...notificationResult };
+  // 📢 Push à TOUS les autres livreurs éligibles non-prioritaires
+  // (skipAlreadyPublishedCheck = true car la 1re vague a déjà créé des DispatchNotifications)
+  const nonPriorityResult = await notifierLivreursEligiblesV2(base44, course, {
+    priorityOnly: false,
+    skipAlreadyPublishedCheck: true,
+  });
+
+  const totalNotified = (priorityResult.notified || 0) + (nonPriorityResult.notified || 0);
+  dispatchLog(`[V2] 📢 Course ${course.id} publiée dans le fil (disponible_push) — ${priorityResult.notified} prioritaire(s) + ${nonPriorityResult.notified} non-prioritaire(s) = ${totalNotified} notifié(s) par push`);
+  return { success: true, published: true, priority: priorityResult, non_priority: nonPriorityResult };
 }
 
 // ── Vérifier si un livreur a une course active (3 niveaux) ──
