@@ -108,6 +108,10 @@ export default function ClientExterneApp() {
   const queryClient = useQueryClient();
   const clientProfilRef = useRef(null);
   useEffect(() => { clientProfilRef.current = clientProfil; }, [clientProfil]);
+  const positionRef = useRef(null);
+  useEffect(() => { positionRef.current = position; }, [position]);
+  const checkStatusRef = useRef(null);
+  useEffect(() => { checkStatusRef.current = checkStatus; });
   const canShowCodePromo = aUnCodePromo && !!(clientProfil?.user_email || clientProfil?.email);
 
   useEffect(() => {
@@ -553,6 +557,20 @@ export default function ClientExterneApp() {
     }, 8000); //  5s → 8s : checkStatus fait 4-5 requêtes imbriquées
     return () => clearInterval(interval);
   }, [onboardingDone, clientProfil?.id, position]);
+
+  // ── Subscription WebSocket temps réel — met à jour les courses instantanément ──
+  // Complète le polling 8s : si un livreur accepte/annule, le client le voit immédiatement
+  useEffect(() => {
+    if (!clientProfil?.id) return;
+    const unsubscribe = base44.entities.CourseExterne.subscribe((event) => {
+      const profil = clientProfilRef.current;
+      const pos = positionRef.current;
+      if (profil && pos) {
+        checkStatusRef.current?.(pos, profil);
+      }
+    });
+    return unsubscribe;
+  }, [clientProfil?.id]);
 
   // Forcer une sync GPS manuelle — EXACTEMENT comme les livreurs
   const handleForceGPSSync = () => {

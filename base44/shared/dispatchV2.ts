@@ -341,6 +341,15 @@ export async function accepterCourseV2(base44: any, courseId: string, livreurId:
 
   if (!isMyCourse) {
     dispatchLog(`[V2] 🏁 Race condition perdue — livreur ${livreurId} n'a pas obtenu la course ${courseId}`);
+    journaliserDispatch(base44, {
+      course_id: courseId,
+      country_code: course.country_code,
+      vague: 0,
+      evenement: 'race_condition_perdue',
+      livreur_acceptant_id: livreurId,
+      livreur_acceptant_nom: `${livreur.prenom || ''} ${livreur.nom || ''}`.trim(),
+      raison_passage: `Perdu par ${livreurId} — gagnant: ${courseVerifie.livreur_id || courseVerifie.accepted_by_livreur_id || '?'}`,
+    });
     return reponseDejaPrise('race_condition_lost', courseVerifie);
   }
 
