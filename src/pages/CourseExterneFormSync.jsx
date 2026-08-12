@@ -538,32 +538,40 @@ export default function CourseExterneFormSync() {
       return;
     }
 
+    // ── Sécurité : remplir client_nom/client_telephone depuis clientFromDB si vide ──
+    // Arrive quand le form est ouvert sans location.state.clientProfil (ex: reload, deep link)
+    const dbClientName = clientFromDB ? [clientFromDB.prenom, clientFromDB.nom].filter(Boolean).join(' ').trim() : '';
+    const finalClientNom = formData.client_nom || dbClientName || '';
+    const finalClientTel = formData.client_telephone || clientFromDB?.telephone || '';
+    // contact_createur_course = numéro prioritaire que le livreur doit contacter
+    const contactCreateurCourse = finalClientTel || null;
+
     let expediteurNom, expediteurTel, expediteurClientId, expediteurPhoneNormalized;
     let destinataireNom, destinataireTel, destinataireClientId, destinatairePhoneNormalized;
 
     if (isExpedie) {
-      expediteurNom = formData.client_nom;
-      expediteurTel = formData.client_telephone;
+      expediteurNom = finalClientNom;
+      expediteurTel = finalClientTel;
       expediteurClientId = clientFromDB?.id || null;
-      expediteurPhoneNormalized = normalizePhone(formData.client_telephone, courseCountryCode);
+      expediteurPhoneNormalized = normalizePhone(finalClientTel, courseCountryCode);
       destinataireNom = formData.destinataire_nom;
       destinataireTel = formData.destinataire_telephone;
       destinataireClientId = formData.destinataire_client_id || null;
       destinatairePhoneNormalized = normalizePhone(formData.destinataire_telephone, courseCountryCode);
     } else if (isDeplacementValid) {
-      expediteurNom = formData.client_nom;
-      expediteurTel = formData.client_telephone;
+      expediteurNom = finalClientNom;
+      expediteurTel = finalClientTel;
       expediteurClientId = clientFromDB?.id || null;
-      expediteurPhoneNormalized = normalizePhone(formData.client_telephone, courseCountryCode);
-      destinataireNom = formData.passager_nom || formData.client_nom;
-      destinataireTel = formData.passager_telephone || formData.client_telephone;
+      expediteurPhoneNormalized = normalizePhone(finalClientTel, courseCountryCode);
+      destinataireNom = formData.passager_nom || finalClientNom;
+      destinataireTel = formData.passager_telephone || finalClientTel;
       destinataireClientId = null;
       destinatairePhoneNormalized = normalizePhone(destinataireTel, courseCountryCode);
     } else {
-      destinataireNom = formData.client_nom;
-      destinataireTel = formData.client_telephone;
+      destinataireNom = finalClientNom;
+      destinataireTel = finalClientTel;
       destinataireClientId = clientFromDB?.id || null;
-      destinatairePhoneNormalized = normalizePhone(formData.client_telephone, courseCountryCode);
+      destinatairePhoneNormalized = normalizePhone(finalClientTel, courseCountryCode);
       expediteurNom = formData.expediteur_nom;
       expediteurTel = formData.expediteur_telephone;
       expediteurClientId = formData.expediteur_client_id || null;
@@ -645,8 +653,9 @@ export default function CourseExterneFormSync() {
 
     createMutation.mutate({
       country_code: courseCountryCode,
-      client_nom: formData.client_nom,
-      client_telephone: formData.client_telephone,
+      client_nom: finalClientNom,
+      client_telephone: finalClientTel,
+      contact_createur_course: contactCreateurCourse,
       type_course: formData.type_course,
       expediteur_nom: expediteurNom || "Expéditeur",
       expediteur_telephone: expediteurTel,
