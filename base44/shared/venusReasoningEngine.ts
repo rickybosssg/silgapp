@@ -1190,6 +1190,43 @@ Réponds UNIQUEMENT avec un JSON.`;
       }
     }
     result.memoire_courte_update = llmUpdateFiltered;
+
+    // ── ANTI-DEMANDE NUMÉRO: Le LLM ne doit JAMAIS demander le numéro de téléphone ──
+    // Le contact_createur_course est automatiquement le numéro WhatsApp du client.
+    // Si le LLM demande quand même le numéro, remplacer par une question appropriée
+    // ou créer la course si toutes les infos sont présentes.
+    if (result.action === 'poser_question' && result.reponse) {
+      const PHONE_REQUEST_PATTERNS = [
+        /votre\s+num[ée]ro\s+de\s+t[ée]l[ée]phone/i,
+        /me\s+confirmer\s+(votre\s+)?num[ée]ro/i,
+        /num[ée]ro\s+de\s+t[ée]l[ée]phone\s+.*(contact\s+principal|livraison|cr[ée]ateur)/i,
+        /pouvez[-\s]vous\s+me\s+(donner|confirmer)\s+votre\s+num[ée]ro/i,
+        /quel\s+est\s+votre\s+num[ée]ro/i,
+        /me\s+donner\s+votre\s+num[ée]ro/i,
+        /confirmer\s+.*(votre\s+)?num[ée]ro/i,
+      ];
+      const isPhoneRequest = PHONE_REQUEST_PATTERNS.some(p => p.test(result.reponse));
+      if (isPhoneRequest) {
+        console.warn('[ReasoningEngine] 🚫 LLM demande le numéro de téléphone — remplacement par question appropriée');
+        const umPhone = { ...mergedMemoireCourte, ...result.memoire_courte_update };
+        if (!umPhone.type_course) umPhone.type_course = 'expedier';
+        if (!umPhone.contact_createur_course || !umPhone.contact_createur_course.trim()) {
+          umPhone.contact_createur_course = input.telephone;
+        }
+        const _hasDepartPhone = !!(umPhone.adresse_depart && umPhone.adresse_depart.trim()) || umPhone.gps_depart_lat != null;
+        const _hasArriveePhone = !!(umPhone.adresse_arrivee && umPhone.adresse_arrivee.trim()) || umPhone.gps_arrivee_lat != null;
+        if (!_hasDepartPhone) {
+          result.reponse = 'Quel est le lieu exact de récupération ? (indiquez le quartier ou un point de repère précis)';
+        } else if (!_hasArriveePhone) {
+          result.reponse = 'Quel est le lieu exact de livraison ? (indiquez le quartier ou un point de repère précis)';
+        } else {
+          // Toutes les infos sont présentes → créer la course au lieu de demander le numéro
+          result.action = 'creer_course';
+          result.reponse = '';
+        }
+        result.memoire_courte_update = umPhone;
+      }
+    }
     // Fusionner infos_connues avec la mémoire existante
     result.infos_connues = { ...mergedMemoireCourte, ...(result.infos_connues || {}) };
 
