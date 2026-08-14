@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import { useAdminContext } from "@/hooks/useAdminContext.js";
 import { MessageSquareWarning } from "lucide-react";
 import AdminETABadge from "./AdminETABadge";
+import { getPrixAffichable } from "@/utils/getPrixAffichable";
 
 const STATUTS_INTERNE = [
   "nouvelle", "en_attente_livreur", "acceptee", "en_route_recuperation",
@@ -246,7 +247,7 @@ export default function CourseDetailDialog({ course: courseProp, open, onClose, 
             )}
             <CourseStatusBadge statut={course.statut} />
             {course.priority && course.priority !== "normal" && <UrgenceBadge urgence={course.priority} />}
-            {course.prix_final && <span className="text-sm font-bold">{course.prix_final.toLocaleString()} FCFA</span>}
+            {(() => { const p = getPrixAffichable(course); return p ? <span className="text-sm font-bold">{p.toLocaleString()} FCFA</span> : null; })()}
             {course.delivery_confirmed_by === 'pin_secours' && (
               <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold">🔑 PIN secours</span>
             )}

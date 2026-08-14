@@ -9,6 +9,7 @@ import { fr } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { base44 } from "@/api/base44Client";
 import { normalizeCommissionPct, splitAmountByCommission } from "@/lib/commissionUtils";
+import { getPrixAffichable } from "@/utils/getPrixAffichable";
 
 const periodFilters = [
   { value: "today", label: "Aujourd'hui" },
@@ -282,7 +283,7 @@ export default function LivreurHistorique({ mesCourses, livreurProfil, isExterne
                                 const dist = course.distance_reelle_km > 0 ? Number(course.distance_reelle_km) : 0;
                                 // CORRECTION PRIX MANUEL
                                 const isPrixManuel = course.pricing_mode === "manual" && course.manual_price_status === "accepted" && Number(course.manual_price) > 0;
-                                const prix = isPrixManuel ? Number(course.manual_price) : (course.prix_final > 0 ? Number(course.prix_final) : 0);
+                                const prix = getPrixAffichable(course) || 0;
                                 const gain = course.montant_livreur > 0 ? Number(course.montant_livreur) : 0;
                                 const commission = course.commission_silga > 0 ? Number(course.commission_silga) : 0;
                                 let dureeMin = null;

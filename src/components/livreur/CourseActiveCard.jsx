@@ -14,6 +14,7 @@ import NavigationGPS from "./NavigationGPS";
 import { normalizeCommissionPct, resolveStoredOrDynamicSplit, splitAmountByCommission } from "@/lib/commissionUtils";
 import ChatWindow from "@/components/chat/ChatWindow";
 import AnnulationExplicationChat from "./AnnulationExplicationChat";
+import { getPrixAffichable } from "@/utils/getPrixAffichable";
 
 const COUNTRY_DIAL_CODE = {
   BF: "226", CI: "225", TG: "228", BJ: "229", SN: "221",
@@ -978,7 +979,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
           {isExterne ? (
             (() => {
               const isPrixManuel = course.pricing_mode === "manual" && course.manual_price_status === "accepted" && Number(course.manual_price) > 0;
-              const prixBase = isPrixManuel ? Number(course.manual_price) : (course.prix_propose_admin || course.prix_estimate || 0);
+              const prixBase = getPrixAffichable(course);
               const split = splitAmountByCommission(prixBase, commissionPct);
               const gain = split.montant_livreur;
 

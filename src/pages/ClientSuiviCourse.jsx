@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, Package, CheckCircle2, Clock, Star, XCircle, ArrowLeft, Share2, Ruler, Banknote } from "lucide-react";
+import { getPrixAffichable } from "@/utils/getPrixAffichable";
 
 function haversineKm(lat1, lon1, lat2, lon2) {
   if (!lat1 || !lon1 || !lat2 || !lon2) return null;
@@ -658,27 +659,11 @@ export default function ClientSuiviCourse() {
               ? haversineKm(maCourse.gps_depart_lat, maCourse.gps_depart_lng, maCourse.gps_arrivee_lat, maCourse.gps_arrivee_lng)
               : null;
             const isFinal = isLivree && maCourse.prix_final > 0;
-            
-            // ✅ PRIX MANUEL ACCEPTÉ = prix officiel de la course
             const isPrixManuelAccepte = maCourse.pricing_mode === "manual" 
               && maCourse.manual_price_status === "accepted" 
               && maCourse.manual_price > 0;
-            
-            let prix = 0;
-            if (isPrixManuelAccepte) {
-              // Prix manuel accepté = source de vérité unique
-              prix = Math.max(Number(maCourse.manual_price), PRIX_MIN);
-            } else if (isFinal) {
-              prix = Math.max(maCourse.prix_final, PRIX_MIN);
-            } else if (distCourse != null && distCourse > 0) {
-              if (distCourse <= 10) {
-                prix = PRIX_MIN;
-              } else {
-                prix = Math.max(Math.round(distCourse * tarifKm), PRIX_MIN);
-              }
-            } else if (maCourse.prix_estimate > 0) {
-              prix = Math.max(maCourse.prix_estimate, PRIX_MIN);
-            }
+            const prixRaw = getPrixAffichable(maCourse);
+            const prix = prixRaw ? Math.max(prixRaw, PRIX_MIN) : 0;
 
             return (
               <div className={`grid grid-cols-3 gap-3 pt-3 mt-1 border-t ${isFinal ? "border-green-200" : "border-gray-200"}`}>
