@@ -7,7 +7,6 @@ import "leaflet/dist/leaflet.css";
 import CourseTimeline from "./CourseTimeline";
 import LivreurCardModerne from "./LivreurCardModerne";
 import { base44 } from "@/api/base44Client";
-import { useRouteORS } from "@/hooks/useRouteORS";
 import { useETACourse } from "@/hooks/useETACourse";
 
 delete L.Icon.Default.prototype._getIconUrl;
