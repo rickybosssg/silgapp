@@ -1,9 +1,10 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// 📌 WATCHDOG DISPATCH V2 — SECTION PROTÉGÉE (2026-08-11)
+// 📌 WATCHDOG DISPATCH V2 — RAPPEL T+5 MIN (2026-08-14)
 // ═══════════════════════════════════════════════════════════════════════════
-// ⚠️  Les phases de secours V2 ci-dessous (T+5min, T+10min, T+15min) font partie
-//     de la VERSION STABLE FIGÉE du Dispatch V2. Ne pas modifier sans validation
-//     explicite du responsable produit. Voir en-tête de base44/shared/dispatchV2.ts.
+// T=0   : 1 push batch à tous les livreurs éligibles et libres (publierCourseDansFil)
+// T+5min: si toujours disponible_push sans livreur → 1 push batch de rappel
+//         aux meilleurs livreurs encore éligibles et non en course.
+// Après acceptation : aucun push. Pas de T+20s, pas de cycle_epuise.
 // ═══════════════════════════════════════════════════════════════════════════
 
 // ── Watchdog de dispatch — détecte et corrige les anomalies de manière idempotente ──
@@ -277,31 +278,36 @@ export async function runWatchdog(base44, body = {}) {
     });
   }
 
-  // ═══ V2 SECOURS : courses en disponible_push sans acceptation ═══
-  // Phase 1 (5-10 min) : push top 3
-  // Phase 2 (10-15 min) : push top 5
-  // Phase 3 (>15 min) : cycle_epuise
+  // ═══ V2 SECOURS : rappel ciblé à T+5 min si la course n'est pas acceptée ═══
+  // T=0   : 1 push batch à tous les livreurs éligibles et libres (publierCourseDansFil)
+  // T+5min: si toujours disponible_push sans livreur → 1 push batch de rappel aux
+  //         meilleurs livreurs encore éligibles et non en course.
+  // Après acceptation : aucun push (la course n'est plus disponible_push).
+  // Pas de T+20s, pas de priorité temporelle, pas de cycle_epuise.
   const v2Enabled = await isV2Enabled(base44);
   if (v2Enabled) {
     const coursesFil = courses.filter(c => c.dispatch_status === 'disponible_push' && c.statut === 'recherche_livreur');
 
     for (const course of coursesFil) {
       const secoursPhase = Number(course.dispatch_v2_secours_phase || 0);
+      if (secoursPhase >= 1) continue; // Rappel déjà envoyé — ne pas re-notifier
+
+      // Garde : ne rien faire si la course a déjà un livreur (acceptation concurrente)
+      if (course.livreur_id || course.accepted_by_livreur_id) continue;
+
       const sollicitationMs = course.heure_sollicitation
         ? new Date(course.heure_sollicitation).getTime()
         : new Date(course.created_date).getTime();
       const ageMin = (now.getTime() - sollicitationMs) / 60000;
 
-      // 🔕 Secours T+5/T+10 DÉSACTIVÉ — simplification 2026-08-14
-      // Un seul push batch à T=0 suffit ; la course reste dans le fil indéfiniment.
-      if (ageMin >= 15 && secoursPhase < 3) {
-        // Phase 3 : V2 — garder en disponible_push (visible dans le fil indéfiniment)
-        // Ne PAS passer en cycle_epuise : en V2, la course reste visible par tous les
-        // livreurs éligibles jusqu'à assignation ou annulation manuelle.
+      if (ageMin >= 5) {
+        // T+5 min : envoyer un push batch de rappel aux meilleurs livreurs encore éligibles
+        // secoursDispatchV2 exclut déjà les livreurs en course, refusés et déjà notifiés.
+        const result = await secoursDispatchV2(base44, course, 10);
         await base44.asServiceRole.entities.CourseExterne.update(course.id, {
-          dispatch_v2_secours_phase: 3,
+          dispatch_v2_secours_phase: 1,
         });
-        corrections.push({ course_id: course.id, action: 'secours_v2_phase3_kept_push' });
+        corrections.push({ course_id: course.id, action: 'secours_v2_rappel_t5min', pushed: result.pushed });
       }
     }
   }

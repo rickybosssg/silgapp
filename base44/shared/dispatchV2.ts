@@ -36,7 +36,7 @@ import { dispatchLog, reponseDejaPrise, generateToken, generatePIN, journaliserD
 import { enregistrerNotification, getLivreursNotifies, getLivreursRefuses, marquerAccepte } from './dispatchNotifications.ts';
 
 // ── Version du bundle (pour vérifier que la production charge la dernière version) ──
-export const DISPATCH_V2_BUNDLE_VERSION = '2026-08-14-simplified-1';
+export const DISPATCH_V2_BUNDLE_VERSION = '2026-08-14-simplified-2';
 
 // ── Feature flag cache (TTL 2 min) ──
 let V2_FLAG_CACHE: { enabled: boolean; expires: number } | null = null;
