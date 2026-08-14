@@ -28,6 +28,7 @@ import CourseEnAttenteModalExterne from "@/components/livreur/CourseEnAttenteMod
 import CourseActiveCard from "@/components/livreur/CourseActiveCard";
 import LivreurHistorique from "@/components/livreur/LivreurHistorique";
 import LivreurExterneOnboarding from "@/components/livreur/LivreurExterneOnboarding";
+import NotificationStatusBanner from "@/components/livreur/NotificationStatusBanner";
 import LivreurMesInfosModal from "@/components/livreur/LivreurMesInfosModal";
 import VenusFloatingButton from "@/components/client/VenusFloatingButton";
 import AlertesLivreurModal from "@/components/livreur/AlertesLivreurModal";
@@ -1487,6 +1488,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
               onActiverGps={handleActiverGPS}
               onLogout={handleLogout}
             />
+
+            <NotificationStatusBanner livreurId={livreurProfil?.id} />
 
             {isEnLigne && !livreurVisible && (
               <div className="rounded-2xl bg-amber-500/10 border border-amber-500/20 px-4 py-3 flex items-center gap-3">

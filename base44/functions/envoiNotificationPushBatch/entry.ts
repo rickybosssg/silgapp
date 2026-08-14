@@ -35,11 +35,30 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Missing required fields: titre, message, livreur_ids[]' }, { status: 400 });
     }
 
-    // ── 1. Récupérer la course (pour country_code) ──
+    // ── 1. Récupérer la course (pour country_code + enrichissement push) ──
     let courseCountry = '';
+    let courseData: any = null;
     if (course_id) {
-      const course = await base44.asServiceRole.entities.CourseExterne.get(course_id).catch(() => null);
-      courseCountry = normalizeCountryCode(course?.country_code);
+      courseData = await base44.asServiceRole.entities.CourseExterne.get(course_id).catch(() => null);
+      courseCountry = normalizeCountryCode(courseData?.country_code);
+    }
+
+    // ── 1b. Enrichir le contenu du push avec les infos course ──
+    // Ajoute le prix et les quartiers au message si disponibles.
+    // Ne modifie PAS le dispatch V2 — c'est uniquement le contenu affiché.
+    let enrichedMessage = message;
+    let enrichedTitre = titre;
+    if (courseData && String(type || '') === 'nouvelle_course') {
+      const depart = courseData.quartier_depart || courseData.adresse_depart || 'Départ';
+      const arrivee = courseData.quartier_arrivee || courseData.adresse_arrivee || 'Destination';
+      const prix = courseData.prix_propose_admin || courseData.prix_estimate || courseData.prix_final;
+      const devise = courseData.devise || 'FCFA';
+      if (prix && Number(prix) > 0) {
+        enrichedMessage = `${depart} → ${arrivee} — ${Number(prix).toLocaleString()} ${devise}`;
+        enrichedTitre = 'Nouvelle course SILGAPP';
+      } else {
+        enrichedMessage = `${depart} → ${arrivee}`;
+      }
     }
 
     // ── 2. Récupérer tous les livreurs en une seule requête ──
@@ -106,9 +125,11 @@ Deno.serve(async (req) => {
 
     // ── 6. Créer les notifications en BDD (bulk) ──
     const notifType = String(type || 'nouvelle_course');
+    const finalTitre = enrichedTitre || titre;
+    const finalMessage = enrichedMessage || message;
     const notificationsToCreate = livreursEligibles.map((l: any) => ({
-      titre,
-      message,
+      titre: finalTitre,
+      message: finalMessage,
       type: notifType,
       course_id: course_id || '',
       destinataire_email: String(l.user_email || '').trim().toLowerCase(),
@@ -182,28 +203,28 @@ Deno.serve(async (req) => {
         let payload;
         if (isUrgentLivreurCourse && isAndroid) {
           payload = {
-            data: { ...dataPayload, title: String(titre), body: String(message) },
+            data: { ...dataPayload, title: String(finalTitre), body: String(finalMessage) },
             android: { collapse_key: notificationTag, priority: 'HIGH', ttl: `${Math.max(60, Number(alert_duration_seconds || 60) + 30)}s` },
           };
         } else if (isUrgentLivreurCourse && isIOS) {
           payload = {
-            notification: { title, body: message },
-            data: { ...dataPayload, title: String(titre), body: String(message) },
+            notification: { title: finalTitre, body: finalMessage },
+            data: { ...dataPayload, title: String(finalTitre), body: String(finalMessage) },
             apns: {
-              payload: { aps: { alert: { title, body: message }, sound: 'default', badge: 1, 'content-available': 1, 'mutable-content': 1, 'interruption-level': 'time-sensitive' }, ...dataPayload },
+              payload: { aps: { alert: { title: finalTitre, body: finalMessage }, sound: 'default', badge: 1, 'content-available': 1, 'mutable-content': 1, 'interruption-level': 'time-sensitive' }, ...dataPayload },
               headers: { 'apns-priority': '10', 'apns-collapse-id': notificationTag },
             },
           };
         } else {
           payload = {
-            notification: { title, body: message },
+            notification: { title: finalTitre, body: finalMessage },
             data: dataPayload,
             android: {
               collapse_key: notificationTag, priority: 'HIGH', ttl: '86400s',
               notification: { tag: notificationTag, channel_id: ANDROID_CHANNEL_ID, sound: 'default', visibility: 'PUBLIC', click_action: ANDROID_CLICK_ACTION, notification_priority: 'PRIORITY_HIGH' },
             },
             apns: {
-              payload: { aps: { alert: { title, body: message }, sound: 'default', badge: 1, 'content-available': 1, 'mutable-content': 1, 'interruption-level': 'time-sensitive' }, ...dataPayload },
+              payload: { aps: { alert: { title: finalTitre, body: finalMessage }, sound: 'default', badge: 1, 'content-available': 1, 'mutable-content': 1, 'interruption-level': 'time-sensitive' }, ...dataPayload },
               headers: { 'apns-priority': '10', 'apns-collapse-id': notificationTag },
             },
             webpush: { fcm_options: { link: APP_URL } },
@@ -219,7 +240,7 @@ Deno.serve(async (req) => {
             base44.asServiceRole.entities.NotificationToken.update(tokenItem.id, {
               actif: isInvalid ? false : tokenItem.actif,
               derniere_notif_statut: 'failed',
-              derniere_notif_titre: titre,
+              derniere_notif_titre: finalTitre,
               derniere_notif_date: nowIso,
               fcm_error: JSON.stringify(response.result?.error || {}).slice(0, 300),
             }).catch(() => null);
@@ -228,7 +249,7 @@ Deno.serve(async (req) => {
             base44.asServiceRole.entities.NotificationToken.update(tokenItem.id, {
               derniere_utilisation: nowIso,
               derniere_notif_statut: 'success',
-              derniere_notif_titre: titre,
+              derniere_notif_titre: finalTitre,
               derniere_notif_date: nowIso,
               fcm_error: null,
             }).catch(() => null);
