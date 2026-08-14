@@ -101,6 +101,12 @@ Deno.serve(async (req) => {
       }
 
       // ── V2 : publier dans le fil de courses disponibles ──
+      // RÈGLE MÉTIER (2026-08-14) :
+      //   T=0  : course visible dans le fil par tous les livreurs éligibles
+      //          + push UNIQUEMENT aux livreurs prioritaires (priorite_dispatch > 0)
+      //   T+20s: si la course est toujours libre, push aux non-prioritaires
+      //   Si acceptée avant 20s → aucun push non-prioritaire
+      // Le premier qui accepte gagne (prioritaire ou non), verrou atomique.
       const v2Enabled = await isV2Enabled(base44);
       if (v2Enabled) {
         const result = await publierCourseDansFil(base44, course);
