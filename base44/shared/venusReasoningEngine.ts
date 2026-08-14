@@ -410,7 +410,7 @@ export async function creerCourseDepuisMemoire(
     type_course: normalizedType,
     adresse_depart: cd.adresse_depart || 'Localisation GPS partagee',
     adresse_arrivee: cd.adresse_arrivee || 'Localisation GPS partagee',
-    prix_estimate: tarifs.minimum,
+    prix_estimate: Math.max(tarifs.minimum, 1500),
     devise: tarifs.devise,
     statut: 'recherche_livreur',
     dispatch_status: 'en_attente',
