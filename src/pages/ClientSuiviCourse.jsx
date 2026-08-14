@@ -573,6 +573,10 @@ export default function ClientSuiviCourse() {
                 livreurNom={maCourse.livreur_nom}
                 phase={isVersRecup ? "vers_recuperation" : "vers_livraison"}
                 statut={maCourse.statut}
+                gpsLastUpdate={maCourse._livreur?.derniere_position_date || maCourse._livreur?.last_seen_at}
+                courseId={maCourse.id}
+                countryCode={maCourse.country_code}
+                livreurId={maCourse.livreur_id}
               />
             );
           })()
@@ -597,7 +601,10 @@ export default function ClientSuiviCourse() {
                 livreurNom={maCourse.livreur_nom}
                 phase="vers_livraison"
                 statut={maCourse.statut}
-                gpsLastUpdate={destGpsLastUpdate}
+                gpsLastUpdate={maCourse._livreur?.derniere_position_date || maCourse._livreur?.last_seen_at || destGpsLastUpdate}
+                courseId={maCourse.id}
+                countryCode={maCourse.country_code}
+                livreurId={maCourse.livreur_id}
               />
             );
           })()
