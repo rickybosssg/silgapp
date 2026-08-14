@@ -35,6 +35,9 @@ import { STATUTS_ACTIFS_COURSE, STATUTS_TERMINAUX_COURSE, calculerDistance } fro
 import { dispatchLog, reponseDejaPrise, generateToken, generatePIN, journaliserDispatch } from './dispatchUtils.ts';
 import { enregistrerNotification, getLivreursNotifies, getLivreursRefuses, marquerAccepte } from './dispatchNotifications.ts';
 
+// ── Version du bundle (pour vérifier que la production charge la dernière version) ──
+export const DISPATCH_V2_BUNDLE_VERSION = '2026-08-14-redeploy-1';
+
 // ── Feature flag cache (TTL 2 min) ──
 let V2_FLAG_CACHE: { enabled: boolean; expires: number } | null = null;
 const V2_FLAG_TTL_MS = 2 * 60 * 1000;
@@ -181,6 +184,9 @@ export async function isPilotLivreur(base44: any, livreurId: string): Promise<bo
 // ciblé aux meilleurs non-prioritaires restants.
 export async function publierCourseDansFil(base44: any, course: any) {
   if (!course?.id) return { error: 'no_course_id' };
+
+  // 🔖 Log de version bundle — pour vérifier que la production charge la dernière version
+  dispatchLog(`[V2] 🔖 publierCourseDansFil — bundle version: ${DISPATCH_V2_BUNDLE_VERSION} — course ${course.id}`);
 
   // 🛡️ GARDE IDEMPOTENTE ATOMIQUE ANTI-CASCADE
   // Utilise updateMany conditionnel : ne met à jour QUE si dispatch_status n'est pas
