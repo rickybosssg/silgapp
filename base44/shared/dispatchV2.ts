@@ -30,6 +30,7 @@
 // V1 (vagues) reste intact et utilisé quand le flag est désactivé.
 // VERSION: 2026-08-11 — Version stable figée. Ne pas modifier sans validation.
 
+import { waitUntil } from 'base44:runtime';
 import { STATUTS_ACTIFS_COURSE, STATUTS_TERMINAUX_COURSE, calculerDistance } from './dispatchConstants.ts';
 import { dispatchLog, reponseDejaPrise, generateToken, generatePIN, journaliserDispatch } from './dispatchUtils.ts';
 import { enregistrerNotification, getLivreursNotifies, getLivreursRefuses, marquerAccepte } from './dispatchNotifications.ts';
@@ -193,19 +194,50 @@ export async function publierCourseDansFil(base44: any, course: any) {
     accepted_by_livreur_id: '',
   });
 
-  // 🎯 Push aux livreurs prioritaires EN PREMIER
+  // 🎯 T=0 : Push UNIQUEMENT aux livreurs prioritaires
+  // La course est visible dans le fil « Disponibles » pour tous les livreurs éligibles,
+  // mais seuls les prioritaires reçoivent un push immédiat. Les non-prioritaires
+  // peuvent accepter la course depuis le fil dès T=0, mais reçoivent un push à T+20s.
   const priorityResult = await notifierLivreursEligiblesV2(base44, course, { priorityOnly: true });
 
-  // 📢 Push à TOUS les autres livreurs éligibles non-prioritaires
-  // (skipAlreadyPublishedCheck = true car la 1re vague a déjà créé des DispatchNotifications)
-  const nonPriorityResult = await notifierLivreursEligiblesV2(base44, course, {
-    priorityOnly: false,
-    skipAlreadyPublishedCheck: true,
-  });
+  // 📢 T+20s : Push aux non-prioritaires via waitUntil (Worker survit 20s — validé en production)
+  // On relit la course avant l'envoi : si elle a été acceptée entre-temps, on n'envoie rien.
+  waitUntil((async () => {
+    try {
+      await new Promise(resolve => setTimeout(resolve, 20000));
 
-  const totalNotified = (priorityResult.notified || 0) + (nonPriorityResult.notified || 0);
-  dispatchLog(`[V2] 📢 Course ${course.id} publiée dans le fil (disponible_push) — ${priorityResult.notified} prioritaire(s) + ${nonPriorityResult.notified} non-prioritaire(s) = ${totalNotified} notifié(s) par push`);
-  return { success: true, published: true, priority: priorityResult, non_priority: nonPriorityResult };
+      // ── Relecture de la course depuis la DB ──
+      const courseAfter20s = await base44.asServiceRole.entities.CourseExterne.get(course.id);
+      if (!courseAfter20s) {
+        dispatchLog(`[V2] T+20s: Course ${course.id} introuvable — skip push non-prioritaire`);
+        return;
+      }
+
+      // ── Si la course n'est plus disponible_push ou a été acceptée, ne rien envoyer ──
+      if (courseAfter20s.dispatch_status !== 'disponible_push') {
+        dispatchLog(`[V2] T+20s: Course ${course.id} dispatch_status=${courseAfter20s.dispatch_status} — skip`);
+        return;
+      }
+      if (courseAfter20s.livreur_id || courseAfter20s.accepted_by_livreur_id) {
+        dispatchLog(`[V2] T+20s: Course ${course.id} déjà acceptée — skip push non-prioritaire`);
+        return;
+      }
+
+      // ── Sélectionner les non-prioritaires encore éligibles ──
+      // (les prioritaires sont dans dejaNotifies → exclus automatiquement par notifierLivreursEligiblesV2)
+      const nonPriorityResult = await notifierLivreursEligiblesV2(base44, courseAfter20s, {
+        priorityOnly: false,
+        skipAlreadyPublishedCheck: true,
+      });
+
+      dispatchLog(`[V2] 📢 T+20s: ${nonPriorityResult.notified} non-prioritaire(s) notifié(s) pour course ${course.id}`);
+    } catch (err: any) {
+      console.error(`[V2] T+20s: Erreur push non-prioritaire course ${course.id}: ${err?.message}`);
+    }
+  })());
+
+  dispatchLog(`[V2] 📢 Course ${course.id} publiée dans le fil (disponible_push) — ${priorityResult.notified} prioritaire(s) notifié(s) à T=0, push non-prioritaire programmé à T+20s`);
+  return { success: true, published: true, priority: priorityResult, non_priority_scheduled: true };
 }
 
 // ── Vérifier si un livreur a une course active (3 niveaux) ──
