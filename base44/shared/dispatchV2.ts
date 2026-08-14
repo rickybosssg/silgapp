@@ -182,23 +182,53 @@ export async function isPilotLivreur(base44: any, livreurId: string): Promise<bo
 export async function publierCourseDansFil(base44: any, course: any) {
   if (!course?.id) return { error: 'no_course_id' };
 
-  await base44.asServiceRole.entities.CourseExterne.update(course.id, {
-    statut: 'recherche_livreur',
-    dispatch_status: 'disponible_push',
-    heure_sollicitation: new Date().toISOString(),
-    timeout_expires_at: null,
-    dispatch_wave: 0,
-    dispatch_next_wave_at: null,
-    dispatch_v2_secours_phase: 0,
-    livreur_id: '',
-    accepted_by_livreur_id: '',
+  // 🛡️ GARDE IDEMPOTENTE ATOMIQUE ANTI-CASCADE
+  // Utilise updateMany conditionnel : ne met à jour QUE si dispatch_status n'est pas
+  // déjà 'disponible_push'. Cela empêche la cascade CREATE → UPDATE de l'orchestrateur
+  // de re-publier : publierCourseDansFil met statut='recherche_livreur', ce qui déclenche
+  // l'UPDATE event → l'orchestrateur rappelle publierCourseDansFil. Avec une garde basée
+  // sur l'objet course passé en paramètre, une race condition peut survenir si le 2e appel
+  // lit la course avant que le 1er ait commité. La garde atomique (updateMany conditionnel)
+  // élimine cette race condition.
+  const nowIso = new Date().toISOString();
+  await base44.asServiceRole.entities.CourseExterne.updateMany(
+    { id: course.id, dispatch_status: { $ne: 'disponible_push' } },
+    { $set: {
+      statut: 'recherche_livreur',
+      dispatch_status: 'disponible_push',
+      heure_sollicitation: nowIso,
+      timeout_expires_at: null,
+      dispatch_wave: 0,
+      dispatch_next_wave_at: null,
+      dispatch_v2_secours_phase: 0,
+      livreur_id: '',
+      accepted_by_livreur_id: '',
+    }}
+  );
+
+  // Re-fetch pour vérifier si ON a gagné la publication (heure_sollicitation = notre now)
+  // ou si un autre appel a déjà publié avant nous.
+  const coursePubliee = await base44.asServiceRole.entities.CourseExterne.get(course.id);
+  if (!coursePubliee) return { error: 'Course introuvable' };
+
+  if (coursePubliee.heure_sollicitation !== nowIso) {
+    dispatchLog(`[V2] ⏭️ Course ${course.id} déjà publiée par un autre appel (heure_sollicitation=${coursePubliee.heure_sollicitation}) — skip republication`);
+    journaliserDispatch(base44, {
+      course_id: course.id,
+      evenement: 'publier_fil_v2_skip',
+      raison_passage: `already_published — heure_sollicitation=${coursePubliee.heure_sollicitation} vs now=${nowIso}`,
+    });
+    return { success: true, already_published: true, skipped: true };
+  }
+
+  journaliserDispatch(base44, {
+    course_id: course.id,
+    evenement: 'publier_fil_v2_execute',
+    raison_passage: `guard passed — heure_sollicitation=${nowIso}`,
   });
 
   // 🎯 T=0 : Push UNIQUEMENT aux livreurs prioritaires
-  // La course est visible dans le fil « Disponibles » pour tous les livreurs éligibles,
-  // mais seuls les prioritaires reçoivent un push immédiat. Les non-prioritaires
-  // peuvent accepter la course depuis le fil dès T=0, mais reçoivent un push à T+20s.
-  const priorityResult = await notifierLivreursEligiblesV2(base44, course, { priorityOnly: true });
+  const priorityResult = await notifierLivreursEligiblesV2(base44, coursePubliee, { priorityOnly: true });
 
   // 📢 T+20s : Push aux non-prioritaires via waitUntil (Worker survit 20s — validé en production)
   // On relit la course avant l'envoi : si elle a été acceptée entre-temps, on n'envoie rien.
