@@ -36,7 +36,7 @@ import { dispatchLog, reponseDejaPrise, generateToken, generatePIN, journaliserD
 import { enregistrerNotification, getLivreursNotifies, getLivreursRefuses, marquerAccepte } from './dispatchNotifications.ts';
 
 // ── Version du bundle (pour vérifier que la production charge la dernière version) ──
-export const DISPATCH_V2_BUNDLE_VERSION = '2026-08-14-redeploy-1';
+export const DISPATCH_V2_BUNDLE_VERSION = '2026-08-14-simplified-1';
 
 // ── Feature flag cache (TTL 2 min) ──
 let V2_FLAG_CACHE: { enabled: boolean; expires: number } | null = null;
@@ -233,47 +233,16 @@ export async function publierCourseDansFil(base44: any, course: any) {
     raison_passage: `guard passed — heure_sollicitation=${nowIso}`,
   });
 
-  // 🎯 T=0 : Push UNIQUEMENT aux livreurs prioritaires
-  const priorityResult = await notifierLivreursEligiblesV2(base44, coursePubliee, { priorityOnly: true });
+  // 🎯 T=0 : UN SEUL push batch à TOUS les livreurs éligibles (prioritaires + non-prioritaires)
+  // Simplification 2026-08-14 : plus de distinction temporelle, plus de T+20s, plus de secours.
+  // La course reste dans le fil indéfiniment jusqu'à acceptation ou annulation.
+  const batchResult = await notifierLivreursEligiblesV2(base44, coursePubliee, {
+    priorityOnly: false,
+    skipAlreadyPublishedCheck: true,
+  });
 
-  // 📢 T+20s : Push aux non-prioritaires via waitUntil (Worker survit 20s — validé en production)
-  // On relit la course avant l'envoi : si elle a été acceptée entre-temps, on n'envoie rien.
-  waitUntil((async () => {
-    try {
-      await new Promise(resolve => setTimeout(resolve, 20000));
-
-      // ── Relecture de la course depuis la DB ──
-      const courseAfter20s = await base44.asServiceRole.entities.CourseExterne.get(course.id);
-      if (!courseAfter20s) {
-        dispatchLog(`[V2] T+20s: Course ${course.id} introuvable — skip push non-prioritaire`);
-        return;
-      }
-
-      // ── Si la course n'est plus disponible_push ou a été acceptée, ne rien envoyer ──
-      if (courseAfter20s.dispatch_status !== 'disponible_push') {
-        dispatchLog(`[V2] T+20s: Course ${course.id} dispatch_status=${courseAfter20s.dispatch_status} — skip`);
-        return;
-      }
-      if (courseAfter20s.livreur_id || courseAfter20s.accepted_by_livreur_id) {
-        dispatchLog(`[V2] T+20s: Course ${course.id} déjà acceptée — skip push non-prioritaire`);
-        return;
-      }
-
-      // ── Sélectionner les non-prioritaires encore éligibles ──
-      // (les prioritaires sont dans dejaNotifies → exclus automatiquement par notifierLivreursEligiblesV2)
-      const nonPriorityResult = await notifierLivreursEligiblesV2(base44, courseAfter20s, {
-        priorityOnly: false,
-        skipAlreadyPublishedCheck: true,
-      });
-
-      dispatchLog(`[V2] 📢 T+20s: ${nonPriorityResult.notified} non-prioritaire(s) notifié(s) pour course ${course.id}`);
-    } catch (err: any) {
-      console.error(`[V2] T+20s: Erreur push non-prioritaire course ${course.id}: ${err?.message}`);
-    }
-  })());
-
-  dispatchLog(`[V2] 📢 Course ${course.id} publiée dans le fil (disponible_push) — ${priorityResult.notified} prioritaire(s) notifié(s) à T=0, push non-prioritaire programmé à T+20s`);
-  return { success: true, published: true, priority: priorityResult, non_priority_scheduled: true };
+  dispatchLog(`[V2] 📢 Course ${course.id} publiée dans le fil (disponible_push) — ${batchResult.notified} livreur(s) notifié(s) à T=0 (batch unique)`);
+  return { success: true, published: true, batch: batchResult };
 }
 
 // ── Vérifier si un livreur a une course active (3 niveaux) ──

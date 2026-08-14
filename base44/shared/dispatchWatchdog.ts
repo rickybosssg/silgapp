@@ -292,27 +292,9 @@ export async function runWatchdog(base44, body = {}) {
         : new Date(course.created_date).getTime();
       const ageMin = (now.getTime() - sollicitationMs) / 60000;
 
-      if (ageMin >= 5 && ageMin < 10 && secoursPhase < 1) {
-        // Phase 1 : push top 3
-        try {
-          const result = await secoursDispatchV2(base44, course, 3);
-          await base44.asServiceRole.entities.CourseExterne.update(course.id, { dispatch_v2_secours_phase: 1 });
-          corrections.push({ course_id: course.id, action: 'secours_v2_top3', ...result });
-        } catch (err) {
-          corrections.push({ course_id: course.id, action: 'secours_v2_top3', error: err.message });
-        }
-        await new Promise(r => setTimeout(r, 100));
-      } else if (ageMin >= 10 && ageMin < 15 && secoursPhase < 2) {
-        // Phase 2 : push top 5
-        try {
-          const result = await secoursDispatchV2(base44, course, 5);
-          await base44.asServiceRole.entities.CourseExterne.update(course.id, { dispatch_v2_secours_phase: 2 });
-          corrections.push({ course_id: course.id, action: 'secours_v2_top5', ...result });
-        } catch (err) {
-          corrections.push({ course_id: course.id, action: 'secours_v2_top5', error: err.message });
-        }
-        await new Promise(r => setTimeout(r, 100));
-      } else if (ageMin >= 15 && secoursPhase < 3) {
+      // 🔕 Secours T+5/T+10 DÉSACTIVÉ — simplification 2026-08-14
+      // Un seul push batch à T=0 suffit ; la course reste dans le fil indéfiniment.
+      if (ageMin >= 15 && secoursPhase < 3) {
         // Phase 3 : V2 — garder en disponible_push (visible dans le fil indéfiniment)
         // Ne PAS passer en cycle_epuise : en V2, la course reste visible par tous les
         // livreurs éligibles jusqu'à assignation ou annulation manuelle.
