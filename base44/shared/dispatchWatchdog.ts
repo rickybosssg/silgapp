@@ -303,7 +303,7 @@ export async function runWatchdog(base44, body = {}) {
       if (ageMin >= 5) {
         // T+5 min : envoyer un push batch de rappel aux meilleurs livreurs encore éligibles
         // secoursDispatchV2 exclut déjà les livreurs en course, refusés et déjà notifiés.
-        const result = await secoursDispatchV2(base44, course, 10);
+        const result = await secoursDispatchV2(base44, course, 10, { excludeAlreadyNotified: false });
         await base44.asServiceRole.entities.CourseExterne.update(course.id, {
           dispatch_v2_secours_phase: 1,
         });

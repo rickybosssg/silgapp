@@ -36,7 +36,7 @@ import { dispatchLog, reponseDejaPrise, generateToken, generatePIN, journaliserD
 import { enregistrerNotification, getLivreursNotifies, getLivreursRefuses, marquerAccepte } from './dispatchNotifications.ts';
 
 // ── Version du bundle (pour vérifier que la production charge la dernière version) ──
-export const DISPATCH_V2_BUNDLE_VERSION = '2026-08-14-simplified-2';
+export const DISPATCH_V2_BUNDLE_VERSION = '2026-08-14-simplified-3';
 
 // ── Feature flag cache (TTL 2 min) ──
 let V2_FLAG_CACHE: { enabled: boolean; expires: number } | null = null;
@@ -494,7 +494,10 @@ export function calculerScore(livreur: any, course: any): number {
 }
 
 // ── Secours : push ciblé au top N livreurs ──
-export async function secoursDispatchV2(base44: any, course: any, nbLivreurs: number) {
+// Pour le rappel T+5min, passer excludeAlreadyNotified=false afin de re-notifier
+// les livreurs déjà notifiés à T=0 mais toujours libres et éligibles.
+export async function secoursDispatchV2(base44: any, course: any, nbLivreurs: number, options: { excludeAlreadyNotified?: boolean } = {}) {
+  const { excludeAlreadyNotified = true } = options;
   if (!course?.id || !course.country_code) return { pushed: 0 };
 
   // 1. Get eligible livreurs
@@ -521,11 +524,12 @@ export async function secoursDispatchV2(base44: any, course: any, nbLivreurs: nu
       .map((c: any) => c.livreur_id)
   );
 
-  // 3. Exclude refused + already notified (anti-doublon)
-  const [refused, dejaNotifies] = await Promise.all([
-    getLivreursRefuses(base44, course.id),
-    getLivreursNotifies(base44, course.id),
-  ]);
+  // 3. Exclude refused + (optionally) already notified
+  const refused = await getLivreursRefuses(base44, course.id);
+  let dejaNotifies: string[] = [];
+  if (excludeAlreadyNotified) {
+    dejaNotifies = await getLivreursNotifies(base44, course.id);
+  }
 
   // 4. Score + sort + slice top N
   const candidats = livreurs
