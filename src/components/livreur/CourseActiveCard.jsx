@@ -540,11 +540,11 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
           style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)" }}
         >
           <div
-            ref={(el) => { annulationModalRef.current = el; }}
-            className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl space-y-5 overflow-y-auto"
-            style={{ maxHeight: '90dvh' }}
+            className="w-full max-w-sm bg-white rounded-3xl shadow-2xl flex flex-col"
+            style={{ maxHeight: '88dvh' }}
           >
-            <div className="text-center">
+            {/* ── Header fixe ── */}
+            <div className="text-center px-6 pt-6 pb-3 flex-shrink-0">
               <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-3 text-3xl">
 
               </div>
@@ -555,54 +555,65 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                   : "Pourquoi souhaitez-vous annuler cette course ?"}
               </p>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { id: "client_injoignable", label: "Client injoignable", icon: "" },
-                { id: "mauvaise_adresse", label: "Mauvaise adresse", icon: "" },
-                { id: "colis_inexistant", label: "Colis inexistant", icon: "" },
-                { id: "client_change_avis", label: "Client a changé d'avis", icon: "" },
-                { id: "colis_interdit", label: "Colis interdit", icon: "" },
-                { id: "désaccord_prix", label: "Désaccord sur le prix", icon: "💰" },
-                { id: "panne_vehicule", label: "Panne du véhicule", icon: "" },
-                { id: "accident", label: "Accident", icon: "" },
-                { id: "autre", label: "Autre", icon: "" },
-              ].map((m) => (
-                <button
-                  key={m.id}
-                  className={`h-20 rounded-2xl border-2 font-semibold text-sm transition-all flex flex-col items-center justify-center gap-1 ${
-                    motifAnnulationLivreur === m.id
-                      ? "border-red-500 bg-red-50 text-red-700"
-                      : "border-gray-200 text-gray-600 hover:bg-gray-50"
-                  }`}
-                  onClick={() => setMotifAnnulationLivreur(m.id)}
-                >
-                  <span className="text-xl">{m.icon}</span>
-                  <span className="text-[10px] leading-tight text-center">{m.label}</span>
-                </button>
-              ))}
-            </div>
-            {motifAnnulationLivreur && (
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-gray-600">
-                  Décrivez le motif de l'annulation{" "}
-                  <span className="text-gray-400 font-normal">(envoyé à l'admin)</span>
-                </label>
-                <textarea
-                  placeholder="Expliquez ce qui s'est passé..."
-                  value={motifAnnulationDetail}
-                  onChange={(e) => setMotifAnnulationDetail(e.target.value)}
-                  onFocus={() => {
-                    // iOS : scroller vers les boutons quand le clavier s'ouvre
-                    setTimeout(() => {
-                      const modal = annulationModalRef.current;
-                      if (modal) modal.scrollTo({ top: modal.scrollHeight, behavior: 'smooth' });
-                    }, 300);
-                  }}
-                  className="w-full h-20 rounded-xl border-2 border-gray-200 p-3 text-sm resize-none focus:border-red-400 focus:outline-none"
-                />
+
+            {/* ── Corps scrollable : motifs + textarea ── */}
+            <div
+              ref={(el) => { annulationModalRef.current = el; }}
+              className="flex-1 overflow-y-auto px-6 py-3 min-h-0"
+            >
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { id: "client_injoignable", label: "Client injoignable", icon: "" },
+                  { id: "mauvaise_adresse", label: "Mauvaise adresse", icon: "" },
+                  { id: "colis_inexistant", label: "Colis inexistant", icon: "" },
+                  { id: "client_change_avis", label: "Client a changé d'avis", icon: "" },
+                  { id: "colis_interdit", label: "Colis interdit", icon: "" },
+                  { id: "désaccord_prix", label: "Désaccord sur le prix", icon: "💰" },
+                  { id: "panne_vehicule", label: "Panne du véhicule", icon: "" },
+                  { id: "accident", label: "Accident", icon: "" },
+                  { id: "autre", label: "Autre", icon: "" },
+                ].map((m) => (
+                  <button
+                    key={m.id}
+                    className={`h-20 rounded-2xl border-2 font-semibold text-sm transition-all flex flex-col items-center justify-center gap-1 ${
+                      motifAnnulationLivreur === m.id
+                        ? "border-red-500 bg-red-50 text-red-700"
+                        : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                    }`}
+                    onClick={() => setMotifAnnulationLivreur(m.id)}
+                  >
+                    <span className="text-xl">{m.icon}</span>
+                    <span className="text-[10px] leading-tight text-center">{m.label}</span>
+                  </button>
+                ))}
               </div>
-            )}
-            <div className="grid grid-cols-2 gap-3 pt-2">
+              {motifAnnulationLivreur && (
+                <div className="space-y-1.5 mt-3">
+                  <label className="text-xs font-semibold text-gray-600">
+                    Décrivez le motif de l'annulation{" "}
+                    <span className="text-gray-400 font-normal">(envoyé à l'admin)</span>
+                  </label>
+                  <textarea
+                    placeholder="Expliquez ce qui s'est passé..."
+                    value={motifAnnulationDetail}
+                    onChange={(e) => setMotifAnnulationDetail(e.target.value)}
+                    onFocus={() => {
+                      setTimeout(() => {
+                        const modal = annulationModalRef.current;
+                        if (modal) modal.scrollTo({ top: modal.scrollHeight, behavior: 'smooth' });
+                      }, 300);
+                    }}
+                    className="w-full h-20 rounded-xl border-2 border-gray-200 p-3 text-sm resize-none focus:border-red-400 focus:outline-none"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* ── Footer fixe toujours visible ── */}
+            <div
+              className="grid grid-cols-2 gap-3 px-6 pt-3 pb-6 flex-shrink-0 border-t border-gray-100"
+              style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}
+            >
               <button
                 className="h-12 rounded-2xl border border-gray-200 text-gray-600 font-bold text-sm"
                 onClick={() => {
