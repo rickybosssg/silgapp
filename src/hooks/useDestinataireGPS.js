@@ -53,7 +53,7 @@ export function useDestinataireGPS(telephone, enabled = true) {
       return;
     }
     fetchGps();
-    const interval = setInterval(fetchGps, 8000);
+    const interval = setInterval(fetchGps, 15000);
     return () => clearInterval(interval);
   }, [telephone, enabled]);
 

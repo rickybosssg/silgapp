@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronRight, Search, Bike, Box, Truck, CheckCircle2, User, MapPin, Navigation } from "lucide-react";
+import { useETACourse } from "@/hooks/useETACourse";
 
 const REASSURANCE_MESSAGES = {
   recherche: [
@@ -47,11 +48,28 @@ function getBarContent(course) {
   return { icon: CheckCircle2, emoji: "📦", text: "Course en cours", color: "bg-primary", phase: "recherche" };
 }
 
-export default function SuiviBarreFlottante({ course, onClick, etaMinutes }) {
+export default function SuiviBarreFlottante({ course, onClick }) {
   const [msgIdx, setMsgIdx] = useState(0);
 
   const content = getBarContent(course);
   const messages = REASSURANCE_MESSAGES[content.phase] || [];
+
+  // ── ETA unifié : useETACourse (ORS prioritaire, Haversine fallback) ──
+  const isLivraison = ["en_livraison", "arrivee"].includes(course?.statut);
+  const isColisRecupere = ["colis_recupere", "passager_embarque", "pris_en_charge"].includes(course?.statut);
+  const targetLat = (isLivraison || isColisRecupere) ? course?.gps_arrivee_lat : course?.gps_depart_lat;
+  const targetLng = (isLivraison || isColisRecupere) ? course?.gps_arrivee_lng : course?.gps_depart_lng;
+  const { etaMinutes } = useETACourse({
+    courseId: course?.id,
+    phase: isLivraison ? "livraison" : "recuperation",
+    fromLat: course?._livreur?.latitude || null,
+    fromLng: course?._livreur?.longitude || null,
+    toLat: targetLat || null,
+    toLng: targetLng || null,
+    countryCode: course?.country_code,
+    livreurId: course?.livreur_id,
+    livreurLastUpdate: course?._livreur?.derniere_position_date || course?._livreur?.last_seen_at || null,
+  });
 
   // Rotation des messages rassurants
   useEffect(() => {

@@ -743,7 +743,31 @@ export default function ClientExterneApp() {
       const map = new Map();
       [...actives, ...activesDestinataire, ...activesExpediteur].forEach(c => map.set(c.id, c));
       const toutes = [...map.values()].sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
-      setCoursesActives(toutes);
+
+      // ── Enrichir avec GPS temps réel du livreur (_livreur) ──
+      // Évite le polling Livreur.get() redondant dans SuiviCourseFullscreen
+      const livreurIds = [...new Set(toutes.filter(c => c.livreur_id && !["livree", "annulee"].includes(c.statut)).map(c => c.livreur_id))];
+      let coursesEnrichies = toutes;
+      if (livreurIds.length > 0) {
+        const livreursData = await Promise.all(
+          livreurIds.map(id => base44.entities.Livreur.filter({ id }).then(r => r?.[0]).catch(() => null))
+        );
+        const livreurMap = {};
+        livreursData.forEach(l => { if (l) livreurMap[l.id] = l; });
+        coursesEnrichies = toutes.map(c => {
+          if (!c.livreur_id || !livreurMap[c.livreur_id]) return c;
+          const l = livreurMap[c.livreur_id];
+          return {
+            ...c,
+            livreur_photo_url: l.photo_url || c.livreur_photo_url || null,
+            livreur_note_moyenne: l.note_moyenne || 0,
+            livreur_nombre_avis: l.nombre_avis || 0,
+            livreur_vehicule: l.vehicule || l.type_vehicule || c.livreur_vehicule || null,
+            _livreur: l,
+          };
+        });
+      }
+      setCoursesActives(coursesEnrichies);
 
       // Nettoyer les notifications obsolètes (courses supprimées ou terminées)
       const currentUserEmail = clientProfil?.user_email;

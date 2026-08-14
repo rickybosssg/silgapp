@@ -21,6 +21,7 @@ import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useAdminContext } from "@/hooks/useAdminContext.js";
 import { MessageSquareWarning } from "lucide-react";
+import AdminETABadge from "./AdminETABadge";
 
 const STATUTS_INTERNE = [
   "nouvelle", "en_attente_livreur", "acceptee", "en_route_recuperation",
@@ -284,9 +285,12 @@ export default function CourseDetailDialog({ course: courseProp, open, onClose, 
 
           {/* Livreur */}
           {course.livreur_nom && (
-            <div className="flex items-center gap-2 bg-muted/50 rounded-lg p-3">
-              <Truck className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm font-medium">{course.livreur_nom}</span>
+            <div className="flex items-center justify-between gap-2 bg-muted/50 rounded-lg p-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <Truck className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                <span className="text-sm font-medium truncate">{course.livreur_nom}</span>
+              </div>
+              <AdminETABadge course={course} />
             </div>
           )}
 

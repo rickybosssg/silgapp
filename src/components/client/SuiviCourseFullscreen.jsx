@@ -101,28 +101,18 @@ export default function SuiviCourseFullscreen({ course, position, onClose, onCal
   const isLivraison = ["en_livraison", "arrivee"].includes(course.statut);
   const isColisRecupere = ["colis_recupere", "passager_embarque", "pris_en_charge"].includes(course.statut);
 
-  // Fetch livreur position en temps réel (toutes les 5s)
+  // ── Position livreur depuis course._livreur (enrichi par ClientExterneApp.checkStatus) ──
+  // Polling Livreur.get() redondant supprimé — la position vient du polling de courses.
   useEffect(() => {
-    if (!course.livreur_id) return;
-    let active = true;
-    const fetchPos = async () => {
-      try {
-        const l = await base44.entities.Livreur.get(course.livreur_id);
-        if (!active) return;
-        if (l?.latitude && l?.longitude) {
-          setLivreurPos({ lat: l.latitude, lng: l.longitude });
-        }
-      } catch (e) {
-        // Fallback: utiliser les positions stockées sur la course
-        const fallbackLat = course.latitude_prise_en_charge || course.latitude_recuperation;
-        const fallbackLng = course.longitude_prise_en_charge || course.longitude_recuperation;
-        if (fallbackLat) setLivreurPos({ lat: fallbackLat, lng: fallbackLng });
-      }
-    };
-    fetchPos();
-    const interval = setInterval(fetchPos, 5000);
-    return () => { active = false; clearInterval(interval); };
-  }, [course.livreur_id, course.latitude_prise_en_charge, course.longitude_prise_en_charge, course.latitude_recuperation, course.longitude_recuperation]);
+    const l = course._livreur;
+    if (l?.latitude && l?.longitude) {
+      setLivreurPos({ lat: l.latitude, lng: l.longitude });
+    } else {
+      const fallbackLat = course.latitude_prise_en_charge || course.latitude_recuperation;
+      const fallbackLng = course.longitude_prise_en_charge || course.longitude_recuperation;
+      if (fallbackLat) setLivreurPos({ lat: fallbackLat, lng: fallbackLng });
+    }
+  }, [course._livreur, course.latitude_prise_en_charge, course.longitude_prise_en_charge, course.latitude_recuperation, course.longitude_recuperation]);
 
   // Messages rassurants rotatifs (en mode livraison)
   useEffect(() => {
@@ -144,7 +134,7 @@ export default function SuiviCourseFullscreen({ course, position, onClose, onCal
     toLng: activeTarget?.lng || null,
     countryCode: course.country_code,
     livreurId: course.livreur_id,
-    livreurLastUpdate: course._livreur?.derniere_position_date || course._livreur?.last_seen_at || null,
+    livreurLastUpdate: course?._livreur?.derniere_position_date || course?._livreur?.last_seen_at || null,
   });
 
   const eta = etaHook.etaMinutes != null

@@ -37,6 +37,7 @@ import ChatWindow from "@/components/chat/ChatWindow";
 import CoursePriceEditor from "@/components/courses/CoursePriceEditor";
 import CarteLivreurClient from "@/components/chat/CarteLivreurClient";
 import ETADisplay from "@/components/client/ETADisplay";
+import ResumeETACell from "@/components/client/ResumeETACell";
 import HistoriqueCoursesClient from "@/components/client/HistoriqueCoursesClient";
 import FraisAnnulationBannerClient from "@/components/client/FraisAnnulationBannerClient";
 import MultiColisClientView from "@/components/multi-colis/MultiColisClientView";
@@ -207,8 +208,8 @@ export default function ClientSuiviCourse() {
     },
     enabled: !!userId,
     initialData: [],
-    refetchInterval: 5000, // ⚡ 2s → 5s : 4 requêtes imbriquées par poll = ~48/min max
-    staleTime: 2000,
+    refetchInterval: 10000, // ⚡ 5s → 10s : polling optimisé (ETA géré par useETACourse)
+    staleTime: 5000,
   });
 
   // Toutes les courses actives / terminées
@@ -647,9 +648,6 @@ export default function ClientSuiviCourse() {
                 ? new Date(maCourse.heure_livraison) - new Date(maCourse.heure_acceptation)
                 : null;
             const dureeReelle = dureeMs ? Math.round(dureeMs / 60000) : null;
-            // ETA temps réel : distance livreur → cible ÷ vitesse (25 km/h)
-            const etaTempsReel = distLivreurCible != null ? Math.max(1, Math.round((distLivreurCible / 25) * 60)) : null;
-            const temps = isLivree ? dureeReelle : etaTempsReel;
 
             // === PRIX : TOUJOURS basé sur expéditeur → destinataire (règle SILGAPP) ===
             // Guard : si destination_inconnue, les GPS arrivée sont null → pas de calcul de distance
@@ -692,12 +690,16 @@ export default function ClientSuiviCourse() {
                     {isLivree ? "Distance (km)" : colisRecupere ? "→ Livraison" : "→ Récup."}
                   </span>
                 </div>
-                <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl p-3 text-center shadow-lg">
-                  <span className="text-2xl font-black text-white block">{temps != null ? temps : "—"}</span>
-                  <span className="text-[10px] font-bold text-blue-100 uppercase tracking-wide">
-                    {isLivree ? "Durée (min)" : "ETA (min)"}
-                  </span>
-                </div>
+                <ResumeETACell
+                  course={maCourse}
+                  livreurLat={livreurLat}
+                  livreurLng={livreurLng}
+                  destGpsLat={destGpsLat}
+                  destGpsLng={destGpsLng}
+                  isLivree={isLivree}
+                  dureeReelle={dureeReelle}
+                  countries={countries}
+                />
                 <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl p-3 text-center shadow-lg">
                   <span className="text-2xl font-black text-white block">{prix > 0 ? prix.toLocaleString() : "—"}</span>
                   <span className="text-[10px] font-bold text-blue-100 uppercase tracking-wide">
