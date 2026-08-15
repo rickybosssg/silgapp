@@ -865,8 +865,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     }
   }, [mesCourses, livreurProfil?.id, prixManuelReponse]);
 
-  // ── Anti-blocage : si le livreur est "en_course" mais n'a AUCUNE course
-  //    active (course livrée/annulée), le remettre "disponible" automatiquement.
+  // ── Anti-blocage (sens 1) : si le livreur est "en_course" mais n'a AUCUNE
+  //    course active (course livrée/annulée), le remettre "disponible".
   //    Évite le bug "bloqué sur En course" quand remettreDisponibleSiAutorise
   //    échoue silencieusement ou quand le statut est désynchronisé. ──
   useEffect(() => {
@@ -875,6 +875,19 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     if (coursesActives.length > 0) return;
     // Pas de course active mais statut "en_course" → corriger
     saveLivreur(livreurProfil.id, { statut: "disponible" })
+      .then(() => queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] }))
+      .catch(() => null);
+  }, [livreurProfil?.id, livreurProfil?.statut, coursesActives.length]);
+
+  // ── Anti-blocage (sens 2) : si le livreur est "disponible" mais a des
+  //    courses actives, le passer "en_course" pour éviter qu'il reçoive de
+  //    nouvelles notifications de dispatch alors qu'il est déjà occupé. ──
+  useEffect(() => {
+    if (!livreurProfil?.id) return;
+    if (livreurProfil.statut !== "disponible") return;
+    if (coursesActives.length === 0) return;
+    // Course active mais statut "disponible" → corriger
+    saveLivreur(livreurProfil.id, { statut: "en_course" })
       .then(() => queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] }))
       .catch(() => null);
   }, [livreurProfil?.id, livreurProfil?.statut, coursesActives.length]);
