@@ -95,6 +95,27 @@ Deno.serve(async (req) => {
           bloque_encours: true,
         });
       }
+      // ── Vérifier si le livreur a d'AUTRES courses actives ──
+      // Si oui, il doit rester "en_course" — ne pas le libérer
+      const STATUTS_ACTIFS_LIVREUR = ["livreur_en_route", "client_contacte", "en_route_expediteur", "arrive_prise_en_charge", "colis_recupere", "passager_embarque", "pris_en_charge", "en_livraison", "arrivee"];
+      const autresCourses = await base44.asServiceRole.entities.CourseExterne.filter(
+        { livreur_id: course.livreur_id },
+        "-created_date", 10
+      );
+      const aAutreCourseActive = (autresCourses || []).some(c =>
+        c.id !== course_id && STATUTS_ACTIFS_LIVREUR.includes(c.statut)
+      );
+      if (aAutreCourseActive) {
+        console.log(`[libererLivreurCourseLivree] Livreur ${course.livreur_nom} a une autre course active — reste "en_course"`);
+        return Response.json({
+          success: true,
+          message: 'Livreur conserve en_course: autre course active',
+          course_id: course_id,
+          livreur_id: course.livreur_id,
+          livreur_nom: course.livreur_nom,
+        });
+      }
+
       const heartbeatAge = livreur?.last_seen_at
         ? (Date.now() - new Date(livreur.last_seen_at).getTime()) / 60000
         : 999;
