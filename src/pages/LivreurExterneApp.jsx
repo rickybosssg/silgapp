@@ -865,7 +865,19 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     }
   }, [mesCourses, livreurProfil?.id, prixManuelReponse]);
 
-  // Auto-resync statut supprimé — le statut ne se change QUE manuellement via le bouton
+  // ── Anti-blocage : si le livreur est "en_course" mais n'a AUCUNE course
+  //    active (course livrée/annulée), le remettre "disponible" automatiquement.
+  //    Évite le bug "bloqué sur En course" quand remettreDisponibleSiAutorise
+  //    échoue silencieusement ou quand le statut est désynchronisé. ──
+  useEffect(() => {
+    if (!livreurProfil?.id) return;
+    if (livreurProfil.statut !== "en_course") return;
+    if (coursesActives.length > 0) return;
+    // Pas de course active mais statut "en_course" → corriger
+    saveLivreur(livreurProfil.id, { statut: "disponible" })
+      .then(() => queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] }))
+      .catch(() => null);
+  }, [livreurProfil?.id, livreurProfil?.statut, coursesActives.length]);
 
   // ─── Gains du jour ────────────────────────────────────────────────────────
   const livreesToday = useMemo(() => {
