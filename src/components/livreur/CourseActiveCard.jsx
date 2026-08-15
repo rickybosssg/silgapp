@@ -556,39 +556,34 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
               </p>
             </div>
 
-            {/* ── Corps scrollable : motifs + textarea ── */}
+            {/* ── Corps scrollable : select + textarea ── */}
             <div
               ref={(el) => { annulationModalRef.current = el; }}
-              className="flex-1 overflow-y-auto px-6 py-3 min-h-0"
+              className="flex-1 overflow-y-auto px-6 py-3 min-h-0 space-y-3"
             >
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { id: "client_injoignable", label: "Client injoignable", icon: "" },
-                  { id: "mauvaise_adresse", label: "Mauvaise adresse", icon: "" },
-                  { id: "colis_inexistant", label: "Colis inexistant", icon: "" },
-                  { id: "client_change_avis", label: "Client a changé d'avis", icon: "" },
-                  { id: "colis_interdit", label: "Colis interdit", icon: "" },
-                  { id: "désaccord_prix", label: "Désaccord sur le prix", icon: "💰" },
-                  { id: "panne_vehicule", label: "Panne du véhicule", icon: "" },
-                  { id: "accident", label: "Accident", icon: "" },
-                  { id: "autre", label: "Autre", icon: "" },
-                ].map((m) => (
-                  <button
-                    key={m.id}
-                    className={`h-20 rounded-2xl border-2 font-semibold text-sm transition-all flex flex-col items-center justify-center gap-1 ${
-                      motifAnnulationLivreur === m.id
-                        ? "border-red-500 bg-red-50 text-red-700"
-                        : "border-gray-200 text-gray-600 hover:bg-gray-50"
-                    }`}
-                    onClick={() => setMotifAnnulationLivreur(m.id)}
-                  >
-                    <span className="text-xl">{m.icon}</span>
-                    <span className="text-[10px] leading-tight text-center">{m.label}</span>
-                  </button>
-                ))}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-gray-600">
+                  Motif de l'annulation
+                </label>
+                <select
+                  value={motifAnnulationLivreur || ""}
+                  onChange={(e) => setMotifAnnulationLivreur(e.target.value)}
+                  className="w-full h-12 rounded-xl border-2 border-gray-200 px-3 text-sm font-medium text-gray-800 bg-white focus:border-red-400 focus:outline-none"
+                >
+                  <option value="" disabled>Sélectionnez un motif...</option>
+                  <option value="client_injoignable">Client injoignable</option>
+                  <option value="mauvaise_adresse">Mauvaise adresse</option>
+                  <option value="colis_inexistant">Colis inexistant</option>
+                  <option value="client_change_avis">Client a changé d'avis</option>
+                  <option value="colis_interdit">Colis interdit</option>
+                  <option value="désaccord_prix">Désaccord sur le prix</option>
+                  <option value="panne_vehicule">Panne du véhicule</option>
+                  <option value="accident">Accident</option>
+                  <option value="autre">Autre</option>
+                </select>
               </div>
               {motifAnnulationLivreur && (
-                <div className="space-y-1.5 mt-3">
+                <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-gray-600">
                     Décrivez le motif de l'annulation{" "}
                     <span className="text-gray-400 font-normal">(envoyé à l'admin)</span>
