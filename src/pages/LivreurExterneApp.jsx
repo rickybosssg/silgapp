@@ -1493,7 +1493,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
       {/* ── Navigation sticky en haut ──────────────── */}
       <div className="sticky top-0 z-30 bg-[#f5f5f7]/90 backdrop-blur-xl px-3 pt-3 pb-2 border-b border-black/5">
-        <div className="max-w-lg mx-auto flex w-full gap-0.5 bg-white/90 rounded-2xl p-1 shadow-[0_8px_30px_rgba(15,23,42,0.06)] border border-black/5">
+        <div className="max-w-lg mx-auto flex w-full gap-1 overflow-x-auto overscroll-x-contain bg-white/90 rounded-2xl p-1 shadow-[0_8px_30px_rgba(15,23,42,0.06)] border border-black/5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {TABS.map(tab => (
             <button
               key={tab.id}
@@ -1501,7 +1501,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
                 setActiveTab(tab.id);
                 if (tab.id === "disponibles") setHasNewAvailableCourse(false);
               }}
-              className={`relative min-w-0 flex-1 px-1 flex items-center justify-center py-2.5 rounded-xl text-[10px] font-bold leading-tight text-center transition-all ${
+              className={`relative flex-none min-w-[76px] px-2 flex items-center justify-center py-2.5 rounded-xl text-[11px] font-bold leading-tight text-center whitespace-nowrap transition-all ${
                 activeTab === tab.id
                   ? "bg-[#007aff] text-white shadow-sm"
                   : "text-slate-500 hover:text-slate-900"
