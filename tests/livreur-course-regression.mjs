@@ -117,5 +117,9 @@ assert.match(courseActiveCardSource, /motif_detail:\s*motifAnnulationDetail\.tri
 assert.match(annulationBackendSource, /source === "livreur"[\s\S]*motif_detail/, "le backend doit valider le detail fourni par le livreur");
 assert.match(annulationBackendSource, /dispatch_refused_ids:\s*JSON\.stringify\(refusedIds\)/, "le livreur doit etre exclu uniquement de la course annulee");
 assert.match(annulationBackendSource, /manual_hors_ligne === true \? "hors_ligne" : "disponible"/, "le livreur doit etre libere sans annuler son choix hors ligne");
+assert.match(annulationBackendSource, /ANNULATION CLIENT OU ADMIN[\s\S]*statut:\s*"annulee"[\s\S]*dispatch_status:\s*"expire"/, "une annulation client doit etre terminale et ne jamais rester en attente");
+assert.doesNotMatch(annulationBackendSource, /ANNULATION CLIENT OU ADMIN[\s\S]*statut:\s*"en_attente"/, "le chemin client ne doit jamais remettre la course en attente");
+assert.match(annulationBackendSource, /livreur_id:\s*livreurId,[\s\S]*user_type:\s*"livreur"[\s\S]*category:\s*"annulation"/, "le livreur concerne doit recevoir le push d'annulation");
+assert.match(annulationBackendSource, /entities\.User\.filter\(\{ role: "admin" \}\)[\s\S]*user_type:\s*"admin"[\s\S]*category:\s*"annulation"/, "les admins autorises du pays doivent recevoir le push d'annulation");
 
 console.log("LIVREUR_COURSE_REGRESSION=PASS");

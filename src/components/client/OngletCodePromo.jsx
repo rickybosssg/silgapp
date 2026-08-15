@@ -125,7 +125,7 @@ export default function OngletCodePromo({ clientProfil }) {
             onClick={() => setOnglet(tab.key)}
             className={`flex-1 py-2 px-2 rounded-lg text-xs font-semibold transition-all ${
               onglet === tab.key
-                ? "bg-white shadow text-foreground"
+                ? "bg-white shadow text-slate-900"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >

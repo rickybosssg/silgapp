@@ -59,26 +59,30 @@ Deno.serve(async (req) => {
 
     const livreurId = course.livreur_id;
     let livreurLibere = false;
+    let livreurEmail = "";
     let courseRedispatch = false;
 
     // ── Libérer le livreur ────────────────────────────────────────────
     if (livreurId) {
       const livreur = await asService.entities.Livreur.get(livreurId).catch(() => null);
       if (livreur) {
+        livreurEmail = String(livreur.user_email || "").trim().toLowerCase();
         await asService.entities.Livreur.update(livreurId, {
           statut: livreur.manual_hors_ligne === true ? "hors_ligne" : "disponible",
         });
         livreurLibere = true;
 
-        // Notification au livreur
-        if (livreur.user_email) {
-          await asService.entities.Notification.create({
+        // Notification BDD + push FCM au livreur via le point d'entree centralise.
+        if (livreurEmail) {
+          await asService.functions.invoke("envoiNotificationPush", {
             titre: "ℹ Course annulée",
             message: `La course #${course_id.slice(-8)} a été annulée. ${source === "livreur" ? "Vous êtes maintenant disponible." : ""}`,
             type: "course_annulee",
             course_id,
-            destinataire_email: livreur.user_email,
-            lue: false,
+            destinataire_email: livreurEmail,
+            livreur_id: livreurId,
+            user_type: "livreur",
+            category: "annulation",
           }).catch(() => null);
         }
       }
@@ -277,6 +281,7 @@ Deno.serve(async (req) => {
       const sourceLabel = source === "client" ? "CLIENT" : "ADMIN";
       const annulData = {
         statut: "annulee",
+        dispatch_status: "expire",
         date_annulation: now,
         livreur_id: "",
         livreur_nom: "",
@@ -288,10 +293,6 @@ Deno.serve(async (req) => {
         notes: (course.notes || "") + ` | [ANNULÉ ${sourceLabel}] ${motif || ""}`,
       };
 
-      if (course.dispatch_status === "propose" || course.dispatch_status === "en_attente") {
-        annulData.dispatch_status = "expire";
-      }
-
       if (course.pricing_mode === "manual" && course.manual_price_status === "pending_client_validation") {
         annulData.manual_price_status = null;
         annulData.manual_price = null;
@@ -299,6 +300,23 @@ Deno.serve(async (req) => {
       }
 
       await asService.entities.CourseExterne.update(course_id, annulData);
+
+      // Alerter chaque administrateur autorise pour ce pays. La fonction push
+      // cree aussi la notification en base, ce qui evite les doublons.
+      const admins = await asService.entities.User.filter({ role: "admin" }).catch(() => []);
+      for (const admin of admins || []) {
+        if (!admin.email) continue;
+        if (admin.admin_type === "pays" && admin.country_code && admin.country_code !== course.country_code) continue;
+        await asService.functions.invoke("envoiNotificationPush", {
+          titre: source === "client" ? "Course annulée par le client" : "Course annulée par l'administration",
+          message: `La course #${course_id.slice(-8)} a été annulée définitivement.${motif ? ` Motif : ${motif}` : ""}`,
+          type: "course_annulee",
+          course_id,
+          destinataire_email: admin.email,
+          user_type: "admin",
+          category: "annulation",
+        }).catch(() => null);
+      }
 
       // Archiver notifications
       const notifs = await asService.entities.Notification.filter({
