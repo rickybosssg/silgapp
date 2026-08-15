@@ -21,6 +21,8 @@ import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useAdminContext } from "@/hooks/useAdminContext.js";
 import { MessageSquareWarning } from "lucide-react";
+import AdminETABadge from "./AdminETABadge";
+import { getPrixAffichable } from "@/utils/getPrixAffichable";
 
 const STATUTS_INTERNE = [
   "nouvelle", "en_attente_livreur", "acceptee", "en_route_recuperation",
@@ -34,17 +36,17 @@ const STATUTS_EXTERNE = [
 
 const TYPE_LABELS = { expedier: "📦 Expédition", recevoir: "📥 Réception", deplacement: "👤 Déplacement" };
 
-export default function CourseDetailDialog({ course, open, onClose, reseau = "interne" }) {
+export default function CourseDetailDialog({ course: courseProp, open, onClose, reseau = "interne" }) {
   const queryClient = useQueryClient();
   const { isPays, countryCode: adminCountryCode } = useAdminContext();
   const statuts = reseau === "externe" ? STATUTS_EXTERNE : STATUTS_INTERNE;
-  const [newStatut, setNewStatut] = React.useState(course?.statut || "");
+  const [newStatut, setNewStatut] = React.useState(courseProp?.statut || "");
   const [confirmAnnulation, setConfirmAnnulation] = React.useState(false);
   const [adminEmail, setAdminEmail] = React.useState("");
   const [reattributing, setReattributing] = React.useState(false);
   const [relaunching, setRelaunching] = React.useState(false);
   const [showManualAssign, setShowManualAssign] = React.useState(false);
-  const countryMismatch = reseau === "externe" && isPays && course?.country_code && course.country_code !== adminCountryCode;
+  const countryMismatch = reseau === "externe" && isPays && courseProp?.country_code && courseProp.country_code !== adminCountryCode;
 
   React.useEffect(() => {
     base44.auth.me().then(u => setAdminEmail(u?.email || "")).catch(() => {});
@@ -52,14 +54,30 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
 
   // Récupérer la raison d'annulation du livreur si la course a été annulée par un livreur
   const { data: annulationLivreur } = useQuery({
-    queryKey: ["annulationLivreur", course?.id],
+    queryKey: ["annulationLivreur", courseProp?.id],
     queryFn: async () => {
-      if (!course?.id) return null;
-      const results = await base44.entities.AnnulationLivreur.filter({ course_id: course.id });
+      if (!courseProp?.id) return null;
+      const results = await base44.entities.AnnulationLivreur.filter({ course_id: courseProp.id });
       return results?.[0] || null;
     },
-    enabled: !!course?.id && reseau === "externe" && ["annulee", "en_attente", "nouvelle", "recherche_livreur"].includes(course?.statut),
+    enabled: !!courseProp?.id && reseau === "externe" && ["annulee", "en_attente", "nouvelle", "recherche_livreur"].includes(courseProp?.statut),
   });
+
+  // ── Refetch temps réel de la course pendant que le dialog est ouvert ──
+  // Évite l'affichage d'un statut stale (ex: "En route" alors que la course est annulée)
+  const { data: courseData } = useQuery({
+    queryKey: ["course-detail", courseProp?.id, reseau],
+    queryFn: async () => {
+      if (!courseProp?.id) return null;
+      const entity = reseau === "externe" ? base44.entities.CourseExterne : base44.entities.Course;
+      return await entity.get(courseProp.id);
+    },
+    enabled: open && !!courseProp?.id,
+    staleTime: 0,
+    refetchInterval: open ? 5000 : false,
+  });
+
+  const course = courseData || courseProp;
 
   React.useEffect(() => {
     setNewStatut(course?.statut || "");
@@ -229,7 +247,7 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
             )}
             <CourseStatusBadge statut={course.statut} />
             {course.priority && course.priority !== "normal" && <UrgenceBadge urgence={course.priority} />}
-            {course.prix_final && <span className="text-sm font-bold">{course.prix_final.toLocaleString()} FCFA</span>}
+            {(() => { const p = getPrixAffichable(course); return p ? <span className="text-sm font-bold">{p.toLocaleString()} FCFA</span> : null; })()}
             {course.delivery_confirmed_by === 'pin_secours' && (
               <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold">🔑 PIN secours</span>
             )}
@@ -268,9 +286,12 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
 
           {/* Livreur */}
           {course.livreur_nom && (
-            <div className="flex items-center gap-2 bg-muted/50 rounded-lg p-3">
-              <Truck className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm font-medium">{course.livreur_nom}</span>
+            <div className="flex items-center justify-between gap-2 bg-muted/50 rounded-lg p-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <Truck className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                <span className="text-sm font-medium truncate">{course.livreur_nom}</span>
+              </div>
+              <AdminETABadge course={course} />
             </div>
           )}
 

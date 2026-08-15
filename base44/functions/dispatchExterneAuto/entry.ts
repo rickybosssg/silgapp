@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
 import { notifierRedispatchClient } from '../../shared/venusRedispatchNotifier.ts';
 import { STATUTS_ACTIFS_COURSE, STATUTS_ACTIFS_VERIF, normalizeCommissionPct, chargerConfigPays } from '../../shared/dispatchConstants.ts';
 import { verifierPaysCourseLivreur, reponseDejaPrise, generateToken, generatePIN, supprimerNotificationsCourse, journaliserDispatch } from '../../shared/dispatchUtils.ts';
@@ -6,7 +6,10 @@ import { chargerConfigDispatch, chargerConfigVaguesGPS, CYCLE_EPUISE_TIMEOUT_MS 
 import { lancerDispatchMulti } from '../../shared/dispatchEngine.ts';
 import { runWatchdog } from '../../shared/dispatchWatchdog.ts';
 import { marquerRefuse, marquerAccepte, getLivreursNotifies, getLivreursRefuses, resetNotifications as resetNotifsEntity } from '../../shared/dispatchNotifications.ts';
-import { accepterCourseV2, publierCourseDansFil, isV2Enabled, secoursDispatchV2, isPilotLivreur } from '../../shared/dispatchV2.ts';
+import { accepterCourseV2, publierCourseDansFil, isV2Enabled, secoursDispatchV2, isPilotLivreur, DISPATCH_V2_BUNDLE_VERSION } from '../../shared/dispatchV2.ts';
+
+// 🔖 Redéploiement forcé — 2026-08-14-simplified-3 — rappel T+5min re-notifie les mêmes livreurs libres
+console.log(`[DISPATCH_EXTERNE_AUTO] 🔖 dispatchV2 bundle version: ${DISPATCH_V2_BUNDLE_VERSION}`);
 
 // ============================================================================
 // HANDLER PRINCIPAL
@@ -101,6 +104,12 @@ Deno.serve(async (req) => {
       }
 
       // ── V2 : publier dans le fil de courses disponibles ──
+      // RÈGLE MÉTIER (2026-08-14) :
+      //   T=0  : course visible dans le fil par tous les livreurs éligibles
+      //          + push UNIQUEMENT aux livreurs prioritaires (priorite_dispatch > 0)
+      //   T+20s: si la course est toujours libre, push aux non-prioritaires
+      //   Si acceptée avant 20s → aucun push non-prioritaire
+      // Le premier qui accepte gagne (prioritaire ou non), verrou atomique.
       const v2Enabled = await isV2Enabled(base44);
       if (v2Enabled) {
         const result = await publierCourseDansFil(base44, course);
@@ -462,7 +471,7 @@ Deno.serve(async (req) => {
                 sender_id: 'silgapp_system',
                 sender_name: 'SILGAPP',
                 message_type: 'text',
-                content: `🔑 Code de récupération : ${pickupPIN}\n\nUtiliser ce code pour récupérer le Colis`,
+                content: `🔑 Code de récupération : ${pickupPIN}\n\nUtiliser ce code pour récupérer le Colis${course.prix_propose_admin ? `\n💰 Prix de la course : ${Number(course.prix_propose_admin).toLocaleString()} ${course.devise || 'FCFA'}` : (course.prix_estimate ? `\n💰 Prix estimé : ${Number(course.prix_estimate).toLocaleString()} ${course.devise || 'FCFA'}` : '')}`,
                 source: 'app',
                 client_message_id: idempotencyKey,
               });

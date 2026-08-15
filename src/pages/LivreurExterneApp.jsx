@@ -28,6 +28,7 @@ import CourseEnAttenteModalExterne from "@/components/livreur/CourseEnAttenteMod
 import CourseActiveCard from "@/components/livreur/CourseActiveCard";
 import LivreurHistorique from "@/components/livreur/LivreurHistorique";
 import LivreurExterneOnboarding from "@/components/livreur/LivreurExterneOnboarding";
+import NotificationStatusBanner from "@/components/livreur/NotificationStatusBanner";
 import LivreurMesInfosModal from "@/components/livreur/LivreurMesInfosModal";
 import VenusFloatingButton from "@/components/client/VenusFloatingButton";
 import AlertesLivreurModal from "@/components/livreur/AlertesLivreurModal";
@@ -218,7 +219,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     livreurProfil?.manual_hors_ligne !== true &&
     livreurProfil?.admin_hors_ligne !== true;
 
-  // Compteur du badge, avec exactement les mêmes exclusions que le fil V2.
+  // Compteur du badge avec les memes exclusions que le fil Dispatch V2.
   const { data: availableCoursesCount = 0 } = useQuery({
     queryKey: ["courses-disponibles-count", livreurProfil?.id, livreurProfil?.country_code, isV2Enabled],
     queryFn: async () => {
@@ -233,7 +234,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
           "-date_reponse", 50
         ).catch(() => []),
       ]);
-      const refusedIds = new Set((refused || []).map(item => item.course_id));
+      const refusedIds = new Set((refused || []).map((item) => item.course_id));
       let dismissedIds = new Set();
       try {
         const dismissed = JSON.parse(localStorage.getItem("silgapp_dismissed_courses") || "{}");
@@ -245,7 +246,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         );
       } catch {}
 
-      return (all || []).filter(course => {
+      return (all || []).filter((course) => {
         if (FINAL_COURSE_STATUSES.has(course.statut)) return false;
         if (course.livreur_id || course.accepted_by_livreur_id) return false;
         if (refusedIds.has(course.id) || dismissedIds.has(course.id)) return false;
@@ -261,6 +262,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     staleTime: 5000,
   });
 
+  // Le point rouge s'affiche dès qu'il y a des courses disponibles ET que le livreur
+  // n'est pas sur l'onglet "Disponibles"
   useEffect(() => {
     if (availableCoursesCount > 0 && activeTab !== "disponibles") {
       setHasNewAvailableCourse(true);
@@ -590,7 +593,11 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
     const checkCourseProposee = async () => {
       try {
-        const allCourses = await base44.entities.CourseExterne.list("-created_date", 50);
+        if (!livreurProfil?.country_code) return;
+        const allCourses = await base44.entities.CourseExterne.filter(
+          { country_code: livreurProfil.country_code },
+          "-created_date", 50
+        );
         if (cancelled) return;
 
         // ── Récupérer les notifications actives du livreur depuis DispatchNotification ──
@@ -630,7 +637,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     };
 
     checkCourseProposee();
-    const interval = setInterval(checkCourseProposee, 2000);
+    const interval = setInterval(checkCourseProposee, 5000);
     return () => {
       cancelled = true;
       clearInterval(interval);
@@ -816,9 +823,10 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     () => mesCourses.filter(c => {
       if (!isCourseAcceptedByLivreur(c, livreurProfil?.id)) return false;
 
-      // GARDE ABSOLUE : une course livrée avec prix_final saisi ET heure_livraison
-      // ne doit JAMAIS apparaître dans les courses actives, quel que soit le mode.
-      if (c.statut === "livree" && c.prix_final > 0 && c.heure_livraison) return false;
+      // GARDE ABSOLUE : une course livrée avec heure_livraison ne doit JAMAIS
+      // apparaître dans les courses actives, quel que soit le mode. Le prix_final
+      // est auto-rempli depuis prix_propose_admin pour les courses admin.
+      if (c.statut === "livree" && c.heure_livraison) return false;
 
       // GARDE ABSOLUE : course annulée = jamais active
       if (c.statut === "annulee") return false;
@@ -828,26 +836,10 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       // qui sont des étapes intermédiaires entre l'acceptation et la récupération du colis.
       if (ACTIVE_LIVREUR_COURSE_STATUSES.has(c.statut)) return true;
 
-      // Admin_manuel : garder la carte visible tant que le montant n'est pas saisi,
-      // même si le backend a déjà marqué la course "livree" via validateQRCode.
-      if ((c.pricing_mode === "admin_manuel" || c.source === "admin") && c.statut === "livree" && !c.prix_final) return true;
-
       return false;
     }),
     [mesCourses, livreurProfil?.id]
   );
-
-  // A profile refresh must never make an assigned courier dispatchable again.
-  // Respect an explicit offline choice, but repair an accidental "disponible"
-  // status while an active course is still attached to this courier.
-  useEffect(() => {
-    if (!livreurProfil?.id || coursesActives.length === 0) return;
-    if (livreurProfil.statut !== "disponible") return;
-
-    saveLivreur(livreurProfil.id, { statut: "en_course" })
-      .then(() => queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] }))
-      .catch(() => null);
-  }, [coursesActives.length, livreurProfil?.id, livreurProfil?.statut, queryClient]);
 
   // Détecter la réponse du client sur une proposition de prix manuel
   // Statuts finaux pour lesquels on n'affiche JAMAIS la modale
@@ -905,7 +897,32 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     }
   }, [mesCourses, livreurProfil?.id, prixManuelReponse]);
 
-  // Auto-resync statut supprimé — le statut ne se change QUE manuellement via le bouton
+  // ── Anti-blocage (sens 1) : si le livreur est "en_course" mais n'a AUCUNE
+  //    course active (course livrée/annulée), le remettre "disponible".
+  //    Évite le bug "bloqué sur En course" quand remettreDisponibleSiAutorise
+  //    échoue silencieusement ou quand le statut est désynchronisé. ──
+  useEffect(() => {
+    if (!livreurProfil?.id) return;
+    if (livreurProfil.statut !== "en_course") return;
+    if (coursesActives.length > 0) return;
+    // Pas de course active mais statut "en_course" → corriger
+    saveLivreur(livreurProfil.id, { statut: "disponible" })
+      .then(() => queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] }))
+      .catch(() => null);
+  }, [livreurProfil?.id, livreurProfil?.statut, coursesActives.length]);
+
+  // ── Anti-blocage (sens 2) : si le livreur est "disponible" mais a des
+  //    courses actives, le passer "en_course" pour éviter qu'il reçoive de
+  //    nouvelles notifications de dispatch alors qu'il est déjà occupé. ──
+  useEffect(() => {
+    if (!livreurProfil?.id) return;
+    if (livreurProfil.statut !== "disponible") return;
+    if (coursesActives.length === 0) return;
+    // Course active mais statut "disponible" → corriger
+    saveLivreur(livreurProfil.id, { statut: "en_course" })
+      .then(() => queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] }))
+      .catch(() => null);
+  }, [livreurProfil?.id, livreurProfil?.statut, coursesActives.length]);
 
   // ─── Gains du jour ────────────────────────────────────────────────────────
   const livreesToday = useMemo(() => {
@@ -1410,8 +1427,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   // ─── Dashboard principal ──────────────────────────────────────────────────
   const TABS = [
     { id: "courses", label: "Courses", emoji: "" },
-    // Onglet "Disponibles" masqué si le livreur a une course active OU si V2 désactivé
-    ...(coursesActives.length === 0 && isV2Enabled ? [{ id: "disponibles", label: "Disponibles", emoji: "" }] : []),
+    // Onglet "Disponibles" toujours visible quand V2 est activé (fixe, ne disparaît jamais)
+    ...(isV2Enabled ? [{ id: "disponibles", label: "Disponibles", emoji: "" }] : []),
     { id: "historique", label: "Historique", emoji: "" },
     { id: "messages", label: "Messages", emoji: "" },
     ...(livreurHasPromoCode ? [{ id: "promo", label: "Code Promo", emoji: "" }] : []),
@@ -1529,6 +1546,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
               onLogout={handleLogout}
             />
 
+            <NotificationStatusBanner livreurId={livreurProfil?.id} />
+
             {isEnLigne && !livreurVisible && (
               <div className="rounded-2xl bg-amber-500/10 border border-amber-500/20 px-4 py-3 flex items-center gap-3">
                 <span className="text-xl flex-shrink-0"></span>
@@ -1605,18 +1624,22 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
             <Link to="/payer-silgapp">
               <div className={`rounded-2xl border p-3.5 flex items-center justify-between shadow-sm active:scale-[0.98] transition ${
-                montantDuSilga > 0 ? "bg-orange-50 border-orange-200" : "bg-white border-black/5"
+                montantDuSilga > 0 ? "bg-orange-50 border-orange-200" : montantDuSilga < 0 ? "bg-green-50 border-green-200" : "bg-white border-black/5"
               }`}>
                 <div className="flex items-center gap-3">
                   <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
-                    montantDuSilga > 0 ? "bg-orange-500/15" : "bg-white/5"
+                    montantDuSilga > 0 ? "bg-orange-500/15" : montantDuSilga < 0 ? "bg-green-500/15" : "bg-white/5"
                   }`}>
-                    <Wallet className={`w-5 h-5 ${montantDuSilga > 0 ? "text-orange-400" : "text-[#00a86b]"}`} />
+                    <Wallet className={`w-5 h-5 ${montantDuSilga > 0 ? "text-orange-400" : montantDuSilga < 0 ? "text-green-500" : "text-[#00a86b]"}`} />
                   </div>
                   <div>
                     <p className="text-sm font-bold text-slate-900">Payer SILGAPP</p>
                     <p className="text-xs text-slate-500">
-                      {montantDuSilga > 0 ? `Total dû : ${montantDuSilga.toLocaleString()} FCFA` : "Aucun dû pour le moment"}
+                      {montantDuSilga > 0
+                        ? `Total dû : ${montantDuSilga.toLocaleString()} FCFA`
+                        : montantDuSilga < 0
+                        ? `Surplus à rembourser : ${Math.abs(montantDuSilga).toLocaleString()} FCFA`
+                        : "Aucun dû pour le moment"}
                     </p>
                   </div>
                 </div>

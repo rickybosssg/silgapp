@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { MapPin, Phone, Navigation, Package, Check, X, AlertTriangle, ChevronRight, QrCode, Clock, Ruler } from "lucide-react";
 import MultiColisProgressBadge from "@/components/multi-colis/MultiColisProgressBadge";
 import MultiColisLivreurView from "@/components/multi-colis/MultiColisLivreurView";
@@ -14,6 +14,7 @@ import NavigationGPS from "./NavigationGPS";
 import { normalizeCommissionPct, resolveStoredOrDynamicSplit, splitAmountByCommission } from "@/lib/commissionUtils";
 import ChatWindow from "@/components/chat/ChatWindow";
 import AnnulationExplicationChat from "./AnnulationExplicationChat";
+import { getPrixAffichable } from "@/utils/getPrixAffichable";
 
 const COUNTRY_DIAL_CODE = {
   BF: "226", CI: "225", TG: "228", BJ: "229", SN: "221",
@@ -167,6 +168,8 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   const [motifAnnulationDetail, setMotifAnnulationDetail] = useState("");
   // Messagerie d'explication apres annulation
   const [showAnnulationChat, setShowAnnulationChat] = useState(false);
+  // Ref du modal d'annulation pour scroll auto vers les boutons (iOS keyboard fix)
+  const annulationModalRef = useRef(null);
 
   // ── Pré-remplir le prix avec la proposition admin si disponible ──
   useEffect(() => {
@@ -204,6 +207,30 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
     }
     return split;
   };
+
+  // ── Auto-appliquer prix_propose_admin comme prix_final pour les courses admin livrées sans prix ──
+  useEffect(() => {
+    if (course.statut !== "livree") return;
+    if (course.prix_final > 0) return;
+    if (course.pricing_mode !== "admin_manuel" && course.source !== "admin") return;
+    if (!course.prix_propose_admin) return;
+
+    const autoSetPrice = async () => {
+      const split = getRequiredSplit(Number(course.prix_propose_admin));
+      if (!split) return;
+      try {
+        await base44.entities.CourseExterne.update(course.id, {
+          prix_final: Number(course.prix_propose_admin),
+          commission_silga: split.commission_silga,
+          montant_livreur: split.montant_livreur,
+        });
+        queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+      } catch (err) {
+        console.error("[CourseActiveCard] Auto-set prix_final error:", err?.message);
+      }
+    };
+    autoSetPrice();
+  }, [course.id, course.statut, course.prix_final, course.prix_propose_admin, course.pricing_mode, course.source]);
 
   // 🔄 Auto-transition : colis_recupere → en_livraison après 10 secondes
   useEffect(() => {
@@ -377,7 +404,13 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   };
 
   // ── Workflow administratif : « Client contacté » puis « En route vers l'expéditeur » ──
+  // ⚠️ Garde anti race-condition : ne pas mettre à jour si la course a été annulée
+  //    ou si le livreur_id a été effacé (annulation concurrente).
   const handleClientContacte = async () => {
+    if (course.statut === "en_attente" || course.statut === "annulee" || !course.livreur_id) {
+      toast.error("Cette course n'est plus assignée.");
+      return;
+    }
     const now = new Date().toISOString();
     updateOptimisticStatut("client_contacte", { heure_contact_client: now });
     await base44.entities.CourseExterne.update(course.id, {
@@ -389,6 +422,10 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   };
 
   const handleDemarrerTrajet = async () => {
+    if (course.statut === "en_attente" || course.statut === "annulee" || !course.livreur_id) {
+      toast.error("Cette course n'est plus assignée.");
+      return;
+    }
     updateOptimisticStatut("en_route_expediteur", {});
     await base44.entities.CourseExterne.update(course.id, {
       statut: "en_route_expediteur",
@@ -422,8 +459,8 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
         source: "livreur",
       });
 
-      if (res?.data?.success) {
-        toast.success(res.data.course_redispatch
+      if (res?.success) {
+        toast.success(res.course_redispatch
           ? "Course remise en dispatch — nouveau livreur recherché"
           : "Course annulée");
         // Libérer le livreur localement
@@ -431,7 +468,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
         // 💬 Ouvrir la messagerie d'explication vers l'admin
         setShowAnnulationChat(true);
       } else {
-        toast.error(res?.data?.error || "Erreur lors de l'annulation");
+        toast.error(res?.error || "Erreur lors de l'annulation");
         setOptimisticStatut(null);
       }
     } catch (error) {
@@ -503,11 +540,15 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
 
       {/* Modal annulation livreur (unifié colis + déplacement) */}
       {showAnnulerCourse && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
           style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)" }}
         >
-          <div className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl space-y-5">
-            <div className="text-center">
+          <div
+            className="w-full max-w-sm bg-white rounded-3xl shadow-2xl flex flex-col"
+            style={{ maxHeight: '88dvh' }}
+          >
+            {/* ── Header fixe ── */}
+            <div className="text-center px-6 pt-6 pb-3 flex-shrink-0">
               <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-3 text-3xl">
 
               </div>
@@ -518,47 +559,60 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                   : "Pourquoi souhaitez-vous annuler cette course ?"}
               </p>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { id: "client_injoignable", label: "Client injoignable", icon: "" },
-                { id: "mauvaise_adresse", label: "Mauvaise adresse", icon: "" },
-                { id: "colis_inexistant", label: "Colis inexistant", icon: "" },
-                { id: "client_change_avis", label: "Client a changé d'avis", icon: "" },
-                { id: "colis_interdit", label: "Colis interdit", icon: "" },
-                { id: "désaccord_prix", label: "Désaccord sur le prix", icon: "💰" },
-                { id: "panne_vehicule", label: "Panne du véhicule", icon: "" },
-                { id: "accident", label: "Accident", icon: "" },
-                { id: "autre", label: "Autre", icon: "" },
-              ].map((m) => (
-                <button
-                  key={m.id}
-                  className={`h-20 rounded-2xl border-2 font-semibold text-sm transition-all flex flex-col items-center justify-center gap-1 ${
-                    motifAnnulationLivreur === m.id
-                      ? "border-red-500 bg-red-50 text-red-700"
-                      : "border-gray-200 text-gray-600 hover:bg-gray-50"
-                  }`}
-                  onClick={() => setMotifAnnulationLivreur(m.id)}
-                >
-                  <span className="text-xl">{m.icon}</span>
-                  <span className="text-[10px] leading-tight text-center">{m.label}</span>
-                </button>
-              ))}
-            </div>
-            {motifAnnulationLivreur && (
+
+            {/* ── Corps scrollable : select + textarea ── */}
+            <div
+              ref={(el) => { annulationModalRef.current = el; }}
+              className="flex-1 overflow-y-auto px-6 py-3 min-h-0 space-y-3"
+            >
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-gray-600">
-                  Décrivez le motif de l'annulation{" "}
-                  <span className="text-gray-400 font-normal">(envoyé à l'admin)</span>
+                  Motif de l'annulation
                 </label>
-                <textarea
-                  placeholder="Expliquez ce qui s'est passé..."
-                  value={motifAnnulationDetail}
-                  onChange={(e) => setMotifAnnulationDetail(e.target.value)}
-                  className="w-full h-20 rounded-xl border-2 border-gray-200 p-3 text-sm resize-none focus:border-red-400 focus:outline-none"
-                />
+                <select
+                  value={motifAnnulationLivreur || ""}
+                  onChange={(e) => setMotifAnnulationLivreur(e.target.value)}
+                  className="w-full h-12 rounded-xl border-2 border-gray-200 px-3 text-sm font-medium text-gray-800 bg-white focus:border-red-400 focus:outline-none"
+                >
+                  <option value="" disabled>Sélectionnez un motif...</option>
+                  <option value="client_injoignable">Client injoignable</option>
+                  <option value="mauvaise_adresse">Mauvaise adresse</option>
+                  <option value="colis_inexistant">Colis inexistant</option>
+                  <option value="client_change_avis">Client a changé d'avis</option>
+                  <option value="colis_interdit">Colis interdit</option>
+                  <option value="désaccord_prix">Désaccord sur le prix</option>
+                  <option value="panne_vehicule">Panne du véhicule</option>
+                  <option value="accident">Accident</option>
+                  <option value="autre">Autre</option>
+                </select>
               </div>
-            )}
-            <div className="grid grid-cols-2 gap-3 pt-2">
+              {motifAnnulationLivreur && (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-gray-600">
+                    Décrivez le motif de l'annulation{" "}
+                    <span className="text-gray-400 font-normal">(envoyé à l'admin)</span>
+                  </label>
+                  <textarea
+                    placeholder="Expliquez ce qui s'est passé..."
+                    value={motifAnnulationDetail}
+                    onChange={(e) => setMotifAnnulationDetail(e.target.value)}
+                    onFocus={() => {
+                      setTimeout(() => {
+                        const modal = annulationModalRef.current;
+                        if (modal) modal.scrollTo({ top: modal.scrollHeight, behavior: 'smooth' });
+                      }, 300);
+                    }}
+                    className="w-full h-20 rounded-xl border-2 border-gray-200 p-3 text-sm resize-none focus:border-red-400 focus:outline-none"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* ── Footer fixe toujours visible ── */}
+            <div
+              className="grid grid-cols-2 gap-3 px-6 pt-3 pb-6 flex-shrink-0 border-t border-gray-100"
+              style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}
+            >
               <button
                 className="h-12 rounded-2xl border border-gray-200 text-gray-600 font-bold text-sm"
                 onClick={() => {
@@ -817,16 +871,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                 heure_contact_client: now,
               }).catch(() => null);
               queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
-              toast.success("Client contacté. Démarrage automatique dans 60s…");
-              // Étape 2 : En route vers l'expéditeur (automatique après 60s)
-              setTimeout(() => {
-                updateOptimisticStatut("en_route_expediteur", {});
-                base44.entities.CourseExterne.update(course.id, {
-                  statut: "en_route_expediteur",
-                }).catch(() => null);
-                queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
-                toast.success("En route vers l'expéditeur !");
-              }, 60000);
+              toast.success("Client contacté. N'oubliez pas de démarrer votre trajet.");
             };
 
             const handleWhatsApp = () => {
@@ -944,7 +989,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
           {isExterne ? (
             (() => {
               const isPrixManuel = course.pricing_mode === "manual" && course.manual_price_status === "accepted" && Number(course.manual_price) > 0;
-              const prixBase = isPrixManuel ? Number(course.manual_price) : (course.prix_propose_admin || course.prix_estimate || 0);
+              const prixBase = getPrixAffichable(course);
               const split = splitAmountByCommission(prixBase, commissionPct);
               const gain = split.montant_livreur;
 
@@ -1546,6 +1591,16 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                     Commission SILGAPP : {commission.toLocaleString()} {course.devise || "F"}
                   </p>
                 )}
+                <button
+                  className="w-full h-12 rounded-2xl bg-gradient-to-b from-primary to-green-700 text-white font-black text-sm shadow-lg shadow-green-200 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                  onClick={() => {
+                    onColisLivre({ ...course, statut: "livree" }, null);
+                    navigateToRecap({ statut: "livree", heure_livraison: course.heure_livraison || new Date().toISOString() });
+                  }}
+                >
+                  <Check className="w-5 h-5" />
+                  Terminer
+                </button>
               </div>
             );
           })()}

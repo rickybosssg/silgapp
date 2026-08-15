@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { getPrixAffichable } from "@/utils/getPrixAffichable";
 import {
   MapPin,
   Package,
@@ -369,9 +370,8 @@ export default function PublicSuiviCourse() {
       ? new Date(course.heure_livraison) - new Date(course.heure_acceptation) : null;
   const dureeMin = dureeMs ? Math.round(dureeMs / 60000) : etaMin;
   const distCourse = haversineKm(course.gps_depart_lat, course.gps_depart_lng, course.gps_arrivee_lat, course.gps_arrivee_lng);
-  const isFinalPrix = isDelivered && course.prix_final > 0;
-  const prixBrut = isFinalPrix ? course.prix_final : (distCourse ? Math.round(distCourse * 100) : (course.prix_estimate || 0));
-  const prixAffiche = prixBrut > 0 ? Math.max(prixBrut, PRIX_MIN) : 0;
+  const prixAfficheRaw = getPrixAffichable(course);
+  const prixAffiche = prixAfficheRaw ? Math.max(prixAfficheRaw, PRIX_MIN) : 0;
   const showEtaCards = ["livreur_en_route", "en_route_expediteur", "colis_recupere", "en_livraison", "livree"].includes(course.statut);
 
   return (
@@ -453,7 +453,7 @@ export default function PublicSuiviCourse() {
               <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl p-3 text-center shadow-lg">
                 <span className="text-2xl font-black text-white block">{prixAffiche > 0 ? prixAffiche.toLocaleString() : "—"}</span>
                 <span className="text-[10px] font-bold text-blue-100 uppercase tracking-wide">
-                  {isFinalPrix ? "Prix final" : "Prix approx."}
+                  {course.statut === "livree" ? "Prix final" : "Prix approx."}
                 </span>
               </div>
             </div>

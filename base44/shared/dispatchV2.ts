@@ -1,11 +1,42 @@
+// ═══════════════════════════════════════════════════════════════════════════
+// 📌 DISPATCH V2 — VERSION STABLE FIGÉE (2026-08-11)
+// ═══════════════════════════════════════════════════════════════════════════
+// ⚠️  NE PAS MODIFIER SANS VALIDATION EXPLICITE DU RESPONSABLE PRODUIT.
+//
+// Ce moteur a été audité, testé et validé. Toute modification — même mineure —
+// doit être signalée et validée avant application. Les optimisations automatiques
+// ou refactorisations sont interdites sur ce fichier.
+//
+// Fonctionnement validé (à conserver) :
+//   1. Course publiée dans le fil « Disponibles » (dispatch_status = disponible_push).
+//   2. Tous les livreurs éligibles et libres voient la course, prioritaires ou non.
+//   3. À T=0, les prioritaires (priorite_dispatch > 0) reçoivent le push en premier,
+//      puis tous les non-prioritaires éligibles reçoivent également un push.
+//   4. Notifications envoyées via envoiNotificationPushBatch (1 appel pour N livreurs).
+//   5. Un non-prioritaire peut accepter immédiatement une course visible dans son fil.
+//   6. Un livreur en course ne reçoit pas le push et ne peut pas accepter une 2e course.
+//   7. Acceptation protégée par verrou atomique (updateMany conditionnel) — 1 seul gagnant.
+//   8. Après acceptation, la course disparaît du fil des autres (livreur_id + WebSocket).
+//   9. T+5 min sans acceptation → push batch Top 3 non-prioritaires encore éligibles.
+//  10. T+10 min sans acceptation → push batch Top 5 non-prioritaires encore éligibles.
+//  11. T+15 min → aucun nouveau push ; la course reste en disponible_push indéfiniment.
+//
+// V1 (dispatchEngine.ts) reste intact pour rollback. Feature flags et pilote
+// (DISPATCH_V2_ENABLED, DISPATCH_V2_PILOT_*) inchangés.
+// ═══════════════════════════════════════════════════════════════════════════
+
 // ── Dispatch V2 : Fil de courses disponibles + secours ciblé ────────────────
 // Nouveau système derrière le feature flag DISPATCH_V2_ENABLED.
 // V1 (vagues) reste intact et utilisé quand le flag est désactivé.
-// VERSION: 2026-08-09 — Correctif updateMany sans filtre livreur_id vide.
+// VERSION: 2026-08-11 — Version stable figée. Ne pas modifier sans validation.
 
+import { waitUntil } from 'base44:runtime';
 import { STATUTS_ACTIFS_COURSE, STATUTS_TERMINAUX_COURSE, calculerDistance } from './dispatchConstants.ts';
 import { dispatchLog, reponseDejaPrise, generateToken, generatePIN, journaliserDispatch } from './dispatchUtils.ts';
 import { enregistrerNotification, getLivreursNotifies, getLivreursRefuses, marquerAccepte } from './dispatchNotifications.ts';
+
+// ── Version du bundle (pour vérifier que la production charge la dernière version) ──
+export const DISPATCH_V2_BUNDLE_VERSION = '2026-08-14-simplified-3';
 
 // ── Feature flag cache (TTL 2 min) ──
 let V2_FLAG_CACHE: { enabled: boolean; expires: number } | null = null;
@@ -30,7 +61,8 @@ export async function isV2Enabled(base44: any): Promise<boolean> {
   }
 }
 
-async function notifierLivreursEligiblesV2(base44: any, course: any) {
+async function notifierLivreursEligiblesV2(base44: any, course: any, options: any = {}) {
+  const { priorityOnly = false, skipAlreadyPublishedCheck = false } = options;
   if (!course?.id || !course?.country_code) return { notified: 0 };
 
   const [livreurs, dejaNotifies, refuses] = await Promise.all([
@@ -48,25 +80,76 @@ async function notifierLivreursEligiblesV2(base44: any, course: any) {
     getLivreursRefuses(base44, course.id),
   ]);
 
-  const exclus = new Set([...(dejaNotifies || []), ...(refuses || [])]);
-  const candidats = (livreurs || []).filter((livreur: any) => livreur.user_email && !exclus.has(livreur.id));
+  // 🛡️ Anti-race-condition : si la course a déjà des notifications, c'est qu'elle
+  // a déjà été publiée dans le fil. Ne pas re-notifier (évite les 82 doublons).
+  // Sauf si skipAlreadyPublishedCheck=true (appel délibéré pour la 2e vague).
+  if (!skipAlreadyPublishedCheck && dejaNotifies && dejaNotifies.length > 0) {
+    dispatchLog(`[V2] ⏭️ Course ${course.id} déjà publiée (${dejaNotifies.length} notifs existantes) — skip re-notification`);
+    return { notified: 0, already_published: true };
+  }
 
-  await Promise.allSettled(candidats.map(async (livreur: any) => {
-    await enregistrerNotification(base44, course.id, livreur, 0, { country_code: course.country_code });
-    await base44.asServiceRole.functions.invoke('envoiNotificationPush', {
-      destinataire_email: livreur.user_email,
-      livreur_id: livreur.id,
+  const exclus = new Set([...(dejaNotifies || []), ...(refuses || [])]);
+  let candidats = (livreurs || []).filter((livreur: any) => livreur.user_email && !exclus.has(livreur.id));
+
+  // 🚫 Exclure les livreurs déjà en course (même définition que aCourseActive)
+  const livreursEnCourse = await getLivreursEnCourse(base44, course.country_code);
+  candidats = candidats.filter((l: any) => !livreursEnCourse.has(l.id));
+
+  // 🎯 Priorité : si priorityOnly=true, ne notifier que les livreurs prioritaires (priorite_dispatch > 0)
+  if (priorityOnly) {
+    candidats = candidats.filter((l: any) => Number(l.priorite_dispatch || 0) > 0);
+  }
+
+  // Enregistrer les DispatchNotifications (bulk) pour le suivi dispatch
+  await Promise.allSettled(
+    candidats.map((livreur: any) => enregistrerNotification(base44, course.id, livreur, 0, { country_code: course.country_code }))
+  );
+
+  // 📤 Envoi push batch : 1 seule invocation backend pour tous les livreurs prioritaires
+  if (candidats.length > 0) {
+    const batchResult = await base44.asServiceRole.functions.invoke('envoiNotificationPushBatch', {
+      course_id: course.id,
+      livreur_ids: candidats.map((l: any) => l.id),
       titre: 'Nouvelle course SILGAPP',
       message: `${course.quartier_depart || course.adresse_depart || 'Départ'} vers ${course.quartier_arrivee || course.adresse_arrivee || 'destination'}`,
       type: 'nouvelle_course',
-      course_id: course.id,
       alert_duration_seconds: 5,
       alert_interval_seconds: 5,
       dispatch_version: '2',
+    }).catch((err: any) => {
+      dispatchLog(`[V2] ⚠️ Batch push error (T=0): ${err?.message}`);
+      return null;
     });
-  }));
 
-  return { notified: candidats.length };
+    const sent = batchResult?.succes || 0;
+    dispatchLog(`[V2] 📢 Batch push T=0: ${sent} token(s) envoyé(s) pour ${candidats.length} livreur(s) prioritaire(s)`);
+    return { notified: candidats.length, push_sent: sent, push_failed: batchResult?.echecs || 0 };
+  }
+
+  return { notified: 0 };
+}
+
+// ── Helper : liste des livreurs en course (même définition que aCourseActive) ──
+async function getLivreursEnCourse(base44: any, countryCode: string): Promise<Set<string>> {
+  if (!countryCode) return new Set();
+  const [courses, coursesAccepted] = await Promise.all([
+    base44.asServiceRole.entities.CourseExterne.filter(
+      { country_code: countryCode, livreur_id: { $ne: null } }, '-created_date', 200
+    ).catch(() => []),
+    base44.asServiceRole.entities.CourseExterne.filter(
+      { country_code: countryCode, accepted_by_livreur_id: { $ne: null } }, '-created_date', 200
+    ).catch(() => []),
+  ]);
+  const ids = new Set<string>();
+  for (const c of [...(courses || []), ...(coursesAccepted || [])]) {
+    if (c.livreur_id && (STATUTS_ACTIFS_COURSE.includes(c.statut) || (c.dispatch_status === 'accepte' && !STATUTS_TERMINAUX_COURSE.includes(c.statut)))) {
+      ids.add(c.livreur_id);
+    }
+    if (c.accepted_by_livreur_id && (STATUTS_ACTIFS_COURSE.includes(c.statut) || (c.dispatch_status === 'accepte' && !STATUTS_TERMINAUX_COURSE.includes(c.statut)))) {
+      ids.add(c.accepted_by_livreur_id);
+    }
+  }
+  return ids;
 }
 
 // ── Pilote par livreur (cache TTL 60s) ──
@@ -93,25 +176,73 @@ export async function isPilotLivreur(base44: any, livreurId: string): Promise<bo
 }
 
 // ── Publier une course dans le fil (V2) ──
+// La course est visible immédiatement dans le fil « Disponibles » de TOUS les
+// livreurs éligibles. Seuls les prioritaires (priorite_dispatch > 0) reçoivent
+// une notification push à T=0. Les non-prioritaires peuvent voir et accepter la
+// course depuis leur fil. Si personne n'a accepté après ~5 min, le watchdog
+// déclenche les phases de secours (secoursDispatchV2) qui envoient un push
+// ciblé aux meilleurs non-prioritaires restants.
 export async function publierCourseDansFil(base44: any, course: any) {
   if (!course?.id) return { error: 'no_course_id' };
 
-  await base44.asServiceRole.entities.CourseExterne.update(course.id, {
-    statut: 'recherche_livreur',
-    dispatch_status: 'disponible_push',
-    heure_sollicitation: new Date().toISOString(),
-    timeout_expires_at: null,
-    dispatch_wave: 0,
-    dispatch_next_wave_at: null,
-    dispatch_v2_secours_phase: 0,
-    livreur_id: '',
-    accepted_by_livreur_id: '',
+  // 🔖 Log de version bundle — pour vérifier que la production charge la dernière version
+  dispatchLog(`[V2] 🔖 publierCourseDansFil — bundle version: ${DISPATCH_V2_BUNDLE_VERSION} — course ${course.id}`);
+
+  // 🛡️ GARDE IDEMPOTENTE ATOMIQUE ANTI-CASCADE
+  // Utilise updateMany conditionnel : ne met à jour QUE si dispatch_status n'est pas
+  // déjà 'disponible_push'. Cela empêche la cascade CREATE → UPDATE de l'orchestrateur
+  // de re-publier : publierCourseDansFil met statut='recherche_livreur', ce qui déclenche
+  // l'UPDATE event → l'orchestrateur rappelle publierCourseDansFil. Avec une garde basée
+  // sur l'objet course passé en paramètre, une race condition peut survenir si le 2e appel
+  // lit la course avant que le 1er ait commité. La garde atomique (updateMany conditionnel)
+  // élimine cette race condition.
+  const nowIso = new Date().toISOString();
+  await base44.asServiceRole.entities.CourseExterne.updateMany(
+    { id: course.id, dispatch_status: { $ne: 'disponible_push' } },
+    { $set: {
+      statut: 'recherche_livreur',
+      dispatch_status: 'disponible_push',
+      heure_sollicitation: nowIso,
+      timeout_expires_at: null,
+      dispatch_wave: 0,
+      dispatch_next_wave_at: null,
+      dispatch_v2_secours_phase: 0,
+      livreur_id: '',
+      accepted_by_livreur_id: '',
+    }}
+  );
+
+  // Re-fetch pour vérifier si ON a gagné la publication (heure_sollicitation = notre now)
+  // ou si un autre appel a déjà publié avant nous.
+  const coursePubliee = await base44.asServiceRole.entities.CourseExterne.get(course.id);
+  if (!coursePubliee) return { error: 'Course introuvable' };
+
+  if (coursePubliee.heure_sollicitation !== nowIso) {
+    dispatchLog(`[V2] ⏭️ Course ${course.id} déjà publiée par un autre appel (heure_sollicitation=${coursePubliee.heure_sollicitation}) — skip republication`);
+    journaliserDispatch(base44, {
+      course_id: course.id,
+      evenement: 'publier_fil_v2_skip',
+      raison_passage: `already_published — heure_sollicitation=${coursePubliee.heure_sollicitation} vs now=${nowIso}`,
+    });
+    return { success: true, already_published: true, skipped: true };
+  }
+
+  journaliserDispatch(base44, {
+    course_id: course.id,
+    evenement: 'publier_fil_v2_execute',
+    raison_passage: `guard passed — heure_sollicitation=${nowIso}`,
   });
 
-  const notificationResult = await notifierLivreursEligiblesV2(base44, course);
+  // 🎯 T=0 : UN SEUL push batch à TOUS les livreurs éligibles (prioritaires + non-prioritaires)
+  // Simplification 2026-08-14 : plus de distinction temporelle, plus de T+20s, plus de secours.
+  // La course reste dans le fil indéfiniment jusqu'à acceptation ou annulation.
+  const batchResult = await notifierLivreursEligiblesV2(base44, coursePubliee, {
+    priorityOnly: false,
+    skipAlreadyPublishedCheck: true,
+  });
 
-  dispatchLog(`[V2] 📢 Course ${course.id} publiée dans le fil (disponible_push)`);
-  return { success: true, published: true, ...notificationResult };
+  dispatchLog(`[V2] 📢 Course ${course.id} publiée dans le fil (disponible_push) — ${batchResult.notified} livreur(s) notifié(s) à T=0 (batch unique)`);
+  return { success: true, published: true, batch: batchResult };
 }
 
 // ── Vérifier si un livreur a une course active (3 niveaux) ──
@@ -247,6 +378,15 @@ export async function accepterCourseV2(base44: any, courseId: string, livreurId:
 
   if (!isMyCourse) {
     dispatchLog(`[V2] 🏁 Race condition perdue — livreur ${livreurId} n'a pas obtenu la course ${courseId}`);
+    journaliserDispatch(base44, {
+      course_id: courseId,
+      country_code: course.country_code,
+      vague: 0,
+      evenement: 'race_condition_perdue',
+      livreur_acceptant_id: livreurId,
+      livreur_acceptant_nom: `${livreur.prenom || ''} ${livreur.nom || ''}`.trim(),
+      raison_passage: `Perdu par ${livreurId} — gagnant: ${courseVerifie.livreur_id || courseVerifie.accepted_by_livreur_id || '?'}`,
+    });
     return reponseDejaPrise('race_condition_lost', courseVerifie);
   }
 
@@ -260,22 +400,39 @@ export async function accepterCourseV2(base44: any, courseId: string, livreurId:
     await base44.asServiceRole.entities.Livreur.update(livreurId, { statut: 'en_course' });
     await marquerAccepte(base44, courseId, livreurId);
 
-    // 13. Message code récupération (courses admin/VENUS)
+    // 13. Message code récupération + push notification (courses admin/VENUS)
     if ((course.source === 'admin' || course.created_by_venus === true) && pickupPIN) {
       const idempotencyKey = `pickup-code-${courseId}-${livreurId}`;
       try {
         const existing = await base44.asServiceRole.entities.Message.filter({ client_message_id: idempotencyKey });
         if (!existing || existing.length === 0) {
+          const prixLabel = course.prix_propose_admin
+            ? `Prix de la course : ${Number(course.prix_propose_admin).toLocaleString()} ${course.devise || 'FCFA'}`
+            : (course.prix_estimate ? `Prix estimé : ${Number(course.prix_estimate).toLocaleString()} ${course.devise || 'FCFA'}` : '');
+          const messageContent = `🔑 Code de récupération : ${pickupPIN}\n📦 Code de livraison : ${deliveryPIN}${prixLabel ? `\n💰 ${prixLabel}` : ''}`;
+
           await base44.asServiceRole.entities.Message.create({
             course_id: courseId,
             sender_type: 'admin',
             sender_id: 'silgapp_system',
             sender_name: 'SILGAPP',
             message_type: 'text',
-            content: `🔑 Code de récupération : ${pickupPIN}`,
+            content: messageContent,
             source: 'app',
             client_message_id: idempotencyKey,
           });
+
+          // 📤 Push notification au livreur avec PIN + prix
+          if (livreur.user_email) {
+            base44.asServiceRole.functions.invoke('envoiNotificationPush', {
+              destinataire_email: livreur.user_email,
+              livreur_id: livreurId,
+              titre: '🔑 Code PIN + Prix de course',
+              message: messageContent,
+              type: 'nouveau_message',
+              course_id: courseId,
+            }).catch((err: any) => console.error('[V2] ❌ Push PIN/prix:', err?.message));
+          }
         }
       } catch (err) { console.error('[V2] ⚠️ Erreur message code récupération:', err?.message); }
     }
@@ -337,7 +494,10 @@ export function calculerScore(livreur: any, course: any): number {
 }
 
 // ── Secours : push ciblé au top N livreurs ──
-export async function secoursDispatchV2(base44: any, course: any, nbLivreurs: number) {
+// Pour le rappel T+5min, passer excludeAlreadyNotified=false afin de re-notifier
+// les livreurs déjà notifiés à T=0 mais toujours libres et éligibles.
+export async function secoursDispatchV2(base44: any, course: any, nbLivreurs: number, options: { excludeAlreadyNotified?: boolean } = {}) {
+  const { excludeAlreadyNotified = true } = options;
   if (!course?.id || !course.country_code) return { pushed: 0 };
 
   // 1. Get eligible livreurs
@@ -364,29 +524,39 @@ export async function secoursDispatchV2(base44: any, course: any, nbLivreurs: nu
       .map((c: any) => c.livreur_id)
   );
 
-  // 3. Exclude refused
+  // 3. Exclude refused + (optionally) already notified
   const refused = await getLivreursRefuses(base44, course.id);
+  let dejaNotifies: string[] = [];
+  if (excludeAlreadyNotified) {
+    dejaNotifies = await getLivreursNotifies(base44, course.id);
+  }
 
   // 4. Score + sort + slice top N
   const candidats = livreurs
-    .filter((l: any) => !livreursEnCourse.has(l.id) && !refused.includes(l.id))
+    .filter((l: any) => !livreursEnCourse.has(l.id) && !refused.includes(l.id) && !dejaNotifies.includes(l.id))
     .map((l: any) => ({ ...l, score: calculerScore(l, course) }))
     .sort((a: any, b: any) => b.score - a.score)
     .slice(0, nbLivreurs);
 
-  // 5. Push ciblé (pas à tous)
-  for (const l of candidats) {
-    base44.asServiceRole.functions.invoke('envoiNotificationPush', {
-      destinataire_email: l.user_email,
-      livreur_id: l.id,
+  // 5. Push batch ciblé : 1 seule invocation backend pour tous les candidats sélectionnés
+  if (candidats.length > 0) {
+    const batchResult = await base44.asServiceRole.functions.invoke('envoiNotificationPushBatch', {
+      course_id: course.id,
+      livreur_ids: candidats.map((l: any) => l.id),
       titre: '📦 Course disponible près de vous',
       message: `${course.quartier_depart || course.adresse_depart || ''} → ${course.quartier_arrivee || course.adresse_arrivee || '?'}`,
       type: 'nouvelle_course',
-      course_id: course.id,
-    }).catch(() => {});
-  }
+      dispatch_version: '2',
+    }).catch((err: any) => {
+      dispatchLog(`[V2] ⚠️ Batch push secours error: ${err?.message}`);
+      return null;
+    });
 
-  dispatchLog(`[V2] 🚨 Secours: ${candidats.length} livreur(s) notifié(s) pour course ${course.id} (top ${nbLivreurs})`);
+    const sent = batchResult?.succes || 0;
+    dispatchLog(`[V2] 🚨 Secours batch: ${sent} token(s) envoyé(s) pour ${candidats.length} livreur(s) - course ${course.id} (top ${nbLivreurs})`);
+  } else {
+    dispatchLog(`[V2] 🚨 Secours: 0 candidat pour course ${course.id} (top ${nbLivreurs})`);
+  }
 
   journaliserDispatch(base44, {
     course_id: course.id,

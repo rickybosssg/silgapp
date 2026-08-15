@@ -94,7 +94,7 @@ const availableCountIndex = livreurAppSource.indexOf("const { data: availableCou
 assert.ok(v2DeclarationIndex >= 0 && availableCountIndex > v2DeclarationIndex, "isV2Enabled doit etre declare avant le compteur de courses");
 assert.match(livreurAppSource, /DispatchNotification\.filter\([\s\S]*statut:\s*"refuse"/, "le badge doit exclure les refus persistants");
 assert.match(livreurAppSource, /dismissedIds\.has\(course\.id\)/, "le badge doit exclure les courses masquees localement");
-assert.match(livreurAppSource, /coursesActives\.length === 0[\s\S]*livreurProfil\.statut !== "disponible"[\s\S]*statut: "en_course"/, "une course active doit maintenir le livreur en_course");
+assert.match(livreurAppSource, /livreurProfil\.statut !== "disponible"[\s\S]*coursesActives\.length === 0[\s\S]*statut: "en_course"/, "une course active doit maintenir le livreur en_course");
 assert.doesNotMatch(dispatchV2Source, /dispatch_status:[^\n]+livreur_id:\s*''/, "le verrou V2 doit accepter un livreur_id null");
 assert.match(dispatchV2Source, /STATUTS_TERMINAUX_COURSE\.includes\(course\.statut\)/, "V2 doit refuser une course terminee ou annulee");
 assert.doesNotMatch(dispatchV2Source, /notes:\s*`Accept/, "V2 ne doit pas exposer son journal technique dans les notes utilisateur");
@@ -104,5 +104,18 @@ assert.match(nativePushSource, /DISPATCH_V2_ALERT_DURATION_MS\s*=\s*10000L/, "l'
 assert.match(nativePushSource, /playNotificationSound\(context, false\)/, "la sonnerie native V2 ne doit pas boucler");
 assert.doesNotMatch(nativePushSource, /setFullScreenIntent\(/, "la notification V2 ne doit pas ouvrir MainActivity automatiquement");
 assert.doesNotMatch(mainActivitySource, /void onResume\(\)[\s\S]*stopUrgentCourseAlert/, "reprendre l'app ne doit pas tronquer l'alerte V2");
+
+const annulationBackendSource = readFileSync(
+  new URL("../base44/functions/annulerCourseExterne/entry.ts", import.meta.url),
+  "utf8",
+);
+assert.match(courseActiveCardSource, /maxHeight:\s*['"]88dvh['"]/, "la modale d'annulation doit tenir sur un petit ecran");
+assert.match(courseActiveCardSource, /overflow-y-auto/, "le contenu de la modale d'annulation doit pouvoir defiler");
+assert.match(courseActiveCardSource, /env\(safe-area-inset-bottom\)/, "le bouton d'annulation doit respecter la safe area Android et iOS");
+assert.match(courseActiveCardSource, /value="autre"/, "le motif Autre doit etre disponible");
+assert.match(courseActiveCardSource, /motif_detail:\s*motifAnnulationDetail\.trim\(\)/, "le detail du motif doit etre transmis au backend");
+assert.match(annulationBackendSource, /source === "livreur"[\s\S]*motif_detail/, "le backend doit valider le detail fourni par le livreur");
+assert.match(annulationBackendSource, /dispatch_refused_ids:\s*JSON\.stringify\(refusedIds\)/, "le livreur doit etre exclu uniquement de la course annulee");
+assert.match(annulationBackendSource, /manual_hors_ligne === true \? "hors_ligne" : "disponible"/, "le livreur doit etre libere sans annuler son choix hors ligne");
 
 console.log("LIVREUR_COURSE_REGRESSION=PASS");

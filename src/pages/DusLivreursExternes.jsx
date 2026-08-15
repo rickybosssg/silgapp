@@ -58,7 +58,7 @@ function DetailModal({ entry, livreurInfo, onClose, onPaiement, onBloquer, onDeb
               {(entry.prenom?.[0] || "") + (entry.nom?.[0] || "")}
             </div>
             <div>
-              <p className="font-bold text-foreground">{entry.prenom} {entry.nom}</p>
+              <p className="font-bold text-gray-900">{entry.prenom} {entry.nom}</p>
               {entry.telephone && <p className="text-xs text-gray-500 flex items-center gap-1"><Phone className="w-3 h-3" />{entry.telephone}</p>}
             </div>
           </div>
@@ -91,6 +91,12 @@ function DetailModal({ entry, livreurInfo, onClose, onPaiement, onBloquer, onDeb
                 <p className="text-xs text-gray-500">Déjà payé</p>
                 <p className="font-bold text-green-600">{entry.montantPaye.toLocaleString()} F</p>
               </div>
+              {entry.montantDu < 0 && (
+                <div className="bg-blue-50 rounded-xl p-3 col-span-2">
+                  <p className="text-xs text-blue-600">Surplus (à rembourser)</p>
+                  <p className="font-bold text-blue-700">{Math.abs(entry.montantDu).toLocaleString()} F</p>
+                </div>
+              )}
             </div>
           )}
 
@@ -113,7 +119,7 @@ function DetailModal({ entry, livreurInfo, onClose, onPaiement, onBloquer, onDeb
           {/* Paiement */}
           {entry.montantDu > 0 && (
             <div className="border-t pt-4">
-              <p className="text-sm font-semibold text-foreground mb-2">Enregistrer un paiement</p>
+              <p className="text-sm font-semibold text-gray-900 mb-2">Enregistrer un paiement</p>
               <div className="flex gap-2">
                 <Input type="number" placeholder="Montant" value={montantSaisi}
                   onChange={e => setMontantSaisi(e.target.value)}
@@ -131,7 +137,7 @@ function DetailModal({ entry, livreurInfo, onClose, onPaiement, onBloquer, onDeb
           {/* Courses — liste simple */}
           {entry.courses.length > 0 && (
             <div className="border-t pt-4">
-              <p className="text-sm font-semibold text-foreground mb-2">Courses ({entry.courses.length})</p>
+              <p className="text-sm font-semibold text-gray-900 mb-2">Courses ({entry.courses.length})</p>
               <div className="space-y-1.5">
                 {entry.courses.map(c => (
                   <div key={c.id} className="flex items-center justify-between text-xs py-1.5 px-2 bg-gray-50 rounded-lg">
@@ -286,7 +292,7 @@ export default function DusLivreursExternes() {
       const isToday = dateLivraison ? new Date(dateLivraison) >= startOfToday : false;
       if (!map[c.livreur_id]) {
         const info = livreurs.find(l => l.id === c.livreur_id);
-        map[c.livreur_id] = { id: c.livreur_id, nom: c.livreur_nom || info?.nom || "Inconnu", prenom: info?.prenom || "", telephone: c.livreur_telephone || info?.telephone || "", livreurInfo: info || null, courses: [], montantTotal: 0, commissionTotal: 0, commissionJour: 0, nbCoursesJour: 0, montantPaye: 0, montantDu: 0 };
+        map[c.livreur_id] = { id: c.livreur_id, nom: info?.nom || c.livreur_nom || "Inconnu", prenom: info?.prenom || "", telephone: c.livreur_telephone || info?.telephone || "", livreurInfo: info || null, courses: [], montantTotal: 0, commissionTotal: 0, commissionJour: 0, nbCoursesJour: 0, montantPaye: 0, montantDu: 0 };
       }
       map[c.livreur_id].courses.push(c);
       map[c.livreur_id].montantTotal += (c.prix_final ?? 0);
@@ -500,7 +506,7 @@ export default function DusLivreursExternes() {
             <Wallet className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h1 className="text-xl font-black text-foreground tracking-tight">Dû Utilisateur</h1>
+            <h1 className="text-xl font-black text-gray-900 tracking-tight">Dû Utilisateur</h1>
             <p className="text-xs text-gray-500">Gestion des commissions & dettes</p>
           </div>
         </div>
@@ -605,14 +611,14 @@ export default function DusLivreursExternes() {
                         </div>
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
-                            <p className="font-bold text-foreground text-sm truncate">{entry.prenom} {entry.nom}</p>
+                            <p className="font-bold text-gray-900 text-sm truncate">{entry.prenom} {entry.nom}</p>
                             <span className={`w-2 h-2 rounded-full shrink-0 ${sf.dot}`} />
                           </div>
                           {entry.telephone && <p className="text-xs text-gray-400 truncate">{entry.telephone}</p>}
                         </div>
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="text-xl font-black text-foreground tracking-tight">{formatMontantCredit(entry.montantDu)}<span className="text-[10px] font-normal text-gray-400 ml-0.5">F</span></p>
+                        <p className="text-xl font-black text-gray-900 tracking-tight">{formatMontantCredit(entry.montantDu)}<span className="text-[10px] font-normal text-gray-400 ml-0.5">F</span></p>
                         <p className={`text-[10px] font-semibold ${entry.montantDu > 0 ? "text-red-500" : entry.montantDu < 0 ? "text-blue-500" : "text-green-500"}`}>{sf.label}</p>
                       </div>
                     </div>
@@ -620,12 +626,15 @@ export default function DusLivreursExternes() {
                       <span className="text-gray-400">Commission générée :</span>
                       <span className="font-bold text-green-600">{(entry.commissionTotal || 0).toLocaleString()} F</span>
                       {entry.courses.length > 0 && <span className="text-gray-400">· {entry.courses.length} course(s)</span>}
-                      {entry.nbCoursesJour > 0 && (
+                      {entry.montantDu < 0 && (
+                        <span className="text-blue-600 font-bold ml-auto">Surplus : {Math.abs(entry.montantDu).toLocaleString()} F</span>
+                      )}
+                      {entry.nbCoursesJour > 0 && entry.montantDu >= 0 && (
                         <span className="text-gray-300 ml-auto">Aujourd'hui : {(entry.commissionJour || 0).toLocaleString()} F</span>
                       )}
                     </div>
                     <div className="flex gap-2 mt-3">
-                      <Button variant="outline" size="sm" className="flex-1 h-9 text-xs rounded-xl font-semibold" onClick={() => setDetailEntry(entry)}>
+                      <Button variant="outline" size="sm" className="flex-1 h-9 text-xs rounded-xl font-semibold text-gray-700" onClick={() => setDetailEntry(entry)}>
                         Détails
                       </Button>
                       {entry.montantDu > 0 && (
@@ -729,19 +738,19 @@ export default function DusLivreursExternes() {
                         </div>
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
-                            <p className="font-bold text-foreground text-sm truncate">{entry.nom}</p>
+                            <p className="font-bold text-gray-900 text-sm truncate">{entry.nom}</p>
                             <span className={`w-2 h-2 rounded-full shrink-0 ${sf.dot}`} />
                           </div>
                           {entry.telephone && <p className="text-xs text-gray-400 truncate">{entry.telephone}</p>}
                         </div>
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="text-xl font-black text-foreground tracking-tight">{entry.montantDu.toLocaleString()}<span className="text-[10px] font-normal text-gray-400 ml-0.5">F</span></p>
+                        <p className="text-xl font-black text-gray-900 tracking-tight">{entry.montantDu.toLocaleString()}<span className="text-[10px] font-normal text-gray-400 ml-0.5">F</span></p>
                         <p className={`text-[10px] font-semibold ${entry.montantDu > 0 ? "text-red-500" : "text-green-500"}`}>{sf.label}</p>
                       </div>
                     </div>
                     <div className="flex gap-2 mt-3">
-                      <Button variant="outline" size="sm" className="flex-1 h-9 text-xs rounded-xl font-semibold" onClick={() => setDetailEntry(entry)}>
+                      <Button variant="outline" size="sm" className="flex-1 h-9 text-xs rounded-xl font-semibold text-gray-700" onClick={() => setDetailEntry(entry)}>
                         Détails
                       </Button>
                       {entry.montantDu > 0 && (
@@ -845,19 +854,19 @@ export default function DusLivreursExternes() {
                         </div>
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
-                            <p className="font-bold text-foreground text-sm truncate">{entry.nom}</p>
+                            <p className="font-bold text-gray-900 text-sm truncate">{entry.nom}</p>
                             <span className={`w-2 h-2 rounded-full shrink-0 ${sf.dot}`} />
                           </div>
                           {entry.telephone && <p className="text-xs text-gray-400 truncate">{entry.telephone}</p>}
                         </div>
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="text-xl font-black text-foreground tracking-tight">{entry.montantDu.toLocaleString()}<span className="text-[10px] font-normal text-gray-400 ml-0.5">F</span></p>
+                        <p className="text-xl font-black text-gray-900 tracking-tight">{entry.montantDu.toLocaleString()}<span className="text-[10px] font-normal text-gray-400 ml-0.5">F</span></p>
                         <p className={`text-[10px] font-semibold ${entry.montantDu > 0 ? "text-red-500" : "text-green-500"}`}>{sf.label}</p>
                       </div>
                     </div>
                     <div className="flex gap-2 mt-3">
-                      <Button variant="outline" size="sm" className="flex-1 h-9 text-xs rounded-xl font-semibold" onClick={() => setDetailEntry(entry)}>
+                      <Button variant="outline" size="sm" className="flex-1 h-9 text-xs rounded-xl font-semibold text-gray-700" onClick={() => setDetailEntry(entry)}>
                         Détails
                       </Button>
                       {entry.montantDu > 0 && (

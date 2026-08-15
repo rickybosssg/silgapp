@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
 import { haversineKm, isValidCoord } from '../../shared/geoUtils.ts';
 
 /**
@@ -31,7 +31,7 @@ Deno.serve(async (req) => {
     }
 
     // Récupérer la course
-    const course = await base44.entities.CourseExterne.get(course_id);
+    const course = await base44.asServiceRole.entities.CourseExterne.get(course_id);
 
     if (!course) {
       return Response.json({ error: 'Course non trouvée' }, { status: 404 });
@@ -69,7 +69,7 @@ Deno.serve(async (req) => {
       }
 
       if (distKm && distKm >= 0.1) {
-        await base44.entities.CourseExterne.update(course_id, { distance_reelle_km: Number(distKm.toFixed(2)) });
+        await base44.asServiceRole.entities.CourseExterne.update(course_id, { distance_reelle_km: Number(distKm.toFixed(2)) });
         course.distance_reelle_km = Number(distKm.toFixed(2));
         console.log(`[libererLivreurCourseLivree] Distance calculée: ${distKm.toFixed(2)} km pour course ${course_id}`);
       }
@@ -80,9 +80,9 @@ Deno.serve(async (req) => {
       console.log(`[libererLivreurCourseLivree] Course ${course_id} ${course.statut}, livreur: ${course.livreur_nom}`);
 
       // Récupérer le livreur pour vérifier le heartbeat
-      const livreur = await base44.entities.Livreur.get(course.livreur_id).catch(() => null);
+      const livreur = await base44.asServiceRole.entities.Livreur.get(course.livreur_id).catch(() => null);
       if (livreur?.bloque_encours) {
-        await base44.entities.Livreur.update(course.livreur_id, {
+        await base44.asServiceRole.entities.Livreur.update(course.livreur_id, {
           statut: 'hors_ligne',
           admin_hors_ligne: true,
         });
@@ -95,20 +95,41 @@ Deno.serve(async (req) => {
           bloque_encours: true,
         });
       }
+      // ── Vérifier si le livreur a d'AUTRES courses actives ──
+      // Si oui, il doit rester "en_course" — ne pas le libérer
+      const STATUTS_ACTIFS_LIVREUR = ["livreur_en_route", "client_contacte", "en_route_expediteur", "arrive_prise_en_charge", "colis_recupere", "passager_embarque", "pris_en_charge", "en_livraison", "arrivee"];
+      const autresCourses = await base44.asServiceRole.entities.CourseExterne.filter(
+        { livreur_id: course.livreur_id },
+        "-created_date", 10
+      );
+      const aAutreCourseActive = (autresCourses || []).some(c =>
+        c.id !== course_id && STATUTS_ACTIFS_LIVREUR.includes(c.statut)
+      );
+      if (aAutreCourseActive) {
+        console.log(`[libererLivreurCourseLivree] Livreur ${course.livreur_nom} a une autre course active — reste "en_course"`);
+        return Response.json({
+          success: true,
+          message: 'Livreur conserve en_course: autre course active',
+          course_id: course_id,
+          livreur_id: course.livreur_id,
+          livreur_nom: course.livreur_nom,
+        });
+      }
+
       const heartbeatAge = livreur?.last_seen_at
         ? (Date.now() - new Date(livreur.last_seen_at).getTime()) / 60000
         : 999;
       // Heartbeat récent (< 10 min) → disponible, sinon → hors_ligne
       const nouveauStatut = livreur.manual_hors_ligne === true ? 'hors_ligne' : 'disponible';
 
-      await base44.entities.Livreur.update(course.livreur_id, { statut: nouveauStatut });
+      await base44.asServiceRole.entities.Livreur.update(course.livreur_id, { statut: nouveauStatut });
 
       console.log(`[libererLivreurCourseLivree] Livreur ${course.livreur_nom} remis à "${nouveauStatut}" (heartbeat: ${Math.round(heartbeatAge)}min)`);
 
       // ── Vérifier l'encours du livreur après libération ──
       // S'assure que la commission de cette course est comptabilisée dans l'encours
       try {
-        await base44.functions.invoke('verifierEncoursLivreur', { course_id });
+        await base44.asServiceRole.functions.invoke('verifierEncoursLivreur', { course_id });
       } catch (encoursErr) {
         console.error('[libererLivreurCourseLivree] verifierEncoursLivreur error:', encoursErr?.message || encoursErr);
       }

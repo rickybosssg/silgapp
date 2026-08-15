@@ -174,7 +174,7 @@ export default function AnnulationExplicationChat({
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex flex-col bg-white">
+    <div className="fixed top-0 left-0 right-0 z-[60] flex flex-col bg-white" style={{ height: '100dvh' }}>
       {/* Header */}
       <div className="flex items-center gap-2 p-3 bg-gradient-to-r from-red-500 to-red-600 text-white safe-area-top">
         <button
@@ -192,6 +192,12 @@ export default function AnnulationExplicationChat({
             Explication — Annulation course #{(course.id || "").slice(-6)}
           </p>
         </div>
+        <button
+          onClick={onClose}
+          className="text-white/90 hover:text-white px-3 py-1.5 rounded-lg hover:bg-white/10 transition-colors text-sm font-semibold flex-shrink-0"
+        >
+          Terminer
+        </button>
       </div>
 
       {/* Bandeau d'information */}
@@ -239,16 +245,6 @@ export default function AnnulationExplicationChat({
           className="h-11 w-11 rounded-xl bg-primary hover:bg-primary/90 text-white flex items-center justify-center shadow-md flex-shrink-0 disabled:opacity-50"
         >
           {sending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
-        </button>
-      </div>
-
-      {/* Bouton Terminer */}
-      <div className="p-3 bg-white border-t border-gray-100 safe-area-bottom">
-        <button
-          onClick={onClose}
-          className="w-full h-12 rounded-xl bg-gray-900 hover:bg-gray-800 text-white font-bold text-sm transition-colors"
-        >
-          Terminer
         </button>
       </div>
     </div>

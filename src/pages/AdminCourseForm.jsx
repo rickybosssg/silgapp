@@ -465,7 +465,7 @@ export default function AdminCourseForm() {
           <div>
             <p className="text-[11px] font-semibold text-gray-500 mb-1.5">Pays de destination</p>
             <Select value={countryCode} onValueChange={setCountryCode}>
-              <SelectTrigger className="rounded-xl h-12 bg-blue-50/40 border-blue-100/50 text-sm font-medium focus:ring-blue-300/50">
+              <SelectTrigger className="rounded-xl h-12 bg-blue-50/40 border-blue-100/50 text-sm font-medium text-gray-900 focus:ring-blue-300/50">
                 <SelectValue>
                   {selectedPays ? `${selectedPays.drapeau}  ${selectedPays.nom}` : "Choisir un pays"}
                 </SelectValue>
@@ -570,7 +570,7 @@ export default function AdminCourseForm() {
             <div>
               <p className="text-[11px] font-semibold text-gray-500 mb-1.5">Type de colis</p>
               <Select value={typeColis} onValueChange={setTypeColis}>
-                <SelectTrigger className="rounded-xl h-12 bg-violet-50/30 border-violet-100/50 text-sm font-medium focus:ring-violet-300/50">
+                <SelectTrigger className="rounded-xl h-12 bg-violet-50/30 border-violet-100/50 text-sm font-medium text-gray-900 focus:ring-violet-300/50">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -618,14 +618,16 @@ export default function AdminCourseForm() {
             <p className="text-[10px] font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">Prix proposé</p>
             <div className="relative">
               <Input
-                type="number"
-                value={prixProposeAdmin}
+                type="text"
+                inputMode="numeric"
+                value={prixProposeAdmin ? Number(prixProposeAdmin.replace(/\D/g, "")).toLocaleString("fr-FR") : ""}
                 onChange={e => {
                   prixProposeManuelModifie.current = true;
-                  setPrixProposeAdmin(e.target.value);
+                  const digits = e.target.value.replace(/\D/g, "");
+                  setPrixProposeAdmin(digits);
                 }}
-                placeholder={prixApproximatif ? String(prixApproximatif.prix) : "—"}
-                className="rounded-xl h-12 pr-20 bg-amber-50/30 border-amber-100/50 text-lg font-bold focus:ring-amber-300/50 focus:border-amber-400"
+                placeholder={prixApproximatif ? prixApproximatif.prix.toLocaleString("fr-FR") : "—"}
+                className="rounded-xl h-12 pr-20 bg-amber-50/30 border-amber-100/50 text-lg font-bold text-gray-900 focus:ring-amber-300/50 focus:border-amber-400"
               />
               <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-bold text-gray-400">
                 {prixApproximatif?.devise || "FCFA"}

@@ -3,6 +3,7 @@ import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { Loader2, CheckCircle2, AlertTriangle, RefreshCw } from "lucide-react";
 import { normalizeCommissionPct, resolveStoredOrDynamicSplit } from "@/lib/commissionUtils";
+import { getPrixAffichable } from "@/utils/getPrixAffichable";
 
 function haversine(lat1, lon1, lat2, lon2) {
   if (!lat1 || !lon1 || !lat2 || !lon2) return 0;
@@ -176,10 +177,7 @@ export default function RecapCourseLivreur() {
 
   // Prix manuel accepté → priorité absolue
   const isPrixManuel = course.pricing_mode === "manual" && course.manual_price_status === "accepted" && Number(course.manual_price) > 0;
-
-  const prixBrut = isPrixManuel
-    ? Number(course.manual_price)
-    : (Number(course.prix_final) > 0 ? Number(course.prix_final) : (dist > 0 ? Math.round(dist * 100) : 0));
+  const prixBrut = getPrixAffichable(course) || 0;
   const prixFinal = Math.max(1000, prixBrut);
   const split = resolveStoredOrDynamicSplit(course, prixFinal, commissionPct);
   const gainLivreur = split.montant_livreur || 0;

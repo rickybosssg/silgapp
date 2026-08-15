@@ -3,6 +3,8 @@ import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, Copy, ExternalLink, MessageCircle, Package, Loader2, ChevronDown, ChevronUp, Check } from "lucide-react";
 import { toast } from "sonner";
+import AdminETABadge from "@/components/courses/AdminETABadge";
+import { getPrixAffichable } from "@/utils/getPrixAffichable";
 
 const COUNTRY_DIAL_CODE = {
   BF: "226", CI: "225", TG: "228", BJ: "229", SN: "221",
@@ -184,10 +186,21 @@ export default function CourseWindowCard({ courseId, formData, onClose }) {
       {!collapsed && (
         <div className="p-3 space-y-2.5">
           {/* Type + trajet */}
-          <div className="flex items-center gap-2 text-xs">
-            <Package className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-            <span className="font-semibold text-gray-700">{TYPE_LABELS[course.type_course] || course.type_course}</span>
+          <div className="flex items-center justify-between gap-2 text-xs">
+            <div className="flex items-center gap-2 min-w-0">
+              <Package className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+              <span className="font-semibold text-gray-700 truncate">{TYPE_LABELS[course.type_course] || course.type_course}</span>
+            </div>
+            <AdminETABadge course={course} />
           </div>
+          {/* Prix de la course */}
+          {(() => { const p = getPrixAffichable(course); return p ? (
+            <div className="flex items-center justify-between rounded-lg bg-amber-50 border border-amber-100 px-3 py-2">
+              <span className="text-[10px] font-semibold text-amber-600 uppercase tracking-wide">Prix</span>
+              <span className="text-lg font-black text-amber-700">{p.toLocaleString()} <span className="text-xs font-bold">{course.devise || "FCFA"}</span></span>
+            </div>
+          ) : null; })()}
+
           <div className="bg-gray-50 rounded-lg p-2 space-y-1">
             <p className="text-[10px] text-gray-400">Départ</p>
             <p className="text-xs font-medium text-gray-700 truncate">{course.adresse_depart || "—"}</p>

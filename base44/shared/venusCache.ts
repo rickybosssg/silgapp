@@ -96,6 +96,16 @@ const SALUTATIONS_PATTERNS = [
   /^je\s+(vous\s+)?souhaite\s+(bonjou+r?|salut|bonsoi[rt])\s*[!.?]*$/i,
   // "Bonsoir à toi/vous"
   /^(bonjou+r?|salut|bonsoi[rt])\s+[aà]\s+(toi|vous)\s*[!.?]*$/i,
+  // Salutation + "j'espère que vous allez bien" / "j'espère que tu vas bien"
+  /^(bonjou+r?|salut|bonsoi[rt])\s+j['e]?\s*esp[èe]re\s+que\s+(vous|tu)\s+(allez|vas)\s+bien\s*[!.?]*$/i,
+  // Salutation + "j'espère que ça va"
+  /^(bonjou+r?|salut|bonsoi[rt])\s+j['e]?\s*esp[èe]re\s+que\s+[çc]a\s+va\s*[!.?]*$/i,
+  // Salutation + "j'espère que tu vas bien" (sans "que")
+  /^(bonjou+r?|salut|bonsoi[rt])\s+j['e]?\s*esp[èe]re\s+(tu|vous)\s+(vas|allez)\s+bien\s*[!.?]*$/i,
+  // Salutation + "comment allez-vous" / "comment vas-tu"
+  /^(bonjou+r?|salut|bonsoi[rt])\s+comment\s+(allez[-\s]vous|vas[-\s]tu)\s*[!?]*$/i,
+  // Salutation + "j'espère que vous allez bien" + "et vous ?" ou variantes courtes
+  /^(bonjou+r?|salut|bonsoi[rt])\s+j['e]?\s*esp[èe]re\s+que\s+(vous|tu)\s+(allez|vas)\s+bien.*/i,
 ];
 
 /**

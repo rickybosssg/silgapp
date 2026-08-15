@@ -4,6 +4,7 @@ import { base44 } from "@/api/base44Client";
 import { Check, X, Clock, Package, Flame, Navigation } from "lucide-react";
 import { toast } from "sonner";
 import { startUrgentCourseAlert, stopUrgentCourseAlert } from "@/lib/livreurUrgentAlert";
+import { getPrixAffichable } from "@/utils/getPrixAffichable";
 
 function calculerDistance(lat1, lng1, lat2, lng2) {
   if ([lat1, lng1, lat2, lng2].some(value => value == null || Number.isNaN(Number(value)))) return null;
@@ -210,7 +211,7 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
         course_id: course.id,
         livreur_id: livreurId,
       });
-      const data = res?.data;
+      const data = res;
       if (data?.success && data?.accepted !== false) {
         stopUrgentCourseAlert("v2-course-accepted");
         toast.success("Course acceptée !");
@@ -247,7 +248,7 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
         livreur_id: livreurId,
         raison: "Refusé depuis Courses disponibles",
       });
-      const data = res?.data;
+      const data = res;
       if (data?.success !== true) {
         toast.error(data?.error || "Le refus n'a pas pu être confirmé par le serveur.");
         return;
@@ -330,7 +331,7 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
                 </p>
               </div>
               {(() => {
-                const prix = course.prix_propose_admin || course.prix_estimate;
+                const prix = getPrixAffichable(course);
                 return prix > 0 ? (
                   <div className="shrink-0 text-right">
                     <p className="text-[10px] font-semibold uppercase text-slate-400">Proposition</p>

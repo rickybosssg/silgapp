@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
 
 /**
  * SYNC AUTOMATIQUE STATUT LIVREUR ← STATUT COURSE
@@ -72,17 +72,41 @@ Deno.serve(async (req) => {
       }
     }
 
+    // 🔔 Rappel push : si statut = client_contacte depuis +60s, rappeler au livreur de démarrer
+    const shouldRappelDemarrage = statut === "client_contacte" && livreurId && old_data?.statut !== "client_contacte";
+    if (shouldRappelDemarrage) {
+      console.log(`[syncStatutLivreur] ⏳ Attente 60s avant rappel démarrage (course ${course.id})`);
+      await new Promise(resolve => setTimeout(resolve, 60000));
+      try {
+        const current = await base44.asServiceRole.entities.CourseExterne.get(course.id);
+        if (current && current.statut === "client_contacte" && current.livreur_id) {
+          const livreur = await base44.asServiceRole.entities.Livreur.get(current.livreur_id).catch(() => null);
+          if (livreur?.user_email) {
+            base44.asServiceRole.functions.invoke('envoiNotificationPush', {
+              destinataire_email: livreur.user_email,
+              livreur_id: livreur.id,
+              titre: '🚗 Démarrez votre trajet',
+              message: 'Vous avez contacté le client. N\'oubliez pas de démarrer votre trajet vers l\'expéditeur.',
+              type: 'rappel_demarrage',
+              course_id: course.id,
+            }).catch(err => console.error('[syncStatutLivreur] ❌ Rappel push error:', err.message));
+            console.log(`[syncStatutLivreur] ✅ Rappel démarrage envoyé au livreur ${livreur.id} (course ${course.id})`);
+          }
+        }
+      } catch (err) {
+        console.error(`[syncStatutLivreur] ❌ Rappel démarrage error:`, err.message);
+      }
+    }
+
     // Cas 1 : Course passée à un statut terminal (annulée ou livrée)
     if (STATUTS_TERMINAUX.includes(statut) && livreurId) {
-      // ADMIN_MANUEL sans prix_final : ne PAS libérer le livreur
-      // Le livreur doit d'abord saisir le montant payé par le client dans l'app.
-      const isAdminSansPrix = (course.pricing_mode === "admin_manuel" || course.source === "admin")
-        && statut === "livree"
-        && (!course.prix_final || Number(course.prix_final) <= 0);
-      if (isAdminSansPrix) {
-        console.log(`[syncStatutLivreur] ⏸ Course admin_manuel livrée sans prix_final — livreur reste en_course (attente saisie montant)`);
-        return Response.json({ success: true, skipped: "admin_manuel_waiting_price", livreur_id: livreurId });
-      }
+      // NOTE : autrefois, les courses admin_manuel livrées sans prix_final
+      // gardaient le livreur en "en_course" pour l'obliger à saisir le montant.
+      // Or, une fois la course "livree", l'UI du livreur ne propose PLUS la
+      // saisie du prix (la course n'est plus dans coursesActives). Résultat :
+      // blocage mortel — le livreur restait "en_course" pour toujours.
+      // Désormais on libère le livreur systématiquement ; l'admin pourra
+      // corriger le prix ultérieurement via le module Comptabilité.
 
       // Vérifier si le livreur a une AUTRE course encore active
       const coursesActives = await base44.asServiceRole.entities.CourseExterne.filter(
@@ -169,24 +193,6 @@ Deno.serve(async (req) => {
         return Response.json({ success: true, action: "livreur_en_course", livreur_id: livreurId });
       }
       return Response.json({ success: true, skipped: "already_en_course" });
-    }
-
-    // 🔄 Auto-transition : colis_recupere → en_livraison après 10 secondes (await réel)
-    if (shouldAutoTransition) {
-      console.log(`[syncStatutLivreur] ⏳ Attente 10s avant transition en_livraison (course ${course.id})`);
-      await new Promise(resolve => setTimeout(resolve, 10000));
-      try {
-        const current = await base44.asServiceRole.entities.CourseExterne.get(course.id);
-        if (current && current.statut === "colis_recupere") {
-          await base44.asServiceRole.entities.CourseExterne.update(course.id, { statut: "en_livraison" });
-          console.log(`[syncStatutLivreur] ✅ Auto-transition: colis_recupere → en_livraison (course ${course.id})`);
-          return Response.json({ success: true, action: "auto_transition_en_livraison", course_id: course.id });
-        } else {
-          console.log(`[syncStatutLivreur] ⏭️ Auto-transition annulée — statut actuel: ${current?.statut || 'introuvable'}`);
-        }
-      } catch (err) {
-        console.error(`[syncStatutLivreur] ❌ Auto-transition error:`, err.message);
-      }
     }
 
     return Response.json({ success: true, skipped: "no_action_needed", statut });

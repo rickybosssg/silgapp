@@ -105,9 +105,15 @@ export default function ClientExterneApp() {
   const prevHadRecherche = useRef(false);
 
   const [userId, setUserId] = useState(null);
+  const userIdRef = useRef(null);
+  useEffect(() => { userIdRef.current = userId; }, [userId]);
   const queryClient = useQueryClient();
   const clientProfilRef = useRef(null);
   useEffect(() => { clientProfilRef.current = clientProfil; }, [clientProfil]);
+  const positionRef = useRef(null);
+  useEffect(() => { positionRef.current = position; }, [position]);
+  const checkStatusRef = useRef(null);
+  useEffect(() => { checkStatusRef.current = checkStatus; });
   const canShowCodePromo = aUnCodePromo && !!(clientProfil?.user_email || clientProfil?.email);
 
   useEffect(() => {
@@ -554,6 +560,20 @@ export default function ClientExterneApp() {
     return () => clearInterval(interval);
   }, [onboardingDone, clientProfil?.id, position]);
 
+  // ── Subscription WebSocket temps réel — met à jour les courses instantanément ──
+  // Complète le polling 8s : si un livreur accepte/annule, le client le voit immédiatement
+  useEffect(() => {
+    if (!clientProfil?.id) return;
+    const unsubscribe = base44.entities.CourseExterne.subscribe((event) => {
+      const profil = clientProfilRef.current;
+      const pos = positionRef.current;
+      if (profil && pos) {
+        checkStatusRef.current?.(pos, profil);
+      }
+    });
+    return unsubscribe;
+  }, [clientProfil?.id]);
+
   // Forcer une sync GPS manuelle — EXACTEMENT comme les livreurs
   const handleForceGPSSync = () => {
     if (!clientProfil?.id || gpsSyncing) return;
@@ -586,7 +606,6 @@ export default function ClientExterneApp() {
   const syncGpsDestinataire = async (pos, profil) => {
     try {
       if (!pos?.latitude || !pos?.longitude || !profil?.id) return;
-      const user = await base44.auth.me();
 
       // Normaliser le téléphone UNE FOIS
       const phoneNorm = profil.telephone ? profil.telephone.replace(/\D/g, "") : null;
@@ -692,10 +711,11 @@ export default function ClientExterneApp() {
 
   const checkStatus = async (pos, profil) => {
     try {
-      const user = await base44.auth.me();
+      const currentUserId = userIdRef.current;
+      if (!currentUserId) return;
 
       // 1. Courses créées par l'utilisateur
-      const coursesClient = await base44.entities.CourseExterne.filter({ created_by_id: user.id }, "-created_date", 20);
+      const coursesClient = await base44.entities.CourseExterne.filter({ created_by_id: currentUserId }, "-created_date", 20);
       const actives = (coursesClient || []).filter(c => !["livree", "annulee"].includes(c.statut));
 
       // 2. Courses où l'utilisateur est destinataire
@@ -704,7 +724,7 @@ export default function ClientExterneApp() {
         const coursesDestinataire = await base44.entities.CourseExterne.filter({ destinataire_client_id: profil.id }, "-created_date", 20);
         activesDestinataire = (coursesDestinataire || []).filter(c =>
           !["livree", "annulee"].includes(c.statut) &&
-          c.created_by_id !== user.id
+          c.created_by_id !== currentUserId
         );
       }
 
@@ -714,7 +734,7 @@ export default function ClientExterneApp() {
         const coursesExpediteur = await base44.entities.CourseExterne.filter({ expediteur_client_id: profil.id }, "-created_date", 20);
         activesExpediteur = (coursesExpediteur || []).filter(c =>
           !["livree", "annulee"].includes(c.statut) &&
-          c.created_by_id !== user.id && // ne pas dupliquer
+          c.created_by_id !== currentUserId && // ne pas dupliquer
           c.type_course === "recevoir" // seulement mode recevoir
         );
       }
@@ -723,10 +743,36 @@ export default function ClientExterneApp() {
       const map = new Map();
       [...actives, ...activesDestinataire, ...activesExpediteur].forEach(c => map.set(c.id, c));
       const toutes = [...map.values()].sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
-      setCoursesActives(toutes);
+
+      // ── Enrichir avec GPS temps réel du livreur (_livreur) ──
+      // Évite le polling Livreur.get() redondant dans SuiviCourseFullscreen
+      const livreurIds = [...new Set(toutes.filter(c => c.livreur_id && !["livree", "annulee"].includes(c.statut)).map(c => c.livreur_id))];
+      let coursesEnrichies = toutes;
+      if (livreurIds.length > 0) {
+        const livreursData = await Promise.all(
+          livreurIds.map(id => base44.entities.Livreur.filter({ id }).then(r => r?.[0]).catch(() => null))
+        );
+        const livreurMap = {};
+        livreursData.forEach(l => { if (l) livreurMap[l.id] = l; });
+        coursesEnrichies = toutes.map(c => {
+          if (!c.livreur_id || !livreurMap[c.livreur_id]) return c;
+          const l = livreurMap[c.livreur_id];
+          return {
+            ...c,
+            livreur_photo_url: l.photo_url || c.livreur_photo_url || null,
+            livreur_note_moyenne: l.note_moyenne || 0,
+            livreur_nombre_avis: l.nombre_avis || 0,
+            livreur_vehicule: l.vehicule || l.type_vehicule || c.livreur_vehicule || null,
+            _livreur: l,
+          };
+        });
+      }
+      setCoursesActives(coursesEnrichies);
 
       // Nettoyer les notifications obsolètes (courses supprimées ou terminées)
-      const userNotifications = await base44.entities.Notification.filter({ destinataire_email: user.email, lue: false });
+      const currentUserEmail = clientProfil?.user_email;
+      if (!currentUserEmail) return;
+      const userNotifications = await base44.entities.Notification.filter({ destinataire_email: currentUserEmail, lue: false });
       if (userNotifications && userNotifications.length > 0) {
         const validCourseIds = new Map(toutes.map(c => [c.id, true]));
         const notificationsValides = userNotifications.filter(n =>
@@ -1379,6 +1425,7 @@ export default function ClientExterneApp() {
               await base44.functions.invoke("annulerCourseExterne", {
                 course_id: coursePrincipale.id,
                 motif: "Annulé par le client",
+                source: "client",
               });
               toast.success("Course annulée");
               setShowSuiviFullscreen(false);

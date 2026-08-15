@@ -1,5 +1,8 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
-import { isV2Enabled } from '../../shared/dispatchV2.ts';
+import { isV2Enabled, DISPATCH_V2_BUNDLE_VERSION } from '../../shared/dispatchV2.ts';
+
+// 🔖 Redéploiement forcé — 2026-08-14-simplified-3 — rappel T+5min re-notifie les mêmes livreurs libres
+console.log(`[COURSE_ORCHESTRATOR] 🔖 dispatchV2 bundle version: ${DISPATCH_V2_BUNDLE_VERSION}`);
 
 /**
  * ════════════════════════════════════════════════════════════════════════

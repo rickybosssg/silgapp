@@ -27,6 +27,7 @@ function fmtSec(sec) {
 export default function ProposedLivreursListV2({ course }) {
   const queryClient = useQueryClient();
   const [assigningId, setAssigningId] = useState(null);
+  const [selectedAssignId, setSelectedAssignId] = useState(null);
   const [now, setNow] = useState(Date.now());
 
   // ── Tick pour compte à rebours ──
@@ -95,17 +96,27 @@ export default function ProposedLivreursListV2({ course }) {
     const fetchEligible = async () => {
       try {
         const livreurs = await base44.entities.Livreur.filter(
-          { country_code: course.country_code, statut: "disponible", actif: true, validation: "valide" },
+          {
+            country_code: course.country_code,
+            type_livreur: "externe",
+            statut: "disponible",
+            actif: true,
+            validation: "valide",
+            bloque_encours: false,
+          },
           "-created_date", 500
         );
         if (!mounted) return;
-        // Compter ceux avec GPS récent (< 10 min)
-        const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000);
-        const withGps = (livreurs || []).filter(l => {
+        // Compter ceux avec activité récente (< 15 min) — aligné avec les critères
+        // de dispatch V2 (notifierLivreursEligiblesV2 n'exclut pas par GPS freshness)
+        const fifteenMinAgo = new Date(Date.now() - 15 * 60 * 1000);
+        const eligible = (livreurs || []).filter(l => {
+          if (l.manual_hors_ligne === true) return false;
+          if (l.admin_hors_ligne === true) return false;
           if (!l.last_seen_at) return false;
-          return new Date(l.last_seen_at) > tenMinAgo;
+          return new Date(l.last_seen_at) > fifteenMinAgo;
         });
-        setEligibleCount(withGps.length);
+        setEligibleCount(eligible.length);
       } catch {
         if (mounted) setEligibleCount(0);
       }
@@ -284,82 +295,94 @@ export default function ProposedLivreursListV2({ course }) {
         </div>
       )}
 
-      {/* ── Liste des livreurs ayant interagi ── */}
+      {/* ── Liste déroulante des livreurs ayant interagi ── */}
       {allInteractedLivreurs.length > 0 && (
         <div className="space-y-1.5">
           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1">
             <Eye className="w-3 h-3" />
             Activité ({allInteractedLivreurs.length})
           </p>
-          {allInteractedLivreurs.map((l) => {
-            const isAccepted = acceptedId && String(l.id) === String(acceptedId);
-            const statutColor =
-              l._statut === "accepte" ? "bg-green-100 border-green-200" :
-              l._statut === "refuse" ? "bg-red-50 border-red-100" :
-              l._statut === "expire" ? "bg-amber-50 border-amber-100" :
-              "bg-white border-gray-100";
+          {(() => {
+            const selectedLivreur = allInteractedLivreurs.find(l => l.id === selectedAssignId);
+            const isAcceptedSelected = selectedLivreur && acceptedId && String(selectedLivreur.id) === String(acceptedId);
             return (
-              <div
-                key={l.id}
-                className={`flex items-center gap-2 p-2 rounded-lg text-xs border ${statutColor}`}
-              >
-                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 ${
-                  isAccepted ? "bg-green-500 text-white" : "bg-gray-100 text-gray-600"
-                }`}>
-                  {(l.prenom?.[0] || "") + (l.nom?.[0] || "")}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-gray-800 truncate">
-                    {l.prenom} {l.nom}
-                  </p>
-                  <div className="flex items-center gap-2 text-[10px] text-gray-400">
-                    {l.telephone && (
-                      <span className="flex items-center gap-0.5">
-                        <Phone className="w-2.5 h-2.5" />
-                        {l.telephone}
+              <>
+                <select
+                  value={selectedAssignId || ""}
+                  onChange={(e) => setSelectedAssignId(e.target.value || null)}
+                  className="w-full text-xs font-semibold text-gray-800 border border-gray-200 rounded-lg px-2.5 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-primary/30"
+                >
+                  <option value="">— Sélectionner un livreur —</option>
+                  {allInteractedLivreurs.map((l) => {
+                    const isAccepted = acceptedId && String(l.id) === String(acceptedId);
+                    const statutLabel = l._statut === "refuse" ? " (Refusé)" : l._statut === "expire" ? " (Expiré)" : isAccepted ? " (Accepté)" : "";
+                    return (
+                      <option key={l.id} value={l.id}>
+                        {l.prenom} {l.nom} — {l.telephone || "?"}{statutLabel}
+                      </option>
+                    );
+                  })}
+                </select>
+                {selectedLivreur && (
+                  <div className="flex items-center gap-2 p-2 rounded-lg text-xs border bg-white border-gray-100">
+                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 ${
+                      isAcceptedSelected ? "bg-green-500 text-white" : "bg-gray-100 text-gray-600"
+                    }`}>
+                      {(selectedLivreur.prenom?.[0] || "") + (selectedLivreur.nom?.[0] || "")}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-gray-800 truncate">
+                        {selectedLivreur.prenom} {selectedLivreur.nom}
+                      </p>
+                      <div className="flex items-center gap-2 text-[10px] text-gray-400">
+                        {selectedLivreur.telephone && (
+                          <span className="flex items-center gap-0.5">
+                            <Phone className="w-2.5 h-2.5" />
+                            {selectedLivreur.telephone}
+                          </span>
+                        )}
+                        {selectedLivreur._date && (
+                          <span className="flex items-center gap-0.5">
+                            <Clock className="w-2.5 h-2.5" />
+                            {format(new Date(selectedLivreur._date), "HH:mm", { locale: fr })}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {selectedLivreur._statut === "refuse" && (
+                      <span className="text-[9px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded-full shrink-0">
+                        Refusé
                       </span>
                     )}
-                    {l._date && (
-                      <span className="flex items-center gap-0.5">
-                        <Clock className="w-2.5 h-2.5" />
-                        {format(new Date(l._date), "HH:mm", { locale: fr })}
+                    {selectedLivreur._statut === "expire" && (
+                      <span className="text-[9px] font-bold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded-full shrink-0">
+                        Expiré
                       </span>
                     )}
+                    {isAcceptedSelected ? (
+                      <span className="flex items-center gap-1 text-[10px] font-bold text-green-700 bg-green-200 px-2 py-1 rounded-full shrink-0">
+                        <CheckCircle2 className="w-3 h-3" />
+                        Accepté
+                      </span>
+                    ) : !isTerminal ? (
+                      <button
+                        onClick={() => handleForceAssign(selectedLivreur)}
+                        disabled={assigningId === selectedLivreur.id}
+                        className="flex items-center gap-1 text-[10px] font-bold text-white bg-primary px-2 py-1 rounded-full shrink-0 hover:bg-primary/90 transition disabled:opacity-50"
+                      >
+                        {assigningId === selectedLivreur.id ? (
+                          <RefreshCw className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <UserCheck className="w-3 h-3" />
+                        )}
+                        {assigningId === selectedLivreur.id ? "..." : "Assigner"}
+                      </button>
+                    ) : null}
                   </div>
-                </div>
-                {/* Badge statut interaction */}
-                {l._statut === "refuse" && (
-                  <span className="text-[9px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded-full shrink-0">
-                    Refusé
-                  </span>
                 )}
-                {l._statut === "expire" && (
-                  <span className="text-[9px] font-bold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded-full shrink-0">
-                    Expiré
-                  </span>
-                )}
-                {isAccepted ? (
-                  <span className="flex items-center gap-1 text-[10px] font-bold text-green-700 bg-green-200 px-2 py-1 rounded-full shrink-0">
-                    <CheckCircle2 className="w-3 h-3" />
-                    Accepté
-                  </span>
-                ) : !isTerminal ? (
-                  <button
-                    onClick={() => handleForceAssign(l)}
-                    disabled={assigningId === l.id}
-                    className="flex items-center gap-1 text-[10px] font-bold text-white bg-primary px-2 py-1 rounded-full shrink-0 hover:bg-primary/90 transition disabled:opacity-50"
-                  >
-                    {assigningId === l.id ? (
-                      <RefreshCw className="w-3 h-3 animate-spin" />
-                    ) : (
-                      <UserCheck className="w-3 h-3" />
-                    )}
-                    {assigningId === l.id ? "..." : "Assigner"}
-                  </button>
-                ) : null}
-              </div>
+              </>
             );
-          })}
+          })()}
         </div>
       )}
 

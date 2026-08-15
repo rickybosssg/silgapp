@@ -410,7 +410,9 @@ export async function creerCourseDepuisMemoire(
     type_course: normalizedType,
     adresse_depart: cd.adresse_depart || 'Localisation GPS partagee',
     adresse_arrivee: cd.adresse_arrivee || 'Localisation GPS partagee',
-    prix_estimate: tarifs.minimum,
+    prix_estimate: cd.prix_propose || Math.max(tarifs.minimum, 1500),
+    prix_propose_admin: cd.prix_propose || undefined,
+    pricing_mode: cd.prix_propose ? 'admin_manuel' : 'automatic',
     devise: tarifs.devise,
     statut: 'recherche_livreur',
     dispatch_status: 'en_attente',
@@ -648,6 +650,27 @@ function extraireInfosDepuisMessage(message: string): Record<string, any> {
     const phone = phoneMatchLong[0].replace(/[\s.-]/g, '');
     if (phone.length >= 8) {
       updates.contact_telephone = phoneMatchLong[0].trim();
+    }
+  }
+
+  // Prix proposé par le client (ex: "1500", "2000 fcfa", "mille", "1500 f")
+  if (!updates.prix_propose) {
+    const priceMatch = message.match(/(\d{3,6})\s*(fcfa|f|cfa|f\b)?/i);
+    if (priceMatch) {
+      const price = parseInt(priceMatch[1]);
+      if (price >= 500 && price <= 100000) {
+        updates.prix_propose = price;
+      }
+    }
+    // Mots écrits: "mille" = 1000, "mille cinq cents" = 1500, "deux mille" = 2000
+    if (!updates.prix_propose) {
+      const milleMatch = msg.match(/(\d+)?\s*mille(?:\s*(\d{2,3}))?/);
+      if (milleMatch) {
+        const milliers = milleMatch[1] ? parseInt(milleMatch[1]) : 1;
+        const centaines = milleMatch[2] ? parseInt(milleMatch[2]) : 0;
+        const total = milliers * 1000 + centaines;
+        if (total >= 500) updates.prix_propose = total;
+      }
     }
   }
 
@@ -1025,15 +1048,16 @@ creer_course | suivre_course | contacter_livreur | annuler_course | modifier_inf
 nouvelle_course | course_en_cours | ancienne_course | paiement | livreur | partenaire | general
 
 ═══ INFOS REQUISES POUR creer_course ═══
-SEULES les infos requises: adresse_depart (ou GPS) + adresse_arrivee (ou GPS).
+SEULES les infos requises: adresse_depart (ou GPS) + adresse_arrivee (ou GPS) + prix_propose (budget du client).
 - type_course: PAR DÉFAUT "expedier" (ne PAS demander). N'utilise "recevoir"/"deplacement" que si le client le précise explicitement.
 - contact_createur_course: numéro WhatsApp du client (automatique, ne PAS demander).
 - contact_telephone (destinataire/expéditeur): FACULTATIF. Ne PAS demander. Laisser vide si non fourni.
 - Nom du destinataire/expéditeur: FACULTATIF.
 
 ═══ FLUX CRÉATION DE COURSE (STRICT) ═══
-Dès que tu as adresse_depart + adresse_arrivee → crée la course IMMÉDIATEMENT (action=creer_course). Ne demande PAS confirmation, ne demande PAS le numéro du destinataire.
-Si une adresse manque → action=poser_question (UNE SEULE question sur l'adresse manquante).
+1. Si adresse_depart OU adresse_arrivee manque → action=poser_question (UNE SEULE question sur l'adresse manquante).
+2. Dès que tu as adresse_depart + adresse_arrivee → demande le prix au client: "À quel prix souhaitez-vous cette livraison ?" (action=poser_question). Stocke la réponse dans memoire_courte_update.prix_propose.
+3. Dès que tu as adresse_depart + adresse_arrivee + prix_propose → crée la course IMMÉDIATEMENT (action=creer_course). Ne demande PAS confirmation.
 Client corrige une adresse → mets à jour memoire_courte_update, puis crée la course.
 JAMAIS de "all_info_collected" ou "user_confirmed" (ces champs n'existent pas).
 INTERDICTION: Ne JAMAIS demander le numéro de téléphone du destinataire. Ne JAMAIS dire "je lance la création"/"je crée"/"je valide"/"je finalise" sans créer la course.
@@ -1048,7 +1072,7 @@ poser_question | creer_course | suivre_course | contacter_livreur | annuler_cour
 1. ANTI-BOUCLE: Ne JAMAIS redemander une info déjà en mémoire courte.
 2. UNE SEULE question par réponse si action=poser_question.
 3. CORRECTIONS: Si client corrige ("non c'est Y"), mets à jour et confirme.
-4. PAS DE PRIX: Ne JAMAIS inventer un prix. Le livreur confirmera le coût.
+4. PRIX: Demande TOUJOURS au client son budget avant de créer la course. Ne JAMAIS inventer un prix — c'est le client qui propose. Stocke le montant dans memoire_courte_update.prix_propose.
 5. SALUTATION simple (Bonjour/Bonsoir/Salut) sans course en cours → accueil chaleureux SANS mentionner de services. Modèle: "Bonjour 👋 Je suis VENUS, l'assistante intelligente de SILGAPP. Comment puis-je vous aider aujourd'hui ?"
 6. CONTINUITÉ: Si VENUS a posé une question, le message actuel est probablement LA RÉPONSE. Ne pas réinterpréter comme nouvelle demande. Ne pas écraser une adresse/type_course déjà connu. Un numéro = contact_telephone, pas nouvelle demande. Ne pas reformuler "Si j'ai bien compris..." si la réponse est directe.
 7. ANTI-FAUX-ANNULATION: "Oui"/"OK"/"D'accord" SEUL ≠ annuler_course. Annulation UNIQUEMENT si mot explicite ("annule", "plus besoin") OU VENUS a posé une question d'annulation et client répond oui.
@@ -1190,6 +1214,43 @@ Réponds UNIQUEMENT avec un JSON.`;
       }
     }
     result.memoire_courte_update = llmUpdateFiltered;
+
+    // ── ANTI-DEMANDE NUMÉRO: Le LLM ne doit JAMAIS demander le numéro de téléphone ──
+    // Le contact_createur_course est automatiquement le numéro WhatsApp du client.
+    // Si le LLM demande quand même le numéro, remplacer par une question appropriée
+    // ou créer la course si toutes les infos sont présentes.
+    if (result.action === 'poser_question' && result.reponse) {
+      const PHONE_REQUEST_PATTERNS = [
+        /votre\s+num[ée]ro\s+de\s+t[ée]l[ée]phone/i,
+        /me\s+confirmer\s+(votre\s+)?num[ée]ro/i,
+        /num[ée]ro\s+de\s+t[ée]l[ée]phone\s+.*(contact\s+principal|livraison|cr[ée]ateur)/i,
+        /pouvez[-\s]vous\s+me\s+(donner|confirmer)\s+votre\s+num[ée]ro/i,
+        /quel\s+est\s+votre\s+num[ée]ro/i,
+        /me\s+donner\s+votre\s+num[ée]ro/i,
+        /confirmer\s+.*(votre\s+)?num[ée]ro/i,
+      ];
+      const isPhoneRequest = PHONE_REQUEST_PATTERNS.some(p => p.test(result.reponse));
+      if (isPhoneRequest) {
+        console.warn('[ReasoningEngine] 🚫 LLM demande le numéro de téléphone — remplacement par question appropriée');
+        const umPhone = { ...mergedMemoireCourte, ...result.memoire_courte_update };
+        if (!umPhone.type_course) umPhone.type_course = 'expedier';
+        if (!umPhone.contact_createur_course || !umPhone.contact_createur_course.trim()) {
+          umPhone.contact_createur_course = input.telephone;
+        }
+        const _hasDepartPhone = !!(umPhone.adresse_depart && umPhone.adresse_depart.trim()) || umPhone.gps_depart_lat != null;
+        const _hasArriveePhone = !!(umPhone.adresse_arrivee && umPhone.adresse_arrivee.trim()) || umPhone.gps_arrivee_lat != null;
+        if (!_hasDepartPhone) {
+          result.reponse = 'Quel est le lieu exact de récupération ? (indiquez le quartier ou un point de repère précis)';
+        } else if (!_hasArriveePhone) {
+          result.reponse = 'Quel est le lieu exact de livraison ? (indiquez le quartier ou un point de repère précis)';
+        } else {
+          // Toutes les infos sont présentes → créer la course au lieu de demander le numéro
+          result.action = 'creer_course';
+          result.reponse = '';
+        }
+        result.memoire_courte_update = umPhone;
+      }
+    }
     // Fusionner infos_connues avec la mémoire existante
     result.infos_connues = { ...mergedMemoireCourte, ...(result.infos_connues || {}) };
 

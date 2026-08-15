@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
 
 Deno.serve(async (req) => {
   try {
@@ -62,8 +62,13 @@ Deno.serve(async (req) => {
           );
           const nouveauSoldeReel = (coursesRestantesImpayees || []).reduce((s, c) => s + (c.commission_silga ?? 0), 0);
 
+          // ── Surplus = montant payé supérieur à la dette réelle ──
+          // montant_du_silga peut être négatif (crédit en faveur du livreur)
+          const surplus = (paiement.montant_paye || 0) - (paiement.montant_du || 0);
+          const soldeFinal = nouveauSoldeReel - Math.max(0, surplus);
+
           // encours suit la même logique (réduit du paiement, floor à 0)
-          const nouvelEncours = Math.max(0, nouveauSoldeReel);
+          const nouvelEncours = Math.max(0, soldeFinal);
 
           // Récupérer le seuil du pays pour savoir si on peut débloquer
           const countries = await base44.asServiceRole.entities.Country.filter({ code: livreur.country_code, actif: true });
@@ -73,9 +78,9 @@ Deno.serve(async (req) => {
           const peutDebloquer = nouvelEncours < seuil;
 
           const updateData = {
-            montant_du_silga: nouveauSoldeReel,
+            montant_du_silga: soldeFinal,
             encours: nouvelEncours,
-            statut_paiement: nouveauSoldeReel <= 0 ? 'paye' : 'non_paye',
+            statut_paiement: soldeFinal <= 0 ? 'paye' : 'non_paye',
             montant_paye: (livreur.montant_paye || 0) + paiement.montant_paye,
             dernier_paiement_date: new Date().toISOString(),
           };
