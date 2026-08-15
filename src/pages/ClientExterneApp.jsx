@@ -1425,6 +1425,7 @@ export default function ClientExterneApp() {
               await base44.functions.invoke("annulerCourseExterne", {
                 course_id: coursePrincipale.id,
                 motif: "Annulé par le client",
+                source: "client",
               });
               toast.success("Course annulée");
               setShowSuiviFullscreen(false);

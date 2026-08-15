@@ -131,13 +131,21 @@ export default function AnnulerCourseDialog({ course, open, onClose, onSuccess, 
     try {
       const motifLabel = MOTIFS.find(m => m.id === motif)?.label || motif;
       const motifText = motif === "autre" ? `${motifLabel}: ${motifDetail.trim()}` : motifLabel;
-      // 1. Annuler la course
-      await base44.entities.CourseExterne.update(course.id, {
-        statut: "annulee",
-        notes: `Annulée par le client. Motif: ${motifText}${situation?.type === "payant" ? ` | Frais: ${situation.montant} ${course.devise || "FCFA"}` : ""}`,
+
+      // ── Appel backend unique : gère libération livreur, notification, frais, etc. ──
+      const res = await base44.functions.invoke("annulerCourseExterne", {
+        course_id: course.id,
+        motif: motifText,
+        motif_detail: motifDetail.trim(),
+        source: "client",
       });
 
-      // 2. Si frais → créer l'enregistrement FraisAnnulation
+      if (res?.success === false) {
+        toast.error(res?.error || "Impossible d'annuler la course");
+        return;
+      }
+
+      // ── Frais d'annulation côté client (si situation payante) ──
       if (situation?.type === "payant" && clientId) {
         await base44.entities.FraisAnnulation.create({
           country_code: course.country_code || "",
@@ -151,7 +159,7 @@ export default function AnnulerCourseDialog({ course, open, onClose, onSuccess, 
           statut_paiement: "impaye",
           raison: "Annulation après acceptation livreur",
           date_annulation: new Date().toISOString(),
-        });
+        }).catch(() => null);
 
         // Vérifier si le client dépasse le seuil de blocage (2000 FCFA)
         const allFrais = await base44.entities.FraisAnnulation.filter({ client_id: clientId, statut_paiement: "impaye" });
@@ -160,16 +168,6 @@ export default function AnnulerCourseDialog({ course, open, onClose, onSuccess, 
           await base44.entities.ClientExterne.update(clientId, { bloque_frais_annulation: true });
           toast.error(`Compte bloqué : ${totalImpaye.toLocaleString()} FCFA de frais impayés. Régularisez via Payer SILGAPP.`);
         }
-      }
-
-      // 3. Notifier le livreur
-      if (course.livreur_id) {
-        base44.functions.invoke("envoiNotificationPush", {
-          livreur_id: course.livreur_id,
-          titre: "Course annulée",
-          message: "La course a été annulée par le client.",
-          course_id: course.id,
-        }).catch(() => {});
       }
 
       if (situation?.type === "payant") {

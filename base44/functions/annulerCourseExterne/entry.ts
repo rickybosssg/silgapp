@@ -273,7 +273,8 @@ Deno.serve(async (req) => {
       // Course mise en attente — aucun dispatch automatique. L'admin doit la relancer manuellement.
 
     } else {
-      // ── ANNULATION ADMIN : course définitivement annulée ──────────
+      // ── ANNULATION CLIENT OU ADMIN : course définitivement annulée ──
+      const sourceLabel = source === "client" ? "CLIENT" : "ADMIN";
       const annulData = {
         statut: "annulee",
         date_annulation: now,
@@ -284,7 +285,7 @@ Deno.serve(async (req) => {
         livreur_vehicule: "",
         livreur_note_moyenne: 0,
         livreur_nombre_avis: 0,
-        notes: (course.notes || "") + ` | [ANNULÉ ADMIN] ${motif || ""}`,
+        notes: (course.notes || "") + ` | [ANNULÉ ${sourceLabel}] ${motif || ""}`,
       };
 
       if (course.dispatch_status === "propose" || course.dispatch_status === "en_attente") {
