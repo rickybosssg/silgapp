@@ -616,19 +616,59 @@ Deno.serve(async (req) => {
 
           if (_hasTypeC && _hasDepartC && _hasArriveeC) {
             venusLog(`[WebhookVenus] ✅ Confirmation déterministe — création directe (0 crédit GPT)`);
+
+            // ═══ ANTI-DOUBLON CRITIQUE (confirmation déterministe) ═══
+            // Même garde que le chemin GPT : vérifier en DB qu'aucune course active
+            // n'existe déjà pour ce client. Sans cette vérification, un "oui" après
+            // une première course créée créerait un doublon.
+            const _STATUTS_ACTIFS_CONF = ['nouvelle', 'programmee', 'recherche_livreur', 'livreur_en_route', 'arrive_prise_en_charge', 'colis_recupere', 'passager_embarque', 'pris_en_charge', 'en_livraison', 'arrivee'];
+            let _activeCourseConf = null;
             try {
-              const crConf = await creerCourseDepuisMemoire(base44, pendingCourseConf, countryCode, tarifs, telephone, profileName, conversation.silgapp_from_number);
-              if (crConf.success) {
-                reponseVenus = crConf.message;
-                pendingCourseConf.course_created = true;
-                pendingCourseConf.course_id = crConf.course.id;
-                await base44.asServiceRole.entities.Conversation.update(conversation.id, { venus_pending_course: JSON.stringify(pendingCourseConf) });
-                venusLog(`[WebhookVenus] ✅ Course créée via confirmation déterministe: ${crConf.course.id}`);
-              } else if (crConf.message) {
-                reponseVenus = crConf.message;
+              const _telNormConf = telephone.replace(/\D/g, '');
+              const _telPlusConf = telephone.startsWith('+') ? telephone : '+' + telephone;
+              const _coursesConf = await base44.asServiceRole.entities.CourseExterne.filter(
+                { client_telephone: _telPlusConf }, '-created_date', 10
+              );
+              _activeCourseConf = (_coursesConf || []).find(c => _STATUTS_ACTIFS_CONF.includes(c.statut)) || null;
+              if (!_activeCourseConf) {
+                const _expConf = await base44.asServiceRole.entities.CourseExterne.filter(
+                  { expediteur_telephone: _telPlusConf }, '-created_date', 10
+                );
+                _activeCourseConf = (_expConf || []).find(c => _STATUTS_ACTIFS_CONF.includes(c.statut)) || null;
               }
-            } catch (e) {
-              console.error(`[WebhookVenus] Erreur confirmation déterministe: ${e.message}`);
+              if (!_activeCourseConf) {
+                const _allConf = await base44.asServiceRole.entities.CourseExterne.filter(
+                  { country_code: countryCode }, '-created_date', 50
+                );
+                _activeCourseConf = (_allConf || []).find(c =>
+                  _STATUTS_ACTIFS_CONF.includes(c.statut) &&
+                  ((c.client_telephone || '').replace(/\D/g, '').endsWith(_telNormConf.slice(-8)) ||
+                   (c.expediteur_telephone || '').replace(/\D/g, '').endsWith(_telNormConf.slice(-8)))
+                ) || null;
+              }
+            } catch (e) { console.error('[WebhookVenus] ANTI-DOUBLON (confirm) DB error:', e.message); }
+
+            if (_activeCourseConf) {
+              console.warn(`[WebhookVenus] 🛡️ ANTI-DOUBLON (confirm) — course active ${_activeCourseConf.id} (${_activeCourseConf.statut}) existe pour ${telephone}`);
+              reponseVenus = `Vous avez déjà une course active (réf: ${(_activeCourseConf.id || '').slice(-6).toUpperCase()}). Le livreur est en cours de recherche.`;
+              pendingCourseConf.course_created = true;
+              pendingCourseConf.course_id = _activeCourseConf.id;
+              await base44.asServiceRole.entities.Conversation.update(conversation.id, { venus_pending_course: JSON.stringify(pendingCourseConf) });
+            } else {
+              try {
+                const crConf = await creerCourseDepuisMemoire(base44, pendingCourseConf, countryCode, tarifs, telephone, profileName, conversation.silgapp_from_number);
+                if (crConf.success) {
+                  reponseVenus = crConf.message;
+                  pendingCourseConf.course_created = true;
+                  pendingCourseConf.course_id = crConf.course.id;
+                  await base44.asServiceRole.entities.Conversation.update(conversation.id, { venus_pending_course: JSON.stringify(pendingCourseConf) });
+                  venusLog(`[WebhookVenus] ✅ Course créée via confirmation déterministe: ${crConf.course.id}`);
+                } else if (crConf.message) {
+                  reponseVenus = crConf.message;
+                }
+              } catch (e) {
+                console.error(`[WebhookVenus] Erreur confirmation déterministe: ${e.message}`);
+              }
             }
           }
         }
