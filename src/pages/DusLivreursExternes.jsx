@@ -450,7 +450,9 @@ export default function DusLivreursExternes() {
 
   const blockMutation = useMutation({
     mutationFn: async ({ id, actif }) => {
+      console.log("[BLOCK] mutationFn start - id:", id, "actif:", actif);
       await base44.entities.Livreur.update(id, { actif });
+      console.log("[BLOCK] mutationFn done - success");
       return { id, actif };
     },
     onMutate: async ({ id, actif }) => {
@@ -461,11 +463,14 @@ export default function DusLivreursExternes() {
       return { prevLivreurs };
     },
     onSuccess: (_, { actif }) => {
+      console.log("[BLOCK] onSuccess - actif:", actif);
       queryClient.invalidateQueries({ queryKey: ["livreurs-externes-all"] });
+      queryClient.invalidateQueries({ queryKey: ["courses-externes-livrees"] });
       toast.success(actif ? "Livreur débloqué" : "Livreur bloqué");
       setDetailEntry(null);
     },
     onError: (err, _v, ctx) => {
+      console.error("[BLOCK] onError:", err);
       if (ctx?.prevLivreurs) queryClient.setQueryData(["livreurs-externes-all", effectiveCountry], ctx.prevLivreurs);
       toast.error("Erreur : " + (err.message || "Échec du blocage"));
     },
