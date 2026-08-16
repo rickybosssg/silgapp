@@ -450,9 +450,7 @@ export default function DusLivreursExternes() {
 
   const blockMutation = useMutation({
     mutationFn: async ({ id, actif }) => {
-      console.log("[BLOCK] mutationFn start - id:", id, "actif:", actif);
       await base44.entities.Livreur.update(id, { actif });
-      console.log("[BLOCK] mutationFn done - success");
       return { id, actif };
     },
     onMutate: async ({ id, actif }) => {
@@ -463,14 +461,12 @@ export default function DusLivreursExternes() {
       return { prevLivreurs };
     },
     onSuccess: (_, { actif }) => {
-      console.log("[BLOCK] onSuccess - actif:", actif);
       queryClient.invalidateQueries({ queryKey: ["livreurs-externes-all"] });
       queryClient.invalidateQueries({ queryKey: ["courses-externes-livrees"] });
       toast.success(actif ? "Livreur débloqué" : "Livreur bloqué");
       setDetailEntry(null);
     },
     onError: (err, _v, ctx) => {
-      console.error("[BLOCK] onError:", err);
       if (ctx?.prevLivreurs) queryClient.setQueryData(["livreurs-externes-all", effectiveCountry], ctx.prevLivreurs);
       toast.error("Erreur : " + (err.message || "Échec du blocage"));
     },
@@ -664,7 +660,7 @@ export default function DusLivreursExternes() {
                         variant={isBloque ? "outline" : "destructive"}
                         className={`flex-1 h-9 text-xs rounded-xl font-semibold ${isBloque ? "border-green-200 text-green-700 hover:bg-green-50" : ""}`}
                         disabled={blockMutation.isPending}
-                        onClick={() => blockMutation.mutate({ id: entry.id, actif: !isBloque })}>
+                        onClick={() => blockMutation.mutate({ id: entry.id, actif: isBloque })}>
                         {blockMutation.isPending && <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />}
                         {isBloque
                           ? <><Unlock className="w-3.5 h-3.5 mr-1" />Débloquer</>
