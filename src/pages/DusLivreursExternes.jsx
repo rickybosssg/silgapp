@@ -662,11 +662,14 @@ export default function DusLivreursExternes() {
                           e.preventDefault();
                           e.stopPropagation();
                           const newActif = !isBloque;
+                          window.alert("DEBUG 1: Début update direct sur " + entry.id + " → actif=" + newActif);
                           try {
-                            await base44.entities.Livreur.update(entry.id, { actif: newActif });
+                            const res = await base44.entities.Livreur.update(entry.id, { actif: newActif });
+                            window.alert("DEBUG 2: update OK: " + JSON.stringify(res).substring(0, 200));
                             toast.success(newActif ? "Livreur débloqué" : "Livreur bloqué");
                             queryClient.invalidateQueries({ queryKey: ["livreurs-externes-all"] });
                           } catch (err) {
+                            window.alert("DEBUG 3: erreur: " + (err?.message || err) + "\nstack: " + err?.stack);
                             toast.error("Erreur : " + (err?.message || "Échec du blocage"));
                           }
                         }}>
