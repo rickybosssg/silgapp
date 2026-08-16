@@ -658,21 +658,9 @@ export default function DusLivreursExternes() {
                         size="sm"
                         variant={isBloque ? "outline" : "destructive"}
                         className={`flex-1 h-9 text-xs rounded-xl font-semibold ${isBloque ? "border-green-200 text-green-700 hover:bg-green-50" : ""}`}
-                        onClick={async (e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          const newActif = !isBloque;
-                          window.alert("DEBUG 1: Début update direct sur " + entry.id + " → actif=" + newActif);
-                          try {
-                            const res = await base44.entities.Livreur.update(entry.id, { actif: newActif });
-                            window.alert("DEBUG 2: update OK: " + JSON.stringify(res).substring(0, 200));
-                            toast.success(newActif ? "Livreur débloqué" : "Livreur bloqué");
-                            queryClient.invalidateQueries({ queryKey: ["livreurs-externes-all"] });
-                          } catch (err) {
-                            window.alert("DEBUG 3: erreur: " + (err?.message || err) + "\nstack: " + err?.stack);
-                            toast.error("Erreur : " + (err?.message || "Échec du blocage"));
-                          }
-                        }}>
+                        disabled={blockMutation.isPending}
+                        onClick={() => blockMutation.mutate({ id: entry.id, actif: !isBloque })}>
+                        {blockMutation.isPending && <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />}
                         {isBloque
                           ? <><Unlock className="w-3.5 h-3.5 mr-1" />Débloquer</>
                           : <><Ban className="w-3.5 h-3.5 mr-1" />Bloquer</>}
