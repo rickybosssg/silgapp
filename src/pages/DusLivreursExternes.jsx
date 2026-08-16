@@ -661,19 +661,26 @@ export default function DusLivreursExternes() {
                         onClick={async (e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          window.alert("DEBUG: clic détecté sur " + (isBloque ? "Débloquer" : "Bloquer") + " pour " + entry.nom + " (id=" + entry.id + ")");
+                          const newActif = !isBloque;
+                          const appId = "6a0ec08f3af5e1d1284254c1";
+                          const token = localStorage.getItem("base44_access_token") || localStorage.getItem("access_token") || localStorage.getItem("token");
+                          const url = `https://app.base44.com/api/apps/${appId}/functions/updateLivreur`;
                           try {
-                            const res = await base44.functions.invoke("updateLivreur", {
-                              id: entry.id,
-                              data: { actif: !isBloque },
+                            const response = await fetch(url, {
+                              method: "POST",
+                              headers: {
+                                "Content-Type": "application/json",
+                                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                              },
+                              body: JSON.stringify({ id: entry.id, data: { actif: newActif } }),
                             });
-                            window.alert("DEBUG: réponse reçue: " + JSON.stringify(res).substring(0, 200));
-                            if (res?.success === false) throw new Error(res.error || "Échec");
-                            if (res?.data?.success === false) throw new Error(res.data.error || "Échec");
-                            toast.success(!isBloque ? "Livreur bloqué" : "Livreur débloqué");
+                            const result = await response.json();
+                            if (!response.ok || result.success === false) {
+                              throw new Error(result.error || `HTTP ${response.status}`);
+                            }
+                            toast.success(newActif ? "Livreur débloqué" : "Livreur bloqué");
                             queryClient.invalidateQueries({ queryKey: ["livreurs-externes-all"] });
                           } catch (err) {
-                            window.alert("DEBUG: erreur: " + (err?.message || err));
                             toast.error("Erreur : " + (err?.message || "Échec du blocage"));
                           }
                         }}>
@@ -1042,8 +1049,42 @@ export default function DusLivreursExternes() {
               paiementMutation.mutate({ entry, montant });
             }
           }}
-          onBloquer={() => blockMutation.mutate({ id: detailEntry.id, actif: false })}
-          onDebloquer={() => blockMutation.mutate({ id: detailEntry.id, actif: true })}
+          onBloquer={async () => {
+            const appId = "6a0ec08f3af5e1d1284254c1";
+            const token = localStorage.getItem("base44_access_token") || localStorage.getItem("access_token") || localStorage.getItem("token");
+            try {
+              const response = await fetch(`https://app.base44.com/api/apps/${appId}/functions/updateLivreur`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                body: JSON.stringify({ id: detailEntry.id, data: { actif: false } }),
+              });
+              const result = await response.json();
+              if (!response.ok || result.success === false) throw new Error(result.error || `HTTP ${response.status}`);
+              toast.success("Livreur bloqué");
+              queryClient.invalidateQueries({ queryKey: ["livreurs-externes-all"] });
+              setDetailEntry(null);
+            } catch (err) {
+              toast.error("Erreur : " + (err?.message || "Échec du blocage"));
+            }
+          }}
+          onDebloquer={async () => {
+            const appId = "6a0ec08f3af5e1d1284254c1";
+            const token = localStorage.getItem("base44_access_token") || localStorage.getItem("access_token") || localStorage.getItem("token");
+            try {
+              const response = await fetch(`https://app.base44.com/api/apps/${appId}/functions/updateLivreur`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                body: JSON.stringify({ id: detailEntry.id, data: { actif: true } }),
+              });
+              const result = await response.json();
+              if (!response.ok || result.success === false) throw new Error(result.error || `HTTP ${response.status}`);
+              toast.success("Livreur débloqué");
+              queryClient.invalidateQueries({ queryKey: ["livreurs-externes-all"] });
+              setDetailEntry(null);
+            } catch (err) {
+              toast.error("Erreur : " + (err?.message || "Échec du déblocage"));
+            }
+          }}
           isPending={paiementMutation.isPending || etablissementPaiementMutation.isPending}
         />
       )}
