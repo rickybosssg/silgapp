@@ -310,8 +310,14 @@ export default function DusLivreursExternes() {
       map[l.id] = { id: l.id, nom: l.nom || "Inconnu", prenom: l.prenom || "", telephone: l.telephone || "", livreurInfo: l, courses: [], montantTotal: 0, commissionTotal: 0, commissionJour: 0, nbCoursesJour: 0, montantPaye: 0, montantDu: 0 };
     });
     Object.values(map).forEach(entry => {
-      // Calcul dynamique basé sur les courses réellement livrées et impayées
-      entry.montantDu = entry.commissionTotal - entry.montantPaye;
+      const info = entry.livreurInfo;
+      if (info) {
+        // Source de vérité = champ stocké sur le livreur, mis à jour à chaque paiement
+        entry.montantDu = info.montant_du_silga ?? info.encours ?? 0;
+      } else {
+        // Pas d'info livreur — calcul de secours basé sur les courses impayées
+        entry.montantDu = entry.commissionTotal - entry.montantPaye;
+      }
     });
     let result = Object.values(map);
     const totalCommissionJour = result.reduce((s, r) => s + (r.commissionJour || 0), 0);
