@@ -502,7 +502,7 @@ export async function handleAnnulationCourse(base44: any, conversation: any, use
     await base44.asServiceRole.functions.invoke('annulerCourseExterne', {
       course_id: courseActive.id,
       motif: 'client_change_avis',
-      source: 'admin',
+      source: 'client',
     });
 
     const courseVerifiee = await base44.asServiceRole.entities.CourseExterne.get(courseActive.id);
