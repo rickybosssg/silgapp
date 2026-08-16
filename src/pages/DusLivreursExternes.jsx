@@ -450,13 +450,25 @@ export default function DusLivreursExternes() {
 
   const blockMutation = useMutation({
     mutationFn: async ({ id, actif }) => {
-      const res = await base44.functions.invoke("updateLivreur", { id, data: { actif } });
-      if (res?.data && res.data.success === false) throw new Error(res.data.error || "Échec");
-      if (res?.success === false) throw new Error(res?.error || "Échec");
-      return res;
+      await base44.entities.Livreur.update(id, { actif });
+      return { id, actif };
     },
-    onSuccess: (_, { actif }) => { queryClient.invalidateQueries({ queryKey: ["livreurs-externes-all"] }); toast.success(actif ? "Débloqué" : "Bloqué"); setDetailEntry(null); },
-    onError: (err) => toast.error("Erreur : " + (err.message || "Échec du blocage")),
+    onMutate: async ({ id, actif }) => {
+      await queryClient.cancelQueries({ queryKey: ["livreurs-externes-all", effectiveCountry] });
+      const prevLivreurs = queryClient.getQueryData(["livreurs-externes-all", effectiveCountry]);
+      queryClient.setQueryData(["livreurs-externes-all", effectiveCountry], (old) =>
+        (old || []).map(l => l.id === id ? { ...l, actif } : l));
+      return { prevLivreurs };
+    },
+    onSuccess: (_, { actif }) => {
+      queryClient.invalidateQueries({ queryKey: ["livreurs-externes-all"] });
+      toast.success(actif ? "Livreur débloqué" : "Livreur bloqué");
+      setDetailEntry(null);
+    },
+    onError: (err, _v, ctx) => {
+      if (ctx?.prevLivreurs) queryClient.setQueryData(["livreurs-externes-all", effectiveCountry], ctx.prevLivreurs);
+      toast.error("Erreur : " + (err.message || "Échec du blocage"));
+    },
   });
 
   // ── Paiement boutique/restaurant (mise à jour directe) ──
