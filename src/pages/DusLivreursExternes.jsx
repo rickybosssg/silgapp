@@ -637,6 +637,16 @@ export default function DusLivreursExternes() {
                       <Button variant="outline" size="sm" className="flex-1 h-9 text-xs rounded-xl font-semibold text-gray-700" onClick={() => setDetailEntry(entry)}>
                         Détails
                       </Button>
+                      <Button
+                        size="sm"
+                        variant={isBloque ? "outline" : "destructive"}
+                        className={`flex-1 h-9 text-xs rounded-xl font-semibold ${isBloque ? "border-green-200 text-green-700 hover:bg-green-50" : ""}`}
+                        disabled={blockMutation.isPending}
+                        onClick={() => blockMutation.mutate({ id: entry.id, actif: !isBloque })}>
+                        {isBloque
+                          ? <><Unlock className="w-3.5 h-3.5 mr-1" />Débloquer</>
+                          : <><Ban className="w-3.5 h-3.5 mr-1" />Bloquer</>}
+                      </Button>
                       {entry.montantDu > 0 && (
                         <Button size="sm" className="flex-1 h-9 text-xs bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 rounded-xl font-semibold border-0"
                           disabled={paiementMutation.isPending}
