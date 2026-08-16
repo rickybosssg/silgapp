@@ -449,9 +449,14 @@ export default function DusLivreursExternes() {
   });
 
   const blockMutation = useMutation({
-    mutationFn: ({ id, actif }) => base44.functions.invoke("updateLivreur", { id, data: { actif } }),
+    mutationFn: async ({ id, actif }) => {
+      const res = await base44.functions.invoke("updateLivreur", { id, data: { actif } });
+      if (res?.data && res.data.success === false) throw new Error(res.data.error || "Échec");
+      if (res?.success === false) throw new Error(res?.error || "Échec");
+      return res;
+    },
     onSuccess: (_, { actif }) => { queryClient.invalidateQueries({ queryKey: ["livreurs-externes-all"] }); toast.success(actif ? "Débloqué" : "Bloqué"); setDetailEntry(null); },
-    onError: () => toast.error("Erreur"),
+    onError: (err) => toast.error("Erreur : " + (err.message || "Échec du blocage")),
   });
 
   // ── Paiement boutique/restaurant (mise à jour directe) ──
