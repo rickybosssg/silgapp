@@ -660,7 +660,11 @@ export default function DusLivreursExternes() {
                         className={`flex-1 h-9 text-xs rounded-xl font-semibold ${isBloque ? "border-green-200 text-green-700 hover:bg-green-50" : ""}`}
                         onClick={async () => {
                           try {
-                            await base44.entities.Livreur.update(entry.id, { actif: !isBloque });
+                            const res = await base44.functions.invoke("updateLivreur", {
+                              id: entry.id,
+                              data: { actif: !isBloque },
+                            });
+                            if (res?.data && res.data.success === false) throw new Error(res.data.error || "Échec");
                             toast.success(!isBloque ? "Livreur bloqué" : "Livreur débloqué");
                             queryClient.invalidateQueries({ queryKey: ["livreurs-externes-all"] });
                           } catch (e) {
