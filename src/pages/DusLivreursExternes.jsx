@@ -658,17 +658,23 @@ export default function DusLivreursExternes() {
                         size="sm"
                         variant={isBloque ? "outline" : "destructive"}
                         className={`flex-1 h-9 text-xs rounded-xl font-semibold ${isBloque ? "border-green-200 text-green-700 hover:bg-green-50" : ""}`}
-                        onClick={async () => {
+                        onClick={async (e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          window.alert("DEBUG: clic détecté sur " + (isBloque ? "Débloquer" : "Bloquer") + " pour " + entry.nom + " (id=" + entry.id + ")");
                           try {
                             const res = await base44.functions.invoke("updateLivreur", {
                               id: entry.id,
                               data: { actif: !isBloque },
                             });
-                            if (res?.data && res.data.success === false) throw new Error(res.data.error || "Échec");
+                            window.alert("DEBUG: réponse reçue: " + JSON.stringify(res).substring(0, 200));
+                            if (res?.success === false) throw new Error(res.error || "Échec");
+                            if (res?.data?.success === false) throw new Error(res.data.error || "Échec");
                             toast.success(!isBloque ? "Livreur bloqué" : "Livreur débloqué");
                             queryClient.invalidateQueries({ queryKey: ["livreurs-externes-all"] });
-                          } catch (e) {
-                            toast.error("Erreur : " + (e?.message || "Échec du blocage"));
+                          } catch (err) {
+                            window.alert("DEBUG: erreur: " + (err?.message || err));
+                            toast.error("Erreur : " + (err?.message || "Échec du blocage"));
                           }
                         }}>
                         {isBloque
