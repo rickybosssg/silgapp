@@ -1,10 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { clearPersistedToken } from "@/lib/authPersistence";
 import { toast } from "sonner";
 import { User, Save, X, Check, Trash2, LogOut } from "lucide-react";
-import CountryCodeSelect from "@/components/ui/CountryCodeSelect";
-import { SILGAPP_COUNTRIES, normalizePhone } from "@/lib/phoneUtils";
+import ClientCountrySelect from "@/components/client/ClientCountrySelect";
+import { SILGAPP_COUNTRIES, normalizePhone, loadCountryPhoneConfigs } from "@/lib/phoneUtils";
 
 function getCountryInfo(countryCode) {
   return SILGAPP_COUNTRIES.find((country) => country.code === countryCode) || SILGAPP_COUNTRIES[0];
@@ -38,6 +38,11 @@ export default function ProfilModal({ clientProfil, onClose, onSave }) {
   const [loading, setLoading] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  // S'assurer que les configs pays dynamiques sont chargées pour la validation téléphonique
+  useEffect(() => {
+    loadCountryPhoneConfigs();
+  }, []);
 
   const handleTelChange = (e) => {
     const raw = e.target.value.replace(/\D/g, "").slice(0, countryInfo.len);
@@ -121,7 +126,7 @@ export default function ProfilModal({ clientProfil, onClose, onSave }) {
           </div>
           <div>
             <label className="text-xs font-bold text-gray-800 mb-1 block">Pays *</label>
-            <CountryCodeSelect
+            <ClientCountrySelect
               value={countryCode}
               onChange={(code) => {
                 setCountryCode(code);
