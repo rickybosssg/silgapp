@@ -212,6 +212,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   });
 
   // ── Compteur de courses disponibles (pilote le point rouge) ──
+  // ⚠️ Garde cohérente avec CoursesDisponibles.jsx : statut === "recherche_livreur"
+  //    ET dispatch_status === "disponible_push" | "propose"
   const { data: availableCoursesCount = 0 } = useQuery({
     queryKey: ["courses-disponibles-count", livreurProfil?.id, livreurProfil?.country_code, isV2Enabled],
     queryFn: async () => {
@@ -221,14 +223,16 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         "-created_date", 50
       );
       return (all || []).filter(c =>
-        !FINAL_COURSE_STATUSES.has(c.statut) &&
+        c.statut === "recherche_livreur" &&
+        (c.dispatch_status === "disponible_push" || c.dispatch_status === "propose") &&
         !c.livreur_id &&
         !c.accepted_by_livreur_id
       ).length;
     },
     enabled: !!livreurProfil?.id && !!livreurProfil?.country_code && isV2Enabled,
     refetchInterval: 10000,
-    staleTime: 5000,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   });
 
   // Le point rouge s'affiche dès qu'il y a des courses disponibles ET que le livreur
@@ -240,6 +244,20 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       setHasNewAvailableCourse(false);
     }
   }, [availableCoursesCount, activeTab]);
+
+  // ── WebSocket : invalider le badge + la liste "Disponibles" en temps réel ──
+  // Quand une course est mise à jour (annulation → en_attente, acceptation → accepte),
+  // le cache React Query doit être invalidé immédiatement sans attendre le polling.
+  useEffect(() => {
+    if (!livreurProfil?.id) return;
+    const unsubscribe = base44.entities.CourseExterne.subscribe((event) => {
+      if (event.type === "create" || event.type === "update" || event.type === "delete") {
+        queryClient.invalidateQueries({ queryKey: ["courses-disponibles-count"] });
+        queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles"] });
+      }
+    });
+    return unsubscribe;
+  }, [livreurProfil?.id, queryClient]);
 
   const { data: countryCommissionRows = [] } = useQuery({
     queryKey: ["country-commission", livreurProfil?.country_code],
