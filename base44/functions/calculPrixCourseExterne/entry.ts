@@ -2,21 +2,10 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
 import { haversineKm } from '../../shared/geoUtils.ts';
 import { normalizeCommissionPct, chargerConfigPays } from '../../shared/dispatchConstants.ts';
 
-// Tarifs par pays (fallback si pas de config en DB)
-const TARIFS_PAYS = {
-  BF: { prix_par_km: 100, prix_minimum: 500, devise: "FCFA" },
-  CI: { prix_par_km: 120, prix_minimum: 600, devise: "FCFA" },
-  TG: { prix_par_km: 100, prix_minimum: 500, devise: "FCFA" },
-  BJ: { prix_par_km: 100, prix_minimum: 500, devise: "FCFA" },
-  SN: { prix_par_km: 150, prix_minimum: 750, devise: "FCFA" },
-  ML: { prix_par_km: 100, prix_minimum: 500, devise: "FCFA" },
-  GN: { prix_par_km: 800, prix_minimum: 4000, devise: "GNF" },
-  NE: { prix_par_km: 100, prix_minimum: 500, devise: "FCFA" },
-  GH: { prix_par_km: 2, prix_minimum: 10, devise: "GHS" },
-};
-
-// calculerDistance → importé de geoUtils (haversineKm)
-// normalizeCommissionPct → importé de dispatchConstants
+// ⚠️ Aucun tarif codé en dur — tous les paramètres proviennent de l'entité Country.
+// Fallback générique unique (ne suppose aucun pays) utilisé uniquement si la BDD
+// est temporairement indisponible. La devise reste inconnue jusqu'à confirmation DB.
+const FALLBACK_TARIF = { prix_par_km: 100, prix_minimum: 500, devise: "FCFA" };
 
 Deno.serve(async (req) => {
   try {
@@ -60,21 +49,21 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'country_code manquant sur la course — impossible de calculer le prix' }, { status: 400 });
     }
 
-    // Essayer de récupérer la config depuis la DB
-    let tarif = TARIFS_PAYS[countryCode] || TARIFS_PAYS["BF"];
+    // Récupérer la config depuis la DB (Country) — aucune valeur codée en dur
+    let tarif = { ...FALLBACK_TARIF };
     let commissionPct = null;
     try {
       const c = await chargerConfigPays(base44, countryCode);
       if (c) {
         tarif = {
-          prix_par_km: c.prix_par_km || tarif.prix_par_km,
-          prix_minimum: c.prix_minimum || tarif.prix_minimum,
-          devise: c.devise || tarif.devise,
+          prix_par_km: c.prix_par_km ?? FALLBACK_TARIF.prix_par_km,
+          prix_minimum: c.prix_minimum ?? FALLBACK_TARIF.prix_minimum,
+          devise: c.devise || FALLBACK_TARIF.devise,
         };
         commissionPct = normalizeCommissionPct(c.commission_pct);
       }
     } catch (_) {
-      // Fallback silencieux sur le tarif statique
+      // Fallback silencieux — le blocage commissionPct === null empêche un prix erroné
     }
 
     if (commissionPct === null) {
@@ -100,11 +89,9 @@ Deno.serve(async (req) => {
 
     const distanceReelle = haversineKm(lat1, lng1, lat2, lng2) ?? 0;
 
-    // Calculer le prix final selon les tarifs du pays
-    // Règle : prix minimum global SILGAPP = 1 000 F CFA (s'applique dans tous les pays FCFA)
-    const PRIX_MINIMUM_GLOBAL = tarif.devise === "FCFA" ? 1000 : tarif.prix_minimum;
+    // Calculer le prix final selon les tarifs du pays (100% depuis Country)
     const prixBrut = distanceReelle * tarif.prix_par_km;
-    const prixFinal = Math.max(Math.round(prixBrut), tarif.prix_minimum, PRIX_MINIMUM_GLOBAL);
+    const prixFinal = Math.max(Math.round(prixBrut), tarif.prix_minimum);
 
     // Commission Silga et montant livreur
     const commissionSilga = Math.round(prixFinal * (commissionPct / 100));

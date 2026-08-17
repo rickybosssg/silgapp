@@ -73,9 +73,8 @@ export function calculerPrixApproximatif(lat1, lng1, lat2, lng2, countryCode) {
   const distance = haversineKm(lat1, lng1, lat2, lng2);
   if (distance === null) return null;
 
-  const PRIX_MINIMUM_GLOBAL = tarif.devise === "FCFA" ? 1000 : tarif.prix_minimum;
   const prixBrut = distance * tarif.prix_par_km;
-  const prixFinal = Math.max(Math.round(prixBrut), tarif.prix_minimum, PRIX_MINIMUM_GLOBAL);
+  const prixFinal = Math.max(Math.round(prixBrut), tarif.prix_minimum);
 
   return {
     prix: prixFinal,

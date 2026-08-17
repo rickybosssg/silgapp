@@ -8,7 +8,7 @@ import CountryCodeSelect from "@/components/ui/CountryCodeSelect";
 import SmartAddressInput from "@/components/location/SmartAddressInput";
 
 // ─── Helpers téléphone (délègue à phoneUtils) ─────────────────────────────────
-export function normaliserTelephone(tel, countryCode = "BF") {
+export function normaliserTelephone(tel, countryCode = "") {
   return normalizePhone(tel, countryCode) ? "+" + (normalizePhone(tel, countryCode) || "") : "";
 }
 
@@ -50,13 +50,13 @@ const GPS_POS_KEY = (id) => `livreur_gps_pos_${id}`;
 // ─── Formulaire profil livreur ────────────────────────────────────────────────
 function FormulaireProfilLivreur({ livreurProfil, gpsData, onTermine }) {
   const [countryCode, setCountryCode] = useState(livreurProfil?.country_code || "");
-  const dialCode = getDialCode(countryCode || "BF");
-  const localLen = getLocalLen(countryCode || "BF");
+  const dialCode = getDialCode(countryCode || "");
+  const localLen = getLocalLen(countryCode || "");
 
   // Extraire les chiffres locaux (sans indicatif) depuis le téléphone stocké
   const extractLocal = (tel, cc) => {
     if (!tel) return "";
-    const c = SILGAPP_COUNTRIES.find(x => x.code === (cc || "BF"));
+    const c = SILGAPP_COUNTRIES.find(x => x.code === (cc || ""));
     const digits = tel.replace(/\D/g, "");
     if (c && digits.startsWith(c.dial)) return digits.slice(c.dial.length);
     return digits.slice(-localLen);

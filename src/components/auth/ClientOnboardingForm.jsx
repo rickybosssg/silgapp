@@ -19,7 +19,7 @@ export default function ClientOnboardingForm({ user, onComplete }) {
     nom: user?.full_name || "",
     prenom: "",
     telephone: "",
-    country_code: "BF",
+    country_code: "",
     ville: "",
     quartier: "",
   });
