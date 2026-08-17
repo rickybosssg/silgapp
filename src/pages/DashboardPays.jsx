@@ -10,7 +10,6 @@ import {
 } from "lucide-react";
 import { format, isToday } from "date-fns";
 import { fr } from "date-fns/locale";
-import { PAYS_SILGAPP } from "@/components/international/CountrySelector.jsx";
 import { useAdminContext } from "@/hooks/useAdminContext.js";
 import CountrySelector, { usePaysActifs } from "@/components/international/CountrySelector.jsx";
 import StatCard from "@/components/dashboard/StatCard";
@@ -28,12 +27,13 @@ export default function DashboardPays() {
   const { isGlobal, isPays, countryCode: adminCountryCode, selectedCountry, setSelectedCountry } = useAdminContext();
   const navigate = useNavigate();
   const paysActifs = usePaysActifs();
+  const paysListe = paysActifs.pays || [];
 
   // L'admin pays est restreint à son propre country_code
   // L'admin global utilise selectedCountry (depuis localStorage ou URL)
   const effectiveCode = isPays ? adminCountryCode : (codeParam || selectedCountry || "BF");
 
-  const paysInfo = PAYS_SILGAPP.find(p => p.code === effectiveCode) || { code: effectiveCode, nom: effectiveCode, emoji_flag: "", devise: "FCFA" };
+  const paysInfo = paysListe.find(p => p.code === effectiveCode) || { code: effectiveCode, nom: effectiveCode, emoji_flag: "", devise: "FCFA" };
 
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [statModal, setStatModal] = useState(null);

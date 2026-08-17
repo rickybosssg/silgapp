@@ -4,7 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Search, Edit3, BookOpen, MessageSquare, EyeOff } from 'lucide-react';
-import { PAYS_SILGAPP } from '@/components/international/CountrySelector';
+import { usePaysActifs } from '@/components/international/CountrySelector';
 import KnowledgeFormDialog from './KnowledgeFormDialog';
 import ScenarioFormDialog from './ScenarioFormDialog';
 
@@ -13,6 +13,7 @@ export default function MisunderstoodTab({ onCorriger }) {
   const [knowledgeDialog, setKnowledgeDialog] = useState(null);
   const [scenarioDialog, setScenarioDialog] = useState(null);
   const queryClient = useQueryClient();
+  const { pays: paysListe } = usePaysActifs();
 
   const { data: interactions = [], isLoading } = useQuery({
     queryKey: ['venus-misunderstood'],
@@ -38,7 +39,7 @@ export default function MisunderstoodTab({ onCorriger }) {
     refresh();
   };
 
-  const flagFor = (cc) => PAYS_SILGAPP.find(p => p.code === cc)?.emoji_flag || '🌍';
+  const flagFor = (cc) => paysListe.find(p => p.code === cc)?.emoji_flag || '🌍';
 
   return (
     <div className="space-y-4">
