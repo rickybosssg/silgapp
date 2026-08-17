@@ -96,17 +96,10 @@ export function formatLocalPhone(phone, countryCode = "BF") {
   const country = getCountryConfig(countryCode);
   const local = extractLocalPhone(phone, country.code);
 
-  if (country.code === "GH" && local.length > 2) {
-    return [local.slice(0, 2), local.slice(2, 5), local.slice(5, 9)].filter(Boolean).join(" ");
-  }
-
   return local.match(/.{1,2}/g)?.join(" ") || local;
 }
 
 export function phonePlaceholder(countryCode = "BF") {
-  const country = getCountryConfig(countryCode);
-  if (country.code === "GH") return "XX XXX XXXX";
-  if (country.code === "CI") return "XX XX XX XX XX";
   return "XX XX XX XX";
 }
 

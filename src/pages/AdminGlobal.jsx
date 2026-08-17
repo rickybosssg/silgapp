@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { isToday } from "date-fns";
-import { PAYS_SILGAPP } from "@/components/international/CountrySelector.jsx";
+import { usePaysActifs } from "@/components/international/CountrySelector.jsx";
 import AdminPaysDialog from "@/components/admin/AdminPaysDialog.jsx";
 import DemoAccessManager from "@/components/admin/DemoAccessManager.jsx";
 
@@ -17,6 +17,7 @@ export default function AdminGlobal() {
   const navigate = useNavigate();
   const [showCreateAdmin, setShowCreateAdmin] = useState(null); // pays object
   const [downloadingReport, setDownloadingReport] = useState(false);
+  const { pays: paysActifsListe } = usePaysActifs();
 
   const handleDownloadReport = async () => {
     setDownloadingReport(true);
@@ -103,11 +104,11 @@ export default function AdminGlobal() {
   const statsByPays = useMemo(() => {
     const allCodes = [...new Set([
       ...pays.map(p => p.code),
-      ...PAYS_SILGAPP.map(p => p.code),
+      ...paysActifsListe.map(p => p.code),
     ])];
 
     return allCodes.map(code => {
-      const paysInfo = pays.find(p => p.code === code) || PAYS_SILGAPP.find(p => p.code === code);
+      const paysInfo = pays.find(p => p.code === code) || paysActifsListe.find(p => p.code === code);
       const c = courses.filter(x => (x.country_code || "BF") === code);
       const livrees = c.filter(x => x.statut === "livree");
       const enCours = c.filter(x => !["livree", "annulee"].includes(x.statut));

@@ -26,10 +26,30 @@ export const STATUTS_ACTIFS_VERIF = STATUTS_ACTIFS_COURSE;
 export const STATUTS_TERMINAUX_COURSE = ['livree', 'annulee'];
 
 // Map pays → indicatif téléphonique (avec +)
-export const INDICATIFS: Record<string, string> = {
-  BF: '+226', CI: '+225', TG: '+228', BJ: '+229', SN: '+221',
-  ML: '+223', GN: '+224', NE: '+227', GH: '+233',
-};
+// ⚠️ Dynamique : chargé depuis Country via chargerConfigPays.
+//    Cette map statique est un FALLBACK uniquement utilisé si la BDD est indisponible.
+export const INDICATIFS: Record<string, string> = {};
+
+/**
+ * Récupère l'indicatif téléphonique d'un pays dynamiquement depuis la BDD.
+ * Fallback sur la map statique INDICATIFS si la BDD est indisponible.
+ */
+export async function getIndicatifPays(base44: any, countryCode: string): Promise<string> {
+  if (!countryCode) return '';
+  // Vérifier le cache statique d'abord
+  if (INDICATIFS[countryCode]) return INDICATIFS[countryCode];
+  try {
+    const country = await chargerConfigPays(base44, countryCode);
+    if (country?.indicatif) {
+      const dial = String(country.indicatif).replace(/^\+/, '');
+      INDICATIFS[countryCode] = `+${dial}`;
+      return `+${dial}`;
+    }
+  } catch {
+    // BDD indisponible — fallback vide
+  }
+  return '';
+}
 
 /**
  * Normalise un pourcentage de commission.

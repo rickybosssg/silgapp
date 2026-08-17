@@ -21,7 +21,7 @@ export function formaterTelephone(tel) {
 
 function getDialCode(countryCode) {
   const c = SILGAPP_COUNTRIES.find(x => x.code === countryCode);
-  return c ? `+${c.dial}` : "+226";
+  return c ? `+${c.dial}` : "+";
 }
 
 function getLocalLen(countryCode) {
