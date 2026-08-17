@@ -6,7 +6,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   ArrowLeft, ArrowRight, MapPin, Navigation, Package,
   User, FileText, CheckCircle, Truck, AlertCircle,
-  Loader2, Search, Send, Inbox, Sparkles, Car, DollarSign
+  Loader2, Search,
+  Pencil, ChevronDown, ChevronUp, Info
 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
@@ -17,30 +18,49 @@ import { SILGAPP_COUNTRIES, phoneVariants } from "@/lib/phoneUtils";
 import NombreColisSelector from "@/components/multi-colis/NombreColisSelector";
 import MultiColisFormStep from "@/components/multi-colis/MultiColisFormStep";
 import SmartAddressInput from "@/components/location/SmartAddressInput";
+import { useCountryPricing } from "@/hooks/useCountryPricing";
 
-// Retourne l'indicatif affiché (ex: "+226") selon le pays
+// ─── Palette premium ─────────────────────────────────────────────────────────
+// Vert émeraude #059669 — Bleu ardoise #1E293B — Fond #F8FAFC
+// Texte principal #0F172A — Accent corail #F97316
+const COLORS = {
+  primary: "#059669",
+  primaryHover: "#047857",
+  primaryLight: "#ECFDF5",
+  secondary: "#1E293B",
+  secondaryLight: "#F1F5F9",
+  accent: "#F97316",
+  accentLight: "#FFF7ED",
+  textMain: "#0F172A",
+  textSecondary: "#64748B",
+  textLabel: "#334155",
+  textHint: "#94A3B8",
+  textError: "#DC2626",
+  bgMain: "#F8FAFC",
+  bgCard: "#FFFFFF",
+  bgSection: "#F1F5F9",
+  border: "#E2E8F0",
+  borderInput: "#CBD5E1",
+};
+
+// ─── Helpers téléphone ────────────────────────────────────────────────────────
 function getDialCode(countryCode) {
   const c = SILGAPP_COUNTRIES.find(x => x.code === countryCode);
   return c ? `+${c.dial}` : "+226";
 }
-// Retourne le placeholder téléphone selon le pays (ex: "+226 XX XX XX XX")
 function getPhonePlaceholder(countryCode) {
   const c = SILGAPP_COUNTRIES.find(x => x.code === countryCode);
   if (!c) return "+226 XX XX XX XX";
   const xs = "X".repeat(c.len).replace(/(.{2})/g, "$1 ").trim();
   return `+${c.dial} ${xs}`;
 }
-// Normalise un numéro pour la recherche en BDD selon le pays actif
 function normalizeForSearch(phone, countryCode) {
   const raw = (phone || "").replace(/\D/g, "");
   if (!raw) return phone || "";
   const c = SILGAPP_COUNTRIES.find(x => x.code === countryCode);
   if (!c) return raw;
-  // Déjà complet avec indicatif
   if (raw.startsWith(c.dial) && raw.length === c.dial.length + c.len) return "+" + raw;
-  // Numéro local (sans indicatif)
   if (raw.length === c.len) return "+" + c.dial + raw;
-  // Avec 0 initial
   if (raw.startsWith("0") && raw.length === c.len + 1) return "+" + c.dial + raw.slice(1);
   return "+" + raw;
 }
@@ -48,10 +68,13 @@ function normalizeForSearch(phone, countryCode) {
 const STORAGE_KEY = "silgapp_course_draft";
 
 // ─── Composant icône d'étape ──────────────────────────────────────────────────
-function StepIcon({ icon: Icon, color, bgColor }) {
+function StepIcon({ icon: Icon }) {
   return (
-    <div className={`w-16 h-16 rounded-3xl ${bgColor} flex items-center justify-center mx-auto mb-4 shadow-lg`}>
-      <Icon className={`w-8 h-8 ${color}`} />
+    <div
+      className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-3"
+      style={{ background: COLORS.primaryLight }}
+    >
+      <Icon className="w-7 h-7" style={{ color: COLORS.primary }} />
     </div>
   );
 }
@@ -59,26 +82,120 @@ function StepIcon({ icon: Icon, color, bgColor }) {
 // ─── Champ input premium ──────────────────────────────────────────────────────
 function PremiumInput({ label, required, hint, children, ...props }) {
   return (
-    <div className="space-y-2">
+    <div className="space-y-1.5">
       {label && (
-        <Label className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
+        <Label className="text-sm font-semibold flex items-center gap-1" style={{ color: COLORS.textLabel }}>
           {label}
           {required && <span className="text-red-500">*</span>}
-          {!required && <span className="text-xs text-gray-400 font-normal">(optionnel)</span>}
+          {!required && <span className="text-xs font-normal" style={{ color: COLORS.textHint }}>(optionnel)</span>}
         </Label>
       )}
       {children || (
         <Input
           {...props}
-          className={`h-14 rounded-2xl border-2 border-gray-200 bg-gray-50 focus:bg-white focus:border-primary px-4 text-base font-medium shadow-sm transition-all ${props.className || ""}`}
+          className="h-14 rounded-xl border bg-white px-4 text-base font-medium transition-all focus:outline-none"
+          style={{ borderColor: COLORS.borderInput }}
         />
       )}
-      {hint && <p className="text-xs text-gray-400 pl-1">{hint}</p>}
+      {hint && <p className="text-xs pl-1" style={{ color: COLORS.textHint }}>{hint}</p>}
     </div>
   );
 }
 
+// ─── Barre de progression premium ────────────────────────────────────────────
+function ProgressBar({ step, totalSteps, stepTitle }) {
+  const progress = ((step + 1) / totalSteps) * 100;
+  return (
+    <div className="mb-6">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-sm font-semibold" style={{ color: COLORS.textSecondary }}>
+          Étape {step + 1} sur {totalSteps}
+          {stepTitle && <span className="ml-1.5 font-bold" style={{ color: COLORS.secondary }}>— {stepTitle}</span>}
+        </span>
+      </div>
+      <div className="relative h-2 rounded-full overflow-hidden" style={{ background: COLORS.bgSection }}>
+        <div
+          className="absolute inset-y-0 left-0 rounded-full transition-all duration-500 ease-out"
+          style={{ width: `${progress}%`, background: COLORS.primary }}
+        />
+      </div>
+      <div className="flex justify-between mt-2">
+        {Array.from({ length: totalSteps }).map((_, i) => (
+          <div
+            key={i}
+            className="rounded-full transition-all duration-300"
+            style={{
+              width: 8,
+              height: 8,
+              background: i <= step ? COLORS.primary : COLORS.border,
+              transform: i === step ? "scale(1.3)" : "scale(1)",
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
 
+// ─── Boutons de navigation ───────────────────────────────────────────────────
+function NavButtons({ step, totalSteps, onBack, onNext, onAnnuler, onSubmit, isLoading, isContinueDisabled, isLastStep }) {
+  return (
+    <div className="flex gap-3 pt-2">
+      {step > 0 ? (
+        <button
+          type="button"
+          onClick={onBack}
+          className="flex-1 h-14 rounded-xl border-2 bg-white font-semibold text-base transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+          style={{ borderColor: COLORS.border, color: COLORS.textSecondary }}
+        >
+          <ArrowLeft className="w-5 h-5" />
+          Retour
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={onAnnuler}
+          className="flex-1 h-14 rounded-xl border-2 bg-white font-semibold text-base transition-all active:scale-[0.98] flex items-center justify-center"
+          style={{ borderColor: COLORS.border, color: COLORS.textSecondary }}
+        >
+          Annuler
+        </button>
+      )}
+
+      {!isLastStep ? (
+        <button
+          type="button"
+          onClick={onNext}
+          disabled={isContinueDisabled}
+          className="flex-1 h-14 rounded-xl text-white font-bold text-base shadow-md transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          style={{ background: COLORS.primary }}
+        >
+          Continuer
+          <ArrowRight className="w-5 h-5" />
+        </button>
+      ) : (
+        <button
+          type="submit"
+          disabled={isLoading}
+          className="flex-1 h-14 rounded-xl text-white font-black text-base shadow-md transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
+          style={{ background: COLORS.primary }}
+        >
+          {isLoading ? (
+            <>
+              <Loader2 className="w-5 h-5 animate-spin" />
+              Création...
+            </>
+          ) : (
+            <>
+              <CheckCircle className="w-5 h-5" />
+              Confirmer la course
+            </>
+          )}
+        </button>
+      )}
+    </div>
+  );
+}
 
 export default function CourseStepForm({
   step,
@@ -90,10 +207,10 @@ export default function CourseStepForm({
   onNext,
   onBack,
   onAnnuler,
+  onGoToStep,
   isLoading,
   clientId,
-  countryCode, // pays actif — détermine l'indicatif téléphonique
-  // Multi-colis
+  countryCode,
   colis,
   onColisChange,
   savedLat,
@@ -104,7 +221,19 @@ export default function CourseStepForm({
   const [expediteurFound, setExpediteurFound] = useState(null);
   const [destinataireFound, setDestinataireFound] = useState(null);
   const [verifying, setVerifying] = useState(false);
-  const progress = ((step + 1) / totalSteps) * 100;
+  const [showNotes, setShowNotes] = useState(false);
+  const { devise: countryDevise, prixSuggeres: countryPrixSuggeres } = useCountryPricing(activeCountry);
+
+  const isExpedie = formData.type_course === "expedier";
+  const isRecevoir = formData.type_course === "recevoir";
+  const isDeplacement = formData.type_course === "deplacement";
+
+  // ─── Titre de l'étape courante ──────────────────────────────────────────────
+  const stepTitles = isExpedie
+    ? ["Récupération", "Destinataire", "Livraison", "Détails", "Récapitulatif"]
+    : isRecevoir
+    ? ["Expéditeur", "Récupération", "Détails", "Récapitulatif"]
+    : ["Prise en charge", "Destination", "Passager", "Détails", "Récapitulatif"];
 
   const updateAddress = (side, text, location) => {
     const isDeparture = side === "depart";
@@ -123,11 +252,7 @@ export default function CourseStepForm({
     }));
   };
 
-  // Auto-activer GPS expéditeur si disponible (flux "recevoir")
-  // IMPORTANT : désactivé pour éviter boucle React #185
-  // La logique est maintenant gérée directement dans le UI (bouton toggle étape 2)
-
-  // ── Auto-remplir le prix proposé avec l'estimation GPS ──
+  // ─── Auto-remplir le prix proposé avec l'estimation GPS (conseil uniquement) ──
   useEffect(() => {
     const lat1 = formData.gps_depart_lat;
     const lng1 = formData.gps_depart_lng;
@@ -135,14 +260,14 @@ export default function CourseStepForm({
     const lng2 = formData.gps_arrivee_lng;
     if (lat1 && lng1 && lat2 && lng2) {
       const estimation = calculerPrixApproximatif(lat1, lng1, lat2, lng2, activeCountry);
+      // Ne pré-remplir que si le client n'a pas encore saisi de prix
       if (estimation && !formData.prix_propose) {
         setFormData(prev => ({ ...prev, prix_propose: estimation.prix }));
       }
     }
   }, [formData.gps_depart_lat, formData.gps_depart_lng, formData.gps_arrivee_lat, formData.gps_arrivee_lng, activeCountry]);
 
-  // Sauvegarder le brouillon — uniquement si changement significatif
-  // Utilise JSON.stringify pour éviter les boucles sur des changements de référence mineurs
+  // ─── Sauvegarder le brouillon ──────────────────────────────────────────────
   const formDataStr = JSON.stringify(formData);
   useEffect(() => {
     try {
@@ -150,7 +275,7 @@ export default function CourseStepForm({
     } catch (err) {
       console.error("Erreur sauvegarde brouillon:", err);
     }
-  }, [formDataStr]); // Stable : dépend de la string, pas de l'objet
+  }, [formDataStr]);
 
   // ─── Vérification expéditeur ───────────────────────────────────────────────
   const verifyExpediteur = async () => {
@@ -186,8 +311,8 @@ export default function CourseStepForm({
             adresse_depart: "Position GPS de l'expéditeur",
           } : {}),
         }));
-        toast.success(` ${client.nom || client.prenom} trouvé dans SILGAPP !`);
-        if (hasGps) toast.success(" Position GPS de l'expéditeur disponible !");
+        toast.success(`${client.nom || client.prenom} trouvé dans SILGAPP !`);
+        if (hasGps) toast.success("Position GPS de l'expéditeur disponible !");
         try {
           await base44.functions.invoke("notifyClientSync", {
             course_id: "pending", expediteur_id: client.id, notification_type: "preparation_expedition"
@@ -203,7 +328,7 @@ export default function CourseStepForm({
           expediteur_gps_lat: null,
           expediteur_gps_lng: null,
         }));
-        toast.info("ℹ Expéditeur non trouvé dans SILGAPP - flux standard activé");
+        toast.info("Expéditeur non trouvé dans SILGAPP - flux standard activé");
       }
     } catch (err) {
       toast.error("Erreur lors de la vérification");
@@ -244,8 +369,8 @@ export default function CourseStepForm({
             adresse_arrivee: "Position GPS du destinataire",
           } : {}),
         }));
-        toast.success(` ${client.nom || client.prenom} trouvé dans SILGAPP !`);
-        if (hasGps) toast.success(" Position GPS du destinataire disponible !");
+        toast.success(`${client.nom || client.prenom} trouvé dans SILGAPP !`);
+        if (hasGps) toast.success("Position GPS du destinataire disponible !");
         try {
           await base44.functions.invoke("notifyClientSync", {
             course_id: "pending", destinataire_id: client.id, notification_type: "preparation_reception"
@@ -258,7 +383,7 @@ export default function CourseStepForm({
           destinataire_client_id: null,
           recipient_has_app: false,
         }));
-        toast.info("ℹ Destinataire non trouvé dans SILGAPP - flux standard activé");
+        toast.info("Destinataire non trouvé dans SILGAPP - flux standard activé");
       }
     } catch (err) {
       toast.error("Erreur lors de la vérification");
@@ -272,22 +397,28 @@ export default function CourseStepForm({
   const VerificationResult = ({ found, nom, latitude, longitude, labelTrouve, labelNonTrouve }) => {
     if (found) {
       return (
-        <div className="p-4 rounded-2xl bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 shadow-sm">
+        <div
+          className="p-4 rounded-2xl border-2"
+          style={{ background: COLORS.primaryLight, borderColor: COLORS.primary }}
+        >
           <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-xl bg-green-500 flex items-center justify-center flex-shrink-0">
+            <div
+              className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+              style={{ background: COLORS.primary }}
+            >
               <CheckCircle className="w-5 h-5 text-white" />
             </div>
             <div className="flex-1">
-              <p className="font-bold text-green-900">{labelTrouve}</p>
-              <p className="text-sm text-green-700 mt-1">
+              <p className="font-bold" style={{ color: COLORS.secondary }}>{labelTrouve}</p>
+              <p className="text-sm mt-1" style={{ color: COLORS.textSecondary }}>
                 <strong>{nom}</strong> est inscrit dans SILGAPP
               </p>
               <div className="flex flex-wrap gap-2 mt-2">
-                <span className="text-xs bg-green-100 text-green-700 px-2.5 py-1 rounded-full font-medium"> Synchronisation</span>
-                <span className="text-xs bg-green-100 text-green-700 px-2.5 py-1 rounded-full font-medium"> Notifications</span>
+                <span className="text-xs px-2.5 py-1 rounded-full font-medium" style={{ background: COLORS.primaryLight, color: COLORS.primary }}>Synchronisation</span>
+                <span className="text-xs px-2.5 py-1 rounded-full font-medium" style={{ background: COLORS.primaryLight, color: COLORS.primary }}>Notifications</span>
                 {latitude && longitude
-                  ? <span className="text-xs bg-green-100 text-green-700 px-2.5 py-1 rounded-full font-medium"> GPS disponible</span>
-                  : <span className="text-xs bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full font-medium"> GPS inactif</span>}
+                  ? <span className="text-xs px-2.5 py-1 rounded-full font-medium" style={{ background: COLORS.primaryLight, color: COLORS.primary }}>GPS disponible</span>
+                  : <span className="text-xs px-2.5 py-1 rounded-full font-medium" style={{ background: COLORS.accentLight, color: COLORS.accent }}>GPS inactif</span>}
               </div>
             </div>
           </div>
@@ -296,14 +427,20 @@ export default function CourseStepForm({
     }
     if (found === null) {
       return (
-        <div className="p-4 rounded-2xl bg-amber-50 border-2 border-amber-200">
+        <div
+          className="p-4 rounded-2xl border-2"
+          style={{ background: COLORS.accentLight, borderColor: COLORS.accent }}
+        >
           <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
-              <AlertCircle className="w-5 h-5 text-amber-600" />
+            <div
+              className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+              style={{ background: COLORS.accentLight }}
+            >
+              <AlertCircle className="w-5 h-5" style={{ color: COLORS.accent }} />
             </div>
             <div>
-              <p className="font-bold text-amber-900">{labelNonTrouve}</p>
-              <p className="text-sm text-amber-700 mt-1">Vous pourrez quand même créer la course.</p>
+              <p className="font-bold" style={{ color: COLORS.secondary }}>{labelNonTrouve}</p>
+              <p className="text-sm mt-1" style={{ color: COLORS.textSecondary }}>Vous pourrez quand même créer la course.</p>
             </div>
           </div>
         </div>
@@ -312,156 +449,94 @@ export default function CourseStepForm({
     return null;
   };
 
+  // ─── Bouton GPS ────────────────────────────────────────────────────────────
+  const GPSButton = ({ onClick, loading, label, sublabel }) => (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={loading}
+      className="w-full rounded-2xl text-white font-bold text-base shadow-md transition-all active:scale-[0.98] overflow-hidden disabled:opacity-75 disabled:cursor-wait"
+      style={{ background: COLORS.secondary }}
+    >
+      <div className="flex flex-col items-center justify-center gap-1 py-5 px-4">
+        <div className="flex items-center gap-2 text-lg font-black">
+          {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : <Navigation className="w-6 h-6" />}
+          {loading ? "Détection en cours..." : label}
+        </div>
+        <p className="text-xs font-normal opacity-80">{loading ? "Détection de votre position en cours..." : sublabel}</p>
+      </div>
+    </button>
+  );
+
+  // ─── Divider ───────────────────────────────────────────────────────────────
+  const Divider = () => (
+    <div className="flex items-center gap-3">
+      <div className="flex-1 h-px" style={{ background: COLORS.border }} />
+      <span className="text-xs font-medium" style={{ color: COLORS.textHint }}>ou saisir manuellement</span>
+      <div className="flex-1 h-px" style={{ background: COLORS.border }} />
+    </div>
+  );
+
+  // ─── Carte GPS récupéré ────────────────────────────────────────────────────
+  const GPSAcquiredCard = ({ address, lat, lng, onClear }) => (
+    <div
+      className="flex items-center gap-4 p-5 rounded-2xl border-2"
+      style={{ background: COLORS.primaryLight, borderColor: COLORS.primary }}
+    >
+      <div
+        className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0"
+        style={{ background: COLORS.primary }}
+      >
+        <CheckCircle className="w-6 h-6 text-white" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="font-bold" style={{ color: COLORS.secondary }}>Position GPS récupérée</p>
+        <p className="text-xs mt-0.5 truncate" style={{ color: COLORS.textSecondary }}>{address || "Position GPS"}</p>
+        {lat && lng && (
+          <p className="text-xs mt-0.5" style={{ color: COLORS.primary }}>
+            {Number(lat).toFixed(4)}, {Number(lng).toFixed(4)}
+          </p>
+        )}
+      </div>
+      <button
+        type="button"
+        onClick={onClear}
+        className="text-xs font-bold px-3 py-1.5 rounded-xl flex-shrink-0"
+        style={{ background: COLORS.primaryLight, color: COLORS.primary }}
+      >
+        Changer
+      </button>
+    </div>
+  );
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ─── RENDU DES ÉTAPES ───────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════════
+
   const renderStep = () => {
-    const isExpedie = formData.type_course === "expedier";
-    const isRecevoir = formData.type_course === "recevoir";
-    const isDeplacement = formData.type_course === "deplacement";
-
     switch (step) {
-      // ─── ÉTAPE 0 : TYPE DE COURSE ──────────────────────────────────────────
-      case 0:
-        return (
-          <div className="space-y-6">
-            <div className="text-center">
-              <StepIcon icon={Sparkles} color="text-primary" bgColor="bg-gradient-to-br from-primary/20 to-red-100 shadow-red-200" />
-              <h2 className="text-2xl font-black text-gray-900">Que souhaitez-vous faire ?</h2>
-              <p className="text-sm text-gray-500 mt-1.5">Choisissez le type de course</p>
-            </div>
-            <div className="grid gap-4">
-              <button
-                type="button"
-                onClick={() => setFormData({ ...formData, type_course: "expedier" })}
-                className={`p-5 rounded-3xl border-2 transition-all duration-200 text-left active:scale-[0.98] shadow-sm ${
-                  formData.type_course === "expedier"
-                    ? "border-primary bg-gradient-to-br from-primary/5 to-red-50 shadow-primary/20 shadow-md"
-                    : "border-gray-200 bg-white hover:border-primary/40 hover:shadow-md"
-                }`}
-              >
-                <div className="flex items-center gap-4">
-                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-md transition-all ${
-                    formData.type_course === "expedier" ? "bg-gradient-to-br from-primary to-red-600 shadow-red-200" : "bg-gray-100"
-                  }`}>
-                    <Send className={`w-7 h-7 ${formData.type_course === "expedier" ? "text-white" : "text-gray-400"}`} />
-                  </div>
-                  <div className="flex-1">
-                    <p className={`font-black text-lg ${formData.type_course === "expedier" ? "text-primary" : "text-gray-800"}`}>
-                      Expédier un colis
-                    </p>
-                    <p className="text-sm text-gray-500 mt-0.5">Vous envoyez un colis à quelqu'un</p>
-                  </div>
-                  {formData.type_course === "expedier" && (
-                    <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
-                      <CheckCircle className="w-5 h-5 text-white" />
-                    </div>
-                  )}
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setFormData({ ...formData, type_course: "recevoir" })}
-                className={`p-5 rounded-3xl border-2 transition-all duration-200 text-left active:scale-[0.98] shadow-sm ${
-                  formData.type_course === "recevoir"
-                    ? "border-accent bg-gradient-to-br from-accent/5 to-green-50 shadow-accent/20 shadow-md"
-                    : "border-gray-200 bg-white hover:border-accent/40 hover:shadow-md"
-                }`}
-              >
-                <div className="flex items-center gap-4">
-                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-md transition-all ${
-                    formData.type_course === "recevoir" ? "bg-gradient-to-br from-accent to-green-600 shadow-green-200" : "bg-gray-100"
-                  }`}>
-                    <Inbox className={`w-7 h-7 ${formData.type_course === "recevoir" ? "text-white" : "text-gray-400"}`} />
-                  </div>
-                  <div className="flex-1">
-                    <p className={`font-black text-lg ${formData.type_course === "recevoir" ? "text-accent" : "text-gray-800"}`}>
-                      Recevoir un colis
-                    </p>
-                    <p className="text-sm text-gray-500 mt-0.5">On vous envoie un colis</p>
-                  </div>
-                  {formData.type_course === "recevoir" && (
-                    <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center flex-shrink-0">
-                      <CheckCircle className="w-5 h-5 text-white" />
-                    </div>
-                  )}
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setFormData({ ...formData, type_course: "deplacement" })}
-                className={`p-5 rounded-3xl border-2 transition-all duration-200 text-left active:scale-[0.98] shadow-sm ${
-                  formData.type_course === "deplacement"
-                    ? "border-sky-500 bg-gradient-to-br from-sky-50 to-blue-50 shadow-sky-200 shadow-md"
-                    : "border-gray-200 bg-white hover:border-sky-300 hover:shadow-md"
-                }`}
-              >
-                <div className="flex items-center gap-4">
-                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-md transition-all ${
-                    formData.type_course === "deplacement" ? "bg-gradient-to-br from-sky-500 to-blue-600 shadow-sky-200" : "bg-gray-100"
-                  }`}>
-                    <Car className={`w-7 h-7 ${formData.type_course === "deplacement" ? "text-white" : "text-gray-400"}`} />
-                  </div>
-                  <div className="flex-1">
-                    <p className={`font-black text-lg ${formData.type_course === "deplacement" ? "text-sky-600" : "text-gray-800"}`}>
-                      Déplacement
-                    </p>
-                    <p className="text-sm text-gray-500 mt-0.5">Transport d'une personne</p>
-                  </div>
-                  {formData.type_course === "deplacement" && (
-                    <div className="w-8 h-8 rounded-full bg-sky-500 flex items-center justify-center flex-shrink-0">
-                      <CheckCircle className="w-5 h-5 text-white" />
-                    </div>
-                  )}
-                </div>
-              </button>
-            </div>
-
-            {/* ── Sélecteur nombre de colis — uniquement pour "expedier" ── */}
-            {formData.type_course === "expedier" && (
-              <div className="mt-5 p-4 bg-white rounded-2xl border-2 border-gray-100 shadow-sm">
-                <NombreColisSelector
-                  value={formData.nb_colis || 1}
-                  onChange={(nb) => setFormData({ ...formData, nb_colis: nb })}
-                />
-              </div>
-            )}
-          </div>
-        );
-
-      // ─── ÉTAPE 1 ───────────────────────────────────────────────────────────
-      case 1: {
-        // Déplacement : adresse de prise en charge (pickup)
+      // ─── ÉTAPE 0 ───────────────────────────────────────────────────────────
+      case 0: {
+        // Déplacement : adresse de prise en charge
         if (isDeplacement) {
           return (
             <div className="space-y-5">
               <div className="text-center">
-                <StepIcon icon={MapPin} color="text-primary" bgColor="bg-gradient-to-br from-red-100 to-red-50 shadow-red-200" />
-                <h2 className="text-2xl font-black text-gray-900">Point de prise en charge</h2>
-                <p className="text-sm text-gray-500 mt-1.5">Où récupérer le passager ?</p>
+                <StepIcon icon={MapPin} />
+                <h2 className="text-2xl font-black" style={{ color: COLORS.secondary }}>Point de prise en charge</h2>
+                <p className="text-sm mt-1.5" style={{ color: COLORS.textSecondary }}>Où récupérer le passager ?</p>
               </div>
               {formData.recuperationGPS ? (
-                <div className="flex items-center gap-4 p-5 rounded-3xl bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 shadow-sm">
-                  <div className="w-12 h-12 rounded-2xl bg-green-500 flex items-center justify-center flex-shrink-0 shadow-md shadow-green-200">
-                    <CheckCircle className="w-6 h-6 text-white" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-bold text-green-900">Position GPS récupérée</p>
-                    <p className="text-xs text-green-700 mt-0.5 truncate">{formData.adresse_depart || "Position GPS"}</p>
-                  </div>
-                  <button type="button" onClick={() => setFormData({ ...formData, recuperationGPS: false, gps_depart_lat: null, gps_depart_lng: null, adresse_depart: "" })} className="text-xs text-green-700 font-bold bg-green-100 px-3 py-1.5 rounded-xl flex-shrink-0">Changer</button>
-                </div>
+                <GPSAcquiredCard
+                  address={formData.adresse_depart}
+                  lat={formData.gps_depart_lat}
+                  lng={formData.gps_depart_lng}
+                  onClear={() => setFormData({ ...formData, recuperationGPS: false, gps_depart_lat: null, gps_depart_lng: null, adresse_depart: "" })}
+                />
               ) : (
                 <>
-                  <button type="button" onClick={gpsHandlers?.onGetGPSDepart} disabled={gpsLoading?.depart} className="w-full rounded-3xl bg-gradient-to-r from-blue-800 to-sky-600 text-white font-bold text-base shadow-xl shadow-blue-200 active:scale-[0.98] transition-all overflow-hidden disabled:opacity-75 disabled:cursor-wait">
-                    <div className="flex flex-col items-center justify-center gap-1 py-5 px-4">
-                      <div className="flex items-center gap-2 text-lg font-black">
-                        {gpsLoading?.depart ? <Loader2 className="w-6 h-6 animate-spin" /> : <Navigation className="w-6 h-6" />}
-                        {gpsLoading?.depart ? "Détection en cours..." : "Utiliser ma position actuelle"}
-                      </div>
-                      <p className="text-xs text-blue-100 font-normal">{gpsLoading?.depart ? "Détection de votre position en cours..." : "Détection automatique de votre position"}</p>
-                    </div>
-                  </button>
-                  <div className="flex items-center gap-3"><div className="flex-1 h-px bg-gray-200" /><span className="text-xs text-gray-400 font-medium">ou saisir manuellement</span><div className="flex-1 h-px bg-gray-200" /></div>
+                  <GPSButton onClick={gpsHandlers?.onGetGPSDepart} loading={gpsLoading?.depart} label="Utiliser ma position actuelle" sublabel="Détection automatique de votre position" />
+                  <Divider />
                   <SmartAddressInput
                     countryCode={activeCountry}
                     label="Adresse de prise en charge"
@@ -474,15 +549,15 @@ export default function CourseStepForm({
             </div>
           );
         }
+        // Recevoir : expéditeur
         if (isRecevoir) {
           return (
             <div className="space-y-5">
               <div className="text-center">
-                <StepIcon icon={User} color="text-blue-600" bgColor="bg-gradient-to-br from-blue-100 to-blue-50 shadow-blue-200" />
-                <h2 className="text-2xl font-black text-gray-900">Chez qui récupérer ?</h2>
-                <p className="text-sm text-gray-500 mt-1.5">Identifiez la personne qui détient votre colis</p>
+                <StepIcon icon={User} />
+                <h2 className="text-2xl font-black" style={{ color: COLORS.secondary }}>Chez qui récupérer ?</h2>
+                <p className="text-sm mt-1.5" style={{ color: COLORS.textSecondary }}>Identifiez la personne qui détient votre colis</p>
               </div>
-
               <PremiumInput
                 label="Nom de l'expéditeur"
                 required={false}
@@ -491,9 +566,8 @@ export default function CourseStepForm({
                 placeholder="Nom complet de l'expéditeur"
                 autoFocus
               />
-
               <div className="space-y-3">
-                <Label className="text-sm font-semibold text-gray-700">
+                <Label className="text-sm font-semibold" style={{ color: COLORS.textLabel }}>
                   Téléphone de l'expéditeur <span className="text-red-500">*</span>
                 </Label>
                 <Input
@@ -501,9 +575,10 @@ export default function CourseStepForm({
                   value={formData.expediteur_telephone}
                   onChange={(e) => setFormData({ ...formData, expediteur_telephone: e.target.value })}
                   placeholder={phonePlaceholder}
-                  className="h-14 rounded-2xl border-2 border-gray-200 bg-gray-50 focus:bg-white focus:border-blue-400 px-4 text-base"
+                  className="h-14 rounded-xl border-2 bg-white px-4 text-base focus:outline-none"
+                  style={{ borderColor: COLORS.borderInput }}
                 />
-                <p className="text-xs text-gray-400 pl-1">Format : {phonePlaceholder}</p>
+                <p className="text-xs pl-1" style={{ color: COLORS.textHint }}>Format : {phonePlaceholder}</p>
                 <div className="flex gap-2 flex-wrap">
                   <CarnetAdresses
                     clientId={clientId}
@@ -528,84 +603,47 @@ export default function CourseStepForm({
                   />
                 </div>
               </div>
-
               <button
                 type="button"
                 onClick={verifyExpediteur}
                 disabled={!formData.expediteur_telephone || verifying}
-                className="w-full h-14 rounded-2xl bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold text-base shadow-lg shadow-blue-200 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="w-full h-14 rounded-xl text-white font-bold text-base shadow-md active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                style={{ background: COLORS.secondary }}
               >
                 {verifying
                   ? <><Loader2 className="w-5 h-5 animate-spin" />Recherche en cours...</>
                   : <><Search className="w-5 h-5" />Vérifier dans SILGAPP</>}
               </button>
-
               <VerificationResult
                 found={expediteurFound}
                 nom={expediteurFound?.nom || expediteurFound?.prenom}
                 latitude={expediteurFound?.latitude}
                 longitude={expediteurFound?.longitude}
-                labelTrouve=" Expéditeur trouvé !"
+                labelTrouve="Expéditeur trouvé !"
                 labelNonTrouve="Expéditeur non trouvé dans SILGAPP"
               />
             </div>
           );
         }
-
-        // "expedier" : Adresse de récupération
+        // Expedier : adresse de récupération
         return (
           <div className="space-y-5">
             <div className="text-center">
-              <StepIcon icon={MapPin} color="text-primary" bgColor="bg-gradient-to-br from-red-100 to-red-50 shadow-red-200" />
-              <h2 className="text-2xl font-black text-gray-900">Où récupérer le colis ?</h2>
-              <p className="text-sm text-gray-500 mt-1.5">Votre adresse de récupération</p>
+              <StepIcon icon={MapPin} />
+              <h2 className="text-2xl font-black" style={{ color: COLORS.secondary }}>Où récupérer le colis ?</h2>
+              <p className="text-sm mt-1.5" style={{ color: COLORS.textSecondary }}>Votre adresse de récupération</p>
             </div>
-
             {formData.recuperationGPS ? (
-              <div className="flex items-center gap-4 p-5 rounded-3xl bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 shadow-sm">
-                <div className="w-12 h-12 rounded-2xl bg-green-500 flex items-center justify-center flex-shrink-0 shadow-md shadow-green-200">
-                  <CheckCircle className="w-6 h-6 text-white" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-bold text-green-900">Position GPS récupérée</p>
-                  <p className="text-xs text-green-700 mt-0.5 truncate">{formData.adresse_depart || "Position GPS"}</p>
-                  {formData.gps_depart_lat && formData.gps_depart_lng && (
-                    <p className="text-xs text-green-600 mt-0.5">
-                       {Number(formData.gps_depart_lat).toFixed(4)}, {Number(formData.gps_depart_lng).toFixed(4)}
-                    </p>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setFormData({ ...formData, recuperationGPS: false, gps_depart_lat: null, gps_depart_lng: null, adresse_depart: "" })}
-                  className="text-xs text-green-700 font-bold bg-green-100 px-3 py-1.5 rounded-xl flex-shrink-0"
-                >
-                  Changer
-                </button>
-              </div>
+              <GPSAcquiredCard
+                address={formData.adresse_depart}
+                lat={formData.gps_depart_lat}
+                lng={formData.gps_depart_lng}
+                onClear={() => setFormData({ ...formData, recuperationGPS: false, gps_depart_lat: null, gps_depart_lng: null, adresse_depart: "" })}
+              />
             ) : (
               <>
-                <button
-                  type="button"
-                  onClick={gpsHandlers?.onGetGPSDepart}
-                  disabled={gpsLoading?.depart}
-                  className="w-full rounded-3xl bg-gradient-to-r from-blue-800 to-sky-600 text-white font-bold text-base shadow-xl shadow-blue-200 active:scale-[0.98] transition-all overflow-hidden disabled:opacity-75 disabled:cursor-wait"
-                >
-                  <div className="flex flex-col items-center justify-center gap-1 py-5 px-4">
-                    <div className="flex items-center gap-2 text-lg font-black">
-                      {gpsLoading?.depart ? <Loader2 className="w-6 h-6 animate-spin" /> : <Navigation className="w-6 h-6" />}
-                      {gpsLoading?.depart ? "Détection en cours..." : "Utiliser ma position actuelle"}
-                    </div>
-                    <p className="text-xs text-blue-100 font-normal">{gpsLoading?.depart ? "Détection de votre position en cours..." : "Détection automatique de votre position"}</p>
-                  </div>
-                </button>
-
-                <div className="flex items-center gap-3">
-                  <div className="flex-1 h-px bg-gray-200" />
-                  <span className="text-xs text-gray-400 font-medium">ou saisir manuellement</span>
-                  <div className="flex-1 h-px bg-gray-200" />
-                </div>
-
+                <GPSButton onClick={gpsHandlers?.onGetGPSDepart} loading={gpsLoading?.depart} label="Utiliser ma position actuelle" sublabel="Détection automatique de votre position" />
+                <Divider />
                 <SmartAddressInput
                   countryCode={activeCountry}
                   label="Adresse de récupération"
@@ -615,20 +653,27 @@ export default function CourseStepForm({
                 />
               </>
             )}
+            {/* Sélecteur nombre de colis — uniquement pour "expedier" */}
+            <div className="p-4 rounded-2xl border" style={{ background: COLORS.bgCard, borderColor: COLORS.border }}>
+              <NombreColisSelector
+                value={formData.nb_colis || 1}
+                onChange={(nb) => setFormData({ ...formData, nb_colis: nb })}
+              />
+            </div>
           </div>
         );
       }
 
-      // ─── ÉTAPE 2 ───────────────────────────────────────────────────────────
-      case 2: {
-        // Déplacement : adresse de destination (dropoff)
+      // ─── ÉTAPE 1 ───────────────────────────────────────────────────────────
+      case 1: {
+        // Déplacement : adresse de destination
         if (isDeplacement) {
           return (
             <div className="space-y-5">
               <div className="text-center">
-                <StepIcon icon={MapPin} color="text-accent" bgColor="bg-gradient-to-br from-green-100 to-green-50 shadow-green-200" />
-                <h2 className="text-2xl font-black text-gray-900">Point de destination</h2>
-                <p className="text-sm text-gray-500 mt-1.5">Où déposer le passager ?</p>
+                <StepIcon icon={MapPin} />
+                <h2 className="text-2xl font-black" style={{ color: COLORS.secondary }}>Point de destination</h2>
+                <p className="text-sm mt-1.5" style={{ color: COLORS.textSecondary }}>Où déposer le passager ?</p>
               </div>
               <SmartAddressInput
                 countryCode={activeCountry}
@@ -639,19 +684,65 @@ export default function CourseStepForm({
                 placeholder="Quartier, rue, restaurant, pharmacie..."
                 autoFocus
               />
-              <button type="button" onClick={gpsHandlers?.onGetGPSArrivee} disabled={gpsLoading?.arrivee} className="w-full rounded-3xl bg-gradient-to-r from-sky-500 to-blue-700 text-white font-bold text-base shadow-xl shadow-sky-200 active:scale-[0.98] transition-all overflow-hidden disabled:opacity-75 disabled:cursor-wait">
-                <div className="flex flex-col items-center justify-center gap-1 py-4 px-4">
-                  <div className="flex items-center gap-2 text-base font-black">
-                    {gpsLoading?.arrivee ? <Loader2 className="w-5 h-5 animate-spin" /> : <Navigation className="w-5 h-5" />}
-                    {gpsLoading?.arrivee ? "Détection en cours..." : "Utiliser ma position actuelle"}
-                  </div>
-                  <p className="text-xs text-blue-100 font-normal">{gpsLoading?.arrivee ? "Détection de votre position en cours..." : "Définir la destination avec le GPS"}</p>
-                </div>
-              </button>
+              <GPSButton onClick={gpsHandlers?.onGetGPSArrivee} loading={gpsLoading?.arrivee} label="Utiliser ma position actuelle" sublabel="Définir la destination avec le GPS" />
             </div>
           );
         }
-        // Mode multi-colis : afficher les formulaires des colis
+        // Recevoir : adresse de récupération
+        if (isRecevoir) {
+          const gpsDispo = !!(formData.expediteur_gps_lat && formData.expediteur_gps_lng && formData.expediteur_gps_available);
+          return (
+            <div className="space-y-5">
+              <div className="text-center">
+                <StepIcon icon={MapPin} />
+                <h2 className="text-2xl font-black" style={{ color: COLORS.secondary }}>Adresse de récupération</h2>
+                <p className="text-sm mt-1.5" style={{ color: COLORS.textSecondary }}>Où le livreur doit récupérer le colis</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!gpsDispo) return;
+                  const newVal = !(gpsDispo && formData.recuperationGPS);
+                  if (newVal) {
+                    setFormData({ ...formData, recuperationGPS: true, adresse_depart: "Position GPS de l'expéditeur" });
+                  } else {
+                    setFormData({ ...formData, recuperationGPS: false, adresse_depart: formData.adresse_depart === "Position GPS de l'expéditeur" ? "" : formData.adresse_depart });
+                  }
+                }}
+                className={`w-full p-4 rounded-2xl border-2 text-left transition-all ${gpsDispo && formData.recuperationGPS ? "" : gpsDispo ? "" : "opacity-60 cursor-not-allowed"}`}
+                style={{
+                  borderColor: gpsDispo && formData.recuperationGPS ? COLORS.primary : COLORS.border,
+                  background: gpsDispo && formData.recuperationGPS ? COLORS.primaryLight : COLORS.bgCard,
+                }}
+              >
+                <div className="flex items-center gap-3">
+                  <Checkbox
+                    checked={gpsDispo && formData.recuperationGPS}
+                    disabled={!gpsDispo}
+                    className="pointer-events-none"
+                  />
+                  <div className="flex-1">
+                    <p className="font-bold" style={{ color: COLORS.secondary }}>Position GPS de l'expéditeur</p>
+                    {gpsDispo
+                      ? <p className="text-xs mt-0.5" style={{ color: COLORS.primary }}>Position disponible</p>
+                      : <p className="text-xs mt-0.5" style={{ color: COLORS.textHint }}>Non disponible (expéditeur sans GPS)</p>}
+                  </div>
+                </div>
+              </button>
+              {!(gpsDispo && formData.recuperationGPS) && (
+                <SmartAddressInput
+                  countryCode={activeCountry}
+                  label="Adresse de récupération"
+                  value={formData.adresse_depart}
+                  onChange={(text, location) => updateAddress("depart", text, location)}
+                  placeholder="Quartier, rue, boutique, pharmacie..."
+                  autoFocus
+                />
+              )}
+            </div>
+          );
+        }
+        // Expedier : destinataire
         if (isExpedie && (formData.nb_colis || 1) > 1) {
           return (
             <MultiColisFormStep
@@ -664,16 +755,14 @@ export default function CourseStepForm({
             />
           );
         }
-
         if (isExpedie) {
           return (
             <div className="space-y-5">
               <div className="text-center">
-                <StepIcon icon={User} color="text-blue-600" bgColor="bg-gradient-to-br from-blue-100 to-blue-50 shadow-blue-200" />
-                <h2 className="text-2xl font-black text-gray-900">À qui envoyer le colis ?</h2>
-                <p className="text-sm text-gray-500 mt-1.5">Identifiez le destinataire</p>
+                <StepIcon icon={User} />
+                <h2 className="text-2xl font-black" style={{ color: COLORS.secondary }}>À qui envoyer le colis ?</h2>
+                <p className="text-sm mt-1.5" style={{ color: COLORS.textSecondary }}>Identifiez le destinataire</p>
               </div>
-
               <PremiumInput
                 label="Nom du destinataire"
                 required={false}
@@ -682,9 +771,8 @@ export default function CourseStepForm({
                 placeholder="Nom complet du destinataire"
                 autoFocus
               />
-
               <div className="space-y-3">
-                <Label className="text-sm font-semibold text-gray-700">
+                <Label className="!text-sm !font-semibold" style={{ color: COLORS.textLabel }}>
                   Téléphone du destinataire <span className="text-red-500">*</span>
                 </Label>
                 <Input
@@ -695,9 +783,10 @@ export default function CourseStepForm({
                     setDestinataireFound(undefined);
                   }}
                   placeholder={phonePlaceholder}
-                  className="h-14 rounded-2xl border-2 border-gray-200 bg-gray-50 focus:bg-white focus:border-blue-400 px-4 text-base"
+                  className="h-14 rounded-xl border-2 bg-white px-4 text-base focus:outline-none"
+                  style={{ borderColor: COLORS.borderInput }}
                 />
-                <p className="text-xs text-gray-400 pl-1">Format : {phonePlaceholder}</p>
+                <p className="text-xs pl-1" style={{ color: COLORS.textHint }}>Format : {phonePlaceholder}</p>
                 <div className="flex gap-2 flex-wrap">
                   <CarnetAdresses
                     clientId={clientId}
@@ -724,98 +813,41 @@ export default function CourseStepForm({
                   />
                 </div>
               </div>
-
               <button
                 type="button"
                 onClick={verifyDestinataire}
                 disabled={!formData.destinataire_telephone || verifying}
-                className="w-full h-14 rounded-2xl bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold text-base shadow-lg shadow-blue-200 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="w-full h-14 rounded-xl text-white font-bold text-base shadow-md active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                style={{ background: COLORS.secondary }}
               >
                 {verifying
                   ? <><Loader2 className="w-5 h-5 animate-spin" />Recherche en cours...</>
                   : <><Search className="w-5 h-5" />Vérifier dans SILGAPP</>}
               </button>
-
               <VerificationResult
                 found={destinataireFound}
                 nom={destinataireFound?.nom || destinataireFound?.prenom}
                 latitude={destinataireFound?.latitude}
                 longitude={destinataireFound?.longitude}
-                labelTrouve=" Destinataire trouvé !"
+                labelTrouve="Destinataire trouvé !"
                 labelNonTrouve="Destinataire non trouvé dans SILGAPP"
               />
             </div>
           );
         }
-
-        // "recevoir" : Adresse de récupération
-        const gpsDispo = !!(formData.expediteur_gps_lat && formData.expediteur_gps_lng && formData.expediteur_gps_available);
-        return (
-          <div className="space-y-5">
-            <div className="text-center">
-              <StepIcon icon={MapPin} color="text-accent" bgColor="bg-gradient-to-br from-green-100 to-green-50 shadow-green-200" />
-              <h2 className="text-2xl font-black text-gray-900">Adresse de récupération</h2>
-              <p className="text-sm text-gray-500 mt-1.5">Où le livreur doit récupérer le colis</p>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => {
-                if (!gpsDispo) return;
-                const newVal = !(gpsDispo && formData.recuperationGPS);
-                if (newVal) {
-                  setFormData({ ...formData, recuperationGPS: true, adresse_depart: "Position GPS de l'expéditeur" });
-                } else {
-                  setFormData({ ...formData, recuperationGPS: false, adresse_depart: formData.adresse_depart === "Position GPS de l'expéditeur" ? "" : formData.adresse_depart });
-                }
-              }}
-              className={`w-full p-4 rounded-2xl border-2 text-left transition-all ${
-                gpsDispo && formData.recuperationGPS
-                  ? "border-accent bg-gradient-to-br from-green-50 to-emerald-50"
-                  : gpsDispo
-                  ? "border-gray-200 bg-white hover:border-accent/40"
-                  : "border-gray-100 bg-gray-50 opacity-60 cursor-not-allowed"
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <Checkbox
-                  checked={gpsDispo && formData.recuperationGPS}
-                  disabled={!gpsDispo}
-                  className="pointer-events-none data-[state=checked]:bg-accent"
-                />
-                <div className="flex-1">
-                  <p className="font-bold text-gray-900"> Position GPS de l'expéditeur</p>
-                  {gpsDispo
-                    ? <p className="text-xs text-green-600 mt-0.5">Position disponible </p>
-                    : <p className="text-xs text-gray-400 mt-0.5">Non disponible (expéditeur sans GPS)</p>}
-                </div>
-              </div>
-            </button>
-
-            {!(gpsDispo && formData.recuperationGPS) && (
-              <SmartAddressInput
-                countryCode={activeCountry}
-                label="Adresse de récupération"
-                value={formData.adresse_depart}
-                onChange={(text, location) => updateAddress("depart", text, location)}
-                placeholder="Quartier, rue, boutique, pharmacie..."
-                autoFocus
-              />
-            )}
-          </div>
-        );
+        return null;
       }
 
-      // ─── ÉTAPE 3 ───────────────────────────────────────────────────────────
-      case 3: {
+      // ─── ÉTAPE 2 ───────────────────────────────────────────────────────────
+      case 2: {
         // Déplacement : infos passager
         if (isDeplacement) {
           return (
             <div className="space-y-5">
               <div className="text-center">
-                <StepIcon icon={User} color="text-sky-600" bgColor="bg-gradient-to-br from-sky-100 to-blue-50 shadow-sky-200" />
-                <h2 className="text-2xl font-black text-gray-900">Qui se déplace ?</h2>
-                <p className="text-sm text-gray-500 mt-1.5">Informations du passager</p>
+                <StepIcon icon={User} />
+                <h2 className="text-2xl font-black" style={{ color: COLORS.secondary }}>Qui se déplace ?</h2>
+                <p className="text-sm mt-1.5" style={{ color: COLORS.textSecondary }}>Informations du passager</p>
               </div>
               <PremiumInput
                 label="Nom du passager"
@@ -826,7 +858,7 @@ export default function CourseStepForm({
                 autoFocus
               />
               <div className="space-y-3">
-                <Label className="text-sm font-semibold text-gray-700">
+                <Label className="text-sm font-semibold" style={{ color: COLORS.textLabel }}>
                   Téléphone du passager <span className="text-red-500">*</span>
                 </Label>
                 <Input
@@ -834,9 +866,10 @@ export default function CourseStepForm({
                   value={formData.passager_telephone || ""}
                   onChange={(e) => setFormData({ ...formData, passager_telephone: e.target.value })}
                   placeholder={phonePlaceholder}
-                  className="h-14 rounded-2xl border-2 border-gray-200 bg-gray-50 focus:bg-white focus:border-sky-400 px-4 text-base"
+                  className="h-14 rounded-xl border-2 bg-white px-4 text-base focus:outline-none"
+                  style={{ borderColor: COLORS.borderInput }}
                 />
-                <p className="text-xs text-gray-400 pl-1">Format : {phonePlaceholder}</p>
+                <p className="text-xs pl-1" style={{ color: COLORS.textHint }}>Format : {phonePlaceholder}</p>
               </div>
               <PremiumInput
                 label="Nombre de passagers"
@@ -849,41 +882,29 @@ export default function CourseStepForm({
                   max={10}
                   value={formData.nb_passagers || 1}
                   onChange={(e) => setFormData({ ...formData, nb_passagers: parseInt(e.target.value) || 1 })}
-                  className="h-14 rounded-2xl border-2 border-gray-200 bg-gray-50 focus:bg-white focus:border-sky-400 px-4 text-base"
+                  className="h-14 rounded-xl border-2 bg-white px-4 text-base focus:outline-none"
+                  style={{ borderColor: COLORS.borderInput }}
                 />
               </PremiumInput>
             </div>
           );
         }
+        // Expedier : adresse de livraison
         if (isExpedie) {
           const gpsDestDispo = !!(formData.gps_arrivee_lat && formData.gps_arrivee_lng && formData.livraisonGPS);
           return (
             <div className="space-y-5">
               <div className="text-center">
-                <StepIcon icon={MapPin} color="text-accent" bgColor="bg-gradient-to-br from-green-100 to-green-50 shadow-green-200" />
-                <h2 className="text-2xl font-black text-gray-900">Où livrer le colis ?</h2>
-                <p className="text-sm text-gray-500 mt-1.5">Adresse ou quartier d'arrivée</p>
+                <StepIcon icon={MapPin} />
+                <h2 className="text-2xl font-black" style={{ color: COLORS.secondary }}>Où livrer le colis ?</h2>
+                <p className="text-sm mt-1.5" style={{ color: COLORS.textSecondary }}>Adresse ou quartier d'arrivée</p>
               </div>
-
               {gpsDestDispo ? (
-                <div className="flex items-center gap-4 p-5 rounded-3xl bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 shadow-sm">
-                  <div className="w-12 h-12 rounded-2xl bg-green-500 flex items-center justify-center flex-shrink-0 shadow-md shadow-green-200">
-                    <CheckCircle className="w-6 h-6 text-white" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-bold text-green-900">Position GPS du destinataire</p>
-                    <p className="text-xs text-green-700 mt-0.5 truncate">{formData.adresse_arrivee || "Position GPS"}</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, livraisonGPS: false, gps_arrivee_lat: null, gps_arrivee_lng: null, adresse_arrivee: "" })}
-                    className="text-xs text-green-700 font-bold bg-green-100 px-3 py-1.5 rounded-xl flex-shrink-0"
-                  >
-                    Changer
-                  </button>
-                </div>
+                <GPSAcquiredCard
+                  address={formData.adresse_arrivee}
+                  onClear={() => setFormData({ ...formData, livraisonGPS: false, gps_arrivee_lat: null, gps_arrivee_lng: null, adresse_arrivee: "" })}
+                />
               ) : (
-                <>
                 <SmartAddressInput
                   countryCode={activeCountry}
                   label="Adresse de livraison"
@@ -893,28 +914,31 @@ export default function CourseStepForm({
                   placeholder="Quartier, rue, restaurant, pharmacie..."
                   autoFocus
                 />
-                </>
               )}
             </div>
           );
         }
-        return renderTypeColis();
+        // Recevoir : type de colis + prix proposé + notes (regroupés)
+        return renderDetailsStep();
       }
 
+      // ─── ÉTAPE 3 ───────────────────────────────────────────────────────────
+      case 3: {
+        // Déplacement : prix proposé + notes
+        if (isDeplacement) return renderDetailsStep();
+        // Expedier : type de colis + prix proposé + notes
+        if (isExpedie) return renderDetailsStep();
+        // Recevoir : récapitulatif
+        return renderRecap();
+      }
+
+      // ─── ÉTAPE 4 ───────────────────────────────────────────────────────────
       case 4: {
-        if (isDeplacement) return renderNotes();
-        if (isExpedie) return renderTypeColis();
-        return renderNotes();
-      }
-
-      case 5: {
+        // Déplacement : récapitulatif
         if (isDeplacement) return renderRecap();
-        if (isExpedie) return renderNotes();
-        return renderRecap();
-      }
-
-      case 6: {
-        return renderRecap();
+        // Expedier : récapitulatif
+        if (isExpedie) return renderRecap();
+        return null;
       }
 
       default:
@@ -922,7 +946,17 @@ export default function CourseStepForm({
     }
   };
 
-  function renderTypeColis() {
+  // ─── Étape Détails (type de colis + prix proposé + notes) ───────────────────
+  function renderDetailsStep() {
+    const isMulti = formData.type_course === "expedier" && (formData.nb_colis || 1) > 1;
+    const lat1 = formData.gps_depart_lat;
+    const lng1 = formData.gps_depart_lng;
+    const lat2 = formData.gps_arrivee_lat;
+    const lng2 = formData.gps_arrivee_lng;
+    const estimation = (lat1 && lng1 && lat2 && lng2)
+      ? calculerPrixApproximatif(lat1, lng1, lat2, lng2, activeCountry)
+      : null;
+
     const typesColis = [
       { value: "petit_colis", label: "Petit colis", icon: "", desc: "< 2 kg" },
       { value: "moyen_colis", label: "Moyen colis", icon: "", desc: "2 - 10 kg" },
@@ -931,265 +965,322 @@ export default function CourseStepForm({
       { value: "nourriture", label: "Nourriture", icon: "", desc: "Repas, boissons" },
       { value: "autre", label: "Autre", icon: "", desc: "Autre type" },
     ];
-    return (
-      <div className="space-y-6">
-        <div className="text-center">
-          <StepIcon icon={Package} color="text-purple-600" bgColor="bg-gradient-to-br from-purple-100 to-purple-50 shadow-purple-200" />
-          <h2 className="text-2xl font-black text-gray-900">Quel type de colis ?</h2>
-          <p className="text-sm text-gray-500 mt-1.5">Sélectionnez la catégorie</p>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          {typesColis.map((type) => (
-            <button
-              key={type.value}
-              type="button"
-              onClick={() => setFormData({ ...formData, type_colis: type.value })}
-              className={`p-4 rounded-2xl border-2 transition-all duration-200 active:scale-[0.97] text-left ${
-                formData.type_colis === type.value
-                  ? "border-purple-500 bg-gradient-to-br from-purple-50 to-purple-100 shadow-md shadow-purple-100"
-                  : "border-gray-200 bg-white hover:border-purple-300 hover:shadow-sm"
-              }`}
-            >
-              <div className="text-3xl mb-2">{type.icon}</div>
-              <div className="font-bold text-sm text-gray-900">{type.label}</div>
-              <div className="text-xs text-gray-500 mt-0.5">{type.desc}</div>
-              {formData.type_colis === type.value && (
-                <div className="mt-2 flex items-center gap-1">
-                  <div className="w-2 h-2 bg-purple-500 rounded-full" />
-                  <span className="text-xs text-purple-600 font-semibold">Sélectionné</span>
-                </div>
-              )}
-            </button>
-          ))}
-        </div>
-      </div>
-    );
-  }
 
-  function renderNotes() {
     return (
       <div className="space-y-5">
         <div className="text-center">
-          <StepIcon icon={FileText} color="text-orange-600" bgColor="bg-gradient-to-br from-orange-100 to-orange-50 shadow-orange-200" />
-          <h2 className="text-2xl font-black text-gray-900">Instructions particulières ?</h2>
-          <p className="text-sm text-gray-500 mt-1.5">Informations utiles pour le livreur</p>
+          <StepIcon icon={Package} />
+          <h2 className="text-2xl font-black" style={{ color: COLORS.secondary }}>Détails</h2>
+          <p className="text-sm mt-1.5" style={{ color: COLORS.textSecondary }}>
+            {isDeplacement ? "Prix et informations" : "Type de colis et prix"}
+          </p>
         </div>
-        <div className="space-y-2">
-          <Textarea
-            value={formData.notes}
-            onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-            placeholder="Point de repère, code porte, étage, sonnette..."
-            rows={5}
-            className="rounded-2xl border-2 border-gray-200 bg-gray-50 focus:bg-white focus:border-orange-300 text-base resize-none p-4"
-            autoFocus
-          />
-          <p className="text-xs text-gray-400 pl-1">Facultatif — Aide le livreur à vous trouver facilement</p>
+
+        {/* Type de colis — sauf déplacement */}
+        {!isDeplacement && !isMulti && (
+          <div className="grid grid-cols-2 gap-3">
+            {typesColis.map((type) => (
+              <button
+                key={type.value}
+                type="button"
+                onClick={() => setFormData({ ...formData, type_colis: type.value })}
+                className="p-4 rounded-2xl border-2 transition-all duration-200 active:scale-[0.97] text-left"
+                style={{
+                  borderColor: formData.type_colis === type.value ? COLORS.primary : COLORS.border,
+                  background: formData.type_colis === type.value ? COLORS.primaryLight : COLORS.bgCard,
+                }}
+              >
+                <div className="text-3xl mb-2">{type.icon}</div>
+                <div className="font-bold text-sm" style={{ color: COLORS.textMain }}>{type.label}</div>
+                <div className="text-xs mt-0.5" style={{ color: COLORS.textSecondary }}>{type.desc}</div>
+                {formData.type_colis === type.value && (
+                  <div className="mt-2 flex items-center gap-1">
+                    <div className="w-2 h-2 rounded-full" style={{ background: COLORS.primary }} />
+                    <span className="text-xs font-semibold" style={{ color: COLORS.primary }}>Sélectionné</span>
+                  </div>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Prix proposé — sauf multi-colis */}
+        {!isMulti && (
+          <>
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold" style={{ color: COLORS.textLabel }}>
+                Prix proposé <span className="text-red-500">*</span>
+              </Label>
+              <div className="relative">
+                <Input
+                  type="number"
+                  inputMode="numeric"
+                  value={formData.prix_propose || ""}
+                  onChange={(e) => setFormData({ ...formData, prix_propose: parseInt(e.target.value) || 0 })}
+                  className="h-16 rounded-xl border-2 bg-white px-4 text-2xl font-black text-center pr-20 focus:outline-none"
+                  style={{ borderColor: COLORS.borderInput }}
+                  placeholder="1500"
+                  autoFocus
+                  min={1}
+                />
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-bold" style={{ color: COLORS.textSecondary }}>{countryDevise}</span>
+              </div>
+              {estimation && (
+                <div
+                  className="flex items-start gap-2 p-3 rounded-xl"
+                  style={{ background: COLORS.secondaryLight }}
+                >
+                  <Info className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: COLORS.secondary }} />
+                  <p className="text-xs" style={{ color: COLORS.secondary }}>
+                    Estimation GPS indicative : ~{estimation.prix.toLocaleString()} {countryDevise} ({estimation.distance} km).
+                    Le prix reste librement choisi par vous.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {countryPrixSuggeres.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: COLORS.textSecondary }}>Suggestions rapides</p>
+                <div className="flex gap-3">
+                  {countryPrixSuggeres.map((montant) => (
+                    <button
+                      key={montant}
+                      type="button"
+                      onClick={() => setFormData({ ...formData, prix_propose: montant })}
+                      className="flex-1 h-14 rounded-xl border-2 font-bold text-base transition-all active:scale-[0.97]"
+                      style={{
+                        borderColor: formData.prix_propose === montant ? COLORS.primary : COLORS.border,
+                        background: formData.prix_propose === montant ? COLORS.primaryLight : COLORS.bgCard,
+                        color: formData.prix_propose === montant ? COLORS.primary : COLORS.textMain,
+                      }}
+                    >
+                      {montant.toLocaleString()} {countryDevise}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Notes — repliable */}
+        <div>
+          <button
+            type="button"
+            onClick={() => setShowNotes(!showNotes)}
+            className="w-full flex items-center justify-between p-3 rounded-xl border"
+            style={{ background: COLORS.bgCard, borderColor: COLORS.border }}
+          >
+            <span className="text-sm font-semibold flex items-center gap-2" style={{ color: COLORS.textLabel }}>
+              <FileText className="w-4 h-4" />
+              Notes (optionnel)
+            </span>
+            {showNotes ? <ChevronUp className="w-4 h-4" style={{ color: COLORS.textSecondary }} /> : <ChevronDown className="w-4 h-4" style={{ color: COLORS.textSecondary }} />}
+          </button>
+          {showNotes && (
+            <div className="mt-2">
+              <Textarea
+                value={formData.notes}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                placeholder="Point de repère, code porte, étage, sonnette..."
+                rows={4}
+                className="rounded-xl border-2 bg-white text-base resize-none p-4 focus:outline-none"
+                style={{ borderColor: COLORS.borderInput }}
+                autoFocus
+              />
+              <p className="text-xs pl-1 mt-1" style={{ color: COLORS.textHint }}>Facultatif — Aide le livreur à vous trouver facilement</p>
+            </div>
+          )}
         </div>
       </div>
     );
   }
 
+  // ─── Étape Récapitulatif premium ───────────────────────────────────────────
   function renderRecap() {
-    const rows = [
-      { icon: <Truck className="w-4 h-4 text-primary" />, bg: "bg-red-50", border: "border-red-100", label: "Type", value: formData.type_course === "expedier" ? "Expédition" : "Réception" },
-      { icon: <MapPin className="w-4 h-4 text-red-600" />, bg: "bg-red-50", border: "border-red-100", label: "Récupération", value: formData.adresse_depart || (formData.recuperationGPS ? " Position GPS" : "—") },
-      { icon: <MapPin className="w-4 h-4 text-green-600" />, bg: "bg-green-50", border: "border-green-100", label: "Livraison", value: formData.adresse_arrivee || "—" },
-      { icon: <User className="w-4 h-4 text-blue-600" />, bg: "bg-blue-50", border: "border-blue-100", label: "Contact", value: formData.type_course === "expedier" ? `${formData.destinataire_nom || "Destinataire"} • ${formData.destinataire_telephone}` : `${formData.expediteur_nom || "Expéditeur"} • ${formData.expediteur_telephone}` },
-      { icon: <Package className="w-4 h-4 text-purple-600" />, bg: "bg-purple-50", border: "border-purple-100", label: "Colis", value: formData.type_colis?.replace(/_/g, " ") || "—" },
-    ];
-    return (
-      <div className="space-y-6">
-        <div className="text-center">
-          <StepIcon icon={CheckCircle} color="text-green-600" bgColor="bg-gradient-to-br from-green-100 to-green-50 shadow-green-200" />
-          <h2 className="text-2xl font-black text-gray-900">Vérifiez votre commande</h2>
-          <p className="text-sm text-gray-500 mt-1.5">Récapitulatif de votre course</p>
-        </div>
-        <div className="space-y-3">
-          {rows.map((row, i) => (
-            <div key={i} className={`flex items-start gap-3 p-4 rounded-2xl ${row.bg} border ${row.border}`}>
-              <div className="w-9 h-9 rounded-xl bg-white flex items-center justify-center flex-shrink-0 shadow-sm">
-                {row.icon}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">{row.label}</p>
-                <p className="font-bold text-gray-900 capitalize mt-0.5 text-sm leading-snug">{row.value}</p>
-              </div>
+    const isMulti = isExpedie && (formData.nb_colis || 1) > 1;
+
+    // Section récapitulatif avec bouton "Modifier"
+    const RecapSection = ({ icon: Icon, title, children, onEdit, editLabel }) => (
+      <div
+        className="rounded-2xl border p-4"
+        style={{ background: COLORS.bgCard, borderColor: COLORS.border }}
+      >
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <div
+              className="w-8 h-8 rounded-lg flex items-center justify-center"
+              style={{ background: COLORS.secondaryLight }}
+            >
+              <Icon className="w-4 h-4" style={{ color: COLORS.secondary }} />
             </div>
-          ))}
-          {formData.notes && (
-            <div className="flex items-start gap-3 p-4 rounded-2xl bg-orange-50 border border-orange-100">
-              <div className="w-9 h-9 rounded-xl bg-white flex items-center justify-center flex-shrink-0 shadow-sm">
-                <FileText className="w-4 h-4 text-orange-600" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Notes</p>
-                <p className="font-medium text-gray-800 text-sm mt-0.5">{formData.notes}</p>
-              </div>
-            </div>
+            <h3 className="font-bold text-sm" style={{ color: COLORS.secondary }}>{title}</h3>
+          </div>
+          {onEdit && (
+            <button
+              type="button"
+              onClick={onEdit}
+              className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg transition-all"
+              style={{ background: COLORS.secondaryLight, color: COLORS.secondary }}
+            >
+              <Pencil className="w-3 h-3" />
+              {editLabel || "Modifier"}
+            </button>
           )}
         </div>
+        <div className="space-y-2">
+          {children}
+        </div>
+      </div>
+    );
 
-        {/* ── Section Prix ── */}
-        {(() => {
-          const isMulti = formData.type_course === "expedier" && (formData.nb_colis || 1) > 1;
-          if (isMulti) return null;
-          const lat1 = formData.gps_depart_lat;
-          const lng1 = formData.gps_depart_lng;
-          const lat2 = formData.gps_arrivee_lat;
-          const lng2 = formData.gps_arrivee_lng;
-          const estimation = (lat1 && lng1 && lat2 && lng2)
-            ? calculerPrixApproximatif(lat1, lng1, lat2, lng2, activeCountry)
-            : null;
-          return (
-            <div className="space-y-3 pt-2">
-              <div className="flex items-start gap-3 p-4 rounded-2xl bg-blue-50 border border-blue-100">
-                <div className="w-9 h-9 rounded-xl bg-white flex items-center justify-center flex-shrink-0 shadow-sm">
-                  <DollarSign className="w-4 h-4 text-blue-600" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Prix approximatif</p>
-                  <p className="font-bold text-blue-900 mt-0.5">
-                    {estimation ? `${estimation.prix.toLocaleString()} ${estimation.devise}` : "GPS requis pour l'estimation"}
-                  </p>
-                  {estimation && (
-                    <p className="text-xs text-blue-500 mt-0.5">≈ {estimation.distance} km</p>
-                  )}
-                </div>
-              </div>
-              {estimation && (
-                <div className="space-y-2">
-                  <Label className="text-sm font-semibold text-gray-700">
-                    Prix proposé <span className="text-red-500">*</span>
-                  </Label>
-                  <div className="relative">
-                    <Input
-                      type="number"
-                      value={formData.prix_propose || ""}
-                      onChange={(e) => setFormData({ ...formData, prix_propose: parseInt(e.target.value) || 0 })}
-                      className="h-14 rounded-2xl border-2 border-gray-200 bg-gray-50 focus:bg-white focus:border-primary px-4 text-base font-bold pr-16"
-                      placeholder="1500"
-                    />
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-gray-600">FCFA</span>
-                  </div>
-                  <p className="text-xs text-gray-400 pl-1">Montant proposé au livreur — modifiable si nécessaire</p>
-                </div>
-              )}
+    const RecapRow = ({ label, value }) => (
+      <div className="flex items-start justify-between gap-2">
+        <span className="text-xs font-medium" style={{ color: COLORS.textSecondary }}>{label}</span>
+        <span className="text-sm font-bold text-right" style={{ color: COLORS.textMain }}>{value || "—"}</span>
+      </div>
+    );
+
+    // ─── Mapping des étapes pour le bouton "Modifier" ──────────────────────
+    // Expedier: 0=Récup, 1=Destinataire, 2=Livraison, 3=Détails, 4=Récap
+    // Recevoir: 0=Expéditeur, 1=Récup, 2=Détails, 3=Récap
+    // Déplacement: 0=Prise en charge, 1=Destination, 2=Passager, 3=Détails, 4=Récap
+    const editSteps = isExpedie
+      ? { trajet: 0, contact: 1, details: 3, prix: 3 }
+      : isRecevoir
+      ? { trajet: 1, contact: 0, details: 2, prix: 2 }
+      : { trajet: 0, contact: 2, details: 3, prix: 3 };
+
+    const handleEditStep = (targetStep) => {
+      if (onGoToStep && typeof targetStep === "number") {
+        onGoToStep(targetStep);
+      }
+    };
+
+    // Contact info selon le type
+    const contactLabel = isExpedie ? "Destinataire" : isRecevoir ? "Expéditeur" : "Passager";
+    const contactNom = isExpedie
+      ? formData.destinataire_nom
+      : isRecevoir
+      ? formData.expediteur_nom
+      : formData.passager_nom;
+    const contactTel = isExpedie
+      ? formData.destinataire_telephone
+      : isRecevoir
+      ? formData.expediteur_telephone
+      : formData.passager_telephone;
+
+    const prixClient = Number(formData.prix_propose) || 0;
+
+    return (
+      <div className="space-y-4">
+        <div className="text-center">
+          <StepIcon icon={CheckCircle} />
+          <h2 className="text-2xl font-black" style={{ color: COLORS.secondary }}>Vérifiez votre commande</h2>
+          <p className="text-sm mt-1.5" style={{ color: COLORS.textSecondary }}>Récapitulatif de votre course</p>
+        </div>
+
+        {/* Section Trajet */}
+        <RecapSection icon={Truck} title="Trajet" editLabel="Modifier le trajet" onEdit={() => handleEditStep(editSteps.trajet)}>
+          <RecapRow label="Récupération" value={formData.adresse_depart || (formData.recuperationGPS ? "Position GPS" : "—")} />
+          <RecapRow label="Livraison" value={formData.adresse_arrivee || "—"} />
+        </RecapSection>
+
+        {/* Section Contact */}
+        <RecapSection icon={User} title="Contact" editLabel="Modifier le contact" onEdit={() => handleEditStep(editSteps.contact)}>
+          <RecapRow label={contactLabel} value={contactNom || "—"} />
+          <RecapRow label="Téléphone" value={contactTel || "—"} />
+        </RecapSection>
+
+        {/* Section Détails */}
+        <RecapSection icon={Package} title="Détails" editLabel="Modifier les détails" onEdit={() => handleEditStep(editSteps.details)}>
+          {!isDeplacement && (
+            <RecapRow label="Type de colis" value={formData.type_colis?.replace(/_/g, " ") || "—"} />
+          )}
+          {isExpedie && (
+            <RecapRow label="Nombre de colis" value={formData.nb_colis > 1 ? `${formData.nb_colis} colis` : "1 colis"} />
+          )}
+          {isDeplacement && (
+            <RecapRow label="Nombre de passagers" value={formData.nb_passagers || 1} />
+          )}
+          {formData.notes && (
+            <RecapRow label="Notes" value={formData.notes} />
+          )}
+        </RecapSection>
+
+        {/* Section Prix */}
+        {!isMulti && (
+          <div
+            className="rounded-2xl border-2 p-4"
+            style={{ background: COLORS.primaryLight, borderColor: COLORS.primary }}
+          >
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: COLORS.primary }}>Prix proposé</span>
+              <button
+                type="button"
+                onClick={() => handleEditStep(editSteps.prix)}
+                className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg transition-all"
+                style={{ background: COLORS.bgCard, color: COLORS.primary }}
+              >
+                <Pencil className="w-3 h-3" />
+                Modifier le prix
+              </button>
             </div>
-          );
-        })()}
+            <p className="text-2xl font-black" style={{ color: COLORS.primary }}>
+              {prixClient > 0 ? `${prixClient.toLocaleString()} ${countryDevise}` : "Non défini"}
+            </p>
+            <p className="text-xs mt-0.5" style={{ color: COLORS.primary }}>Montant proposé au livreur</p>
+          </div>
+        )}
       </div>
     );
   }
 
   // ─── Logique désactivation bouton Continuer ───────────────────────────────
   const isContinueDisabled = () => {
-    const isExpedie = formData.type_course === "expedier";
-    const isRecevoir = formData.type_course === "recevoir";
-    const isDeplacement = formData.type_course === "deplacement";
     const isMulti = isExpedie && (formData.nb_colis || 1) > 1;
-    if (step === 0) return !formData.type_course;
-    if (step === 1) {
+    if (step === 0) {
       if (isRecevoir) return !formData.expediteur_telephone;
-      // expedier/deplacement : adresse optionnelle — toujours continuer
+      return false;
     }
-    if (step === 2) {
+    if (step === 1) {
+      if (isDeplacement) return false;
       if (isMulti) return !(colis || []).every(c => !!c.destinataire_telephone);
       if (isExpedie) return !formData.destinataire_telephone;
-      // recevoir/deplacement : adresse optionnelle — toujours continuer
+      return false;
+    }
+    if (step === 2) {
+      if (isDeplacement) return !formData.passager_telephone;
+      if (isRecevoir) return !(formData.prix_propose > 0);
+      return false;
     }
     if (step === 3) {
-      if (isDeplacement) return !formData.passager_telephone;
-      if (isRecevoir) return !formData.type_colis;
-    }
-    if (step === 4) {
-      if (isExpedie) return !formData.type_colis;
+      if (isDeplacement) return !(formData.prix_propose > 0);
+      if (isExpedie) return !(formData.prix_propose > 0);
+      return false;
     }
     return false;
   };
 
+  const isLastStep = step === totalSteps - 1;
+  const currentStepTitle = stepTitles[step] || "";
+
   return (
     <div className="w-full">
-      {/* ─── Barre de progression premium ────────────────────────────────── */}
-      <div className="mb-7">
-        <div className="flex items-center justify-between mb-2.5">
-          <span className="text-sm font-bold text-gray-600">Étape {step + 1} sur {totalSteps}</span>
-          <span className="text-sm font-black text-primary">{Math.round(progress)}%</span>
-        </div>
-        <div className="relative h-3 bg-gray-100 rounded-full overflow-hidden shadow-inner">
-          <div
-            className="absolute inset-y-0 left-0 bg-gradient-to-r from-primary to-red-500 rounded-full transition-all duration-500 ease-out"
-            style={{ width: `${progress}%` }}
-          >
-            <div className="absolute inset-0 bg-white/20 rounded-full" style={{
-              backgroundImage: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%)",
-              backgroundSize: "200% 100%",
-              animation: "shimmer 2s infinite"
-            }} />
-          </div>
-        </div>
-        <div className="flex justify-between mt-1.5">
-          {Array.from({ length: totalSteps }).map((_, i) => (
-            <div
-              key={i}
-              className={`h-1.5 w-1.5 rounded-full transition-all duration-300 ${i <= step ? "bg-primary scale-125" : "bg-gray-200"}`}
-            />
-          ))}
-        </div>
-      </div>
-
+      <ProgressBar step={step} totalSteps={totalSteps} stepTitle={currentStepTitle} />
       <div className="mb-6">{renderStep()}</div>
-
-      {/* ─── Navigation ──────────────────────────────────────────────────── */}
-      <div className="flex gap-3">
-        {step > 0 ? (
-          <button
-            type="button"
-            onClick={onBack}
-            className="flex-1 h-14 rounded-2xl border-2 border-gray-200 bg-white text-gray-700 font-bold text-base active:scale-[0.98] transition-all hover:bg-gray-50 flex items-center justify-center gap-2"
-          >
-            <ArrowLeft className="w-5 h-5" />
-            Retour
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={onAnnuler}
-            className="flex-1 h-14 rounded-2xl border-2 border-gray-200 bg-white text-gray-600 font-semibold text-base active:scale-[0.98] transition-all hover:bg-gray-50 flex items-center justify-center"
-          >
-            Annuler
-          </button>
-        )}
-
-        {step < totalSteps - 1 ? (
-          <button
-            type="button"
-            onClick={onNext}
-            disabled={isContinueDisabled()}
-            className="flex-1 h-14 rounded-2xl bg-gradient-to-r from-primary to-red-600 text-white font-bold text-base shadow-lg shadow-primary/30 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-          >
-            Continuer
-            <ArrowRight className="w-5 h-5" />
-          </button>
-        ) : (
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="flex-1 h-14 rounded-2xl bg-gradient-to-r from-green-600 to-emerald-600 text-white font-black text-base shadow-lg shadow-green-200 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                Création...
-              </>
-            ) : (
-              <>
-                <CheckCircle className="w-5 h-5" />
-                Confirmer la course
-              </>
-            )}
-          </button>
-        )}
-      </div>
+      <NavButtons
+        step={step}
+        totalSteps={totalSteps}
+        onBack={onBack}
+        onNext={onNext}
+        onAnnuler={onAnnuler}
+        onSubmit={onNext}
+        isLoading={isLoading}
+        isContinueDisabled={isContinueDisabled()}
+        isLastStep={isLastStep}
+      />
     </div>
   );
 }

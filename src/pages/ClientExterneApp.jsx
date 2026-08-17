@@ -1161,7 +1161,7 @@ export default function ClientExterneApp() {
                 </button>
 
                 <button
-                  className="group relative overflow-hidden rounded-2xl bg-white border border-black/5 shadow-[0_8px_24px_rgba(15,23,42,0.07)] p-5 text-left active:scale-[0.97] transition-all hover:shadow-md"
+                  className="group relative overflow-hidden rounded-2xl bg-white border border-black/5 shadow-[0_8px_24px_rgba(15,23,42,0.07)] p-5 pr-16 text-left active:scale-[0.97] transition-all hover:shadow-md"
                   onClick={() => navigate("/client/pharmacies")}
                 >
                   <div className="w-12 h-12 rounded-2xl bg-[#00a86b] flex items-center justify-center shadow-sm mb-2 group-hover:scale-105 transition-transform">

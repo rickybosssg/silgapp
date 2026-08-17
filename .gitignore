@@ -19,6 +19,7 @@ dist
 dist-ssr
 *.local
 outputs/
+artifacts/
 work-certs/
 *.apk
 *.aab

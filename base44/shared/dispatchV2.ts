@@ -36,7 +36,7 @@ import { dispatchLog, reponseDejaPrise, generateToken, generatePIN, journaliserD
 import { enregistrerNotification, getLivreursNotifies, getLivreursRefuses, marquerAccepte } from './dispatchNotifications.ts';
 
 // ── Version du bundle (pour vérifier que la production charge la dernière version) ──
-export const DISPATCH_V2_BUNDLE_VERSION = '2026-08-14-simplified-3';
+export const DISPATCH_V2_BUNDLE_VERSION = '2026-08-17-fix-en-attente-accept';
 
 // ── Feature flag cache (TTL 2 min) ──
 let V2_FLAG_CACHE: { enabled: boolean; expires: number } | null = null;
@@ -197,8 +197,13 @@ export async function publierCourseDansFil(base44: any, course: any) {
   // lit la course avant que le 1er ait commité. La garde atomique (updateMany conditionnel)
   // élimine cette race condition.
   const nowIso = new Date().toISOString();
+  // 🛡️ GARDE ÉLARGIE : ne pas republier si la course est déjà publiée (disponible_push),
+  // déjà acceptée (accepte) ou en négociation de prix (propose).
+  // Fix 2026-08-17 : race condition où publierCourseDansFil était rappelé par
+  // l'orchestrateur APRÈS une acceptation, effaçant livreur_id et remettant la
+  // course dans le fil → double acceptation par un second livreur.
   await base44.asServiceRole.entities.CourseExterne.updateMany(
-    { id: course.id, dispatch_status: { $ne: 'disponible_push' } },
+    { id: course.id, dispatch_status: { $nin: ['disponible_push', 'accepte', 'propose', 'redispatch'] } },
     { $set: {
       statut: 'recherche_livreur',
       dispatch_status: 'disponible_push',
@@ -275,8 +280,13 @@ export async function accepterCourseV2(base44: any, courseId: string, livreurId:
   const course = await base44.asServiceRole.entities.CourseExterne.get(courseId);
   if (!course) return { error: 'Course introuvable' };
 
-  // 2. Check course still available (disponible_push V2, propose V1, en_attente = admin manuel)
-  if (course.dispatch_status !== 'disponible_push' && course.dispatch_status !== 'propose' && course.dispatch_status !== 'en_attente') {
+  // 2. Check course still available (disponible_push V2, propose V1)
+  // ⚠️ en_attente est EXCLU — c'est le statut utilisé par annulerCourseExterne
+  // quand un livreur annule. Si on l'autorise ici, un autre livreur peut
+  // accepter une course que le livreur précédent a annulée.
+  // L'admin doit utiliser l'assignation manuelle (AssignLivreurDialog) pour
+  // réaffecter une course en attente.
+  if (course.dispatch_status !== 'disponible_push' && course.dispatch_status !== 'propose') {
     return reponseDejaPrise('not_available', course);
   }
   // 2b. Refuser les courses en statut terminal (annulee / livree)
@@ -367,7 +377,7 @@ export async function accepterCourseV2(base44: any, courseId: string, livreurId:
   // chaine vide : Base44 stocke aussi l'absence de livreur avec null, ce qui
   // empêchait toute acceptation de ces courses.
   await base44.asServiceRole.entities.CourseExterne.updateMany(
-    { id: courseId, dispatch_status: { $in: ['propose', 'disponible_push', 'en_attente'] } },
+    { id: courseId, dispatch_status: { $in: ['propose', 'disponible_push'] } },
     { $set: updateData }
   );
 

@@ -9,7 +9,7 @@ import { base44 } from "@/api/base44Client";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { useAdminContext } from "@/hooks/useAdminContext.js";
-import { PAYS_SILGAPP } from "@/components/international/CountrySelector.jsx";
+import { usePaysActifs } from "@/components/international/CountrySelector.jsx";
 
 const doLogout = () => {
   ['base44_access_token', 'access_token', 'base44_token', 'token'].forEach(k => {
@@ -69,6 +69,7 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, part
   const { isPays, countryCode: adminCountryCode, selectedCountry, setSelectedCountry } = useAdminContext();
   const effectiveCountry = isPays ? adminCountryCode : selectedCountry;
   const showCountryPicker = reseau === "externe" && !isPays;
+  const { pays: paysListe } = usePaysActifs();
 
 
   return (
@@ -171,10 +172,10 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, part
               <button
                 onClick={() => setCountryOpen(!countryOpen)}
                 className="w-full flex items-center justify-center h-9 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
-                title={effectiveCountry ? PAYS_SILGAPP.find(p => p.code === effectiveCountry)?.nom : "Choisir un pays"}
+                title={effectiveCountry ? paysListe.find(p => p.code === effectiveCountry)?.nom : "Choisir un pays"}
               >
                 <span className="text-base">
-                  {effectiveCountry ? PAYS_SILGAPP.find(p => p.code === effectiveCountry)?.emoji_flag || "🌍" : "🌍"}
+                  {effectiveCountry ? paysListe.find(p => p.code === effectiveCountry)?.emoji_flag || "🌍" : "🌍"}
                 </span>
               </button>
             ) : (
@@ -184,10 +185,10 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, part
               >
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="text-base flex-shrink-0">
-                    {effectiveCountry ? PAYS_SILGAPP.find(p => p.code === effectiveCountry)?.emoji_flag || "🌍" : "🌍"}
+                    {effectiveCountry ? paysListe.find(p => p.code === effectiveCountry)?.emoji_flag || "🌍" : "🌍"}
                   </span>
                   <span className="text-xs font-semibold text-slate-400 truncate">
-                    {effectiveCountry ? PAYS_SILGAPP.find(p => p.code === effectiveCountry)?.nom : "Choisir un pays"}
+                    {effectiveCountry ? paysListe.find(p => p.code === effectiveCountry)?.nom : "Choisir un pays"}
                   </span>
                 </div>
                 <ChevronDown className={cn("w-3.5 h-3.5 text-slate-400 flex-shrink-0 transition-transform", countryOpen && "rotate-180")} />
@@ -202,7 +203,7 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, part
                   "absolute z-50 bg-[#1e2228] border border-white/5 rounded-xl shadow-2xl max-h-72 overflow-y-auto",
                   collapsed ? "left-14 bottom-0 w-52" : "left-3 right-3 bottom-full mb-2"
                 )}>
-                  {PAYS_SILGAPP.map((p) => (
+                  {paysListe.map((p) => (
                     <button
                       key={p.code}
                       onClick={() => { setSelectedCountry(p.code); setCountryOpen(false); }}

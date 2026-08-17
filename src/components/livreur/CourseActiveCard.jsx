@@ -14,16 +14,9 @@ import NavigationGPS from "./NavigationGPS";
 import { normalizeCommissionPct, resolveStoredOrDynamicSplit, splitAmountByCommission } from "@/lib/commissionUtils";
 import ChatWindow from "@/components/chat/ChatWindow";
 import AnnulationExplicationChat from "./AnnulationExplicationChat";
-import { getPrixAffichable } from "@/utils/getPrixAffichable";
+import { getPrixAffichable, getDeviseAffichable } from "@/utils/getPrixAffichable";
 
-const COUNTRY_DIAL_CODE = {
-  BF: "226", CI: "225", TG: "228", BJ: "229", SN: "221",
-  ML: "223", GN: "224", NE: "227", GH: "233",
-};
-const COUNTRY_LOCAL_LEN = {
-  BF: 8, CI: 10, TG: 8, BJ: 8, SN: 9,
-  ML: 8, GN: 9, NE: 8, GH: 9,
-};
+import { getCountryConfig } from "@/lib/phoneUtils";
 
 function isInternalDispatchNote(value) {
   return /^Accept(?:e|ee|é|ée)e? par \S+ (?:a|à) \d{4}-\d{2}-\d{2}T/i.test(String(value || "").trim());
@@ -800,8 +793,9 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
 
               const handleWhatsApp = () => {
                 let num = (contactTel || "").replace(/\D/g, "");
-                const dial = COUNTRY_DIAL_CODE[course.country_code] || "226";
-                const localLen = COUNTRY_LOCAL_LEN[course.country_code] || 8;
+                const cfg = getCountryConfig(course.country_code);
+                const dial = cfg.dial;
+                const localLen = cfg.len;
                 if (num.startsWith(dial) && num.length === dial.length + localLen) {
                   // déjà international
                 } else if (num.startsWith("0") && num.length === localLen + 1) {
@@ -879,8 +873,9 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
               // Normalisation multi-pays : si le numéro a déjà un indicatif international (10+ chiffres), ok
               // Sinon on laisse le numéro tel quel — wa.me gère les numéros locaux avec indicatif
               let num = (contactTel || "").replace(/\D/g, "");
-              const dial = COUNTRY_DIAL_CODE[course.country_code] || "226";
-              const localLen = COUNTRY_LOCAL_LEN[course.country_code] || 8;
+              const cfg = getCountryConfig(course.country_code);
+              const dial = cfg.dial;
+              const localLen = cfg.len;
               // Normaliser vers le format international pour wa.me
               if (num.startsWith(dial) && num.length === dial.length + localLen) {
                 // déjà international
@@ -891,10 +886,13 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
               } else if (num.startsWith("0")) {
                 num = dial + num.slice(1); // fallback: retirer le 0
               }
+              const livreurNomFormate = livreurNom ? livreurNom.trim() : null;
               const msg = encodeURIComponent(
                 colisRecupere
                   ? "Bonjour, je suis votre livreur SILGAPP. Je suis en route pour vous livrer votre colis."
-                  : "Bonjour, je suis votre livreur SILGAPP. Je suis en route pour récupérer votre colis."
+                  : (livreurNomFormate
+                    ? `Bonjour, je suis ${livreurNomFormate}, votre livreur SILGAPP. Je suis en route pour récupérer votre colis. Merci de m'envoyer la localisation du lieu de récupération.`
+                    : "Bonjour, je suis votre livreur SILGAPP. Je suis en route pour récupérer votre colis. Merci de m'envoyer la localisation du lieu de récupération.")
               );
               const lien = `https://wa.me/${num}?text=${msg}`;
               const popup = window.open(lien, "_blank", "noopener,noreferrer");
@@ -995,6 +993,8 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
 
               if (prixBase <= 0) return null;
 
+              const hasClientPrix = Number(course.prix_propose_client) > 0;
+
               return (
                 <div className={cn(
                   "rounded-xl p-3 border",
@@ -1004,12 +1004,12 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                 )}>
                   <div className="flex items-center justify-between mb-1">
                     <span className={cn("text-xs font-semibold", isPrixManuel ? "text-green-700" : "text-blue-700")}>
-                      {isPrixManuel ? "Prix validé " : (course.prix_propose_admin ? "Prix proposé" : "Prix estimé")}
+                      {isPrixManuel ? "Prix validé " : (hasClientPrix ? "Prix proposé par le client" : (course.prix_propose_admin ? "Prix proposé (admin)" : "Prix estimé"))}
                     </span>
                     <span className={cn("text-lg font-black", isPrixManuel ? "text-green-900" : "text-blue-900")}>
                       {isPrixManuel
-                        ? `${prixBase.toLocaleString()} ${course.devise || "F"}`
-                        : `~${prixBase.toLocaleString()} ${course.devise || "F"}`
+                        ? `${prixBase.toLocaleString()} ${getDeviseAffichable(course)}`
+                        : `~${prixBase.toLocaleString()} ${getDeviseAffichable(course)}`
                       }
                     </span>
                   </div>

@@ -8,6 +8,7 @@ import {
   mettreAJourMemoireLongue,
   chargerHistoriqueRecent,
   trouverCourseActive,
+  trouverCourseActiveParTelephone,
   raisonnerVenus,
   creerCourseDepuisMemoire,
   loggerRaisonnement,
@@ -616,19 +617,32 @@ Deno.serve(async (req) => {
 
           if (_hasTypeC && _hasDepartC && _hasArriveeC) {
             venusLog(`[WebhookVenus] ✅ Confirmation déterministe — création directe (0 crédit GPT)`);
-            try {
-              const crConf = await creerCourseDepuisMemoire(base44, pendingCourseConf, countryCode, tarifs, telephone, profileName, conversation.silgapp_from_number);
-              if (crConf.success) {
-                reponseVenus = crConf.message;
-                pendingCourseConf.course_created = true;
-                pendingCourseConf.course_id = crConf.course.id;
-                await base44.asServiceRole.entities.Conversation.update(conversation.id, { venus_pending_course: JSON.stringify(pendingCourseConf) });
-                venusLog(`[WebhookVenus] ✅ Course créée via confirmation déterministe: ${crConf.course.id}`);
-              } else if (crConf.message) {
-                reponseVenus = crConf.message;
+
+            // ═══ ANTI-DOUBLON CRITIQUE (confirmation déterministe) ═══
+            // Garde partagée : vérifier en DB qu'aucune course active n'existe déjà.
+            const _activeCourseConf = await trouverCourseActiveParTelephone(base44, telephone, countryCode);
+
+            if (_activeCourseConf) {
+              console.warn(`[WebhookVenus] 🛡️ ANTI-DOUBLON (confirm) — course active ${_activeCourseConf.id} (${_activeCourseConf.statut}) existe pour ${telephone}`);
+              reponseVenus = `Vous avez déjà une course active (réf: ${(_activeCourseConf.id || '').slice(-6).toUpperCase()}). Le livreur est en cours de recherche.`;
+              pendingCourseConf.course_created = true;
+              pendingCourseConf.course_id = _activeCourseConf.id;
+              await base44.asServiceRole.entities.Conversation.update(conversation.id, { venus_pending_course: JSON.stringify(pendingCourseConf) });
+            } else {
+              try {
+                const crConf = await creerCourseDepuisMemoire(base44, pendingCourseConf, countryCode, tarifs, telephone, profileName, conversation.silgapp_from_number);
+                if (crConf.success) {
+                  reponseVenus = crConf.message;
+                  pendingCourseConf.course_created = true;
+                  pendingCourseConf.course_id = crConf.course.id;
+                  await base44.asServiceRole.entities.Conversation.update(conversation.id, { venus_pending_course: JSON.stringify(pendingCourseConf) });
+                  venusLog(`[WebhookVenus] ✅ Course créée via confirmation déterministe: ${crConf.course.id}`);
+                } else if (crConf.message) {
+                  reponseVenus = crConf.message;
+                }
+              } catch (e) {
+                console.error(`[WebhookVenus] Erreur confirmation déterministe: ${e.message}`);
               }
-            } catch (e) {
-              console.error(`[WebhookVenus] Erreur confirmation déterministe: ${e.message}`);
             }
           }
         }
@@ -719,37 +733,8 @@ Deno.serve(async (req) => {
         let courseCreee = false;
 
         if (reasoningResult.action === 'creer_course') {
-          // ═══ ANTI-DOUBLON CRITIQUE — Requête DB DIRECTE (autonome) ═══
-          // On ne fait confiance NI à pendingCourse NI à courseActive.
-          // On interroge la DB directement pour les courses actives de ce téléphone.
-          const _STATUTS_ACTIFS_GUARD = ['nouvelle', 'programmee', 'recherche_livreur', 'livreur_en_route', 'arrive_prise_en_charge', 'colis_recupere', 'passager_embarque', 'pris_en_charge', 'en_livraison', 'arrivee'];
-          let _activeCourseDB = null;
-          try {
-            const _telNorm = telephone.replace(/\D/g, '');
-            const _telPlus = telephone.startsWith('+') ? telephone : '+' + telephone;
-            const _coursesDB = await base44.asServiceRole.entities.CourseExterne.filter(
-              { client_telephone: _telPlus }, '-created_date', 10
-            );
-            _activeCourseDB = (_coursesDB || []).find(c => _STATUTS_ACTIFS_GUARD.includes(c.statut)) || null;
-            // Fallback: search by expediteur_telephone
-            if (!_activeCourseDB) {
-              const _expCourses = await base44.asServiceRole.entities.CourseExterne.filter(
-                { expediteur_telephone: _telPlus }, '-created_date', 10
-              );
-              _activeCourseDB = (_expCourses || []).find(c => _STATUTS_ACTIFS_GUARD.includes(c.statut)) || null;
-            }
-            // Fallback: search by last 8 digits
-            if (!_activeCourseDB) {
-              const _allRecent = await base44.asServiceRole.entities.CourseExterne.filter(
-                { country_code: countryCode }, '-created_date', 50
-              );
-              _activeCourseDB = (_allRecent || []).find(c =>
-                _STATUTS_ACTIFS_GUARD.includes(c.statut) &&
-                ((c.client_telephone || '').replace(/\D/g, '').endsWith(_telNorm.slice(-8)) ||
-                 (c.expediteur_telephone || '').replace(/\D/g, '').endsWith(_telNorm.slice(-8)))
-              ) || null;
-            }
-          } catch (e) { console.error('[WebhookVenus] ANTI-DOUBLON DB query error:', e.message); }
+          // ═══ ANTI-DOUBLON CRITIQUE — Garde partagée ═══
+          const _activeCourseDB = await trouverCourseActiveParTelephone(base44, telephone, countryCode);
 
           const _dejaCree = pendingCourse?.course_created === true;
           const _courseActiveExiste = !!_activeCourseDB;
@@ -841,7 +826,7 @@ Deno.serve(async (req) => {
               await base44.asServiceRole.functions.invoke('annulerCourseExterne', {
                 course_id: courseActive.id,
                 motif: 'client_change_avis',
-                source: 'admin',
+                source: 'client',
               });
               // 2. Vérifier que la DB confirme réellement le statut "annulee"
               const courseVerifiee = await base44.asServiceRole.entities.CourseExterne.get(courseActive.id);

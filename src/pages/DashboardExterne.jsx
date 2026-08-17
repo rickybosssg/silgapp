@@ -14,6 +14,7 @@ import { isClientEligibleCarte } from "@/lib/dispatchRules.js";
 import { calculateLivreurCounters, calculateClientCounters } from "@/lib/livreurCounters.js";
 import CoursesEnTraitement from "@/components/dashboard/CoursesEnTraitement";
 import CoursesTerminees from "@/components/dashboard/CoursesTerminees";
+import CoursesRedispatch from "@/components/dashboard/CoursesRedispatch";
 import DispatchHealthPanel from "@/components/dashboard/DispatchHealthPanel";
 import VenusActivityPanel from "@/components/dashboard/VenusActivityPanel";
 import CourseDetailDialog from "@/components/courses/CourseDetailDialog";
@@ -51,7 +52,7 @@ export default function DashboardExterne() {
   const [statModal, setStatModal] = useState(null);
   const [showCodePromo, setShowCodePromo] = useState(false);
   const { isGlobal, isPays, countryCode: adminCountryCode, selectedCountry } = useAdminContext();
-  const paysActifs = usePaysActifs();
+  const { pays: paysActifs } = usePaysActifs();
   const defaultCountry = paysActifs.length === 1 ? paysActifs[0].code : null;
   const effectiveCountry = isPays ? adminCountryCode : (selectedCountry || defaultCountry);
 
@@ -296,6 +297,9 @@ export default function DashboardExterne() {
             </div>
           </div>
         </div>
+
+        {/* ── COURSES EN REDISPATCH (intervention admin) ── */}
+        <CoursesRedispatch courses={courses} onView={setSelectedCourse} />
 
         {/* ── COURSES EN COURS ────────────────────────────── */}
         <div>

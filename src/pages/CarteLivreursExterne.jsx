@@ -133,7 +133,7 @@ export default function CarteLivreursExterne() {
   };
 
   const { isGlobal, isPays, countryCode: adminCountryCode, selectedCountry, setSelectedCountry } = useAdminContext();
-  const paysActifs = usePaysActifs();
+  const { pays: paysActifs } = usePaysActifs();
   const defaultCountry = paysActifs.length === 1 ? paysActifs[0].code : null;
   const effectiveCountry = isPays ? adminCountryCode : (selectedCountry || defaultCountry || "");
 

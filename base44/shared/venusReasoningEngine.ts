@@ -323,6 +323,49 @@ const STATUTS_ACTIFS = [
   'pris_en_charge', 'en_livraison', 'arrivee',
 ];
 
+/**
+ * Recherche UNIQUEMENT une course active (non livrée/annulée) pour un téléphone.
+ * Utilisé comme garde anti-doublon avant toute création de course.
+ * Retourne null si aucune course active n'existe.
+ */
+export async function trouverCourseActiveParTelephone(base44: any, telephone: string, countryCode: string): Promise<any | null> {
+  try {
+    const telNorm = telephone.replace(/\D/g, '');
+    const telPlus = telephone.startsWith('+') ? telephone : '+' + telephone;
+
+    // 1. Recherche par client_telephone
+    let courses = await base44.asServiceRole.entities.CourseExterne.filter(
+      { client_telephone: telPlus }, '-created_date', 10
+    );
+    let active = (courses || []).find(c => STATUTS_ACTIFS.includes(c.statut)) || null;
+
+    // 2. Fallback : expediteur_telephone
+    if (!active) {
+      const exp = await base44.asServiceRole.entities.CourseExterne.filter(
+        { expediteur_telephone: telPlus }, '-created_date', 10
+      );
+      active = (exp || []).find(c => STATUTS_ACTIFS.includes(c.statut)) || null;
+    }
+
+    // 3. Fallback : derniers 8 chiffres
+    if (!active) {
+      const allRecent = await base44.asServiceRole.entities.CourseExterne.filter(
+        { country_code: countryCode }, '-created_date', 50
+      );
+      active = (allRecent || []).find(c =>
+        STATUTS_ACTIFS.includes(c.statut) &&
+        ((c.client_telephone || '').replace(/\D/g, '').endsWith(telNorm.slice(-8)) ||
+         (c.expediteur_telephone || '').replace(/\D/g, '').endsWith(telNorm.slice(-8)))
+      ) || null;
+    }
+
+    return active;
+  } catch (e) {
+    console.error('[ReasoningEngine] Erreur recherche course active (anti-doublon):', e.message);
+    return null;
+  }
+}
+
 export async function trouverCourseActive(base44: any, telephone: string, countryCode: string): Promise<any | null> {
   try {
     let courses = await base44.asServiceRole.entities.CourseExterne.filter(

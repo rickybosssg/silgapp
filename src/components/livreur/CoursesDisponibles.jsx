@@ -76,14 +76,16 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
     queryFn: async () => {
       if (!countryCode || !isV2Enabled) return [];
       const all = await base44.entities.CourseExterne.filter(
-        { dispatch_status: { $in: ["disponible_push", "propose", "en_attente"] }, country_code: countryCode },
+        { dispatch_status: { $in: ["disponible_push", "propose"] }, country_code: countryCode },
         "-created_date", 50
       );
       return all || [];
     },
     enabled: !!livreurId && !!countryCode && livreurDisponible && isV2Enabled,
     refetchInterval: 10000,
-    staleTime: 5000,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
   });
 
   // ── Récupérer les courses refusées par ce livreur depuis DispatchNotification ──
@@ -141,9 +143,23 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
   }, [livreurId, countryCode, queryClient]);
 
   // Filtrer les courses éligibles
+  // ⚠️ RÈGLE MÉTIER : une course n'est visible dans "Disponibles" QUE si :
+  //   - statut === "recherche_livreur" (course active, pas en attente/annulée/livrée)
+  //   - dispatch_status === "disponible_push" (V2) ou "propose" (V1 négociation prix)
+  // Une course en_attente (annulée par livreur, suspendue par admin) ne doit JAMAIS
+  // apparaître, quel que soit son dispatch_status résiduel.
   const eligibleCourses = useMemo(() => {
     return courses.filter(course => {
+      // ── Garde absolue sur le statut : en_attente = invisible, point final ──
+      if (course.statut === "en_attente") return false;
       if (FINAL_COURSE_STATUSES.has(course.statut)) return false;
+      // ── Garde positive : seul "recherche_livreur" est un statut disponible ──
+      if (course.statut !== "recherche_livreur") return false;
+      // ── Garde sur dispatch_status : disponible_push (V2) ou propose (V1) ──
+      // ⚠️ "redispatch" = course annulée par un livreur, en attente de décision admin
+      //    Ne doit JAMAIS apparaître dans le fil "Disponibles"
+      if (course.dispatch_status !== "disponible_push" && course.dispatch_status !== "propose") return false;
+      if (course.dispatch_status === "redispatch") return false;
       if (course.livreur_id) return false;
       if (refusedIds.includes(course.id)) return false;
       // Exclure si timeout expiré
@@ -332,13 +348,16 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
               </div>
               {(() => {
                 const prix = getPrixAffichable(course);
+                const devise = course.devise || "FCFA";
                 return prix > 0 ? (
                   <div className="shrink-0 text-right">
-                    <p className="text-[10px] font-semibold uppercase text-slate-400">Proposition</p>
+                    <p className="text-[10px] font-semibold uppercase text-slate-400">
+                      {Number(course.prix_propose_client) > 0 ? "Prix client" : "Proposition"}
+                    </p>
                     <p className="mt-0.5 text-xl font-bold text-[#008f5a]">
                       {prix.toLocaleString()}
                     </p>
-                    <p className="text-[10px] font-bold text-[#008f5a]">FCFA</p>
+                    <p className="text-[10px] font-bold text-[#008f5a]">{devise}</p>
                   </div>
                 ) : null;
               })()}

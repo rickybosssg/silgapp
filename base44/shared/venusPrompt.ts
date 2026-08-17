@@ -20,6 +20,7 @@ IMPORTANT : Les informations spécifiques au pays (tarifs, devise, ville princip
 
 ═══ TARIFS ═══
 RÈGLE CRITIQUE : Tu NE dois JAMAIS inventer ou afficher un tarif précis pour une course. Le prix réel est calculé par le moteur de tarification et communiqué par le livreur. Les tarifs publics (prix/km, minimum) sont informatifs. Si un client demande le prix d'une course précise : "Je ne peux pas encore déterminer le tarif avec précision. Le livreur qui prendra votre course vous contactera pour confirmer le coût de la livraison avant le démarrage de la course." Ne jamais inventer un taux de commission. Prix minimum selon le pays — jamais en dessous.
+RÈGLE BUDGET : AVANT de finaliser la création d'une course, demande TOUJOURS au client quel budget il est prêt à consacrer à cette livraison (ex: "Quel budget envisagez-vous pour cette livraison ?"). Note la réponse dans le champ prix_budget de la mémoire courte. Si le client n'a pas de budget précis, propose le tarif estimé à titre indicatif et demande sa validation. Ne JAMAIS créer une course sans avoir au moins évoqué le budget avec le client.
 
 ═══ AIDE CLIENTS ═══
 3 types de courses : expédier un colis, recevoir un colis, se déplacer.
@@ -51,25 +52,14 @@ Je peux vous aider à :
 Comment puis-je vous aider ?`;
 
 // ── Délégation vers venusI18nEngine (source de vérité unique) ──
-export { detecterPaysDepuisTelephone, INDICATIFS_PAYS } from './venusI18nEngine.ts';
-
-// TARIFS_PAYS — dérivé de FALLBACK_PAYS pour rétrocompatibilité
-import { chargerConfigPays } from './venusI18nEngine.ts';
+export { detecterPaysDepuisTelephone, detecterPaysDepuisTelephoneAsync, INDICATIFS_PAYS } from './venusI18nEngine.ts';
+export { chargerConfigPays } from './venusI18nEngine.ts';
 import type { CountryConfig } from './venusI18nEngine.ts';
 
-const PAYS_CODES = ['BF', 'CI', 'TG', 'BJ', 'SN', 'ML', 'GN', 'NE', 'GH'];
-
-export const TARIFS_PAYS: Record<string, { nom: string; ville: string; devise: string; prix_km: number; minimum: number; rayon: number; indicatif: string }> = {
-  BF: { nom: 'Burkina Faso', ville: 'Ouagadougou', devise: 'FCFA', prix_km: 100, minimum: 1000, rayon: 30, indicatif: '+226' },
-  CI: { nom: "Côte d'Ivoire", ville: 'Abidjan', devise: 'FCFA', prix_km: 120, minimum: 1000, rayon: 40, indicatif: '+225' },
-  TG: { nom: 'Togo', ville: 'Lomé', devise: 'FCFA', prix_km: 100, minimum: 1000, rayon: 25, indicatif: '+228' },
-  BJ: { nom: 'Bénin', ville: 'Cotonou', devise: 'FCFA', prix_km: 100, minimum: 1000, rayon: 25, indicatif: '+229' },
-  SN: { nom: 'Sénégal', ville: 'Dakar', devise: 'FCFA', prix_km: 150, minimum: 1000, rayon: 35, indicatif: '+221' },
-  ML: { nom: 'Mali', ville: 'Bamako', devise: 'FCFA', prix_km: 100, minimum: 1000, rayon: 30, indicatif: '+223' },
-  GN: { nom: 'Guinée', ville: 'Conakry', devise: 'GNF', prix_km: 800, minimum: 4000, rayon: 30, indicatif: '+224' },
-  NE: { nom: 'Niger', ville: 'Niamey', devise: 'FCFA', prix_km: 100, minimum: 1000, rayon: 25, indicatif: '+227' },
-  GH: { nom: 'Ghana', ville: 'Accra', devise: 'GHS', prix_km: 2, minimum: 10, rayon: 30, indicatif: '+233' },
-};
+// TARIFS_PAYS — ⚠️ DÉPRÉCIÉ : utiliser chargerConfigPays(base44, countryCode) à la place.
+// Cette map statique n'est conservée que pour la rétrocompatibilité.
+// Elle sera supprimée une fois tous les appels migrés vers la version dynamique.
+export const TARIFS_PAYS: Record<string, { nom: string; ville: string; devise: string; prix_km: number; minimum: number; rayon: number; indicatif: string }> = {};
 
 /**
  * ─── PROMPT DYNAMIQUE MULTI-PAYS / MULTILINGUE ───

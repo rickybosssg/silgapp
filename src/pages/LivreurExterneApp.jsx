@@ -185,6 +185,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   const { pulling, refreshing } = usePullToRefresh(async () => {
     await queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
     await queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+    await queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles"] });
   });
 
 
@@ -226,7 +227,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       if (!livreurProfil?.id || !livreurProfil?.country_code || !isV2Enabled) return 0;
       const [all, refused] = await Promise.all([
         base44.entities.CourseExterne.filter(
-          { dispatch_status: { $in: ["disponible_push", "propose", "en_attente"] }, country_code: livreurProfil.country_code },
+          { dispatch_status: { $in: ["disponible_push", "propose"] }, country_code: livreurProfil.country_code },
           "-created_date", 50
         ),
         base44.entities.DispatchNotification.filter(
@@ -247,6 +248,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       } catch {}
 
       return (all || []).filter((course) => {
+        if (course.statut !== "recherche_livreur") return false;
+        if (course.dispatch_status !== "disponible_push" && course.dispatch_status !== "propose") return false;
         if (FINAL_COURSE_STATUSES.has(course.statut)) return false;
         if (course.livreur_id || course.accepted_by_livreur_id) return false;
         if (refusedIds.has(course.id) || dismissedIds.has(course.id)) return false;
@@ -259,7 +262,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     },
     enabled: !!livreurProfil?.id && !!livreurProfil?.country_code && isV2Enabled && livreurCanReceiveV2,
     refetchInterval: 10000,
-    staleTime: 5000,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   });
 
   // Le point rouge s'affiche dès qu'il y a des courses disponibles ET que le livreur
@@ -271,6 +275,20 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       setHasNewAvailableCourse(false);
     }
   }, [availableCoursesCount, activeTab]);
+
+  // ── WebSocket : invalider le badge + la liste "Disponibles" en temps réel ──
+  // Quand une course est mise à jour (annulation → en_attente, acceptation → accepte),
+  // le cache React Query doit être invalidé immédiatement sans attendre le polling.
+  useEffect(() => {
+    if (!livreurProfil?.id) return;
+    const unsubscribe = base44.entities.CourseExterne.subscribe((event) => {
+      if (event.type === "create" || event.type === "update" || event.type === "delete") {
+        queryClient.invalidateQueries({ queryKey: ["courses-disponibles-count"] });
+        queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles"] });
+      }
+    });
+    return unsubscribe;
+  }, [livreurProfil?.id, queryClient]);
 
   const { data: countryCommissionRows = [] } = useQuery({
     queryKey: ["country-commission", livreurProfil?.country_code],
@@ -543,6 +561,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     const refreshCourses = () => {
       if (!livreurId) return;
       queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+      queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles"] });
       queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
     };
     const handleVisibility = () => {

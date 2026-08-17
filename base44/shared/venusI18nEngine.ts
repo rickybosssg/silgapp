@@ -66,12 +66,45 @@ const FALLBACK_PAYS: Record<string, CountryConfig> = {
 //  DÉTECTION DE PAYS
 // ═════════════════════════════════════════════════════════════
 
+// Cache dynamique des indicatifs (chargé depuis Country)
+let _indicatifsCache: Record<string, string> | null = null;
+
+/**
+ * Détecte le pays depuis un numéro de téléphone.
+ * Version synchrone — utilise le cache statique INDICATIFS_PAYS (fallback).
+ * Pour une détection 100% dynamique, utiliser detecterPaysDepuisTelephoneAsync.
+ */
 export function detecterPaysDepuisTelephone(telephone: string): string | null {
   const tel = telephone.replace(/\s+/g, '').replace(/[^\d+]/g, '');
-  for (const [indicatif, code] of Object.entries(INDICATIFS_PAYS)) {
+  const map = _indicatifsCache || INDICATIFS_PAYS;
+  for (const [indicatif, code] of Object.entries(map)) {
     if (tel.startsWith(indicatif)) return code;
   }
   return null;
+}
+
+/**
+ * Version async — charge les indicatifs depuis Country (BDD) au premier appel,
+ * puis utilise le cache pour les appels suivants.
+ */
+export async function detecterPaysDepuisTelephoneAsync(base44: any, telephone: string): Promise<string | null> {
+  if (!_indicatifsCache) {
+    try {
+      const countries = await base44.asServiceRole.entities.Country.filter({ actif: true });
+      const dynamicMap: Record<string, string> = {};
+      for (const c of countries || []) {
+        if (c.indicatif && c.code) {
+          const dial = c.indicatif.startsWith('+') ? c.indicatif : `+${c.indicatif}`;
+          dynamicMap[dial] = c.code;
+        }
+      }
+      // Fusionner : priorité à la BDD, fallback statique pour les pays pas encore en BDD
+      _indicatifsCache = { ...INDICATIFS_PAYS, ...dynamicMap };
+    } catch {
+      _indicatifsCache = INDICATIFS_PAYS;
+    }
+  }
+  return detecterPaysDepuisTelephone(telephone);
 }
 
 // ═════════════════════════════════════════════════════════════
@@ -540,8 +573,8 @@ export async function construireContexteVenus(
   telephone: string,
   messageClient?: string
 ): Promise<VenusContext> {
-  // 1. Détecter pays
-  const countryCode = detecterPaysDepuisTelephone(telephone);
+  // 1. Détecter pays (dynamique via BDD)
+  const countryCode = await detecterPaysDepuisTelephoneAsync(base44, telephone);
 
   // 2. Charger config pays
   const country = await chargerConfigPays(base44, countryCode);

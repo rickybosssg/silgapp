@@ -20,17 +20,7 @@
     },
     "country_code": {
       "type": "string",
-      "enum": [
-        "BF",
-        "CI",
-        "TG",
-        "BJ",
-        "SN",
-        "ML",
-        "GN",
-        "NE",
-        "GH"
-      ]
+      "description": "Code pays ISO 2 lettres (ex: BF, CI, TG). Dynamique : aucun pays cod\u00e9 en dur."
     },
     "prenom": {
       "type": "string"

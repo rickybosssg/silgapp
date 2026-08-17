@@ -62,7 +62,10 @@ const nativePushSource = readFileSync(
 assert.match(livreurAppSource, /id:\s*"disponibles"/, "l'onglet Disponibles doit etre declare");
 assert.match(livreurAppSource, /activeTab === "disponibles"/, "l'onglet Disponibles doit etre rendu");
 assert.match(livreurAppSource, /<CoursesDisponibles/, "le composant CoursesDisponibles doit etre monte");
-assert.match(coursesDisponiblesSource, /\$in:\s*\["disponible_push",\s*"propose",\s*"en_attente"\]/, "la liste V2 doit charger le fil et les propositions compatibles");
+assert.match(coursesDisponiblesSource, /\$in:\s*\["disponible_push",\s*"propose"\]/, "la liste V2 doit charger uniquement le fil actif et les propositions compatibles");
+assert.doesNotMatch(coursesDisponiblesSource, /\$in:\s*\[[^\]]*"en_attente"/, "une course en attente ne doit jamais etre chargee dans Disponibles");
+assert.match(coursesDisponiblesSource, /course\.statut !== "recherche_livreur"/, "seules les courses en recherche livreur doivent etre visibles");
+assert.match(coursesDisponiblesSource, /course\.statut === "en_attente"/, "une course en attente doit etre explicitement exclue");
 assert.match(coursesDisponiblesSource, /country_code:\s*countryCode/, "la liste doit rester isolee par pays");
 assert.match(coursesDisponiblesSource, /refusedCourseIds\.includes\(course\.id\)/, "une course refusee ne doit pas reapparaitre");
 assert.match(coursesDisponiblesSource, /livreurDisponible/, "un livreur hors ligne ne doit pas charger les courses disponibles");
@@ -116,6 +119,7 @@ assert.match(courseActiveCardSource, /value="autre"/, "le motif Autre doit etre 
 assert.match(courseActiveCardSource, /motif_detail:\s*motifAnnulationDetail\.trim\(\)/, "le detail du motif doit etre transmis au backend");
 assert.match(annulationBackendSource, /source === "livreur"[\s\S]*motif_detail/, "le backend doit valider le detail fourni par le livreur");
 assert.match(annulationBackendSource, /dispatch_refused_ids:\s*JSON\.stringify\(refusedIds\)/, "le livreur doit etre exclu uniquement de la course annulee");
+assert.match(annulationBackendSource, /statut:\s*"en_attente"[\s\S]*dispatch_status:\s*"en_attente"/, "une annulation livreur doit suspendre la course jusqu'a l'action admin");
 assert.match(annulationBackendSource, /manual_hors_ligne === true \? "hors_ligne" : "disponible"/, "le livreur doit etre libere sans annuler son choix hors ligne");
 assert.match(annulationBackendSource, /ANNULATION CLIENT OU ADMIN[\s\S]*statut:\s*"annulee"[\s\S]*dispatch_status:\s*"expire"/, "une annulation client doit etre terminale et ne jamais rester en attente");
 assert.doesNotMatch(annulationBackendSource, /ANNULATION CLIENT OU ADMIN[\s\S]*statut:\s*"en_attente"/, "le chemin client ne doit jamais remettre la course en attente");

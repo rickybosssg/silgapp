@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { base44 } from "@/api/base44Client";
 import { navItems as allNavItems } from "@/components/layout/Sidebar";
 import { useAdminContext } from "@/hooks/useAdminContext.js";
-import { PAYS_SILGAPP } from "@/components/international/CountrySelector.jsx";
+import { usePaysActifs } from "@/components/international/CountrySelector.jsx";
 
 // Bottom tab bar : items communs aux deux réseaux
 const bottomTabPaths = ["/", "/carte", "/courses", "/livreurs"];
@@ -76,6 +76,7 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
   const { isPays, countryCode: adminCountryCode, selectedCountry, setSelectedCountry } = useAdminContext();
   const effectiveCountry = isPays ? adminCountryCode : selectedCountry;
   const showCountryPicker = reseau === "externe" && !isPays;
+  const { pays } = usePaysActifs();
 
   return (
     <>
@@ -160,17 +161,17 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
                 >
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="text-base flex-shrink-0">
-                      {effectiveCountry ? PAYS_SILGAPP.find(p => p.code === effectiveCountry)?.emoji_flag || "🌍" : "🌍"}
+                      {effectiveCountry ? pays.find(p => p.code === effectiveCountry)?.emoji_flag || "🌍" : "🌍"}
                     </span>
                     <span className="text-sm font-medium text-slate-300 truncate">
-                      {effectiveCountry ? PAYS_SILGAPP.find(p => p.code === effectiveCountry)?.nom : "Choisir un pays"}
+                      {effectiveCountry ? pays.find(p => p.code === effectiveCountry)?.nom : "Choisir un pays"}
                     </span>
                   </div>
                   <ChevronDown className={cn("w-4 h-4 text-slate-400 flex-shrink-0 transition-transform", countryOpen && "rotate-180")} />
                 </button>
                 {countryOpen && (
                   <div className="mt-1 border border-white/5 rounded-xl bg-[#1e2228] shadow-lg max-h-56 overflow-y-auto">
-                    {PAYS_SILGAPP.map((p) => (
+                    {pays.map((p) => (
                       <button
                         key={p.code}
                         onClick={() => { setSelectedCountry(p.code); setCountryOpen(false); }}

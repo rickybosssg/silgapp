@@ -137,13 +137,13 @@ export default function VenusFloatingButton({ forcedCountryCode = null }) {
         whileHover={{ scale: isDragging ? 1 : 1.1 }}
         whileTap={{ scale: isDragging ? 1 : 0.95 }}
         onClick={() => !isDragging && setShowChat(true)}
-        className="fixed z-50 flex items-center justify-center w-16 h-16 rounded-full shadow-2xl overflow-hidden border-4 border-white cursor-grab active:cursor-grabbing"
+        className="fixed z-50 flex items-center justify-center w-12 h-12 rounded-full shadow-2xl overflow-hidden border-2 border-white cursor-grab active:cursor-grabbing"
         style={{
           background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
           boxShadow: isDragging
             ? "0 12px 40px rgba(102, 126, 234, 0.5)"
             : "0 8px 32px rgba(102, 126, 234, 0.4), 0 0 20px rgba(118, 75, 162, 0.3)",
-          right: "24px",
+          right: "6px",
           bottom: "24px",
         }}
       >
@@ -169,7 +169,7 @@ export default function VenusFloatingButton({ forcedCountryCode = null }) {
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-400 to-pink-500">
-              <Sparkles className="w-8 h-8 text-white" />
+              <Sparkles className="w-6 h-6 text-white" />
             </div>
           )}
         </div>

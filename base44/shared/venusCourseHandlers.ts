@@ -3,6 +3,7 @@
 // Gère: consultation, localisation, redispatch, contact livreur, annulation, prix manuel, modification.
 
 import { detecterPaysDepuisTelephone } from './venusPrompt.ts';
+import { chargerConfigPays } from './venusI18nEngine.ts';
 import { genererReferenceCourse } from './venusCourseReference.ts';
 import {
   detecterIntentionModification,
@@ -45,7 +46,10 @@ export async function handleConsultationCourse(base44, telephone, userMessage, p
   }
 
   if (!courses || courses.length === 0) {
-    return `Bonjour ${profileName || ''}, je n'ai trouve aucune course associee a votre numero ${telephone}. Si vous souhaitez creer une nouvelle course, dites-le moi ! Pour toute question, contactez le support au +226 66 92 51 90.`;
+    const countryCode = detecterPaysDepuisTelephone(telephone);
+    const countryConfig = countryCode ? await chargerConfigPays(base44, countryCode) : null;
+    const supportTel = countryConfig?.support_telephone || '+226 66 92 51 90';
+    return `Bonjour ${profileName || ''}, je n'ai trouve aucune course associee a votre numero ${telephone}. Si vous souhaitez creer une nouvelle course, dites-le moi ! Pour toute question, contactez le support au ${supportTel}.`;
   }
 
   const STATUTS_ACTIFS = ['nouvelle', 'programmee', 'recherche_livreur', 'livreur_en_route', 'arrive_prise_en_charge', 'colis_recupere', 'passager_embarque', 'pris_en_charge', 'en_livraison', 'arrivee'];
@@ -502,7 +506,7 @@ export async function handleAnnulationCourse(base44: any, conversation: any, use
     await base44.asServiceRole.functions.invoke('annulerCourseExterne', {
       course_id: courseActive.id,
       motif: 'client_change_avis',
-      source: 'admin',
+      source: 'client',
     });
 
     const courseVerifiee = await base44.asServiceRole.entities.CourseExterne.get(courseActive.id);

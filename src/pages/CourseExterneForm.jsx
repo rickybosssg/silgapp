@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card } from "@/components/ui/card";
 import { ArrowLeft, MapPin, Navigation, AlertCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { getCountryTarifConfig } from "@/lib/priceEstimate";
 
 export default function CourseExterneForm() {
   const location = useLocation();
@@ -120,7 +121,8 @@ export default function CourseExterneForm() {
       Math.sin(dLon / 2) * Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     const distanceEstimee = R * c;
-    const prixEstime = Math.round(distanceEstimee * 100);
+    const tarif = getCountryTarifConfig(courseCountryCode);
+    const prixEstime = Math.round(distanceEstimee * (tarif.prix_par_km || 100));
 
     createMutation.mutate({
       ...formData,
@@ -165,7 +167,7 @@ export default function CourseExterneForm() {
                   type="tel"
                   value={formData.client_telephone}
                   onChange={(e) => setFormData({ ...formData, client_telephone: e.target.value })}
-                  placeholder="+226 XX XX XX XX"
+                  placeholder="XX XX XX XX"
                   required
                 />
               </div>

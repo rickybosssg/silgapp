@@ -10,11 +10,12 @@
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc -p ./jsconfig.json",
     "test:livreur-course": "node tests/livreur-course-regression.mjs",
+    "test:source-integrity": "node tests/source-integrity.mjs",
     "test:venus-whatsapp": "node --experimental-strip-types tests/venus-whatsapp-regression.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
-    "@base44/sdk": "^0.8.41",
+    "@base44/sdk": "^0.8.42",
     "@base44/vite-plugin": "^1.0.30",
     "@capacitor-community/background-geolocation": "^1.2.26",
     "@capacitor-community/contacts": "^5.1.1",

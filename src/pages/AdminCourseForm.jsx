@@ -569,19 +569,12 @@ export default function AdminCourseForm() {
           {typeCourse !== "deplacement" && (
             <div>
               <p className="text-[11px] font-semibold text-gray-500 mb-1.5">Type de colis</p>
-              <Select value={typeColis} onValueChange={setTypeColis}>
-                <SelectTrigger className="rounded-xl h-12 bg-violet-50/30 border-violet-100/50 text-sm font-medium text-gray-900 focus:ring-violet-300/50">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="petit_colis">📦  Petit colis</SelectItem>
-                  <SelectItem value="moyen_colis">📦  Moyen colis</SelectItem>
-                  <SelectItem value="gros_colis">📦  Gros colis</SelectItem>
-                  <SelectItem value="document">📄  Document</SelectItem>
-                  <SelectItem value="nourriture">🍽️  Nourriture</SelectItem>
-                  <SelectItem value="autre">📋  Autre</SelectItem>
-                </SelectContent>
-              </Select>
+              <Input
+                value={typeColis}
+                onChange={e => setTypeColis(e.target.value)}
+                placeholder="Ex: Petit colis, document, nourriture..."
+                className="rounded-xl h-12 bg-violet-50/30 border-violet-100/50 text-sm font-medium text-gray-900 focus:ring-violet-300/50 focus:border-violet-400"
+              />
             </div>
           )}
         </div>

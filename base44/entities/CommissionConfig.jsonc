@@ -4,18 +4,7 @@
   "properties": {
     "pays_code": {
       "type": "string",
-      "enum": [
-        "BF",
-        "CI",
-        "TG",
-        "BJ",
-        "SN",
-        "ML",
-        "GN",
-        "NE",
-        "GH"
-      ],
-      "description": "Code pays \u2014 isolation stricte"
+      "description": "Code pays ISO 2 lettres \u2014 isolation stricte (ex: BF, CI, NG, MA). Dynamique : aucun pays cod\u00e9 en dur."
     },
     "commission_boutique_defaut": {
       "type": "number",
@@ -26,6 +15,11 @@
       "type": "number",
       "default": 10,
       "description": "Commission par d\u00e9faut restaurants (%)"
+    },
+    "commission_pharmacie_defaut": {
+      "type": "number",
+      "default": 10,
+      "description": "Commission par d\u00e9faut pharmacies (%)"
     }
   },
   "required": [
