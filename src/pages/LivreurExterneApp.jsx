@@ -185,6 +185,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   const { pulling, refreshing } = usePullToRefresh(async () => {
     await queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
     await queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+    await queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles"] });
   });
 
 
@@ -511,6 +512,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     const refreshCourses = () => {
       if (!livreurId) return;
       queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+      queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles"] });
       queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
     };
     const handleVisibility = () => {

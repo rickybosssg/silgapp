@@ -83,7 +83,9 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
     },
     enabled: !!livreurId && !!countryCode && livreurDisponible && isV2Enabled,
     refetchInterval: 10000,
-    staleTime: 5000,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
   });
 
   // ── Récupérer les courses refusées par ce livreur depuis DispatchNotification ──
