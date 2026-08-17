@@ -887,10 +887,13 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
               } else if (num.startsWith("0")) {
                 num = dial + num.slice(1); // fallback: retirer le 0
               }
+              const livreurNomFormate = livreurNom ? livreurNom.trim() : null;
               const msg = encodeURIComponent(
                 colisRecupere
                   ? "Bonjour, je suis votre livreur SILGAPP. Je suis en route pour vous livrer votre colis."
-                  : "Bonjour, je suis votre livreur SILGAPP. Je suis en route pour récupérer votre colis."
+                  : (livreurNomFormate
+                    ? `Bonjour, je suis ${livreurNomFormate}, votre livreur SILGAPP. Je suis en route pour récupérer votre colis. Merci de m'envoyer la localisation du lieu de récupération.`
+                    : "Bonjour, je suis votre livreur SILGAPP. Je suis en route pour récupérer votre colis. Merci de m'envoyer la localisation du lieu de récupération.")
               );
               const lien = `https://wa.me/${num}?text=${msg}`;
               const popup = window.open(lien, "_blank", "noopener,noreferrer");
