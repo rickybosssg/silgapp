@@ -6,9 +6,10 @@
  * Règle (figée) :
  *   1. manual_price      si pricing_mode === "manual" ET manual_price_status === "accepted"
  *   2. prix_final         si statut === "livree" ET prix_final > 0
- *   3. prix_propose_admin si > 0
- *   4. prix_estimate      si > 0
- *   5. null               (à afficher comme "—")
+ *   3. prix_propose_client si > 0  (prix proposé par le CLIENT)
+ *   4. prix_propose_admin  si > 0  (prix proposé par l'ADMIN)
+ *   5. prix_estimate      si > 0
+ *   6. null               (à afficher comme "—")
  *
  * ⚠️  Cette fonction ne fait que LIRE — elle ne modifie aucun champ en base,
  *     ne recalcule aucune commission, et ne touche pas au Dispatch V2.
@@ -33,16 +34,30 @@ export function getPrixAffichable(course) {
     return Number(course.prix_final);
   }
 
-  // 3. Prix proposé par l'admin
+  // 3. Prix proposé par le client
+  if (Number(course.prix_propose_client) > 0) {
+    return Number(course.prix_propose_client);
+  }
+
+  // 4. Prix proposé par l'admin
   if (Number(course.prix_propose_admin) > 0) {
     return Number(course.prix_propose_admin);
   }
 
-  // 4. Prix estimé
+  // 5. Prix estimé
   if (Number(course.prix_estimate) > 0) {
     return Number(course.prix_estimate);
   }
 
-  // 5. Aucun prix disponible
+  // 6. Aucun prix disponible
   return null;
+}
+
+/**
+ * Retourne la devise à afficher pour une course.
+ * Priorité : course.devise → fallback "FCFA".
+ */
+export function getDeviseAffichable(course) {
+  if (!course) return "FCFA";
+  return course.devise || "FCFA";
 }

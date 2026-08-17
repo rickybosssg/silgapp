@@ -680,6 +680,7 @@ export default function CourseExterneFormSync() {
       destination_inconnue: destInconnue,
       prix_estimate: isMulti ? 0 : prixEstime,
       prix_propose_admin: isMulti ? 0 : (formData.prix_propose || prixEstime),
+      prix_propose_client: isMulti ? 0 : (formData.prix_propose || 0),
       pricing_mode: isMulti ? "automatic" : "admin_manuel",
       statut: formData.date_souhaitee ? "programmee" : "recherche_livreur",
       dispatch_status: "en_attente",
@@ -760,7 +761,7 @@ export default function CourseExterneFormSync() {
     );
   }
 
-  const totalSteps = typeCourse === "deplacement" ? 6 : 7;
+  const totalSteps = typeCourse === "deplacement" ? 7 : 8;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white p-4">

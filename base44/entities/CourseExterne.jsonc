@@ -161,6 +161,10 @@
       "type": "number",
       "description": "Prix propose par l'admin lors de la creation d'une course administrative. Visible par le livreur avant acceptation. Sert de reference pour eviter les declarations de montant artificiellement basses."
     },
+    "prix_propose_client": {
+      "type": "number",
+      "description": "Prix propose par le CLIENT lors de la creation de sa course (etape Prix propos\u00e9 dans le formulaire). Distinct de prix_propose_admin qui est reserve a l'admin. Visible par le livreur et l'admin."
+    },
     "prix_final": {
       "type": "number"
     },

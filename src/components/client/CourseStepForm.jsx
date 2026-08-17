@@ -17,6 +17,7 @@ import { SILGAPP_COUNTRIES, phoneVariants } from "@/lib/phoneUtils";
 import NombreColisSelector from "@/components/multi-colis/NombreColisSelector";
 import MultiColisFormStep from "@/components/multi-colis/MultiColisFormStep";
 import SmartAddressInput from "@/components/location/SmartAddressInput";
+import { useCountryPricing } from "@/hooks/useCountryPricing";
 
 // Retourne l'indicatif affiché (ex: "+226") selon le pays
 function getDialCode(countryCode) {
@@ -105,6 +106,7 @@ export default function CourseStepForm({
   const [destinataireFound, setDestinataireFound] = useState(null);
   const [verifying, setVerifying] = useState(false);
   const progress = ((step + 1) / totalSteps) * 100;
+  const { devise: countryDevise, prixSuggeres: countryPrixSuggeres } = useCountryPricing(activeCountry);
 
   const updateAddress = (side, text, location) => {
     const isDeparture = side === "depart";
@@ -902,18 +904,24 @@ export default function CourseStepForm({
       }
 
       case 4: {
-        if (isDeplacement) return renderNotes();
+        if (isDeplacement) return renderPrixPropose();
         if (isExpedie) return renderTypeColis();
-        return renderNotes();
+        return renderPrixPropose();
       }
 
       case 5: {
+        if (isDeplacement) return renderNotes();
+        if (isExpedie) return renderPrixPropose();
+        return renderNotes();
+      }
+
+      case 6: {
         if (isDeplacement) return renderRecap();
         if (isExpedie) return renderNotes();
         return renderRecap();
       }
 
-      case 6: {
+      case 7: {
         return renderRecap();
       }
 
@@ -961,6 +969,78 @@ export default function CourseStepForm({
               )}
             </button>
           ))}
+        </div>
+      </div>
+    );
+  }
+
+  function renderPrixPropose() {
+    const isMulti = formData.type_course === "expedier" && (formData.nb_colis || 1) > 1;
+    if (isMulti) return null; // pas de prix proposé en multi-colis
+    const lat1 = formData.gps_depart_lat;
+    const lng1 = formData.gps_depart_lng;
+    const lat2 = formData.gps_arrivee_lat;
+    const lng2 = formData.gps_arrivee_lng;
+    const estimation = (lat1 && lng1 && lat2 && lng2)
+      ? calculerPrixApproximatif(lat1, lng1, lat2, lng2, activeCountry)
+      : null;
+
+    return (
+      <div className="space-y-5">
+        <div className="text-center">
+          <StepIcon icon={DollarSign} color="text-blue-600" bgColor="bg-gradient-to-br from-blue-100 to-blue-50 shadow-blue-200" />
+          <h2 className="text-2xl font-black text-gray-900">Quel prix proposes-tu ?</h2>
+          <p className="text-sm text-gray-500 mt-1.5">Propose le montant que tu souhaites payer pour cette course.</p>
+        </div>
+
+        <div className="space-y-2">
+          <Label className="text-sm font-semibold text-gray-700">
+            Prix proposé <span className="text-red-500">*</span>
+          </Label>
+          <div className="relative">
+            <Input
+              type="number"
+              inputMode="numeric"
+              value={formData.prix_propose || ""}
+              onChange={(e) => setFormData({ ...formData, prix_propose: parseInt(e.target.value) || 0 })}
+              className="h-16 rounded-2xl border-2 border-gray-200 bg-gray-50 focus:bg-white focus:border-primary px-4 text-2xl font-black text-center pr-20"
+              placeholder="1500"
+              autoFocus
+              min={1}
+            />
+            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-bold text-gray-600">{countryDevise}</span>
+          </div>
+          {estimation && (
+            <p className="text-xs text-gray-400 pl-1">Estimation GPS : ~{estimation.prix.toLocaleString()} {countryDevise} ({estimation.distance} km)</p>
+          )}
+        </div>
+
+        {countryPrixSuggeres.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Suggestions rapides</p>
+            <div className="flex gap-3">
+              {countryPrixSuggeres.map((montant) => (
+                <button
+                  key={montant}
+                  type="button"
+                  onClick={() => setFormData({ ...formData, prix_propose: montant })}
+                  className={`flex-1 h-14 rounded-2xl border-2 font-bold text-base transition-all active:scale-[0.97] ${
+                    formData.prix_propose === montant
+                      ? "border-primary bg-primary/5 text-primary shadow-md"
+                      : "border-gray-200 bg-white text-gray-700 hover:border-primary/40 hover:shadow-sm"
+                  }`}
+                >
+                  {montant.toLocaleString()} {countryDevise}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="rounded-2xl bg-amber-50 border border-amber-200 p-3">
+          <p className="text-xs text-amber-800 leading-relaxed">
+            💡 Un prix trop bas peut rendre la recherche de livreur plus difficile. Propose un prix attractif pour augmenter tes chances de trouver rapidement un livreur.
+          </p>
         </div>
       </div>
     );
@@ -1033,47 +1113,21 @@ export default function CourseStepForm({
         {(() => {
           const isMulti = formData.type_course === "expedier" && (formData.nb_colis || 1) > 1;
           if (isMulti) return null;
-          const lat1 = formData.gps_depart_lat;
-          const lng1 = formData.gps_depart_lng;
-          const lat2 = formData.gps_arrivee_lat;
-          const lng2 = formData.gps_arrivee_lng;
-          const estimation = (lat1 && lng1 && lat2 && lng2)
-            ? calculerPrixApproximatif(lat1, lng1, lat2, lng2, activeCountry)
-            : null;
+          const prixClient = Number(formData.prix_propose) || 0;
           return (
             <div className="space-y-3 pt-2">
-              <div className="flex items-start gap-3 p-4 rounded-2xl bg-blue-50 border border-blue-100">
+              <div className="flex items-start gap-3 p-4 rounded-2xl bg-green-50 border border-green-200">
                 <div className="w-9 h-9 rounded-xl bg-white flex items-center justify-center flex-shrink-0 shadow-sm">
-                  <DollarSign className="w-4 h-4 text-blue-600" />
+                  <DollarSign className="w-4 h-4 text-green-600" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Prix approximatif</p>
-                  <p className="font-bold text-blue-900 mt-0.5">
-                    {estimation ? `${estimation.prix.toLocaleString()} ${estimation.devise}` : "GPS requis pour l'estimation"}
+                  <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Prix proposé par vous</p>
+                  <p className="font-bold text-green-900 mt-0.5 text-lg">
+                    {prixClient > 0 ? `${prixClient.toLocaleString()} ${countryDevise}` : "Non défini"}
                   </p>
-                  {estimation && (
-                    <p className="text-xs text-blue-500 mt-0.5">≈ {estimation.distance} km</p>
-                  )}
+                  <p className="text-xs text-green-600 mt-0.5">Montant proposé au livreur</p>
                 </div>
               </div>
-              {estimation && (
-                <div className="space-y-2">
-                  <Label className="text-sm font-semibold text-gray-700">
-                    Prix proposé <span className="text-red-500">*</span>
-                  </Label>
-                  <div className="relative">
-                    <Input
-                      type="number"
-                      value={formData.prix_propose || ""}
-                      onChange={(e) => setFormData({ ...formData, prix_propose: parseInt(e.target.value) || 0 })}
-                      className="h-14 rounded-2xl border-2 border-gray-200 bg-gray-50 focus:bg-white focus:border-primary px-4 text-base font-bold pr-16"
-                      placeholder="1500"
-                    />
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-gray-600">FCFA</span>
-                  </div>
-                  <p className="text-xs text-gray-400 pl-1">Montant proposé au livreur — modifiable si nécessaire</p>
-                </div>
-              )}
             </div>
           );
         })()}
@@ -1102,7 +1156,12 @@ export default function CourseStepForm({
       if (isRecevoir) return !formData.type_colis;
     }
     if (step === 4) {
+      if (isDeplacement) return !(formData.prix_propose > 0);
       if (isExpedie) return !formData.type_colis;
+      return !(formData.prix_propose > 0); // recevoir
+    }
+    if (step === 5) {
+      if (isExpedie) return !(formData.prix_propose > 0);
     }
     return false;
   };

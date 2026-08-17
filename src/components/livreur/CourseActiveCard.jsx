@@ -14,7 +14,7 @@ import NavigationGPS from "./NavigationGPS";
 import { normalizeCommissionPct, resolveStoredOrDynamicSplit, splitAmountByCommission } from "@/lib/commissionUtils";
 import ChatWindow from "@/components/chat/ChatWindow";
 import AnnulationExplicationChat from "./AnnulationExplicationChat";
-import { getPrixAffichable } from "@/utils/getPrixAffichable";
+import { getPrixAffichable, getDeviseAffichable } from "@/utils/getPrixAffichable";
 
 import { getCountryConfig } from "@/lib/phoneUtils";
 
@@ -989,6 +989,8 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
 
               if (prixBase <= 0) return null;
 
+              const hasClientPrix = Number(course.prix_propose_client) > 0;
+
               return (
                 <div className={cn(
                   "rounded-xl p-3 border",
@@ -998,12 +1000,12 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                 )}>
                   <div className="flex items-center justify-between mb-1">
                     <span className={cn("text-xs font-semibold", isPrixManuel ? "text-green-700" : "text-blue-700")}>
-                      {isPrixManuel ? "Prix validé " : (course.prix_propose_admin ? "Prix proposé" : "Prix estimé")}
+                      {isPrixManuel ? "Prix validé " : (hasClientPrix ? "Prix proposé par le client" : (course.prix_propose_admin ? "Prix proposé (admin)" : "Prix estimé"))}
                     </span>
                     <span className={cn("text-lg font-black", isPrixManuel ? "text-green-900" : "text-blue-900")}>
                       {isPrixManuel
-                        ? `${prixBase.toLocaleString()} ${course.devise || "F"}`
-                        : `~${prixBase.toLocaleString()} ${course.devise || "F"}`
+                        ? `${prixBase.toLocaleString()} ${getDeviseAffichable(course)}`
+                        : `~${prixBase.toLocaleString()} ${getDeviseAffichable(course)}`
                       }
                     </span>
                   </div>

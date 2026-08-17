@@ -348,13 +348,16 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
               </div>
               {(() => {
                 const prix = getPrixAffichable(course);
+                const devise = course.devise || "FCFA";
                 return prix > 0 ? (
                   <div className="shrink-0 text-right">
-                    <p className="text-[10px] font-semibold uppercase text-slate-400">Proposition</p>
+                    <p className="text-[10px] font-semibold uppercase text-slate-400">
+                      {Number(course.prix_propose_client) > 0 ? "Prix client" : "Proposition"}
+                    </p>
                     <p className="mt-0.5 text-xl font-bold text-[#008f5a]">
                       {prix.toLocaleString()}
                     </p>
-                    <p className="text-[10px] font-bold text-[#008f5a]">FCFA</p>
+                    <p className="text-[10px] font-bold text-[#008f5a]">{devise}</p>
                   </div>
                 ) : null;
               })()}
