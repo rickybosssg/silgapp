@@ -216,7 +216,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     queryFn: async () => {
       if (!livreurProfil?.country_code || !isV2Enabled) return 0;
       const all = await base44.entities.CourseExterne.filter(
-        { dispatch_status: { $in: ["disponible_push", "propose", "en_attente"] }, country_code: livreurProfil.country_code },
+        { dispatch_status: { $in: ["disponible_push", "propose"] }, country_code: livreurProfil.country_code },
         "-created_date", 50
       );
       return (all || []).filter(c =>
