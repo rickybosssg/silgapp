@@ -36,7 +36,7 @@ import { dispatchLog, reponseDejaPrise, generateToken, generatePIN, journaliserD
 import { enregistrerNotification, getLivreursNotifies, getLivreursRefuses, marquerAccepte } from './dispatchNotifications.ts';
 
 // ── Version du bundle (pour vérifier que la production charge la dernière version) ──
-export const DISPATCH_V2_BUNDLE_VERSION = '2026-08-14-simplified-3';
+export const DISPATCH_V2_BUNDLE_VERSION = '2026-08-17-fix-double-accept';
 
 // ── Feature flag cache (TTL 2 min) ──
 let V2_FLAG_CACHE: { enabled: boolean; expires: number } | null = null;
@@ -197,8 +197,13 @@ export async function publierCourseDansFil(base44: any, course: any) {
   // lit la course avant que le 1er ait commité. La garde atomique (updateMany conditionnel)
   // élimine cette race condition.
   const nowIso = new Date().toISOString();
+  // 🛡️ GARDE ÉLARGIE : ne pas republier si la course est déjà publiée (disponible_push),
+  // déjà acceptée (accepte) ou en négociation de prix (propose).
+  // Fix 2026-08-17 : race condition où publierCourseDansFil était rappelé par
+  // l'orchestrateur APRÈS une acceptation, effaçant livreur_id et remettant la
+  // course dans le fil → double acceptation par un second livreur.
   await base44.asServiceRole.entities.CourseExterne.updateMany(
-    { id: course.id, dispatch_status: { $ne: 'disponible_push' } },
+    { id: course.id, dispatch_status: { $nin: ['disponible_push', 'accepte', 'propose'] } },
     { $set: {
       statut: 'recherche_livreur',
       dispatch_status: 'disponible_push',
