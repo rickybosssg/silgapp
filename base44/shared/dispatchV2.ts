@@ -203,7 +203,7 @@ export async function publierCourseDansFil(base44: any, course: any) {
   // l'orchestrateur APRÈS une acceptation, effaçant livreur_id et remettant la
   // course dans le fil → double acceptation par un second livreur.
   await base44.asServiceRole.entities.CourseExterne.updateMany(
-    { id: course.id, dispatch_status: { $nin: ['disponible_push', 'accepte', 'propose'] } },
+    { id: course.id, dispatch_status: { $nin: ['disponible_push', 'accepte', 'propose', 'redispatch'] } },
     { $set: {
       statut: 'recherche_livreur',
       dispatch_status: 'disponible_push',

@@ -156,7 +156,10 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
       // ── Garde positive : seul "recherche_livreur" est un statut disponible ──
       if (course.statut !== "recherche_livreur") return false;
       // ── Garde sur dispatch_status : disponible_push (V2) ou propose (V1) ──
+      // ⚠️ "redispatch" = course annulée par un livreur, en attente de décision admin
+      //    Ne doit JAMAIS apparaître dans le fil "Disponibles"
       if (course.dispatch_status !== "disponible_push" && course.dispatch_status !== "propose") return false;
+      if (course.dispatch_status === "redispatch") return false;
       if (course.livreur_id) return false;
       if (refusedIds.includes(course.id)) return false;
       // Exclure si timeout expiré

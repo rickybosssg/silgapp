@@ -127,9 +127,9 @@ Deno.serve(async (req) => {
         }
       }
 
-      // ── ANNULATION LIVREUR : course mise en "en_attente" (dispatch SUSPENDU) ──
-      // Le dispatch n'est PAS relancé automatiquement. L'admin doit repasser
-      // manuellement la course en "nouvelle" pour relancer la recherche.
+      // ── ANNULATION LIVREUR : course mise en "redispatch" (pause administrative) ──
+      // Le dispatch n'est PAS relancé automatiquement. La course reste en statut
+      // "redispatch" tant que l'admin ne la repasse pas manuellement en "recherche_livreur".
       // Le livreur qui a annulé est EXCLU définitivement de cette course précise
       // (dispatch_refused_ids) mais reste disponible pour les autres courses.
       let refusedIds = [];
@@ -137,7 +137,7 @@ Deno.serve(async (req) => {
       if (livreurId && !refusedIds.includes(livreurId)) refusedIds.push(livreurId);
       const resetData = {
         statut: "en_attente",
-        dispatch_status: "en_attente",
+        dispatch_status: "redispatch",
         dispatch_wave: 0,
         livreur_id: null,
         livreur_nom: "",
@@ -159,7 +159,7 @@ Deno.serve(async (req) => {
         delivery_confirmed_at: null,
         accepted_by_livreur_id: null,
         accepted_at: null,
-        notes: (course.notes || "") + ` | [ANNULÉ LIVREUR → MISE EN ATTENTE] ${motif || "non spécifié"}`,
+        notes: (course.notes || "") + ` | [ANNULÉ LIVREUR → REDISPATCH] ${motif || "non spécifié"}`,
       };
 
       // Nettoyer prix manuel si applicable
@@ -208,8 +208,8 @@ Deno.serve(async (req) => {
 
       // ── Notification admin (modal — alerte_critique_dispatch pour déclencher le SystemAlertModal) ──
       await asService.entities.Notification.create({
-        titre: "⏸ Course annulée par le livreur — mise en attente",
-        message: `Le livreur ${course.livreur_nom || "?"} a annulé la course #${course_id.slice(-8)} (${course.adresse_depart || "?"} → ${course.adresse_arrivee || "?"}). Motif: ${motif || "non spécifié"}. ${motif_detail ? `Détail: ${motif_detail}.` : ""} La course a été mise en statut "en attente" — le dispatch est suspendu. Pour relancer la recherche, repassez-la manuellement en "Nouvelle" (l'annulant reste exclu).`,
+        titre: "⏸ Course annulée par le livreur — redispatch requis",
+        message: `Le livreur ${course.livreur_nom || "?"} a annulé la course #${course_id.slice(-8)} (${course.adresse_depart || "?"} → ${course.adresse_arrivee || "?"}). Motif: ${motif || "non spécifié"}. ${motif_detail ? `Détail: ${motif_detail}.` : ""} La course est en statut "redispatch" — elle ne sera PAS re-proposée automatiquement. Pour relancer la recherche, changez manuellement son statut vers "recherche_livreur" (le livreur ayant annulé reste exclu).`,
         type: "alerte_critique_dispatch",
         course_id,
         destinataire_email: "admin",
@@ -242,7 +242,7 @@ Deno.serve(async (req) => {
 
         await asService.entities.Notification.create({
           titre: "⏸ Votre course est en attente",
-          message: `Votre livreur a annulé la course (motif: ${motifLabel}). Votre demande a été mise en attente — un nouveau livreur vous sera assigné après validation de notre équipe.`,
+          message: `Votre livreur a annulé la course (motif: ${motifLabel}). Votre demande est en attente — un nouveau livreur vous sera assigné après validation de notre équipe.`,
           type: "course_modifiee",
           course_id,
           destinataire_email: clientEmail,
@@ -251,7 +251,7 @@ Deno.serve(async (req) => {
 
         await base44.asServiceRole.functions.invoke('envoiNotificationPush', {
           titre: "⏸ Votre course est en attente",
-          message: `Votre livreur a annulé (motif: ${motifLabel}). Votre demande est en attente de validation.`,
+          message: `Votre livreur a annulé (motif: ${motifLabel}). Votre demande est en attente de validation par notre équipe.`,
           type: "course_modifiee",
           destinataire_email: clientEmail,
           user_type: "client",
