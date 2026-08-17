@@ -303,8 +303,13 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
     }
 
     if (course.pricing_mode === "admin_manuel" || course.source === "admin") {
-      const montant = parseFloat(prixReel);
-      if (!prixReel || isNaN(montant) || montant <= 0) {
+      // ── RÈGLE MÉTIER : Le prix fixé par l'admin est OBLIGATOIREMENT le prix final. ──
+      // Le livreur ne peut pas le modifier. Si prix_propose_admin est défini, on l'utilise
+      // systématiquement, peu importe ce que le livreur a saisi.
+      const montant = course.prix_propose_admin
+        ? Number(course.prix_propose_admin)
+        : parseFloat(prixReel);
+      if (!montant || isNaN(montant) || montant <= 0) {
         toast.error("Entrez le montant reçu du client");
         return;
       }
@@ -709,7 +714,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
               <p className="text-sm text-gray-500 mt-1">
                 {(course.pricing_mode === "admin_manuel" || course.source === "admin")
                   ? (course.prix_propose_admin
-                    ? "Montant fixé par l'admin — modifiable si nécessaire"
+                    ? "Montant fixé par l'admin — non modifiable"
                     : "Saisissez le montant payé par le client")
                   : "Quel montant avez-vous reçu du client ?"}
               </p>
@@ -721,6 +726,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                 value={prixReel}
                 onChange={(e) => setPrixReel(e.target.value)}
                 className="text-center text-2xl font-black h-16 rounded-2xl border-2 border-gray-100 focus:border-primary pr-16"
+                readOnly={!!((course.pricing_mode === "admin_manuel" || course.source === "admin") && course.prix_propose_admin)}
                 autoFocus
               />
               <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-gray-600">FCFA</span>
