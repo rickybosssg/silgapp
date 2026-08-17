@@ -701,6 +701,7 @@ export default function CourseExterneFormSync() {
 
   const handleNext = () => setCurrentStep((prev) => prev + 1);
   const handleBack = () => setCurrentStep((prev) => prev - 1);
+  const handleGoToStep = (targetStep) => setCurrentStep(targetStep);
 
   const handleAnnuler = () => {
     localStorage.removeItem(STORAGE_KEY);
@@ -761,17 +762,17 @@ export default function CourseExterneFormSync() {
     );
   }
 
-  const totalSteps = typeCourse === "deplacement" ? 7 : 8;
+  const totalSteps = typeCourse === "deplacement" ? 5 : typeCourse === "recevoir" ? 4 : 5;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white p-4">
+    <div className="min-h-screen p-4" style={{ background: "#F8FAFC" }}>
       <div className="max-w-lg mx-auto">
         <div className="flex items-center gap-3 mb-4">
-          <Button variant="outline" size="sm" onClick={handleAnnuler} className="h-10 w-10 p-0">
+          <Button variant="outline" size="sm" onClick={handleAnnuler} className="h-10 w-10 p-0" style={{ borderColor: "#E2E8F0", color: "#1E293B" }}>
             <ArrowLeft className="w-4 h-4" />
           </Button>
           <div className="flex-1">
-            <h1 className="text-xl font-bold text-foreground">
+            <h1 className="text-xl font-bold text-slate-900">
               {formData.type_course === "expedier" ? "Expédier un colis" : formData.type_course === "deplacement" ? "Déplacement" : "Recevoir un colis"}
             </h1>
           </div>
@@ -779,14 +780,20 @@ export default function CourseExterneFormSync() {
             <button
               type="button"
               onClick={() => setFormData(prev => ({ ...prev, mode_immediat: true }))}
-              className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${formData.mode_immediat ? "bg-primary text-white shadow" : "bg-gray-100 text-gray-500"}`}
+              className="px-3 py-1.5 rounded-full text-xs font-bold transition-all"
+              style={formData.mode_immediat
+                ? { background: "#059669", color: "#FFFFFF" }
+                : { background: "#F1F5F9", color: "#64748B" }}
             >
               Maintenant
             </button>
             <button
               type="button"
               onClick={() => setFormData(prev => ({ ...prev, mode_immediat: false }))}
-              className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${!formData.mode_immediat ? "bg-primary text-white shadow" : "bg-gray-100 text-gray-500"}`}
+              className="px-3 py-1.5 rounded-full text-xs font-bold transition-all"
+              style={!formData.mode_immediat
+                ? { background: "#059669", color: "#FFFFFF" }
+                : { background: "#F1F5F9", color: "#64748B" }}
             >
               Programmer
             </button>
@@ -794,19 +801,20 @@ export default function CourseExterneFormSync() {
         </div>
 
         {!formData.mode_immediat && (
-          <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-2xl">
-            <p className="text-xs font-bold text-amber-700 mb-2"> Date et heure souhaitées</p>
+          <div className="mb-4 p-3 rounded-2xl border" style={{ background: "#FFF7ED", borderColor: "#F97316" }}>
+            <p className="text-xs font-bold mb-2" style={{ color: "#F97316" }}> Date et heure souhaitées</p>
             <input
               type="datetime-local"
               value={formData.date_souhaitee ? formData.date_souhaitee.slice(0, 16) : ""}
               onChange={e => setFormData(prev => ({ ...prev, date_souhaitee: e.target.value ? new Date(e.target.value).toISOString() : "" }))}
               min={new Date().toISOString().slice(0, 16)}
-              className="w-full h-11 rounded-xl border border-amber-300 bg-white px-3 text-sm text-gray-900"
+              className="w-full h-11 rounded-xl border bg-white px-3 text-sm"
+              style={{ borderColor: "#F97316", color: "#0F172A" }}
             />
           </div>
         )}
 
-        <Card className="p-6" style={{ background: "#ffffff" }}>
+        <Card className="p-5 sm:p-6" style={{ background: "#FFFFFF", borderRadius: "1rem", borderColor: "#E2E8F0" }}>
           <form onSubmit={handleSubmit}>
             <CourseStepForm
               step={currentStep}
@@ -818,6 +826,7 @@ export default function CourseExterneFormSync() {
               onNext={handleNext}
               onBack={handleBack}
               onAnnuler={handleAnnuler}
+              onGoToStep={handleGoToStep}
               isLoading={createMutation.isPending || isSubmitting}
               clientId={clientProfil?.id}
               countryCode={clientProfil?.country_code}
