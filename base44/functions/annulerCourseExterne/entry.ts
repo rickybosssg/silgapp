@@ -288,9 +288,11 @@ Deno.serve(async (req) => {
         notes: (course.notes || "") + ` | [ANNULÉ ${sourceLabel}] ${motif || ""}`,
       };
 
-      if (course.dispatch_status === "propose" || course.dispatch_status === "en_attente") {
-        annulData.dispatch_status = "expire";
-      }
+      // ⚠️ Toujours passer dispatch_status à "expire" pour les annulations client/admin,
+      // quel que soit le statut actuel (disponible_push, propose, en_attente, etc.).
+      // Sans cela, les courses annulées restent visibles dans le fil "Disponibles"
+      // des livreurs car la requête filtre par dispatch_status ∈ [disponible_push, propose].
+      annulData.dispatch_status = "expire";
 
       if (course.pricing_mode === "manual" && course.manual_price_status === "pending_client_validation") {
         annulData.manual_price_status = null;
