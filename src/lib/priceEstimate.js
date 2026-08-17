@@ -1,17 +1,53 @@
-// ── Grille tarifaire SILGAPP (miroir du backend calculPrixCourseExterne) ──
-// Utilisé pour le calcul du prix approximatif côté frontend (AdminCourseForm).
+// ── Grille tarifaire SILGAPP — dynamique (fetch depuis Country) ──
+// Plus aucun pays codé en dur. Fallback minimal uniquement si la BDD
+// est indisponible au premier chargement.
 
-const TARIFS_PAYS = {
-  BF: { prix_par_km: 100, prix_minimum: 500, devise: "FCFA" },
-  CI: { prix_par_km: 120, prix_minimum: 600, devise: "FCFA" },
-  TG: { prix_par_km: 100, prix_minimum: 500, devise: "FCFA" },
-  BJ: { prix_par_km: 100, prix_minimum: 500, devise: "FCFA" },
-  SN: { prix_par_km: 150, prix_minimum: 750, devise: "FCFA" },
-  ML: { prix_par_km: 100, prix_minimum: 500, devise: "FCFA" },
-  GN: { prix_par_km: 800, prix_minimum: 4000, devise: "GNF" },
-  NE: { prix_par_km: 100, prix_minimum: 500, devise: "FCFA" },
-  GH: { prix_par_km: 2, prix_minimum: 10, devise: "GHS" },
+import { base44 } from "@/api/base44Client";
+
+// Cache en mémoire des configs pays (évite les requêtes répétées)
+const countryConfigCache = new Map();
+let cacheInitialized = false;
+
+const FALLBACK_CONFIG = {
+  prix_par_km: 100,
+  prix_minimum: 500,
+  devise: "FCFA",
 };
+
+/**
+ * Charge toutes les configs Country actives en cache.
+ * Idempotent — ne recharge que si le cache est vide.
+ */
+export async function ensureCountryConfigCache() {
+  if (cacheInitialized && countryConfigCache.size > 0) return;
+  try {
+    const countries = await base44.entities.Country.filter({ actif: true });
+    for (const c of countries || []) {
+      if (c.code) {
+        countryConfigCache.set(c.code, {
+          prix_par_km: c.prix_par_km ?? FALLBACK_CONFIG.prix_par_km,
+          prix_minimum: c.prix_minimum ?? FALLBACK_CONFIG.prix_minimum,
+          devise: c.devise || FALLBACK_CONFIG.devise,
+          indicatif: c.indicatif,
+          commission_pct: c.commission_pct,
+          rayon_km: c.rayon_km,
+        });
+      }
+    }
+    cacheInitialized = true;
+  } catch (e) {
+    console.warn("[priceEstimate] Failed to load country configs, using fallback:", e?.message);
+  }
+}
+
+/**
+ * Récupère la config tarifaire d'un pays depuis le cache.
+ * Fallback minimal si le pays n'est pas en base.
+ */
+export function getCountryTarifConfig(countryCode) {
+  const code = String(countryCode || "").toUpperCase();
+  return countryConfigCache.get(code) || { ...FALLBACK_CONFIG };
+}
 
 export function haversineKm(lat1, lng1, lat2, lng2) {
   if (!lat1 || !lng1 || !lat2 || !lng2) return null;
@@ -28,12 +64,12 @@ export function haversineKm(lat1, lng1, lat2, lng2) {
 
 /**
  * Calcule le prix approximatif d'une course à partir des coordonnées GPS.
- * Utilise la même formule que le backend (calculPrixCourseExterne).
+ * Utilise la config du pays depuis la BDD (Country).
  *
  * @returns {prix, distance, devise} ou null si GPS manquant
  */
 export function calculerPrixApproximatif(lat1, lng1, lat2, lng2, countryCode) {
-  const tarif = TARIFS_PAYS[countryCode] || TARIFS_PAYS["BF"];
+  const tarif = getCountryTarifConfig(countryCode);
   const distance = haversineKm(lat1, lng1, lat2, lng2);
   if (distance === null) return null;
 
@@ -46,4 +82,13 @@ export function calculerPrixApproximatif(lat1, lng1, lat2, lng2, countryCode) {
     distance: Math.round(distance * 10) / 10,
     devise: tarif.devise,
   };
+}
+
+/**
+ * Version async — garantit que le cache est chargé avant le calcul.
+ * À utiliser dans les composants qui peuvent attendre (useEffect, onClick).
+ */
+export async function calculerPrixApproximatifAsync(lat1, lng1, lat2, lng2, countryCode) {
+  await ensureCountryConfigCache();
+  return calculerPrixApproximatif(lat1, lng1, lat2, lng2, countryCode);
 }

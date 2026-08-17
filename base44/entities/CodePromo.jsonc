@@ -38,19 +38,8 @@
     },
     "country_code": {
       "type": "string",
-      "enum": [
-        "BF",
-        "CI",
-        "TG",
-        "BJ",
-        "SN",
-        "ML",
-        "GN",
-        "NE",
-        "GH"
-      ],
       "default": "BF",
-      "description": "Pays du code promo"
+      "description": "Code pays ISO 2 lettres (ex: BF, CI, TG). Dynamique : aucun pays cod\u00e9 en dur."
     },
     "actif": {
       "type": "boolean",

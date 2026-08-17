@@ -1,37 +1,23 @@
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { ChevronDown, Check } from "lucide-react";
+import { ChevronDown, Check, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// Données statiques de référence pour les pays supportés
-export const PAYS_SILGAPP = [
-  { code: "BF", nom: "Burkina Faso", indicatif: "+226", emoji_flag: "", devise: "FCFA", ville_principale: "Ouagadougou" },
-  { code: "CI", nom: "Côte d'Ivoire", indicatif: "+225", emoji_flag: "", devise: "FCFA", ville_principale: "Abidjan" },
-  { code: "TG", nom: "Togo", indicatif: "+228", emoji_flag: "", devise: "FCFA", ville_principale: "Lomé" },
-  { code: "BJ", nom: "Bénin", indicatif: "+229", emoji_flag: "", devise: "FCFA", ville_principale: "Cotonou" },
-  { code: "SN", nom: "Sénégal", indicatif: "+221", emoji_flag: "", devise: "FCFA", ville_principale: "Dakar" },
-  { code: "ML", nom: "Mali", indicatif: "+223", emoji_flag: "", devise: "FCFA", ville_principale: "Bamako" },
-  { code: "GN", nom: "Guinée", indicatif: "+224", emoji_flag: "", devise: "GNF", ville_principale: "Conakry" },
-  { code: "NE", nom: "Niger", indicatif: "+227", emoji_flag: "", devise: "FCFA", ville_principale: "Niamey" },
-  { code: "GH", nom: "Ghana", indicatif: "+233", emoji_flag: "", devise: "GHS", ville_principale: "Accra" },
-];
-
-// Hook pour récupérer les pays actifs
+// Hook pour récupérer les pays actifs — 100% dynamique depuis la BDD
 export function usePaysActifs() {
-  const { data: pays = [] } = useQuery({
+  const { data: pays = [], isLoading } = useQuery({
     queryKey: ["pays-actifs"],
     queryFn: () => base44.entities.Country.filter({ actif: true }, "ordre"),
     initialData: [],
     staleTime: 60000,
   });
-  return pays;
+  return { pays, isLoading };
 }
 
 // Sélecteur de pays avec Select stylisé (mobile-friendly)
 export default function CountrySelector({ value, onChange, className = "" }) {
-  const paysDB = usePaysActifs();
-  const pays = paysDB.length > 0 ? paysDB : PAYS_SILGAPP;
+  const { pays, isLoading } = usePaysActifs();
   const [isOpen, setIsOpen] = useState(false);
 
   const selectedCountry = pays.find(p => p.code === value);
@@ -46,7 +32,7 @@ export default function CountrySelector({ value, onChange, className = "" }) {
       >
         <span className="flex items-center gap-2">
           <span className="text-lg">{selectedCountry?.emoji_flag || ""}</span>
-          <span>{selectedCountry?.nom || "Tous les pays"}</span>
+          <span>{isLoading ? "Chargement..." : selectedCountry?.nom || "Tous les pays"}</span>
         </span>
         <ChevronDown className={cn("w-4 h-4 transition-transform", isOpen && "rotate-180")} />
       </button>
