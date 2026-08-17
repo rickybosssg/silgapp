@@ -144,6 +144,7 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
   const eligibleCourses = useMemo(() => {
     return courses.filter(course => {
       if (FINAL_COURSE_STATUSES.has(course.statut)) return false;
+      if (course.dispatch_status === "en_attente") return false;
       if (course.livreur_id) return false;
       if (refusedIds.includes(course.id)) return false;
       // Exclure si timeout expiré
