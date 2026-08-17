@@ -143,10 +143,20 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
   }, [livreurId, countryCode, queryClient]);
 
   // Filtrer les courses éligibles
+  // ⚠️ RÈGLE MÉTIER : une course n'est visible dans "Disponibles" QUE si :
+  //   - statut === "recherche_livreur" (course active, pas en attente/annulée/livrée)
+  //   - dispatch_status === "disponible_push" (V2) ou "propose" (V1 négociation prix)
+  // Une course en_attente (annulée par livreur, suspendue par admin) ne doit JAMAIS
+  // apparaître, quel que soit son dispatch_status résiduel.
   const eligibleCourses = useMemo(() => {
     return courses.filter(course => {
+      // ── Garde absolue sur le statut : en_attente = invisible, point final ──
+      if (course.statut === "en_attente") return false;
       if (FINAL_COURSE_STATUSES.has(course.statut)) return false;
-      if (course.dispatch_status === "en_attente") return false;
+      // ── Garde positive : seul "recherche_livreur" est un statut disponible ──
+      if (course.statut !== "recherche_livreur") return false;
+      // ── Garde sur dispatch_status : disponible_push (V2) ou propose (V1) ──
+      if (course.dispatch_status !== "disponible_push" && course.dispatch_status !== "propose") return false;
       if (course.livreur_id) return false;
       if (refusedIds.includes(course.id)) return false;
       // Exclure si timeout expiré
