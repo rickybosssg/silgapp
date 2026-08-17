@@ -23,7 +23,21 @@ const STATUTS_ACTIFS_LIVREUR = [
 ];
 
 const PRIX_DEFAUT = 1500;
-const COMMISSION_PCT_DEFAUT = 10;
+// ⚠️ NE JAMAIS hardcoder la commission — toujours la récupérer depuis Country.
+// const COMMISSION_PCT_DEFAUT = 10; // SUPPRIMÉ : causait des commissions à 10% au lieu de 20%
+
+function normalizeCommissionPct(value) {
+  const pct = Number(value);
+  if (!Number.isFinite(pct) || pct < 0 || pct > 100) return null;
+  return pct;
+}
+
+async function chargerCommissionPays(base44, countryCode) {
+  const code = String(countryCode || '').trim().toUpperCase();
+  if (!code) return null;
+  const countries = await base44.asServiceRole.entities.Country.filter({ code, actif: true });
+  return normalizeCommissionPct(countries?.[0]?.commission_pct);
+}
 
 Deno.serve(async (req) => {
   try {
@@ -84,20 +98,29 @@ Deno.serve(async (req) => {
     }
 
     // ── Correction 3 : courses "livree" sans prix_final → prix par défaut ──
+    // ⚠️ La commission est récupérée DYNAMIQUEMENT depuis Country (jamais hardcodée).
+    // Si la commission du pays n'est pas configurée, la course est SKIPPÉE (pas de fallback).
     let coursesPrixCorigees = 0;
+    let coursesPrixSkipped = 0;
     const coursesSansPrix = (allCourses || []).filter(c =>
       c.statut === 'livree' && (!c.prix_final || Number(c.prix_final) <= 0)
     );
-    const commissionSilga = Math.round(PRIX_DEFAUT * COMMISSION_PCT_DEFAUT / 100);
-    const montantLivreur = PRIX_DEFAUT - commissionSilga;
     for (const course of coursesSansPrix) {
       try {
+        const commissionPct = await chargerCommissionPays(base44, course.country_code);
+        if (commissionPct === null) {
+          console.error(`[CORRECTION] Course ${course.id?.slice(-8)} : commission non configurée pour ${course.country_code} — SKIPPÉE`);
+          coursesPrixSkipped++;
+          continue;
+        }
+        const commissionSilga = Math.round(PRIX_DEFAUT * commissionPct / 100);
+        const montantLivreur = PRIX_DEFAUT - commissionSilga;
         await base44.asServiceRole.entities.CourseExterne.update(course.id, {
           prix_final: PRIX_DEFAUT,
           commission_silga: commissionSilga,
           montant_livreur: montantLivreur,
         });
-        console.log(`[CORRECTION] Course ${course.id?.slice(-8)} (${course.livreur_nom}) : prix manquant → ${PRIX_DEFAUT} F`);
+        console.log(`[CORRECTION] Course ${course.id?.slice(-8)} (${course.livreur_nom}) : prix manquant → ${PRIX_DEFAUT} F (commission ${commissionPct}%)`);
         coursesPrixCorigees++;
       } catch (err) {
         console.error(`[CORRECTION] Erreur prix course ${course.id?.slice(-8)}:`, err.message);
