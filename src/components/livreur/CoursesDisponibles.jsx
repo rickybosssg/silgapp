@@ -76,7 +76,7 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
     queryFn: async () => {
       if (!countryCode || !isV2Enabled) return [];
       const all = await base44.entities.CourseExterne.filter(
-        { dispatch_status: { $in: ["disponible_push", "propose", "en_attente"] }, country_code: countryCode },
+        { dispatch_status: { $in: ["disponible_push", "propose"] }, country_code: countryCode },
         "-created_date", 50
       );
       return all || [];
