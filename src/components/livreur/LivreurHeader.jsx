@@ -87,8 +87,8 @@ export default function LivreurHeader({
       "rounded-[2rem] text-white overflow-hidden relative border",
       "shadow-[0_18px_45px_rgba(0,122,255,0.24)] ring-1 ring-white/10",
       isON
-        ? "bg-[#0879e8] border-white/20"
-        : "bg-[#2c2c2e] border-white/10"
+        ? "bg-primary border-white/20 silgapp-relief-surface"
+        : "bg-muted border-border"
     )}>
       {/* Barre de statut coloree */}
       <div className={cn(

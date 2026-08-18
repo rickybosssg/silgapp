@@ -199,11 +199,11 @@ function EtapeProfil({ clientProfil, onSuccess }) {
   return (
     <div className="fixed inset-0 bg-[radial-gradient(circle_at_top,#dbeafe_0,#eef6ff_34%,#f8fafc_72%)] flex items-center justify-center p-4 z-50 overflow-y-auto">
       <div className="max-w-md w-full my-4 overflow-hidden rounded-[2rem] bg-white shadow-2xl shadow-blue-950/15 border border-white/80">
-        <div className="relative bg-gradient-to-br from-slate-950 via-blue-900 to-sky-700 px-6 py-7 text-white">
+        <div className="relative bg-gradient-to-br from-primary-dark via-primary to-primary-dark px-6 py-7 text-white silgapp-relief-surface">
           <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-white/10" />
           <div className="absolute -left-12 bottom-0 h-28 w-28 rounded-full bg-sky-300/20" />
           <div className="relative grid grid-cols-[64px_1fr] gap-4 [&>p]:col-start-2 [&>p]:m-0 [&>p:first-of-type]:text-2xl [&>p:first-of-type]:font-black [&>p:first-of-type]:leading-tight [&>p:first-of-type]:text-white [&>p:last-of-type]:text-sm [&>p:last-of-type]:leading-relaxed [&>p:last-of-type]:text-blue-100">
-          <div className="w-16 h-16 rounded-3xl bg-white/15 border border-white/20 flex items-center justify-center shadow-lg shadow-blue-950/20">
+          <div className="w-16 h-16 rounded-3xl bg-white/15 border border-white/20 flex items-center justify-center shadow-lg shadow-primary/20 silgapp-relief">
             <User className="w-8 h-8 text-white" />
           </div>
           <p className="text-2xl font-black leading-tight text-white">Complétez vos informations</p>
@@ -339,7 +339,7 @@ function EtapeProfil({ clientProfil, onSuccess }) {
         <button
           onClick={handleSave}
           disabled={loading || !peutSauvegarder}
-          className="w-[calc(100%-2.5rem)] sm:w-[calc(100%-3rem)] mx-5 sm:mx-6 mb-6 h-14 rounded-2xl bg-gradient-to-r from-blue-700 via-sky-600 to-cyan-500 text-white font-black text-base shadow-lg shadow-blue-200 active:scale-[0.98] transition-all disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-2"
+          className="w-[calc(100%-2.5rem)] sm:w-[calc(100%-3rem)] mx-5 sm:mx-6 mb-6 h-14 rounded-2xl bg-primary text-white font-black text-base shadow-lg shadow-primary/20 active:scale-[0.98] transition-all disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-2 silgapp-relief"
         >
           {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />}
           {loading ? "Sauvegarde..." : "Valider et continuer"}

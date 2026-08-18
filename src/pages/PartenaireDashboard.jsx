@@ -209,48 +209,48 @@ export default function PartenaireDashboard() {
 
   if (!user || loading) {
     return (
-      <div className="min-h-screen bg-[#16191d] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-[#00a86b]" />
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
   }
 
   if (!hasEtablissement) {
     return (
-      <div className="min-h-screen bg-[#16191d] flex items-center justify-center p-6">
+      <div className="min-h-screen bg-background flex items-center justify-center p-6">
         <div className="w-full max-w-md space-y-6">
           <button
             type="button"
             onClick={returnToRoleSelection}
-            className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-[#1f2429] px-4 py-2 text-sm font-bold text-white/80 shadow-sm hover:bg-[#2b3137] active:scale-[0.98] transition-all"
+            className="inline-flex items-center gap-2 rounded-2xl border border-border bg-card px-4 py-2 text-sm font-bold text-foreground/80 shadow-sm hover:bg-muted active:scale-[0.98] transition-all"
           >
             <ArrowLeft className="w-4 h-4" />
             Retour au choix du compte
           </button>
           <div className="text-center space-y-3">
-            <div className="w-20 h-20 rounded-2xl bg-[#00a86b]/15 flex items-center justify-center mx-auto">
-              <Store className="w-10 h-10 text-[#00a86b]" />
+            <div className="w-20 h-20 rounded-2xl bg-primary/15 flex items-center justify-center mx-auto">
+              <Store className="w-10 h-10 text-primary" />
             </div>
-            <h1 className="text-2xl font-black text-white">Espace Partenaire</h1>
-            <p className="text-white/50">Que souhaitez-vous créer ?</p>
+            <h1 className="text-2xl font-black text-foreground">Espace Partenaire</h1>
+            <p className="text-muted-foreground">Que souhaitez-vous créer ?</p>
           </div>
           <div className="space-y-4">
-            <button onClick={() => setTab("boutique_form")} className="w-full p-6 rounded-3xl border-2 border-sky-500/20 bg-[#1f2429] hover:border-sky-500 hover:shadow-lg transition-all text-left">
+            <button onClick={() => setTab("boutique_form")} className="w-full p-6 rounded-3xl border-2 border-sky-500/20 bg-card hover:border-sky-500 hover:shadow-lg transition-all text-left">
               <div className="flex items-center gap-4">
                 <div className="w-14 h-14 rounded-2xl bg-sky-500/15 flex items-center justify-center"><Store className="w-7 h-7 text-sky-400" /></div>
-                <div><p className="font-black text-lg text-white">Une Boutique</p><p className="text-sm text-white/50">Vendre des produits</p></div>
+                <div><p className="font-black text-lg text-foreground">Une Boutique</p><p className="text-sm text-muted-foreground">Vendre des produits</p></div>
               </div>
             </button>
-            <button onClick={() => setTab("restaurant_form")} className="w-full p-6 rounded-3xl border-2 border-orange-500/20 bg-[#1f2429] hover:border-orange-500 hover:shadow-lg transition-all text-left">
+            <button onClick={() => setTab("restaurant_form")} className="w-full p-6 rounded-3xl border-2 border-orange-500/20 bg-card hover:border-orange-500 hover:shadow-lg transition-all text-left">
               <div className="flex items-center gap-4">
                 <div className="w-14 h-14 rounded-2xl bg-orange-500/15 flex items-center justify-center"><UtensilsCrossed className="w-7 h-7 text-orange-400" /></div>
-                <div><p className="font-black text-lg text-white">Un Restaurant</p><p className="text-sm text-white/50">Proposer un menu et des plats</p></div>
+                <div><p className="font-black text-lg text-foreground">Un Restaurant</p><p className="text-sm text-muted-foreground">Proposer un menu et des plats</p></div>
               </div>
             </button>
-            <button onClick={() => setTab("pharmacie_form")} className="w-full p-6 rounded-3xl border-2 border-white/10 bg-[#1f2429] hover:border-[#00a86b] hover:shadow-lg transition-all text-left">
+            <button onClick={() => setTab("pharmacie_form")} className="w-full p-6 rounded-3xl border-2 border-border bg-card hover:border-primary hover:shadow-lg transition-all text-left">
               <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center"><Pill className="w-7 h-7 text-white/70" /></div>
-                <div><p className="font-black text-lg text-white">Une Pharmacie</p><p className="text-sm text-white/50">Discuter avec clients et livrer</p></div>
+                <div className="w-14 h-14 rounded-2xl bg-primary/5 flex items-center justify-center"><Pill className="w-7 h-7 text-foreground/70" /></div>
+                <div><p className="font-black text-lg text-foreground">Une Pharmacie</p><p className="text-sm text-muted-foreground">Discuter avec clients et livrer</p></div>
               </div>
             </button>
           </div>
@@ -258,12 +258,12 @@ export default function PartenaireDashboard() {
             <button onClick={async () => {
               await base44.auth.updateMe({ silgapp_role: "" }).catch(() => {});
               window.location.reload();
-            }} className="flex items-center gap-1.5 text-sm text-[#00a86b] font-medium hover:text-[#00c47a]">
+            }} className="flex items-center gap-1.5 text-sm text-primary font-medium hover:text-primary-dark">
               <ArrowLeft className="w-4 h-4" />
               Retour au choix de rôle
             </button>
-            <span className="text-white/20">|</span>
-            <button onClick={() => { clearPersistedToken(); base44.auth.logout(); }} className="text-sm text-white/40 underline">Se déconnecter</button>
+            <span className="text-border">|</span>
+            <button onClick={() => { clearPersistedToken(); base44.auth.logout(); }} className="text-sm text-muted-foreground underline">Se déconnecter</button>
           </div>
           {tab === "boutique_form" && (
             <EtablissementForm type="boutique" partenaireId={user.id} userEmail={user.email} isAdmin={user?.role === 'admin'}
@@ -288,29 +288,29 @@ export default function PartenaireDashboard() {
   // ── Bloquer l'accès si l'établissement n'est pas validé ──
   if (etablissement && etablissement.validation === "en_attente") {
     return (
-      <div className="min-h-screen bg-[#16191d] flex items-center justify-center p-6">
+      <div className="min-h-screen bg-background flex items-center justify-center p-6">
         <div className="text-center space-y-4 max-w-sm">
           <div className="w-20 h-20 rounded-3xl bg-amber-500/15 flex items-center justify-center mx-auto">
             <Clock className="w-10 h-10 text-amber-400" />
           </div>
-          <h1 className="text-xl font-black text-white">Compte en attente de validation</h1>
-          <p className="text-sm text-white/50">Votre établissement est en cours de vérification par l'équipe SILGAPP. Vous recevrez une notification dès que votre compte sera validé.</p>
+          <h1 className="text-xl font-black text-foreground">Compte en attente de validation</h1>
+          <p className="text-sm text-muted-foreground">Votre établissement est en cours de vérification par l'équipe SILGAPP. Vous recevrez une notification dès que votre compte sera validé.</p>
           <div className="flex items-center gap-2 bg-amber-500/10 rounded-xl px-4 py-3 border border-amber-500/20">
             <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-            <p className="text-xs text-amber-400 font-medium">Validation sous 24-48h ouvrées</p>
+            <p className="text-xs text-amber-400 font-medium">Validation sous 24-48H ouvrées</p>
           </div>
-          <p className="text-xs text-white/40">📞 Support : +226 66 92 51 90</p>
+          <p className="text-xs text-muted-foreground">📞 Support : +226 66 92 51 90</p>
           <div className="flex items-center justify-center gap-3 pt-1">
             <button onClick={async () => {
               await base44.auth.updateMe({ silgapp_role: "" }).catch(() => {});
               clearPersistedToken();
               base44.auth.logout();
-            }} className="flex items-center gap-1 text-xs text-[#00a86b] font-medium hover:text-[#00c47a] py-2 px-3">
+            }} className="flex items-center gap-1 text-xs text-primary font-medium hover:text-primary-dark py-2 px-3">
               <ArrowLeft className="w-3.5 h-3.5" />
               Changer de rôle
             </button>
-            <span className="text-white/20">|</span>
-            <button onClick={() => { clearPersistedToken(); base44.auth.logout(); }} className="text-xs text-white/50 underline underline-offset-2 hover:text-white/70 py-2 px-3">Se déconnecter</button>
+            <span className="text-border">|</span>
+            <button onClick={() => { clearPersistedToken(); base44.auth.logout(); }} className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground/70 py-2 px-3">Se déconnecter</button>
           </div>
         </div>
       </div>
@@ -319,25 +319,25 @@ export default function PartenaireDashboard() {
 
   if (etablissement && (etablissement.validation === "refuse" || etablissement.validation === "suspendu")) {
     return (
-      <div className="min-h-screen bg-[#16191d] flex items-center justify-center p-6">
+      <div className="min-h-screen bg-background flex items-center justify-center p-6">
         <div className="text-center space-y-4 max-w-sm">
           <div className="w-20 h-20 rounded-3xl bg-red-500/15 flex items-center justify-center mx-auto">
             <XCircle className="w-10 h-10 text-red-400" />
           </div>
-          <h1 className="text-xl font-black text-white">{etablissement.validation === "refuse" ? "Compte refusé" : "Compte suspendu"}</h1>
-          <p className="text-sm text-white/50">{etablissement.motif_refus || "Contactez le support SILGAPP pour plus d'informations."}</p>
-          <p className="text-xs text-white/40">📞 Support : +226 66 92 51 90</p>
+          <h1 className="text-xl font-black text-foreground">{etablissement.validation === "refuse" ? "Compte refusé" : "Compte suspendu"}</h1>
+          <p className="text-sm text-muted-foreground">{etablissement.motif_refus || "Contactez le support SILGAPP pour plus d'informations."}</p>
+          <p className="text-xs text-muted-foreground">📞 Support : +226 66 92 51 90</p>
           <div className="flex items-center justify-center gap-3 pt-1">
             <button onClick={async () => {
               await base44.auth.updateMe({ silgapp_role: "" }).catch(() => {});
               clearPersistedToken();
               base44.auth.logout();
-            }} className="flex items-center gap-1 text-xs text-[#00a86b] font-medium hover:text-[#00c47a] py-2 px-3">
+            }} className="flex items-center gap-1 text-xs text-primary font-medium hover:text-primary-dark py-2 px-3">
               <ArrowLeft className="w-3.5 h-3.5" />
               Changer de rôle
             </button>
-            <span className="text-white/20">|</span>
-            <button onClick={() => { clearPersistedToken(); base44.auth.logout(); }} className="text-xs text-[#00a86b] underline py-2 px-3">Se déconnecter</button>
+            <span className="text-border">|</span>
+            <button onClick={() => { clearPersistedToken(); base44.auth.logout(); }} className="text-xs text-primary underline py-2 px-3">Se déconnecter</button>
           </div>
         </div>
       </div>
@@ -349,12 +349,12 @@ export default function PartenaireDashboard() {
     : commandes.filter(c => !["livree", "annulee"].includes(c.statut)).length;
 
   return (
-    <div className="min-h-screen bg-[#f5f5f7] pb-24 text-[#1d1d1f]">
+    <div className="min-h-screen bg-background pb-24 text-foreground">
       {/* ── En-tête premium ── */}
-      <div className="bg-white/90 backdrop-blur-xl text-slate-900 px-4 py-4 sticky top-0 z-20 shadow-[0_8px_30px_rgba(15,23,42,0.06)] border-b border-black/5">
+      <div className="bg-white/90 backdrop-blur-xl text-slate-900 px-4 py-4 sticky top-0 z-20 shadow-[0_8px_30px_rgba(15,23,42,0.06)] border-b border-border">
         <div className="max-w-lg mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-12 h-12 rounded-2xl bg-blue-50 text-[#007aff] flex items-center justify-center overflow-hidden flex-shrink-0 border border-blue-100">
+            <div className="w-12 h-12 rounded-2xl bg-blue-50 text-primary flex items-center justify-center overflow-hidden flex-shrink-0 border border-blue-100">
               {etablissement.logo_url
                 ? <img src={etablissement.logo_url} alt="logo" className="w-full h-full object-cover" />
                 : (etablissementType === "boutique" ? <Store className="w-6 h-6" /> : etablissementType === "restaurant" ? <UtensilsCrossed className="w-6 h-6" /> : <Pill className="w-6 h-6" />)}
@@ -370,7 +370,7 @@ export default function PartenaireDashboard() {
             </div>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            <button onClick={() => { clearPersistedToken(); base44.auth.logout(); }} className="w-9 h-9 rounded-xl bg-blue-50 text-[#007aff] flex items-center justify-center hover:bg-blue-100 transition-colors border border-blue-100">
+            <button onClick={() => { clearPersistedToken(); base44.auth.logout(); }} className="w-9 h-9 rounded-xl bg-blue-50 text-primary flex items-center justify-center hover:bg-blue-100 transition-colors border border-blue-100">
               <LogOut className="w-4 h-4" />
             </button>
           </div>
