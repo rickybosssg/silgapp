@@ -81,9 +81,9 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
   return (
     <>
       {/* ===== MOBILE HEADER ===== */}
-      <header className="lg:hidden fixed top-0 left-0 right-0 bg-[#16191d]/95 backdrop-blur-xl border-b border-white/5 z-40 flex items-center justify-between px-4 shadow-sm safe-area-top" style={{ minHeight: '3.5rem' }}>
+      <header className="lg:hidden fixed top-0 left-0 right-0 bg-sidebar/95 backdrop-blur-xl border-b border-white/5 z-40 flex items-center justify-between px-4 shadow-sm safe-area-top" style={{ minHeight: '3.5rem' }}>
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-[#00a86b] flex items-center justify-center shadow-sm">
+          <div className="w-8 h-8 rounded-xl bg-sidebar-primary flex items-center justify-center silgapp-relief">
             <span className="text-white font-black text-sm">S</span>
           </div>
           <div>
@@ -134,7 +134,7 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
         <div className="lg:hidden fixed inset-0 z-50" onClick={() => setShowMenu(false)}>
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
           <div
-            className="absolute right-0 top-0 bottom-0 w-72 bg-[#16191d] flex flex-col shadow-2xl border-l border-white/5"
+            className="absolute right-0 top-0 bottom-0 w-72 bg-sidebar flex flex-col shadow-2xl border-l border-white/5"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Menu header */}
@@ -162,11 +162,11 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
                   <select
                     value={effectiveCountry || ""}
                     onChange={(e) => setSelectedCountry(e.target.value)}
-                    className="w-full appearance-none bg-white/5 text-slate-200 text-sm font-medium rounded-xl pl-10 pr-8 py-2.5 border border-white/5 focus:outline-none focus:ring-1 focus:ring-[#00a86b]/40 cursor-pointer"
+                    className="w-full appearance-none bg-white/5 text-slate-200 text-sm font-medium rounded-xl pl-10 pr-8 py-2.5 border border-white/5 focus:outline-none focus:ring-1 focus:ring-sidebar-primary/40 cursor-pointer"
                   >
-                    <option value="" className="bg-[#1e2228] text-slate-400">Choisir un pays</option>
+                    <option value="" className="bg-sidebar-accent text-slate-400">Choisir un pays</option>
                     {paysListe.map((p) => (
-                      <option key={p.code} value={p.code} className="bg-[#1e2228] text-slate-200">
+                      <option key={p.code} value={p.code} className="bg-sidebar-accent text-slate-200">
                         {p.emoji_flag} {p.nom}
                       </option>
                     ))}
@@ -189,8 +189,8 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
                     className={cn(
                       "flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-all",
                       isActive
-                        ? "bg-[#00a86b] text-white shadow-sm"
-                        : "text-slate-300 hover:bg-white/5 hover:text-[#00a86b]"
+                        ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm silgapp-relief-surface"
+                        : "text-slate-300 hover:bg-white/5 hover:text-sidebar-primary"
                     )}
                   >
                     <Icon className="w-4 h-4 flex-shrink-0" />
@@ -241,7 +241,7 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
       )}
 
       {/* ===== MOBILE BOTTOM TAB BAR ===== */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-[#16191d]/95 backdrop-blur-xl border-t border-white/5 z-40 safe-area-bottom shadow-[0_-8px_30px_rgba(0,0,0,0.3)]">
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-sidebar/95 backdrop-blur-xl border-t border-white/5 z-40 safe-area-bottom shadow-[0_-8px_30px_rgba(0,0,0,0.3)]">
         <div className="flex items-stretch justify-around">
           {allNavItems.filter(item => bottomTabPaths.includes(item.path)).map((item) => {
             const isActive = location.pathname === item.path;
@@ -263,18 +263,18 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
                 }}
                 className={cn(
                   "flex flex-col items-center justify-center py-2 px-1 flex-1 transition-all min-h-[56px]",
-                  isActive ? "text-[#00a86b]" : "text-slate-400"
+                  isActive ? "text-sidebar-primary" : "text-slate-400"
                 )}
               >
                 <div className={cn(
                   "w-10 h-6 flex items-center justify-center rounded-full transition-all",
-                  isActive && "bg-[#00a86b]/10"
+                  isActive && "bg-sidebar-primary/10"
                 )}>
                   <Icon className="w-5 h-5" />
                 </div>
                 <span className={cn(
                   "text-[10px] font-medium mt-0.5",
-                  isActive ? "text-[#00a86b]" : "text-slate-400"
+                  isActive ? "text-sidebar-primary" : "text-slate-400"
                 )}>
                   {item.label}
                 </span>
