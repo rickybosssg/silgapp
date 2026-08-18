@@ -1,18 +1,45 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { ChevronDown, Check, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// Hook pour récupérer les pays actifs — 100% dynamique depuis la BDD
+// Liste de secours — utilisée uniquement si la requête BDD échoue
+const PAYS_FALLBACK = [
+  { code: "BF", nom: "Burkina Faso", emoji_flag: "🇧🇫", ordre: 1 },
+  { code: "CI", nom: "Côte d'Ivoire", emoji_flag: "🇨🇮", ordre: 2 },
+  { code: "TG", nom: "Togo", emoji_flag: "🇹🇬", ordre: 3 },
+  { code: "GH", nom: "Ghana", emoji_flag: "🇬🇭", ordre: 4 },
+  { code: "BJ", nom: "Bénin", emoji_flag: "🇧🇯", ordre: 5 },
+  { code: "SN", nom: "Sénégal", emoji_flag: "🇸🇳", ordre: 6 },
+  { code: "ML", nom: "Mali", emoji_flag: "🇲🇱", ordre: 7 },
+  { code: "GN", nom: "Guinée", emoji_flag: "🇬🇳", ordre: 8 },
+  { code: "NE", nom: "Niger", emoji_flag: "🇳🇪", ordre: 9 },
+  { code: "CM", nom: "Cameroun", emoji_flag: "🇨🇲", ordre: 10 },
+  { code: "GA", nom: "Gabon", emoji_flag: "🇬🇦", ordre: 11 },
+  { code: "TD", nom: "Tchad", emoji_flag: "🇹🇩", ordre: 12 },
+  { code: "NG", nom: "Nigeria", emoji_flag: "🇳🇬", ordre: 13 },
+  { code: "CA", nom: "Canada", emoji_flag: "🇨🇦", ordre: 14 },
+];
+
+// Hook pour récupérer les pays actifs — dynamique depuis la BDD avec fallback de secours
 export function usePaysActifs() {
-  const { data: pays = [], isLoading } = useQuery({
+  const { data: pays = [], isLoading, error } = useQuery({
     queryKey: ["pays-actifs"],
-    queryFn: () => base44.entities.Country.filter({ actif: true }, "ordre"),
+    queryFn: async () => {
+      const result = await base44.entities.Country.filter({ actif: true }, "ordre");
+      return Array.isArray(result) && result.length > 0 ? result : PAYS_FALLBACK;
+    },
     initialData: [],
     staleTime: 60000,
+    retry: 2,
+    refetchOnMount: true,
   });
-  return { pays, isLoading };
+
+  // Fallback si la requête échoue ou retourne vide
+  const paysFinal = (!pays || pays.length === 0) ? PAYS_FALLBACK : pays;
+
+  return { pays: paysFinal, isLoading, error };
 }
 
 // Sélecteur de pays avec Select stylisé (mobile-friendly)
