@@ -274,7 +274,7 @@ export default function DashboardExterne() {
           <KpiCard label="Courses" value={stats.total} icon={Package} color="bg-primary-dark" />
           <KpiCard label="En cours" value={stats.enCours} icon={Clock} color="bg-warning" onClick={() => setStatModal({ type: "en_traitement", data: coursesEnTraitement })} />
           <KpiCard label="Livrées" value={stats.livrees} icon={CheckCircle2} color="bg-success" onClick={() => setStatModal({ type: "livrees", data: coursesTerminees.filter(c => c.statut === "livree") })} />
-          <KpiCard label="Annulées" value={stats.annulees} icon={XCircle} color="bg-danger" onClick={() => setStatModal({ type: "annulees", data: coursesTerminees.filter(c => c.statut === "annulee") })} />
+          <KpiCard label="Annulées" value={stats.annulees} icon={XCircle} color="bg-red-500" onClick={() => setStatModal({ type: "annulees", data: coursesTerminees.filter(c => c.statut === "annulee") })} />
           <KpiCard label="CA du jour" value={stats.ca > 999 ? `${Math.round(stats.ca/1000)}k` : stats.ca} suffix={stats.ca <= 999 ? "F" : "F"} icon={TrendingUp} color="bg-primary" onClick={() => setStatModal({ type: "ca", data: coursesTerminees.filter(c => c.statut === "livree") })} />
           <KpiCard label="Disponibles" value={stats.libres} icon={Truck} color="bg-success" onClick={() => setStatModal({ type: "livreurs_dispo", data: livreursEnLigne.filter(l => l.statut === "disponible") })} />
         </div>
