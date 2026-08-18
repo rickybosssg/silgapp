@@ -155,38 +155,24 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
             {/* Sélecteur de pays — réseau externe uniquement */}
             {showCountryPicker && (
               <div className="px-3 py-2 border-b border-white/5">
-                <button
-                  onClick={() => setCountryOpen(!countryOpen)}
-                  className="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 transition-colors"
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-base flex-shrink-0">
-                      {effectiveCountry ? paysListe.find(p => p.code === effectiveCountry)?.emoji_flag || "🌍" : "🌍"}
-                    </span>
-                    <span className="text-sm font-medium text-slate-300 truncate">
-                      {effectiveCountry ? paysListe.find(p => p.code === effectiveCountry)?.nom : "Choisir un pays"}
-                    </span>
-                  </div>
-                  <ChevronDown className={cn("w-4 h-4 text-slate-400 flex-shrink-0 transition-transform", countryOpen && "rotate-180")} />
-                </button>
-                {countryOpen && (
-                  <div className="mt-1 border border-white/5 rounded-xl bg-[#1e2228] shadow-lg max-h-56 overflow-y-auto">
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-base pointer-events-none z-10">
+                    {effectiveCountry ? paysListe.find(p => p.code === effectiveCountry)?.emoji_flag || "🌍" : "🌍"}
+                  </span>
+                  <select
+                    value={effectiveCountry || ""}
+                    onChange={(e) => setSelectedCountry(e.target.value)}
+                    className="w-full appearance-none bg-white/5 text-slate-200 text-sm font-medium rounded-xl pl-10 pr-8 py-2.5 border border-white/5 focus:outline-none focus:ring-1 focus:ring-[#00a86b]/40 cursor-pointer"
+                  >
+                    <option value="" className="bg-[#1e2228] text-slate-400">Choisir un pays</option>
                     {paysListe.map((p) => (
-                      <button
-                        key={p.code}
-                        onClick={() => { setSelectedCountry(p.code); setCountryOpen(false); }}
-                        className={cn(
-                          "w-full flex items-center gap-3 px-3 py-2.5 text-sm transition-colors hover:bg-white/5",
-                          effectiveCountry === p.code ? "bg-[#00a86b]/10 text-[#00a86b] font-semibold" : "text-slate-400"
-                        )}
-                      >
-                        <span className="text-base flex-shrink-0">{p.emoji_flag}</span>
-                        <span className="flex-1 text-left">{p.nom}</span>
-                        {effectiveCountry === p.code && <Check className="w-4 h-4 text-[#00a86b] flex-shrink-0" />}
-                      </button>
+                      <option key={p.code} value={p.code} className="bg-[#1e2228] text-slate-200">
+                        {p.emoji_flag} {p.nom}
+                      </option>
                     ))}
-                  </div>
-                )}
+                  </select>
+                  <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
               </div>
             )}
 
