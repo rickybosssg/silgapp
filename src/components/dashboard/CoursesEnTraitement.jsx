@@ -42,14 +42,14 @@ function CourseItemExterne({ course, onView }) {
   const addrArrivee = cleanAddress(course.adresse_arrivee, course.gps_arrivee_lat, course.gps_arrivee_lng);
 
   return (
-    <Card className="p-4 hover:shadow-md transition-all border-l-4 border-l-blue-400 space-y-2.5 bg-[hsl(215 18% 28%)] border-white/8">
+    <Card className="p-4 hover:shadow-md transition-all border-l-4 border-l-blue-400 space-y-2.5 bg-card border-border">
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0 space-y-2">
           {/* Nom client — agrandi et en gras */}
           <div className="flex items-center gap-2 flex-wrap">
             <div className="flex items-center gap-1.5">
-              <User className="w-4 h-4 text-white/50" />
-              <span className="font-bold text-base text-white">{expediteur}</span>
+              <User className="w-4 h-4 text-gray-400" />
+              <span className="font-bold text-base text-foreground">{expediteur}</span>
             </div>
             <span className={`text-xs px-2.5 py-1 rounded-full border font-semibold ${statutColor}`}>
               {statutLabel}
@@ -57,27 +57,27 @@ function CourseItemExterne({ course, onView }) {
           </div>
 
           {/* Adresses — nettoyées, jamais d'URL */}
-          <div className="flex items-center gap-1.5 text-xs text-white/80">
-            <MapPin className="w-3 h-3 text-emerald-400 flex-shrink-0" />
+          <div className="flex items-center gap-1.5 text-xs text-gray-600">
+            <MapPin className="w-3 h-3 text-emerald-600 flex-shrink-0" />
             <span className="truncate">{addrDepart}</span>
-            <ArrowRight className="w-3 h-3 flex-shrink-0" />
-            <MapPin className="w-3 h-3 text-emerald-400 flex-shrink-0" />
+            <ArrowRight className="w-3 h-3 flex-shrink-0 text-gray-400" />
+            <MapPin className="w-3 h-3 text-emerald-600 flex-shrink-0" />
             <span className="truncate">{addrArrivee || "Destination à définir"}</span>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
             {course.livreur_nom && (
-              <span className="text-xs font-medium text-white">🚴 {course.livreur_nom}</span>
+              <span className="text-xs font-medium text-gray-700">🚴 {course.livreur_nom}</span>
             )}
             {course.destinataire_nom && (
-              <span className="text-xs text-white/50">→ {course.destinataire_nom}</span>
+              <span className="text-xs text-gray-500">→ {course.destinataire_nom}</span>
             )}
             {course.prix_final > 0 && (
-              <span className="text-xs font-bold text-emerald-400 ml-auto">
+              <span className="text-xs font-bold text-emerald-600 ml-auto">
                 {course.prix_final.toLocaleString()} F
               </span>
             )}
-            <span className="text-[10px] text-white/80 flex items-center gap-1">
+            <span className="text-[10px] text-gray-500 flex items-center gap-1">
               <Clock className="w-3 h-3" />
               {format(new Date(course.created_date), "HH:mm", { locale: fr })}
             </span>
@@ -106,43 +106,43 @@ function CourseItemInterne({ course, onView }) {
   const addrArrivee = cleanAddress(course.adresse_arrivee);
   
   return (
-    <Card className={`p-4 hover:shadow-md transition-all space-y-2.5 bg-[hsl(215 18% 28%)] border-white/8 ${isDispatchAuto ? 'border-l-4 border-l-amber-400 bg-amber-500/5' : ''}`}>
+    <Card className={`p-4 hover:shadow-md transition-all space-y-2.5 bg-card border-border ${isDispatchAuto ? 'border-l-4 border-l-amber-400 bg-amber-50' : ''}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0 space-y-2">
           <div className="flex items-center gap-2 flex-wrap">
             <div className="flex items-center gap-1.5">
-              <User className="w-4 h-4 text-white/50" />
-              <span className="font-bold text-base text-white">{course.client_nom || "Client"}</span>
+              <User className="w-4 h-4 text-gray-400" />
+              <span className="font-bold text-base text-foreground">{course.client_nom || "Client"}</span>
             </div>
             {course.urgence && course.urgence !== "normale" && (
               <UrgenceBadge urgence={course.urgence} />
             )}
             {isDispatchAuto && (
-              <span className="text-xs px-2 py-0.5 rounded-full border font-medium bg-amber-500/15 text-amber-400 border-amber-500/30 flex items-center gap-1">
+              <span className="text-xs px-2 py-0.5 rounded-full border font-medium bg-amber-100 text-amber-700 border-amber-300 flex items-center gap-1">
                 <span className="animate-pulse">🔍</span> Recherche livreur en cours
               </span>
             )}
           </div>
 
-          <div className="flex items-center gap-1.5 text-xs text-white/80">
-            <MapPin className="w-3 h-3 text-emerald-400 flex-shrink-0" />
+          <div className="flex items-center gap-1.5 text-xs text-gray-600">
+            <MapPin className="w-3 h-3 text-emerald-600 flex-shrink-0" />
             <span className="truncate">{addrDepart}</span>
-            <ArrowRight className="w-3 h-3 flex-shrink-0" />
-            <MapPin className="w-3 h-3 text-emerald-400 flex-shrink-0" />
+            <ArrowRight className="w-3 h-3 flex-shrink-0 text-gray-400" />
+            <MapPin className="w-3 h-3 text-emerald-600 flex-shrink-0" />
             <span className="truncate">{addrArrivee}</span>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
             {!isDispatchAuto && <CourseStatusBadge statut={course.statut} dispatchStatus={course.dispatch_status} />}
             {course.livreur_nom && (
-              <span className="text-xs font-medium text-white">🚴 {course.livreur_nom}</span>
+              <span className="text-xs font-medium text-gray-700">🚴 {course.livreur_nom}</span>
             )}
             {(course.prix_reel || course.prix) > 0 && (
-              <span className="text-xs font-bold text-emerald-400 ml-auto">
+              <span className="text-xs font-bold text-emerald-600 ml-auto">
                 {(course.prix_reel || course.prix).toLocaleString()} F
               </span>
             )}
-            <span className="text-[10px] text-white/80 flex items-center gap-1">
+            <span className="text-[10px] text-gray-500 flex items-center gap-1">
               <Clock className="w-3 h-3" />
               {format(new Date(course.created_date), "HH:mm", { locale: fr })}
             </span>
@@ -164,23 +164,23 @@ function CourseItemInterne({ course, onView }) {
 
 export default function CoursesEnTraitement({ courses, onView, isExterne = false }) {
   return (
-    <Card className="p-0 overflow-hidden bg-[hsl(215 18% 28%)] border-white/8">
-      <div className="px-4 pt-4 pb-3 border-b border-white/8 flex items-center justify-between">
+    <Card className="p-0 overflow-hidden bg-card border-border">
+      <div className="px-4 pt-4 pb-3 border-b border-gray-100 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse" />
-          <h2 className="font-bold text-sm text-white">Courses en traitement</h2>
-          <span className="bg-blue-500/15 text-blue-400 text-xs font-bold px-2 py-0.5 rounded-full">
+          <h2 className="font-bold text-sm text-foreground">Courses en traitement</h2>
+          <span className="bg-blue-100 text-blue-700 text-xs font-bold px-2 py-0.5 rounded-full">
             {courses.length}
           </span>
         </div>
-        <p className="text-xs text-white/70">Assignées — en cours de livraison</p>
+        <p className="text-xs text-gray-500">Assignées — en cours de livraison</p>
       </div>
       <div className="p-3 space-y-2 max-h-[400px] overflow-y-auto">
         {courses.length === 0 ? (
           <div className="text-center py-8 space-y-2">
-            <div className="w-2.5 h-2.5 rounded-full bg-blue-500/50 mx-auto" />
-            <p className="text-white/70 text-sm">Aucune course en traitement</p>
-            <p className="text-xs text-white/70">Les courses assignées apparaîtront ici</p>
+            <div className="w-2.5 h-2.5 rounded-full bg-blue-300 mx-auto" />
+            <p className="text-gray-500 text-sm">Aucune course en traitement</p>
+            <p className="text-xs text-gray-400">Les courses assignées apparaîtront ici</p>
           </div>
         ) : (
           courses.map(c =>
