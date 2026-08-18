@@ -76,7 +76,7 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
   const { isPays, countryCode: adminCountryCode, selectedCountry, setSelectedCountry } = useAdminContext();
   const effectiveCountry = isPays ? adminCountryCode : selectedCountry;
   const showCountryPicker = reseau === "externe" && !isPays;
-  const pays = usePaysActifs();
+  const { pays: paysListe = [] } = usePaysActifs();
 
   return (
     <>
@@ -161,17 +161,17 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
                 >
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="text-base flex-shrink-0">
-                      {effectiveCountry ? pays.find(p => p.code === effectiveCountry)?.emoji_flag || "🌍" : "🌍"}
+                      {effectiveCountry ? paysListe.find(p => p.code === effectiveCountry)?.emoji_flag || "🌍" : "🌍"}
                     </span>
                     <span className="text-sm font-medium text-slate-300 truncate">
-                      {effectiveCountry ? pays.find(p => p.code === effectiveCountry)?.nom : "Choisir un pays"}
+                      {effectiveCountry ? paysListe.find(p => p.code === effectiveCountry)?.nom : "Choisir un pays"}
                     </span>
                   </div>
                   <ChevronDown className={cn("w-4 h-4 text-slate-400 flex-shrink-0 transition-transform", countryOpen && "rotate-180")} />
                 </button>
                 {countryOpen && (
                   <div className="mt-1 border border-white/5 rounded-xl bg-[#1e2228] shadow-lg max-h-56 overflow-y-auto">
-                    {pays.map((p) => (
+                    {paysListe.map((p) => (
                       <button
                         key={p.code}
                         onClick={() => { setSelectedCountry(p.code); setCountryOpen(false); }}
