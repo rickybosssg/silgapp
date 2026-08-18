@@ -19,9 +19,9 @@ export default function LivreursEnLigne({ livreurs = [] }) {
         className="w-full flex items-center justify-between group"
       >
         <h2 className="font-bold text-sm flex items-center gap-2 text-white">
-          <Truck className="w-4 h-4 text-[#00a86b]" />
+          <Truck className="w-4 h-4 text-emerald-400" />
           Livreurs en ligne
-          <span className="text-xs bg-[#00a86b]/15 text-[#00a86b] font-bold px-2 py-0.5 rounded-full">
+          <span className="text-xs bg-[#00a86b]/15 text-emerald-400 font-bold px-2 py-0.5 rounded-full">
             {livreurs.length}
           </span>
         </h2>
@@ -30,12 +30,12 @@ export default function LivreursEnLigne({ livreurs = [] }) {
             <>
               <span className="flex items-center gap-1.5 text-xs">
                 <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse inline-block" />
-                <span className="text-white/50">Disponibles :</span>
+                <span className="text-white/80">Disponibles :</span>
                 <span className="font-black text-green-400">{disponibles.length}</span>
               </span>
               <span className="flex items-center gap-1.5 text-xs">
                 <span className="w-2 h-2 rounded-full bg-orange-400 inline-block" />
-                <span className="text-white/50">En course :</span>
+                <span className="text-white/80">En course :</span>
                 <span className="font-black text-orange-400">{enCourse.length}</span>
               </span>
             </>
@@ -75,7 +75,7 @@ export default function LivreursEnLigne({ livreurs = [] }) {
       {open && (
         <div className="mt-3">
           {livreurs.length === 0 ? (
-            <p className="text-xs text-white/40 text-center py-3">Aucun livreur en ligne</p>
+            <p className="text-xs text-white/70 text-center py-3">Aucun livreur en ligne</p>
           ) : (
             <>
               <div className="flex flex-wrap gap-2">
@@ -96,7 +96,7 @@ export default function LivreursEnLigne({ livreurs = [] }) {
                       {l.photo_url ? (
                         <img src={l.photo_url} alt={nom} className="w-5 h-5 rounded-full object-cover flex-shrink-0" />
                       ) : (
-                        <span className="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0 text-[9px] font-bold text-white/60">
+                        <span className="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0 text-[9px] font-bold text-white/80">
                           {nom.charAt(0).toUpperCase()}
                         </span>
                       )}
@@ -116,7 +116,7 @@ export default function LivreursEnLigne({ livreurs = [] }) {
                 })}
               </div>
               <div className="mt-3 text-right">
-                <Link to="/livreurs" className="text-xs text-[#00a86b] hover:underline">Voir tous les livreurs →</Link>
+                <Link to="/livreurs" className="text-xs text-emerald-400 hover:underline">Voir tous les livreurs →</Link>
               </div>
             </>
           )}

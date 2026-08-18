@@ -181,7 +181,7 @@ export default function DashboardExterne() {
                     )}
                   </h1>
                 </div>
-                <p className="text-white/40 text-xs capitalize">
+                <p className="text-white/80 text-xs capitalize">
                   {format(new Date(), "EEEE d MMMM yyyy", { locale: fr })}
                 </p>
               </div>
@@ -189,11 +189,11 @@ export default function DashboardExterne() {
 
             <div className="flex items-center gap-2 flex-wrap">
               {/* Pill live */}
-              <div className="flex items-center gap-2 bg-white/10 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white/70">
+              <div className="flex items-center gap-2 bg-white/10 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white/80">
                 <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
                 {livreursEnLigne.length} livreur{livreursEnLigne.length > 1 ? "s" : ""} en ligne
               </div>
-              <div className="flex items-center gap-2 bg-white/10 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white/70">
+              <div className="flex items-center gap-2 bg-white/10 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white/80">
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
                 {clientsEnLigne.length} client{clientsEnLigne.length > 1 ? "s" : ""} actif{clientsEnLigne.length > 1 ? "s" : ""}
               </div>
@@ -244,7 +244,7 @@ export default function DashboardExterne() {
                 className={`px-2.5 py-1 rounded-full text-[10px] font-bold border transition-all ${
                   filtreTypeDashboard === f.key
                     ? "bg-white/25 text-white border-white/40"
-                    : "bg-white/5 text-white/50 border-white/10 hover:bg-white/15"
+                    : "bg-white/5 text-white/80 border-white/10 hover:bg-white/15"
                 }`}
               >
                 {f.label}
@@ -262,7 +262,7 @@ export default function DashboardExterne() {
             ].map(item => (
               <div key={item.label} className="flex flex-col items-center gap-0.5 border-r border-white/10 last:border-r-0 pr-3 last:pr-0">
                 <p className={`text-xl sm:text-2xl font-black leading-none ${item.color}`}>{item.value}</p>
-                <p className="text-xs text-white/60 uppercase tracking-wide">{item.label}</p>
+                <p className="text-xs text-white/80 uppercase tracking-wide">{item.label}</p>
               </div>
             ))}
           </div>

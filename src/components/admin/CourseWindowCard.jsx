@@ -95,7 +95,7 @@ export default function CourseWindowCard({ courseId, formData, onClose }) {
     return (
       <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-4 flex items-center gap-2">
         <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
-        <span className="text-xs text-gray-400">Chargement course...</span>
+        <span className="text-xs text-gray-600">Chargement course...</span>
       </div>
     );
   }
@@ -103,7 +103,7 @@ export default function CourseWindowCard({ courseId, formData, onClose }) {
   if (!course) {
     return (
       <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-4">
-        <p className="text-xs text-gray-400 mb-2">Course introuvable</p>
+        <p className="text-xs text-gray-600 mb-2">Course introuvable</p>
         <Button size="sm" variant="outline" onClick={onClose} className="w-full h-8 text-xs">Fermer</Button>
       </div>
     );
@@ -202,20 +202,20 @@ export default function CourseWindowCard({ courseId, formData, onClose }) {
           ) : null; })()}
 
           <div className="bg-gray-50 rounded-lg p-2 space-y-1">
-            <p className="text-[10px] text-gray-400">Départ</p>
+            <p className="text-[10px] text-gray-600">Départ</p>
             <p className="text-xs font-medium text-gray-700 truncate">{course.adresse_depart || "—"}</p>
-            <p className="text-[10px] text-gray-400 mt-1">Arrivée</p>
+            <p className="text-[10px] text-gray-600 mt-1">Arrivée</p>
             <p className="text-xs font-medium text-gray-700 truncate">{course.adresse_arrivee || "—"}</p>
           </div>
 
           {/* PINs */}
           <div className="grid grid-cols-2 gap-2">
             <div className="bg-amber-50 border border-amber-100 rounded-lg p-2 text-center">
-              <p className="text-[9px] text-amber-500 uppercase font-semibold">PIN récup.</p>
+              <p className="text-[9px] text-amber-700 uppercase font-semibold">PIN récup.</p>
               <p className="text-lg font-black text-primary tracking-widest">{course.pickup_code_4_digits}</p>
             </div>
             <div className="bg-amber-50 border border-amber-100 rounded-lg p-2 text-center">
-              <p className="text-[9px] text-amber-500 uppercase font-semibold">PIN livr.</p>
+              <p className="text-[9px] text-amber-700 uppercase font-semibold">PIN livr.</p>
               <p className="text-lg font-black text-primary tracking-widest">{course.delivery_code_4_digits}</p>
             </div>
           </div>
@@ -248,7 +248,7 @@ export default function CourseWindowCard({ courseId, formData, onClose }) {
                 <div className="w-7 h-7 rounded-lg bg-gray-300 flex items-center justify-center shrink-0">
                   <MessageCircle className="w-3.5 h-3.5 text-gray-400" />
                 </div>
-                <p className="text-[11px] font-bold text-gray-400">Expéditeur — aucun numéro</p>
+                <p className="text-[11px] font-bold text-gray-600">Expéditeur — aucun numéro</p>
               </div>
             )}
 
@@ -270,7 +270,7 @@ export default function CourseWindowCard({ courseId, formData, onClose }) {
                 <div className="w-7 h-7 rounded-lg bg-gray-300 flex items-center justify-center shrink-0">
                   <MessageCircle className="w-3.5 h-3.5 text-gray-400" />
                 </div>
-                <p className="text-[11px] font-bold text-gray-400">Destinataire — aucun numéro</p>
+                <p className="text-[11px] font-bold text-gray-600">Destinataire — aucun numéro</p>
               </div>
             )}
           </div>

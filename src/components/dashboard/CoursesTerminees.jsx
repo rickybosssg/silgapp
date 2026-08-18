@@ -16,10 +16,10 @@ function CourseItem({ course, onView }) {
           <span className="font-bold text-sm text-white">{course.client_nom || course.client_telephone}</span>
           <CourseStatusBadge statut={course.statut} />
           {course.livreur_nom && (
-            <span className="text-[10px] text-white/50">→ {course.livreur_nom}</span>
+            <span className="text-[10px] text-white/80">→ {course.livreur_nom}</span>
           )}
         </div>
-        <div className="flex items-center gap-1 text-[11px] text-white/50">
+        <div className="flex items-center gap-1 text-[11px] text-white/80">
           <MapPin className="w-2.5 h-2.5 flex-shrink-0" />
           <span className="truncate">{addrDepart}</span>
           <ArrowRight className="w-2.5 h-2.5 flex-shrink-0" />
@@ -28,14 +28,14 @@ function CourseItem({ course, onView }) {
       </div>
       <div className="flex items-center gap-2 flex-shrink-0">
         {course.prix_final > 0 && (
-          <span className="text-xs font-bold text-[#00a86b]">{course.prix_final.toLocaleString()} F</span>
+          <span className="text-xs font-bold text-emerald-400">{course.prix_final.toLocaleString()} F</span>
         )}
         {course.distance_reelle_km ? (
-          <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-cyan-400 bg-cyan-500/10 rounded-full px-1.5 py-0.5">
+          <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-cyan-300 bg-cyan-500/10 rounded-full px-1.5 py-0.5">
             <MapPin className="w-2.5 h-2.5" />{Number(course.distance_reelle_km).toFixed(1)} km
           </span>
         ) : null}
-        <span className="text-[10px] text-white/50">
+        <span className="text-[10px] text-white/80">
           {format(new Date(course.heure_livraison || course.created_date), "HH:mm")}
         </span>
         <Button
@@ -65,11 +65,11 @@ export default function CoursesTerminees({ courses, onView }) {
             {courses.length}
           </span>
         </div>
-        <p className="text-xs text-white/50">Livrées & annulées</p>
+        <p className="text-xs text-white/70">Livrées & annulées</p>
       </div>
       <div className="px-4 pb-2">
         {courses.length === 0 ? (
-          <p className="text-center py-6 text-white/50 text-sm">Aucune course terminée aujourd'hui</p>
+          <p className="text-center py-6 text-white/70 text-sm">Aucune course terminée aujourd'hui</p>
         ) : (
           <>
             {affichees.map(c => (
@@ -78,7 +78,7 @@ export default function CoursesTerminees({ courses, onView }) {
             {courses.length > 5 && (
               <button
                 onClick={() => setExpanded(!expanded)}
-                className="w-full py-2 text-xs text-[#00a86b] flex items-center justify-center gap-1 hover:underline"
+                className="w-full py-2 text-xs text-emerald-400 flex items-center justify-center gap-1 hover:underline"
               >
                 {expanded ? <><ChevronUp className="w-3 h-3" /> Réduire</> : <><ChevronDown className="w-3 h-3" /> Voir les {courses.length - 5} autres</>}
               </button>

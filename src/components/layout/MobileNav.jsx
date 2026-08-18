@@ -88,7 +88,7 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
           </div>
           <div>
             <h1 className="font-extrabold text-sm text-white leading-tight">SILGAPP</h1>
-            <p className="text-[9px] text-slate-400 leading-tight">SILGAPP Livraison</p>
+            <p className="text-[9px] text-slate-300 leading-tight">SILGAPP Livraison</p>
           </div>
         </div>
 

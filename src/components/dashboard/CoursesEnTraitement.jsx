@@ -57,11 +57,11 @@ function CourseItemExterne({ course, onView }) {
           </div>
 
           {/* Adresses — nettoyées, jamais d'URL */}
-          <div className="flex items-center gap-1.5 text-xs text-white/50">
-            <MapPin className="w-3 h-3 text-[#00a86b] flex-shrink-0" />
+          <div className="flex items-center gap-1.5 text-xs text-white/80">
+            <MapPin className="w-3 h-3 text-emerald-400 flex-shrink-0" />
             <span className="truncate">{addrDepart}</span>
             <ArrowRight className="w-3 h-3 flex-shrink-0" />
-            <MapPin className="w-3 h-3 text-[#00a86b] flex-shrink-0" />
+            <MapPin className="w-3 h-3 text-emerald-400 flex-shrink-0" />
             <span className="truncate">{addrArrivee || "Destination à définir"}</span>
           </div>
 
@@ -73,11 +73,11 @@ function CourseItemExterne({ course, onView }) {
               <span className="text-xs text-white/50">→ {course.destinataire_nom}</span>
             )}
             {course.prix_final > 0 && (
-              <span className="text-xs font-bold text-[#00a86b] ml-auto">
+              <span className="text-xs font-bold text-emerald-400 ml-auto">
                 {course.prix_final.toLocaleString()} F
               </span>
             )}
-            <span className="text-[10px] text-white/50 flex items-center gap-1">
+            <span className="text-[10px] text-white/80 flex items-center gap-1">
               <Clock className="w-3 h-3" />
               {format(new Date(course.created_date), "HH:mm", { locale: fr })}
             </span>
@@ -124,11 +124,11 @@ function CourseItemInterne({ course, onView }) {
             )}
           </div>
 
-          <div className="flex items-center gap-1.5 text-xs text-white/50">
-            <MapPin className="w-3 h-3 text-[#00a86b] flex-shrink-0" />
+          <div className="flex items-center gap-1.5 text-xs text-white/80">
+            <MapPin className="w-3 h-3 text-emerald-400 flex-shrink-0" />
             <span className="truncate">{addrDepart}</span>
             <ArrowRight className="w-3 h-3 flex-shrink-0" />
-            <MapPin className="w-3 h-3 text-[#00a86b] flex-shrink-0" />
+            <MapPin className="w-3 h-3 text-emerald-400 flex-shrink-0" />
             <span className="truncate">{addrArrivee}</span>
           </div>
 
@@ -138,11 +138,11 @@ function CourseItemInterne({ course, onView }) {
               <span className="text-xs font-medium text-white">🚴 {course.livreur_nom}</span>
             )}
             {(course.prix_reel || course.prix) > 0 && (
-              <span className="text-xs font-bold text-[#00a86b] ml-auto">
+              <span className="text-xs font-bold text-emerald-400 ml-auto">
                 {(course.prix_reel || course.prix).toLocaleString()} F
               </span>
             )}
-            <span className="text-[10px] text-white/50 flex items-center gap-1">
+            <span className="text-[10px] text-white/80 flex items-center gap-1">
               <Clock className="w-3 h-3" />
               {format(new Date(course.created_date), "HH:mm", { locale: fr })}
             </span>
@@ -173,14 +173,14 @@ export default function CoursesEnTraitement({ courses, onView, isExterne = false
             {courses.length}
           </span>
         </div>
-        <p className="text-xs text-white/50">Assignées — en cours de livraison</p>
+        <p className="text-xs text-white/70">Assignées — en cours de livraison</p>
       </div>
       <div className="p-3 space-y-2 max-h-[400px] overflow-y-auto">
         {courses.length === 0 ? (
           <div className="text-center py-8 space-y-2">
             <div className="w-2.5 h-2.5 rounded-full bg-blue-500/50 mx-auto" />
-            <p className="text-white/50 text-sm">Aucune course en traitement</p>
-            <p className="text-xs text-white/40">Les courses assignées apparaîtront ici</p>
+            <p className="text-white/70 text-sm">Aucune course en traitement</p>
+            <p className="text-xs text-white/70">Les courses assignées apparaîtront ici</p>
           </div>
         ) : (
           courses.map(c =>

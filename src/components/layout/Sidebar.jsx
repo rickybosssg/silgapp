@@ -92,7 +92,7 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, part
         {!collapsed && (
           <div>
             <h1 className="font-extrabold text-sm text-white tracking-wide">SILGAPP</h1>
-            <p className="text-[10px] text-slate-400">SILGAPP Livraison</p>
+            <p className="text-[10px] text-slate-300">SILGAPP Livraison</p>
           </div>
         )}
       </div>
