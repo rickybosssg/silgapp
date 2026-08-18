@@ -163,15 +163,15 @@ export default function CourseWindowCard({ courseId, formData, onClose }) {
   return (
     <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
       {/* Header */}
-      <div className={`relative overflow-hidden p-3 ${isTerminal ? "bg-gradient-to-br from-green-700 to-green-900" : "bg-gradient-to-br from-emerald-700 to-emerald-900"}`}>
+      <div className="relative overflow-hidden p-3 bg-gradient-to-br from-primary-dark to-primary silgapp-relief-surface">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 min-w-0">
-            <div className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center shrink-0">
+            <div className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center shrink-0 silgapp-relief">
               <CheckCircle2 className="w-4 h-4 text-white" />
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-bold text-white truncate">Course créée</p>
-              <p className="text-[10px] text-white/60">#{course.id?.slice(-8) || course.id}</p>
+              <p className="text-sm font-bold text-white truncate silgapp-relief-text">Course créée</p>
+              <p className="text-[10px] text-white/70">#{course.id?.slice(-8) || course.id}</p>
             </div>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
@@ -278,7 +278,7 @@ export default function CourseWindowCard({ courseId, formData, onClose }) {
           {/* Course Traité button */}
           <Button
             onClick={onClose}
-            className="w-full h-10 rounded-xl gap-2 font-bold text-sm bg-gradient-to-r from-green-600 to-emerald-700 hover:from-green-500 hover:to-emerald-600 shadow-md"
+            className="w-full h-10 rounded-xl gap-2 font-bold text-sm bg-primary hover:bg-primary-dark shadow-md silgapp-relief-surface"
           >
             <Check className="w-4 h-4" />
             Course Traité

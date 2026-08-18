@@ -514,14 +514,14 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
 
   if (state === "unauthenticated") {
     return (
-      <div className="silgapp-auth-screen min-h-screen bg-[#eef6ff] px-5 py-7 flex items-center justify-center dark:bg-[#07111f]">
-        <div className="w-full max-w-sm overflow-hidden rounded-[28px] border border-white/80 bg-white shadow-[0_24px_70px_rgba(15,79,154,0.18)] dark:border-slate-700 dark:bg-slate-950">
-          <div className="relative overflow-hidden bg-[#0b4a8b] px-6 pb-7 pt-8 text-white">
+      <div className="silgapp-auth-screen min-h-screen bg-primary-light px-5 py-7 flex items-center justify-center dark:bg-[#07111f]">
+        <div className="w-full max-w-sm overflow-hidden rounded-[28px] border border-white/80 bg-white shadow-[0_24px_70px_rgba(0,122,255,0.18)] dark:border-slate-700 dark:bg-slate-950">
+          <div className="relative overflow-hidden bg-primary-dark px-6 pb-7 pt-8 text-white silgapp-relief-surface">
             <div className="absolute right-[-45px] top-[-55px] h-40 w-40 rounded-full bg-cyan-300/15" />
             <div className="absolute bottom-[-70px] left-[-45px] h-44 w-44 rounded-full bg-blue-300/10" />
             <div className="relative">
               <div className="mb-5 flex items-center justify-between">
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/20 bg-white/15 shadow-lg">
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/20 bg-white/15 shadow-lg silgapp-relief">
                   <Truck className="h-7 w-7 text-white" />
                 </div>
                 <div className="flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[11px] font-semibold text-blue-50">
@@ -530,7 +530,7 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
                 </div>
               </div>
               <p className="text-xs font-bold uppercase text-cyan-200">SILGAPP</p>
-              <h1 className="mt-1 text-2xl font-bold text-white">
+              <h1 className="mt-1 text-2xl font-bold text-white silgapp-relief-text">
                 {authMode === "register"
                   ? "Créer un compte"
                   : authMode === "verify"
@@ -656,7 +656,7 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
             <button
               type="submit"
               disabled={loginLoading}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#0b62b5] px-4 py-3.5 font-bold text-white shadow-lg shadow-blue-600/20 transition hover:bg-[#084f94] active:scale-[0.98] disabled:opacity-70"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3.5 font-bold text-white shadow-lg shadow-primary/20 transition hover:bg-primary-dark active:scale-[0.98] disabled:opacity-70 silgapp-relief"
             >
               {loginLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
               {authMode === "register"
@@ -675,7 +675,7 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
               <button
                 type="button"
                 onClick={() => switchAuthMode("reset_request")}
-                className="w-full text-sm font-semibold text-[#0b62b5] hover:text-[#084f94]"
+                className="w-full text-sm font-semibold text-primary hover:text-primary-dark"
               >
                 Mot de passe oublié ?
               </button>
@@ -691,7 +691,7 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
                     .then(() => setLoginInfo("Nouveau code envoyé. Vérifiez votre email."))
                     .catch((error) => setLoginError(error?.message || "Impossible de renvoyer le code."));
                 }}
-                className="w-full text-sm font-semibold text-[#0b62b5]"
+                className="w-full text-sm font-semibold text-primary"
               >
                 Renvoyer le code
               </button>
@@ -702,7 +702,7 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
             <button
               type="button"
               onClick={() => switchAuthMode("login")}
-              className="w-full text-sm font-semibold text-[#0b62b5]"
+              className="w-full text-sm font-semibold text-primary"
             >
               Retour à la connexion
             </button>
@@ -710,7 +710,7 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
             <button
               type="button"
               onClick={() => switchAuthMode(authMode === "login" ? "register" : "login")}
-              className="w-full text-sm font-semibold text-[#0b62b5]"
+              className="w-full text-sm font-semibold text-primary"
             >
               {authMode === "login" ? "Créer un nouveau compte" : "J'ai déjà un compte"}
             </button>
