@@ -8,17 +8,28 @@ const PRIORITY_STYLES = {
   P1: { bg: "bg-orange-500", border: "border-orange-600", label: "Important" },
 };
 
+const TOAST_POSITION_STYLE = {
+  position: "fixed",
+  top: "max(env(safe-area-inset-top), 12px)",
+  left: "12px",
+  right: "12px",
+  width: "auto",
+  maxWidth: "calc(100vw - 24px)",
+  zIndex: 70,
+  boxSizing: "border-box",
+};
+
 export default function VenusAdminToast({ toast, onDismiss }) {
   return (
     <AnimatePresence>
       {toast && (
         <motion.div
           key={toast.id}
-          initial={{ opacity: 0, y: -100, scale: 0.95 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: -100, scale: 0.95 }}
+          initial={{ opacity: 0, y: -80 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -80 }}
           transition={{ duration: 0.3, ease: "easeOut" }}
-          className="fixed top-4 right-3 left-3 z-[60] safe-area-top"
+          style={TOAST_POSITION_STYLE}
         >
           <div className={cn(
             "flex items-start gap-3 rounded-xl shadow-2xl border-2 p-3 text-white",
@@ -30,11 +41,11 @@ export default function VenusAdminToast({ toast, onDismiss }) {
             </div>
             <div className="flex-1 min-w-0 pt-0.5">
               <div className="flex items-center gap-2 mb-0.5">
-                <span className="text-[10px] font-black uppercase tracking-wide bg-white/20 px-1.5 py-0.5 rounded">
+                <span className="text-[10px] font-black uppercase tracking-wide bg-white/20 px-1.5 py-0.5 rounded flex-shrink-0">
                   {PRIORITY_STYLES[toast.priority]?.label || "Important"}
                 </span>
                 {toast.count > 1 && (
-                  <span className="text-[10px] font-bold bg-white/20 px-1.5 py-0.5 rounded">×{toast.count}</span>
+                  <span className="text-[10px] font-bold bg-white/20 px-1.5 py-0.5 rounded flex-shrink-0">×{toast.count}</span>
                 )}
               </div>
               <p className="text-sm font-semibold leading-snug break-words whitespace-normal">{toast.message}</p>
