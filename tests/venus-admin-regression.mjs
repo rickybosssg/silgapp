@@ -29,12 +29,35 @@ for (const functionPath of [
 for (const entityPath of [
   "base44/entities/VenusAdminEvent.jsonc",
   "base44/entities/VenusRapport.jsonc",
+  "base44/entities/AdminInboxItem.jsonc",
 ]) {
   const schema = JSON.parse(read(entityPath));
   for (const operation of ["read", "create", "update", "delete"]) {
     assert.equal(schema.rls?.[operation]?.user_condition?.role, "admin", `${entityPath}: RLS ${operation} doit être limitée au rôle admin`);
   }
 }
+
+const adminToast = read("src/components/admin/VenusAdminToast.jsx");
+assert.match(adminToast, /createPortal\(/, "Le toast Admin doit être rendu dans un portal document.body");
+assert.match(adminToast, /document\.body/, "Le toast Admin doit être détaché des transforms parents");
+assert.doesNotMatch(adminToast, /scale:\s*/, "Le toast Admin ne doit pas réintroduire de transform scale");
+
+const adminInboxPage = read("src/pages/CentreNotifications.jsx");
+assert.match(adminInboxPage, /useEffect\(\(\) => \{[\s\S]*AdminInboxItem\.subscribe/, "La subscription Inbox doit être gérée par un effet React");
+assert.match(adminInboxPage, /return \(\) => unsubscribe\?\.\(\)/, "La subscription Inbox doit être nettoyée au démontage");
+assert.match(adminInboxPage, /navigate\(item\.action_url\)/, "Le Centre Admin doit ouvrir les deep links persistés");
+assert.doesNotMatch(adminInboxPage, /AdminInboxItem\.bulkUpdate/, "Le marquage global ne doit pas dépendre d'une méthode SDK non vérifiée");
+
+const eventBus = read("base44/shared/venusAdminEventBus.ts");
+assert.match(eventBus, /source_id:\s*venusEvent\?\.id/, "AdminInboxItem doit référencer le vrai VenusAdminEvent");
+
+const pushFunction = read("base44/functions/envoiNotificationPush/entry.ts");
+assert.match(pushFunction, /inbox_item_id:\s*String\(inboxItemId/, "Le payload FCM Admin doit contenir inbox_item_id");
+
+const messageFunction = read("base44/functions/envoyerMessage/entry.ts");
+assert.match(messageFunction, /deduplication_key:\s*`INBOX_MSG_\$\{message\.id\}_\$\{admin\.email\}`/, "Les messages Admin doivent être dédupliqués par message et destinataire");
+assert.equal((messageFunction.match(/createAdminInboxItem\(/g) || []).length, 1, "Un message Admin ne doit créer l'Inbox qu'une seule fois");
+assert.match(messageFunction, /inbox_item_id:\s*adminInboxIds\.get\(r\.email\)/, "Le push message Admin doit réutiliser l'Inbox existante");
 
 assert.equal(shouldPush({ id: "p0", type: "test", priority: "haute", observation: "P0" }), true);
 assert.equal(shouldPush({ id: "p1", type: "test", priority: "moyenne", observation: "P1" }), true);

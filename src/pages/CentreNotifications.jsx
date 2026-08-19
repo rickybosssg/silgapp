@@ -1,9 +1,11 @@
-import React, { useState, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bell, MessageSquare, Sparkles, Package, CreditCard, XCircle, Settings, Check, Archive, Inbox } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Bell, MessageSquare, Sparkles, Package, CreditCard, XCircle, Settings, Check, Archive, Inbox, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { useAdminContext } from "@/hooks/useAdminContext.js";
 
 const CATEGORIES = [
   { key: "all", label: "Tous", icon: Inbox },
@@ -36,30 +38,34 @@ function timeAgo(dateStr) {
 
 export default function CentreNotifications() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [activeCategory, setActiveCategory] = useState("all");
+  const { isPays, countryCode, selectedCountry, loading: adminContextLoading } = useAdminContext();
+  const effectiveCountry = isPays ? countryCode : selectedCountry;
 
   const { data: items = [], isLoading } = useQuery({
-    queryKey: ["admin-inbox-items"],
-    queryFn: () => base44.entities.AdminInboxItem.list("-created_date", 200),
+    queryKey: ["admin-inbox-items", effectiveCountry || "ALL"],
+    queryFn: () => base44.entities.AdminInboxItem.filter(
+      effectiveCountry ? { country_code: effectiveCountry } : {},
+      "-created_date",
+      200
+    ),
+    enabled: !adminContextLoading,
     refetchInterval: 30000,
   });
 
-  // Realtime subscription
-  useQuery({
-    queryKey: ["admin-inbox-subscription"],
-    queryFn: async () => {
-      const unsub = base44.entities.AdminInboxItem.subscribe(() => {
-        queryClient.invalidateQueries({ queryKey: ["admin-inbox-items"] });
-      });
-      return unsub;
-    },
-    staleTime: Infinity,
-  });
+  useEffect(() => {
+    const unsubscribe = base44.entities.AdminInboxItem.subscribe(() => {
+      queryClient.invalidateQueries({ queryKey: ["admin-inbox-items"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-inbox-unread-count"] });
+    });
+    return () => unsubscribe?.();
+  }, [queryClient]);
 
   const unreadCount = useMemo(() => items.filter(i => i.status === "unread").length, [items]);
 
   const filteredItems = useMemo(() => {
-    const sorted = [...items].sort((a, b) => {
+    const sorted = items.filter(i => i.status !== "archived").sort((a, b) => {
       // Unread first
       if (a.status === "unread" && b.status !== "unread") return -1;
       if (a.status !== "unread" && b.status === "unread") return 1;
@@ -96,14 +102,21 @@ export default function CentreNotifications() {
     const unread = items.filter(i => i.status === "unread");
     if (unread.length === 0) return;
     try {
-      await base44.entities.AdminInboxItem.bulkUpdate(
-        unread.map(i => ({ id: i.id, status: "read", read_at: new Date().toISOString() }))
-      );
+      const readAt = new Date().toISOString();
+      await Promise.all(unread.map(item =>
+        base44.entities.AdminInboxItem.update(item.id, { status: "read", read_at: readAt })
+      ));
       queryClient.invalidateQueries({ queryKey: ["admin-inbox-items"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-inbox-unread-count"] });
       toast.success(`${unread.length} notification(s) marquée(s) comme lues`);
     } catch (e) {
       toast.error("Erreur marquage global");
     }
+  };
+
+  const handleOpen = async (item) => {
+    if (item.status === "unread") await handleMarkRead(item);
+    if (item.action_url?.startsWith("/")) navigate(item.action_url);
   };
 
   const categoryCounts = useMemo(() => {
@@ -210,8 +223,17 @@ export default function CentreNotifications() {
                     <p className="text-sm font-bold text-gray-900">{item.title}</p>
                     <p className="text-xs text-gray-600 mt-0.5">{item.body}</p>
 
-                    {isUnread && (
-                      <div className="flex gap-2 mt-2">
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {item.action_url?.startsWith("/") && (
+                        <button
+                          onClick={() => handleOpen(item)}
+                          className="flex items-center gap-1 px-2 py-1 rounded-lg bg-primary text-white text-[10px] font-semibold hover:bg-primary/90"
+                        >
+                          Ouvrir <ArrowRight className="w-3 h-3" />
+                        </button>
+                      )}
+                      {isUnread && (
+                        <>
                         <button
                           onClick={() => handleMarkRead(item)}
                           className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white border border-gray-200 text-[10px] font-semibold text-gray-700 hover:bg-gray-50"
@@ -224,8 +246,9 @@ export default function CentreNotifications() {
                         >
                           <Archive className="w-3 h-3" /> Archiver
                         </button>
-                      </div>
-                    )}
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

@@ -12,6 +12,7 @@ import AppMaintenanceGate from './components/admin/AppMaintenanceGate.jsx';
 import { restoreTokenFromCookie, syncTokenFromPreferences, clearPersistedToken } from '@/lib/authPersistence';
 import { trackAppInstall } from '@/lib/trackInstall';
 import IOSAppStoreBanner from './components/IOSAppStoreBanner.jsx';
+import { base44 } from '@/api/base44Client';
 
 // LoadingScreen défini IMMÉDIATEMENT avant lazy loading
 const LoadingScreen = () => <SplashScreen />;
@@ -69,7 +70,6 @@ const PolitiqueConfidentialite = lazy(() => import('./pages/PolitiqueConfidentia
 const TestNotifications = lazy(() => import('./pages/TestNotifications.jsx'));
 const DiagnosticPushComplet = lazy(() => import('./pages/DiagnosticPushComplet.jsx'));
 const TestDispatchLivreur = lazy(() => import('./pages/TestDispatchLivreur.jsx'));
-const CentreNotificationsPush = lazy(() => import('./pages/CentreNotificationsPush.jsx'));
 const DemoDashboard = lazy(() => import('./pages/DemoDashboard.jsx'));
 const Statistiques = lazy(() => import('./pages/Statistiques.jsx'));
 // ── Module Boutiques / Restaurants / Partenaires ──
@@ -156,6 +156,42 @@ function AppContent() {
   // Hook for Android hardware back button
   const navigate = useNavigate();
   const location = useLocation();
+
+  useEffect(() => {
+    let active = true;
+
+    const openAdminInboxItem = async (data = {}) => {
+      const itemId = String(data.inbox_item_id || '').trim();
+      if (!itemId) return;
+
+      try {
+        const user = await base44.auth.me();
+        if (!active || user?.role !== 'admin') return;
+        localStorage.removeItem('silgapp_last_opened_notification');
+
+        const items = await base44.entities.AdminInboxItem.filter({ id: itemId }, '-created_date', 1);
+        if (!active) return;
+        const actionUrl = items?.[0]?.action_url;
+        navigate(actionUrl?.startsWith('/') ? actionUrl : '/admin/centre-notifications');
+      } catch {
+        if (active) navigate('/admin/centre-notifications');
+      }
+    };
+
+    const handleNotificationOpened = (event) => openAdminInboxItem(event.detail || {});
+    window.addEventListener('silgapp:notification-opened', handleNotificationOpened);
+
+    try {
+      const lastOpened = JSON.parse(localStorage.getItem('silgapp_last_opened_notification') || 'null');
+      if (lastOpened?.inbox_item_id) openAdminInboxItem(lastOpened);
+    } catch {}
+
+    return () => {
+      active = false;
+      window.removeEventListener('silgapp:notification-opened', handleNotificationOpened);
+    };
+  }, [navigate]);
+
   useEffect(() => {
     const handleBackButton = (e) => {
       e.preventDefault();
@@ -409,7 +445,6 @@ function AppContent() {
           )}
           <Route path="/notifications" element={<AnimatedRoutes><Notifications /></AnimatedRoutes>} />
           <Route path="/admin/test-notifications" element={<AnimatedRoutes><TestNotifications /></AnimatedRoutes>} />
-          <Route path="/diagnostic-push-complet" element={<AnimatedRoutes><DiagnosticPushComplet /></AnimatedRoutes>} />
           <Route path="/admin/test-dispatch-livreur" element={<AnimatedRoutes><TestDispatchLivreur /></AnimatedRoutes>} />
           <Route path="/admin/centre-notifications" element={<AnimatedRoutes><CentreNotifications /></AnimatedRoutes>} />
           <Route path="/admin/demandes-livreurs" element={<AnimatedRoutes><DemandesLivreursAdmin /></AnimatedRoutes>} />
@@ -428,7 +463,6 @@ function AppContent() {
           <Route path="/admin/messages" element={<AnimatedRoutes><AdminMessages /></AnimatedRoutes>} />
           <Route path="/admin/whatsapp" element={<AnimatedRoutes><WhatsAppAdmin /></AnimatedRoutes>} />
           <Route path="/admin/venus" element={<AnimatedRoutes><VenusAdminCenter /></AnimatedRoutes>} />
-          <Route path="/admin/venus-brain" element={<AnimatedRoutes><VenusBrainCenter /></AnimatedRoutes>} />
           <Route path="/admin/venus-learning" element={<AnimatedRoutes><VenusLearningCenter /></AnimatedRoutes>} />
           <Route path="/admin/venus-brain" element={<AnimatedRoutes><VenusBrainCenter /></AnimatedRoutes>} />
           <Route path="/admin/venus-workflows" element={<AnimatedRoutes><VenusWorkflowCenter /></AnimatedRoutes>} />

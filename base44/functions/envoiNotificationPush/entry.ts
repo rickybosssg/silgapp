@@ -239,6 +239,7 @@ Deno.serve(async (req) => {
       alert_interval_seconds,
       dispatch_version,
       category,
+      inbox_item_id: existingInboxItemId,
     } = body;
     const targetEmail = String(destinataire_email || '').trim().toLowerCase();
 
@@ -364,24 +365,36 @@ Deno.serve(async (req) => {
     let inboxItemId: string | null = null;
     if (String(user_type || '') === 'admin') {
       try {
-        const { createAdminInboxItem } = await import('../../shared/adminInbox.ts');
-        const inboxType = String(type || '').includes('annul') ? 'cancellation'
-          : String(type || '').includes('paiement') || String(type || '').includes('payment') ? 'payment'
-          : String(type || '').includes('course') ? 'course'
-          : String(type || '').includes('message') ? 'message'
-          : 'system';
-        inboxItemId = await createAdminInboxItem(base44, {
-          type: inboxType as any,
-          priority: 'P2',
-          title: personalizedTitre,
-          body: personalizedMessage,
-          source_entity: 'Notification',
-          source_id: notification.id,
-          course_id: course_id || undefined,
-          country_code: 'ALL',
-          action_url: course_id ? '/courses' : '/admin/centre-notifications',
-          deduplication_key: `INBOX_NOTIF_${notification.id}`,
-        });
+        if (existingInboxItemId) {
+          inboxItemId = String(existingInboxItemId);
+        } else {
+          let inboxCountryCode = 'ALL';
+          if (course_id) {
+            const inboxCourse = await base44.asServiceRole.entities.CourseExterne.get(course_id).catch(() => null);
+            inboxCountryCode = normalizeCountryCode(inboxCourse?.country_code) || 'ALL';
+          } else {
+            const adminUsers = await base44.asServiceRole.entities.User.filter({ email: targetEmail }).catch(() => []);
+            inboxCountryCode = normalizeCountryCode(adminUsers?.[0]?.country_code) || 'ALL';
+          }
+          const { createAdminInboxItem } = await import('../../shared/adminInbox.ts');
+          const inboxType = String(type || '').includes('annul') ? 'cancellation'
+            : String(type || '').includes('paiement') || String(type || '').includes('payment') ? 'payment'
+            : String(type || '').includes('course') ? 'course'
+            : String(type || '').includes('message') ? 'message'
+            : 'system';
+          inboxItemId = await createAdminInboxItem(base44, {
+            type: inboxType as any,
+            priority: 'P2',
+            title: personalizedTitre,
+            body: personalizedMessage,
+            source_entity: 'Notification',
+            source_id: notification.id,
+            course_id: course_id || undefined,
+            country_code: inboxCountryCode,
+            action_url: course_id ? '/courses' : '/admin/centre-notifications',
+            deduplication_key: `INBOX_NOTIF_${notification.id}`,
+          });
+        }
       } catch (_) {
         // Non-bloquant
       }

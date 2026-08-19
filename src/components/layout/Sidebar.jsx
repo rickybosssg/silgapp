@@ -75,10 +75,11 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, part
 
   // ── Badge non-lu pour le Centre de notifications ──
   const { data: inboxUnread = 0 } = useQuery({
-    queryKey: ["admin-inbox-unread-count"],
+    queryKey: ["admin-inbox-unread-count", effectiveCountry || "ALL"],
     queryFn: async () => {
       try {
-        const items = await base44.entities.AdminInboxItem.filter({ status: "unread" }, "-created_date", 200);
+        const filter = { status: "unread", ...(effectiveCountry ? { country_code: effectiveCountry } : {}) };
+        const items = await base44.entities.AdminInboxItem.filter(filter, "-created_date", 200);
         return items?.length || 0;
       } catch { return 0; }
     },
