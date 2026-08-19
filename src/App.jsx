@@ -400,7 +400,7 @@ function AppContent() {
               <Route path="/admin/frais-annulation" element={<AnimatedRoutes><FraisAnnulationAdmin /></AnimatedRoutes>} />
               <Route path="/admin/venus-rapports" element={<AnimatedRoutes><VenusRapportsPage /></AnimatedRoutes>} />
               <Route path="/admin/zones-chaudes" element={<AnimatedRoutes><ZonesChaudesAdmin /></AnimatedRoutes>} />
-              <Route path="/admin/nouvelle-course" element={<AnimatedRoutes><AdminCourseForm /></AnimatedRoutes>} />
+              <Route path="/admin/nouvelle-course" element={<AdminCourseForm />} />
               <Route path="/admin/externe" element={<AnimatedRoutes><DashboardAdminExterne /></AnimatedRoutes>} />
               <Route path="/maintenance" element={<AnimatedRoutes><Maintenance /></AnimatedRoutes>} />
               <Route path="/diagnostic-push-complet" element={<AnimatedRoutes><DiagnosticPushComplet /></AnimatedRoutes>} />
