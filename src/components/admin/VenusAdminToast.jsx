@@ -18,7 +18,7 @@ export default function VenusAdminToast({ toast, onDismiss }) {
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -100, scale: 0.95 }}
           transition={{ duration: 0.3, ease: "easeOut" }}
-          className="fixed top-4 left-1/2 -translate-x-1/2 z-[60] w-full max-w-md px-4 safe-area-top"
+          className="fixed top-4 right-3 left-3 z-[60] safe-area-top"
         >
           <div className={cn(
             "flex items-start gap-3 rounded-xl shadow-2xl border-2 p-3 text-white",
@@ -37,7 +37,7 @@ export default function VenusAdminToast({ toast, onDismiss }) {
                   <span className="text-[10px] font-bold bg-white/20 px-1.5 py-0.5 rounded">×{toast.count}</span>
                 )}
               </div>
-              <p className="text-sm font-semibold leading-snug">{toast.message}</p>
+              <p className="text-sm font-semibold leading-snug break-words whitespace-normal">{toast.message}</p>
             </div>
             <button
               onClick={onDismiss}
