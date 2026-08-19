@@ -10,6 +10,7 @@ import {
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import VenusRapportsTab from "./VenusRapportsTab";
 
 const VENUS_AVATAR = "https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/17cf522aa_file_0000000034b871f7bf133c0de0c9eb62.png";
 
@@ -31,6 +32,7 @@ const FILTERS = [
 export default function VenusAdminPanel({ onClose }) {
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState("all");
+  const [activeTab, setActiveTab] = useState("alertes");
 
   const { data: events = [], isLoading } = useQuery({
     queryKey: ["venus-admin-events"],
@@ -107,6 +109,24 @@ export default function VenusAdminPanel({ onClose }) {
           </Button>
         </div>
 
+        {/* Tabs */}
+        <div className="flex items-center gap-1.5 px-3 py-2 border-b bg-slate-50">
+          <button
+            onClick={() => setActiveTab("alertes")}
+            className={cn("px-3 py-1.5 rounded-lg text-xs font-bold", activeTab === "alertes" ? "bg-primary text-white" : "bg-white text-slate-600 border border-slate-200")}
+          >
+            Alertes
+          </button>
+          <button
+            onClick={() => setActiveTab("rapports")}
+            className={cn("px-3 py-1.5 rounded-lg text-xs font-bold", activeTab === "rapports" ? "bg-primary text-white" : "bg-white text-slate-600 border border-slate-200")}
+          >
+            Rapports
+          </button>
+        </div>
+
+        {activeTab === "alertes" && (
+        <>
         {/* Filtres */}
         <div className="flex items-center gap-1.5 p-3 border-b bg-slate-50 overflow-x-auto scrollbar-hide">
           {FILTERS.map(f => (
@@ -217,6 +237,9 @@ export default function VenusAdminPanel({ onClose }) {
             })
           )}
         </div>
+        </>
+        )}
+        {activeTab === "rapports" && <VenusRapportsTab />}
       </div>
     </div>
   );

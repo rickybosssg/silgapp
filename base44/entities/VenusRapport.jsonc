@@ -11,9 +11,19 @@
       ],
       "description": "Type de rapport"
     },
+    "sous_type": {
+      "type": "string",
+      "enum": [
+        "matin",
+        "soir",
+        "journee",
+        "hebdomadaire"
+      ],
+      "description": "Sous-type: matin (bilan veille), soir (bilan jour), journee (point intelligent), hebdomadaire"
+    },
     "country_code": {
       "type": "string",
-      "description": "Pays concern\u00e9 ou 'ALL' pour global"
+      "description": "Pays concern\u00e9 ou ALL pour global"
     },
     "periode_debut": {
       "type": "string",
@@ -29,6 +39,24 @@
       "type": "string",
       "description": "Contenu du rapport en JSON stringifi\u00e9"
     },
+    "resume": {
+      "type": "string",
+      "description": "R\u00e9sum\u00e9 textuel d\u00e9terministe affich\u00e9 \u00e0 Eric"
+    },
+    "statut_lecture": {
+      "type": "string",
+      "enum": [
+        "non_lu",
+        "lu"
+      ],
+      "default": "non_lu",
+      "description": "Statut de lecture par l'admin"
+    },
+    "lu_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date de lecture par l'admin"
+    },
     "nb_questions": {
       "type": "number",
       "default": 0
@@ -42,20 +70,16 @@
       "default": 0
     },
     "top_categories": {
-      "type": "string",
-      "description": "JSON stringifi\u00e9 des top cat\u00e9gories"
+      "type": "string"
     },
     "problemes_detectes": {
-      "type": "string",
-      "description": "JSON stringifi\u00e9 des probl\u00e8mes d\u00e9tect\u00e9s"
+      "type": "string"
     },
     "recommandations": {
-      "type": "string",
-      "description": "Recommandations g\u00e9n\u00e9r\u00e9es par l'IA"
+      "type": "string"
     },
     "genere_par": {
-      "type": "string",
-      "description": "Admin ou syst\u00e8me ayant g\u00e9n\u00e9r\u00e9 le rapport"
+      "type": "string"
     }
   },
   "required": [
