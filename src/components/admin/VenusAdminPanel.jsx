@@ -12,6 +12,7 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import VenusRapportsTab from "./VenusRapportsTab";
 import VenusAdminChat from "./VenusAdminChat";
+import VenusAdminInsights from "./VenusAdminInsights";
 
 const VENUS_AVATAR = "https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/17cf522aa_file_0000000034b871f7bf133c0de0c9eb62.png";
 
@@ -113,6 +114,12 @@ export default function VenusAdminPanel({ onClose }) {
         {/* Tabs */}
         <div className="flex items-center gap-1.5 px-3 py-2 border-b bg-slate-50">
           <button
+            onClick={() => setActiveTab("insights")}
+            className={cn("px-3 py-1.5 rounded-lg text-xs font-bold", activeTab === "insights" ? "bg-primary text-white" : "bg-white text-slate-600 border border-slate-200")}
+          >
+            À surveiller
+          </button>
+          <button
             onClick={() => setActiveTab("alertes")}
             className={cn("px-3 py-1.5 rounded-lg text-xs font-bold", activeTab === "alertes" ? "bg-primary text-white" : "bg-white text-slate-600 border border-slate-200")}
           >
@@ -132,6 +139,7 @@ export default function VenusAdminPanel({ onClose }) {
           </button>
         </div>
 
+        {activeTab === "insights" && <VenusAdminInsights />}
         {activeTab === "alertes" && (
         <>
         {/* Filtres */}

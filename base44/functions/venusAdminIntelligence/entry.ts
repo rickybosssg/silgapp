@@ -1,9 +1,7 @@
-// ═══════════════════════════════════════════════════════════════════════
-// PHASE 5 — VENUS Admin Chat (Conversation + Intelligence proactive)
-// Mode: READ → ANALYZE → EXPLAIN → RECOMMEND (lecture seule absolue)
+// PHASE 5 — VENUS Admin Intelligence Proactive (READ ONLY)
+// Détections DÉTERMINISTES de tendances. Lecture seule stricte.
 // Sources: CourseExterne.prix_final, commission_silga, Livreur.montant_du_silga, PaiementSilgapp.montant_paye (traite)
 // VENUS WhatsApp inchangée. Dispatch V2 inchangé.
-// ═══════════════════════════════════════════════════════════════════════
 
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
 
@@ -11,23 +9,25 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const DATE_STR = (d) => d.toISOString().split('T')[0];
 
 const SEUILS = {
-  annulation_rate: 0.30, annulation_increase: 0.50, course_volume_change: 0.20,
-  ca_change: 0.25, ca_week_change: 0.25, debt_concentration: 0.60,
-  problem_courses: 3, dispatch_delay_min: 30, driver_availability_drop: 0.70,
-  commission_tolerance: 0.05, repetitive_events: 3, debtors_threshold: 5,
+  annulation_rate: 0.30,
+  annulation_increase: 0.50,
+  course_volume_change: 0.20,
+  ca_change: 0.25,
+  ca_week_change: 0.25,
+  debt_concentration: 0.60,
+  problem_courses: 3,
+  dispatch_delay_min: 30,
+  driver_availability_drop: 0.70,
+  commission_tolerance: 0.05,
+  repetitive_events: 3,
+  debtors_threshold: 5,
 };
 
 export default async function handler(req) {
   const body = await req.json().catch(() => ({}));
-  const message = body.message || '';
-  const history = Array.isArray(body.history) ? body.history : [];
   const countryCode = body.country_code || 'ALL';
-
-  if (!message) return Response.json({ success: false, error: 'Message requis' }, { status: 400 });
-
   const base44 = createClientFromRequest(req);
 
-  // ── 1. Périodes ──
   const now = new Date();
   const today = DATE_STR(now);
   const yesterday = DATE_STR(new Date(now.getTime() - DAY_MS));
@@ -35,13 +35,11 @@ export default async function handler(req) {
   const twoWeeksAgo = DATE_STR(new Date(now.getTime() - 14 * DAY_MS));
   const currentHour = now.getHours();
 
-  // ── 2. Données (sources officielles) ──
-  const [allCourses, allDrivers, allPayments, recentEvents, recentReports] = await Promise.all([
+  const [allCourses, allDrivers, allPayments, recentEvents] = await Promise.all([
     base44.entities.CourseExterne.list('-created_date', 1000),
     base44.entities.Livreur.list('-created_date', 500),
     base44.entities.PaiementSilgapp.filter({ statut: 'traite' }),
     base44.entities.VenusAdminEvent.list('-created_date', 50),
-    base44.entities.VenusRapport.list('-created_date', 10),
   ]);
 
   const filterCountry = (items) => countryCode === 'ALL' ? items : items.filter(i => i.country_code === countryCode);
@@ -49,7 +47,6 @@ export default async function handler(req) {
   const drivers = filterCountry(allDrivers);
   const payments = filterCountry(allPayments);
 
-  // ── 3. Métriques ──
   const coursesToday = courses.filter(c => c.created_date?.split('T')[0] === today);
   const coursesYesterday = courses.filter(c => c.created_date?.split('T')[0] === yesterday);
   const todayUpToNow = coursesToday.filter(c => new Date(c.created_date).getHours() <= currentHour);
@@ -91,22 +88,18 @@ export default async function handler(req) {
   const availableDriversYesterday = drivers.filter(d => d.last_seen_at && DATE_STR(new Date(d.last_seen_at)) === yesterday && d.statut === 'disponible').length;
 
   const problemCourses = courses.filter(c => c.statut === 'recherche_livreur' || c.statut === 'annulee' || c.dispatch_status === 'cycle_epuise');
+  const problemCoursesCount = problemCourses.length;
+
   const nowMs = now.getTime();
   const dispatchDelayedCourses = courses.filter(c => c.statut === 'recherche_livreur' && (nowMs - new Date(c.created_date).getTime()) > SEUILS.dispatch_delay_min * 60 * 1000);
+
   const commissionAnomalies = courses.filter(c => c.statut === 'livree' && c.prix_final && c.commission_silga && Math.abs(c.commission_silga - c.prix_final * 0.10) / Math.max(c.prix_final * 0.10, 1) > SEUILS.commission_tolerance);
+
   const eventCounts = {};
   recentEvents.forEach(e => { eventCounts[e.event_type] = (eventCounts[e.event_type] || 0) + 1; });
   const repetitiveTypes = Object.entries(eventCounts).filter(([, count]) => count >= SEUILS.repetitive_events);
 
-  const driverStats = {};
-  courses.filter(c => c.statut === 'livree' && c.livreur_id).forEach(c => {
-    if (!driverStats[c.livreur_id]) driverStats[c.livreur_id] = { nom: c.livreur_nom || 'N/A', count: 0, revenu: 0 };
-    driverStats[c.livreur_id].count += 1;
-    driverStats[c.livreur_id].revenu += c.prix_final || 0;
-  });
-  const topLivreurs = Object.values(driverStats).sort((a, b) => b.count - a.count).slice(0, 10);
-
-  // ── 4. Détections déterministes (PHASE 5) ──
+  // ── DÉTECTIONS ──
   const insights = [];
 
   const annulationRateToday = coursesToday.length > 0 ? annuleesToday / coursesToday.length : 0;
@@ -174,12 +167,12 @@ export default async function handler(req) {
       course_ids: [], livreur_ids: topDebiteurs.slice(0, 3).map(d => d.id) });
   }
 
-  if (problemCourses.length >= SEUILS.problem_courses) {
+  if (problemCoursesCount >= SEUILS.problem_courses) {
     insights.push({ id: 'courses_problematiques', type: 'courses_problematiques', priority: 'haute', confidence: 'eleve', comparison: 'snapshot',
-      observation: `${problemCourses.length} courses problématiques (en recherche de livreur, annulées, ou dispatch épuisé)`,
+      observation: `${problemCoursesCount} courses problématiques (en recherche de livreur, annulées, ou dispatch épuisé)`,
       analyse: 'Plusieurs courses simultanées nécessitent une attention immédiate',
       recommandation: 'Vérifier les courses concernées et le statut des livreurs',
-      data: { count: problemCourses.length },
+      data: { count: problemCoursesCount },
       course_ids: problemCourses.slice(0, 10).map(c => c.id), livreur_ids: [] });
   }
 
@@ -221,103 +214,35 @@ export default async function handler(req) {
 
   const priorityOrder = { haute: 0, moyenne: 1, basse: 2 };
   insights.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
-  const topInsights = insights.slice(0, 5);
 
-  // ── 5. Contexte pour le LLM ──
-  const contextData = {
-    periode: { today, yesterday, weekAgo, twoWeeksAgo, currentHour },
-    financials: {
-      today: { ca: caToday, livrees: livreesToday.length, annulees: annuleesToday, en_cours: enCoursToday, commissions: commissionsToday, paiements_recus: paiementsTodayTotal, courses_count: coursesTodayCount },
-      yesterday: { ca: caYesterday, annulees: annuleesYesterday, courses_up_to_hour: coursesYesterdayUpToHourCount },
-      this_week: { ca: caWeek, commissions: commissionsWeek, paiements_recus: paiementsWeekTotal },
-      last_week: { ca: caPrevWeek },
-      montants_dus_total: montantsDus, nb_livreurs_endette: debtors.length,
-    },
-    top_debiteurs: topDebiteurs,
-    top_livreurs: topLivreurs,
-    courses_problematiques: problemCourses.slice(0, 5).map(c => ({ id: c.id, statut: c.statut, client: c.client_nom, adresse_depart: c.adresse_depart, prix: c.prix_final, livreur: c.livreur_nom, dispatch_status: c.dispatch_status, notes: c.notes, created_date: c.created_date })),
-    drivers: { available: availableDrivers, total: drivers.length },
-    seuils: SEUILS,
-    insights_proactives: topInsights,
-    recent_reports: recentReports.slice(0, 5).map(r => ({ type: r.sous_type, resume: r.resume, date: r.periode_debut })),
-    country_code: countryCode,
-  };
-
-  // ── 6. Prompt LLM ──
-  const systemPrompt = `Tu es VENUS Admin, l'assistante de direction d'Eric. Tu observes, analyses, expliques et recommandes. Tu ne modifies JAMAIS aucune donnée.
-
-MODE OPÉRATOIRE: READ → ANALYZE → EXPLAIN → RECOMMEND
-
-RÈGLES STRICTES:
-- Lecture seule absolue. Aucune modification de course, statut, prix, commission, paiement, livreur, dispatch, ou message.
-- Tu utilises UNIQUEMENT les données du contexte fourni.
-- Si une information n'est pas dans le contexte, dis-le honnêtement.
-- Sois précis avec les montants (format X F CFA).
-- Tu gardes le contexte de la conversation: si Eric pose une question de suivi ("lesquels ?", "pourquoi ?", "et hier ?", "lesquels sont concernés ?"), réponds en référence au message précédent.
-- Tu t'adresses toujours à Eric par son prénom.
-
-INTELLIGENCE PROACTIVE:
-Les "insights_proactives" dans le contexte sont des détections DÉTERMINISTES (calculées à partir des données réelles, pas par l'IA). Chaque insight contient:
-- observation: ce qui s'est passé (fait)
-- analyse: pourquoi cela mérite l'attention (interprétation)
-- recommandation: ce qu'Eric pourrait vérifier ou décider (suggestion)
-- confidence: niveau de confiance (eleve, moyen, faible)
-- course_ids / livreur_ids: les éléments concernés
-
-Quand Eric demande "Montre-moi les courses concernées" ou "Quels livreurs sont concernés ?", utilise les course_ids et livreur_ids des insights pour répondre.
-
-Quand Eric demande "Compare avec la semaine dernière", utilise les données this_week vs last_week.
-
-DISTINGUE TOUJOURS:
-- Observation = ce qui s'est passé (fait)
-- Analyse = pourquoi cela mérite l'attention
-- Recommandation = ce qu'Eric pourrait vérifier
-
-NIVEAU DE CONFIANCE:
-Quand tu expliques une cause, indique toujours le niveau de confiance:
-- élevé = les données supportent directement la conclusion
-- moyen = les données suggèrent une tendance mais d'autres explications sont possibles
-- faible = données limitées ou corrélation faible
-
-JAMAIS D'HYPOTHÈSE COMME CERTITUDE:
-Dis "Cela peut indiquer un problème de disponibilité" et non "Le dispatch est défaillant".
-
-DONNÉES TEMPS RÉEL:
-${JSON.stringify(contextData, null, 2)}`;
-
-  const historyStr = history.slice(-10).map(h => {
-    const role = h.role === 'user' ? 'ERIC' : 'VENUS';
-    return `${role}: ${h.content}`;
-  }).join('\n');
-
-  const fullPrompt = `${systemPrompt}
-
-${historyStr ? `HISTORIQUE:
-${historyStr}
-
-` : ''}QUESTION D'ERIC: ${message}
-
-RÉPONSE DE VENUS:`;
-
-  // ── 7. Appel LLM ──
-  const llmResponse = await base44.integrations.Core.InvokeLLM({ prompt: fullPrompt });
-
-  const responseText = typeof llmResponse === 'string'
-    ? llmResponse
-    : (llmResponse?.response || llmResponse?.output || JSON.stringify(llmResponse));
+  const driverStats = {};
+  courses.filter(c => c.statut === 'livree' && c.livreur_id).forEach(c => {
+    if (!driverStats[c.livreur_id]) driverStats[c.livreur_id] = { nom: c.livreur_nom || 'N/A', count: 0, revenu: 0 };
+    driverStats[c.livreur_id].count += 1;
+    driverStats[c.livreur_id].revenu += c.prix_final || 0;
+  });
+  const topLivreurs = Object.values(driverStats).sort((a, b) => b.count - a.count).slice(0, 10);
 
   return Response.json({
     success: true,
-    response: responseText,
-    context_summary: {
-      today_ca: caToday,
-      yesterday_ca: caYesterday,
-      debtors_count: debtors.length,
-      top_debtor: topDebiteurs[0] || null,
-      top_driver: topLivreurs[0]?.nom || null,
-      problem_courses_count: problemCourses.length,
-      insights_count: topInsights.length,
-      insights_types: topInsights.map(i => i.type),
+    insights: insights.slice(0, 5),
+    metrics: {
+      periode: { today, yesterday, weekAgo, twoWeeksAgo, currentHour },
+      financials: {
+        today: { ca: caToday, livrees: livreesToday.length, annulees: annuleesToday, en_cours: enCoursToday, commissions: commissionsToday, paiements_recus: paiementsTodayTotal, courses_count: coursesTodayCount },
+        yesterday: { ca: caYesterday, annulees: annuleesYesterday, courses_up_to_hour: coursesYesterdayUpToHourCount },
+        this_week: { ca: caWeek, commissions: commissionsWeek, paiements_recus: paiementsWeekTotal },
+        last_week: { ca: caPrevWeek },
+        debt: { total: montantsDus, debtors_count: debtors.length, top3_concentration: debtConcentration },
+      },
+      top_debiteurs: topDebiteurs,
+      top_livreurs: topLivreurs,
+      courses_problematiques: problemCourses.slice(0, 5).map(c => ({ id: c.id, statut: c.statut, client: c.client_nom, adresse_depart: c.adresse_depart, prix: c.prix_final, livreur: c.livreur_nom, dispatch_status: c.dispatch_status, notes: c.notes, created_date: c.created_date })),
+      drivers: { available: availableDrivers, total: drivers.length },
+      seuils: SEUILS,
     },
+    seuils: SEUILS,
+    generated_at: now.toISOString(),
+    country_code: countryCode,
   });
 }
