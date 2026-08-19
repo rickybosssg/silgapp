@@ -15,7 +15,8 @@ function Save-ResizedImage {
     [int]$Width,
     [int]$Height,
     [double]$Scale = 1,
-    [System.Drawing.Color]$Background = [System.Drawing.Color]::Transparent
+    [System.Drawing.Color]$Background = [System.Drawing.Color]::Transparent,
+    [switch]$Opaque
   )
 
   $directory = Split-Path -Parent $Path
@@ -27,7 +28,12 @@ function Save-ResizedImage {
     return
   }
 
-  $bitmap = New-Object System.Drawing.Bitmap($Width, $Height, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+  $pixelFormat = if ($Opaque) {
+    [System.Drawing.Imaging.PixelFormat]::Format24bppRgb
+  } else {
+    [System.Drawing.Imaging.PixelFormat]::Format32bppArgb
+  }
+  $bitmap = New-Object System.Drawing.Bitmap($Width, $Height, $pixelFormat)
   $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
   $graphics.Clear($Background)
   $graphics.CompositingQuality = [System.Drawing.Drawing2D.CompositingQuality]::HighQuality
@@ -99,7 +105,7 @@ try {
     Save-ResizedImage -Path (Join-Path $_.DirectoryName "silgapp_splash.png") -Width $width -Height $height -Scale 0.52 -Background ([System.Drawing.Color]::FromArgb(255, 243, 247, 255))
   }
 
-  Save-ResizedImage -Path (Join-Path $root "ios/App/App/Assets.xcassets/AppIcon.appiconset/Silgapp-AppIcon-1024.png") -Width 1024 -Height 1024
+  Save-ResizedImage -Path (Join-Path $root "ios/App/App/Assets.xcassets/AppIcon.appiconset/Silgapp-AppIcon-1024-Opaque.png") -Width 1024 -Height 1024 -Opaque
   Get-ChildItem -LiteralPath (Join-Path $root "ios/App/App/Assets.xcassets/Splash.imageset") -Filter "*.png" | ForEach-Object {
     if ($_.Name -like "Silgapp-Splash-*") {
       return

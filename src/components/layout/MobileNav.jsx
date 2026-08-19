@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Menu, X, LogOut, Bell, ChevronDown, Check, MessageCircle } from "lucide-react";
+import { Menu, X, LogOut, Bell, ChevronDown, MessageCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { clearPersistedToken } from "@/lib/authPersistence";
 import { Badge } from "@/components/ui/badge";

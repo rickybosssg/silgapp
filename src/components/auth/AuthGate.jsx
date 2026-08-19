@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { base44, detectedToken } from "@/api/base44Client";
 import { APP_PUBLIC_URL, BASE44_APP_ID } from "@/lib/app-params";
-import { ArrowRight, Loader2, Lock, Mail, ShieldCheck, Truck, Store } from "lucide-react";
+import { ArrowRight, Loader2, Lock, Mail, ShieldCheck, Store } from "lucide-react";
 import AppMaintenanceGate from "@/components/admin/AppMaintenanceGate";
 import { registerPushToken } from "@/lib/notifications";
 import { persistToken, clearPersistedToken } from "@/lib/authPersistence";
