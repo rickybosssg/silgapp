@@ -108,6 +108,7 @@ const PaiementsAdmin = lazy(() => import('./pages/PaiementsAdmin.jsx'));
 const DispatchLogs = lazy(() => import('./pages/DispatchLogs.jsx'));
 const LivreursPrioritaires = lazy(() => import('./pages/LivreursPrioritaires.jsx'));
 const AdminCourseStandalone = lazy(() => import('./pages/AdminCourseStandalone.jsx'));
+const CentreNotifications = lazy(() => import('./pages/CentreNotifications.jsx'));
 
 function AnimatedRoutes({ children }) {
   // Variables définies DANS la fonction pour éviter init issues
@@ -410,7 +411,7 @@ function AppContent() {
           <Route path="/admin/test-notifications" element={<AnimatedRoutes><TestNotifications /></AnimatedRoutes>} />
           <Route path="/diagnostic-push-complet" element={<AnimatedRoutes><DiagnosticPushComplet /></AnimatedRoutes>} />
           <Route path="/admin/test-dispatch-livreur" element={<AnimatedRoutes><TestDispatchLivreur /></AnimatedRoutes>} />
-          <Route path="/admin/centre-notifications" element={<AnimatedRoutes><CentreNotificationsPush /></AnimatedRoutes>} />
+          <Route path="/admin/centre-notifications" element={<AnimatedRoutes><CentreNotifications /></AnimatedRoutes>} />
           <Route path="/admin/demandes-livreurs" element={<AnimatedRoutes><DemandesLivreursAdmin /></AnimatedRoutes>} />
           <Route path="/admin/livreurs-bloques" element={<AnimatedRoutes><LivreursBloquesEncours /></AnimatedRoutes>} />
           <Route path="/admin/comptabilite" element={<AnimatedRoutes><Comptabilite /></AnimatedRoutes>} />
