@@ -47,8 +47,8 @@ export default function LivreurStatsBanner({ mesCourses, totalEncaisse, montantD
         {/* KPI row */}
         <div className="grid grid-cols-3 gap-2.5">
           {[
-            { icon: <Package className="w-4 h-4 text-[#007aff]" />, bg: "bg-blue-50", val: coursesAujourdHui, label: "Courses", valClass: "text-[#007aff]" },
-            { icon: <CheckCircle className="w-4 h-4 text-[#00a86b]" />, bg: "bg-green-500/10", val: livreesToday.length,    label: "Livrées",   valClass: "text-[#00a86b]" },
+            { icon: <Package className="w-4 h-4 text-primary" />, bg: "bg-blue-50", val: coursesAujourdHui, label: "Courses", valClass: "text-primary" },
+            { icon: <CheckCircle className="w-4 h-4 text-success" />, bg: "bg-green-500/10", val: livreesToday.length,    label: "Livrées",   valClass: "text-success" },
             { icon: montantDuSilga < 0 ? <CheckCircle className="w-4 h-4 text-green-500" /> : <AlertCircle className="w-4 h-4 text-orange-400" />, bg: montantDuSilga < 0 ? "bg-green-500/10" : "bg-orange-500/10", val: null, label: montantDuSilga < 0 ? "Surplus" : "Dû SILGAPP", valClass: montantDuSilga < 0 ? "text-green-500" : "text-orange-400" },
           ].map((item, i) => (
             <div key={i} className="bg-white rounded-3xl p-3.5 shadow-[0_8px_24px_rgba(15,23,42,0.06)] border border-black/5 text-center">
@@ -77,7 +77,7 @@ export default function LivreurStatsBanner({ mesCourses, totalEncaisse, montantD
             <div className="bg-white grid grid-cols-3 divide-x divide-slate-100">
               {[
                 { label: "Total client", val: prixTotalToday, color: "text-slate-900" },
-                { label: "Votre gain", val: gainToday,    color: "text-[#00a86b]" },
+                { label: "Votre gain", val: gainToday,    color: "text-success" },
                 { label: "Commission SILGAPP", val: commissionToday, color: "text-orange-400" },
               ].map((s, i) => (
                 <div key={i} className="p-3 text-center">
@@ -95,28 +95,28 @@ export default function LivreurStatsBanner({ mesCourses, totalEncaisse, montantD
   const coursesLivrees = livreesToday.length;
   return (
     <div className="grid grid-cols-3 gap-3">
-      <div className="bg-[#1f2429] rounded-2xl p-3 shadow-sm border border-white/8 text-center">
+      <div className="bg-card rounded-2xl p-3 shadow-sm border border-border text-center">
         <div className="w-8 h-8 rounded-xl bg-sky-500/10 flex items-center justify-center mx-auto mb-1.5">
           <Package className="w-4 h-4 text-sky-400" />
         </div>
-        <p className="text-xl font-bold text-white">{coursesAujourdHui}</p>
-        <p className="text-[10px] text-white/40 font-medium">Courses</p>
+        <p className="text-xl font-bold text-foreground">{coursesAujourdHui}</p>
+        <p className="text-[10px] text-muted-foreground font-medium">Courses</p>
       </div>
-      <div className="bg-[#1f2429] rounded-2xl p-3 shadow-sm border border-white/8 text-center">
+      <div className="bg-card rounded-2xl p-3 shadow-sm border border-border text-center">
         <div className="w-8 h-8 rounded-xl bg-green-500/10 flex items-center justify-center mx-auto mb-1.5">
-          <CheckCircle className="w-4 h-4 text-[#00a86b]" />
+          <CheckCircle className="w-4 h-4 text-success" />
         </div>
-        <p className="text-xl font-bold text-white">{coursesLivrees}</p>
-        <p className="text-[10px] text-white/40 font-medium">Livrées</p>
+        <p className="text-xl font-bold text-foreground">{coursesLivrees}</p>
+        <p className="text-[10px] text-muted-foreground font-medium">Livrées</p>
       </div>
-      <div className="bg-[#1f2429] rounded-2xl p-3 shadow-sm border border-white/8 text-center">
+      <div className="bg-card rounded-2xl p-3 shadow-sm border border-border text-center">
         <div className="w-8 h-8 rounded-xl bg-amber-500/10 flex items-center justify-center mx-auto mb-1.5">
           <TrendingUp className="w-4 h-4 text-amber-400" />
         </div>
-        <p className="text-sm font-bold text-white leading-tight">
+        <p className="text-sm font-bold text-foreground leading-tight">
           {totalEncaisse > 0 ? `${totalEncaisse.toLocaleString()} FCFA` : "0 FCFA"}
         </p>
-        <p className="text-[10px] text-white/40 font-medium">Encaissé</p>
+        <p className="text-[10px] text-muted-foreground font-medium">Encaissé</p>
       </div>
     </div>
   );

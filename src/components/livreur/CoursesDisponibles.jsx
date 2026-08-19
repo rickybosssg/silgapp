@@ -279,7 +279,7 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="w-8 h-8 rounded-full border-2 border-[#00a86b] border-t-transparent animate-spin" />
+        <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
       </div>
     );
   }
@@ -288,7 +288,7 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
     return (
       <div className="rounded-2xl bg-white border border-black/5 p-8 text-center space-y-3 shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
         <div className="w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center mx-auto">
-          <Navigation className="w-7 h-7 text-[#007aff]" />
+          <Navigation className="w-7 h-7 text-primary" />
         </div>
         <p className="text-sm font-bold text-slate-800">Passez en ligne pour voir les courses</p>
         <p className="text-xs text-slate-500">
@@ -313,13 +313,13 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
   }
 
   return (
-    <div className="space-y-3 rounded-lg bg-[#edf3f8] p-3">
+    <div className="space-y-3 rounded-lg bg-muted p-3">
       <div className="flex items-center justify-between px-1 py-0.5">
         <div>
-          <p className="text-[11px] font-bold uppercase text-[#007aff]">Dispatch en direct</p>
-          <h2 className="mt-0.5 text-lg font-bold text-[#1d1d1f]">Courses disponibles</h2>
+          <p className="text-[11px] font-bold uppercase text-primary">Dispatch en direct</p>
+          <h2 className="mt-0.5 text-lg font-bold text-foreground">Courses disponibles</h2>
         </div>
-        <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-full bg-[#1d1d1f] px-2 text-xs font-bold text-white">
+        <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-full bg-foreground px-2 text-xs font-bold text-white">
           {coursesWithDistance.length}
         </span>
       </div>
@@ -327,7 +327,7 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
       {coursesWithDistance.map(course => (
         <div
           key={course.id}
-          className="overflow-hidden rounded-lg border border-[#dbe5ee] bg-[#fbfdff] shadow-[0_8px_22px_rgba(15,23,42,0.07)]"
+          className="overflow-hidden rounded-lg border border-border bg-card shadow-[0_8px_22px_rgba(15,23,42,0.07)]"
         >
           <div className="p-4">
             <div className="flex items-start justify-between gap-4">
@@ -354,10 +354,10 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
                     <p className="text-[10px] font-semibold uppercase text-slate-400">
                       {Number(course.prix_propose_client) > 0 ? "Prix client" : "Proposition"}
                     </p>
-                    <p className="mt-0.5 text-xl font-bold text-[#008f5a]">
+                    <p className="mt-0.5 text-xl font-bold text-success">
                       {prix.toLocaleString()}
                     </p>
-                    <p className="text-[10px] font-bold text-[#008f5a]">{devise}</p>
+                    <p className="text-[10px] font-bold text-success">{devise}</p>
                   </div>
                 ) : null;
               })()}
@@ -365,20 +365,20 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
 
             <div className="mt-4 grid grid-cols-[22px_1fr] gap-x-2.5">
               <div className="flex flex-col items-center pt-1">
-                <span className="h-3 w-3 rounded-full border-[3px] border-[#00a86b] bg-white" />
+                <span className="h-3 w-3 rounded-full border-[3px] border-success bg-white" />
                 <span className="my-1 min-h-8 w-px flex-1 bg-slate-200" />
-                <span className="h-3 w-3 rounded-[3px] bg-[#007aff]" />
+                <span className="h-3 w-3 rounded-[3px] bg-primary" />
               </div>
               <div className="space-y-3">
                 <div>
                   <p className="text-[10px] font-bold uppercase text-slate-400">Récupération</p>
-                  <p className="mt-0.5 text-sm font-semibold leading-snug text-[#1d1d1f]">
+                  <p className="mt-0.5 text-sm font-semibold leading-snug text-foreground">
                     {course.quartier_depart || course.adresse_depart || "Adresse à confirmer"}
                   </p>
                 </div>
                 <div>
                   <p className="text-[10px] font-bold uppercase text-slate-400">Livraison</p>
-                  <p className="mt-0.5 text-sm font-semibold leading-snug text-[#1d1d1f]">
+                  <p className="mt-0.5 text-sm font-semibold leading-snug text-foreground">
                     {course.quartier_arrivee || course.adresse_arrivee || "Adresse à confirmer"}
                   </p>
                 </div>
@@ -388,7 +388,7 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
             <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3 text-[11px] font-medium text-slate-600">
               {course.__distance !== null && (
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1.5">
-                  <Navigation className="h-3.5 w-3.5 text-[#007aff]" />
+                  <Navigation className="h-3.5 w-3.5 text-primary" />
                   {course.__distance.toFixed(1)} km de vous
                 </span>
               )}
@@ -401,12 +401,12 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
             </div>
           </div>
 
-          <div className="grid grid-cols-[1fr_52px] gap-2.5 border-t border-slate-100 bg-[#f6f9fc] p-3">
+          <div className="grid grid-cols-[1fr_52px] gap-2.5 border-t border-slate-100 bg-muted p-3">
             <button
               type="button"
               onClick={() => handleAccept(course)}
               disabled={acceptingId === course.id}
-              className="h-12 rounded-lg bg-[#00a86b] text-sm font-bold text-white shadow-[0_6px_14px_rgba(0,168,107,0.2)] transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 flex items-center justify-center gap-2"
+              className="h-12 rounded-lg bg-primary text-sm font-bold text-white shadow-[0_6px_14px_rgba(0,122,255,0.2)] transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {acceptingId === course.id ? (
                 <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />

@@ -159,11 +159,11 @@ export default function DashboardExterne() {
   const taux = stats.total > 0 ? Math.round((stats.livrees / stats.total) * 100) : 0;
 
   return (
-    <div className="min-h-screen bg-[#16191d] text-slate-100">
+    <div className="min-h-screen bg-background text-foreground">
       <div className="px-4 py-4 lg:px-6 lg:py-6 space-y-5 max-w-7xl mx-auto">
 
         {/* ── HERO HEADER ─────────────────────────────────── */}
-        <div className="relative overflow-hidden rounded-3xl bg-[#0d4f3c] p-5 sm:p-6 shadow-[0_18px_45px_rgba(0,168,107,0.2)] border border-white/10">
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-primary-dark via-primary to-primary-dark p-5 sm:p-6 shadow-[0_18px_45px_rgba(0,122,255,0.2)] border border-white/10 silgapp-relief-surface">
           <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-4">
               <Link to="/">
@@ -181,7 +181,7 @@ export default function DashboardExterne() {
                     )}
                   </h1>
                 </div>
-                <p className="text-white/40 text-xs capitalize">
+                <p className="text-white/80 text-xs capitalize">
                   {format(new Date(), "EEEE d MMMM yyyy", { locale: fr })}
                 </p>
               </div>
@@ -189,11 +189,11 @@ export default function DashboardExterne() {
 
             <div className="flex items-center gap-2 flex-wrap">
               {/* Pill live */}
-              <div className="flex items-center gap-2 bg-white/10 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white/70">
+              <div className="flex items-center gap-2 bg-white/10 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white/80">
                 <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
                 {livreursEnLigne.length} livreur{livreursEnLigne.length > 1 ? "s" : ""} en ligne
               </div>
-              <div className="flex items-center gap-2 bg-white/10 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white/70">
+              <div className="flex items-center gap-2 bg-white/10 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white/80">
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
                 {clientsEnLigne.length} client{clientsEnLigne.length > 1 ? "s" : ""} actif{clientsEnLigne.length > 1 ? "s" : ""}
               </div>
@@ -222,7 +222,7 @@ export default function DashboardExterne() {
                 <span className="hidden sm:inline">Codes Promo</span>
               </Button>
               <Link to="/carte">
-                <Button size="sm" className="gap-1.5 bg-[#00a86b] hover:bg-[#00a86b]/90 text-white rounded-xl text-xs shadow-lg shadow-[#00a86b]/30">
+                <Button size="sm" className="gap-1.5 bg-primary hover:bg-primary-dark text-white rounded-xl text-xs shadow-lg shadow-primary/30">
                   <MapPin className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">Carte</span>
                 </Button>
@@ -244,7 +244,7 @@ export default function DashboardExterne() {
                 className={`px-2.5 py-1 rounded-full text-[10px] font-bold border transition-all ${
                   filtreTypeDashboard === f.key
                     ? "bg-white/25 text-white border-white/40"
-                    : "bg-white/5 text-white/50 border-white/10 hover:bg-white/15"
+                    : "bg-white/5 text-white/80 border-white/10 hover:bg-white/15"
                 }`}
               >
                 {f.label}
@@ -262,7 +262,7 @@ export default function DashboardExterne() {
             ].map(item => (
               <div key={item.label} className="flex flex-col items-center gap-0.5 border-r border-white/10 last:border-r-0 pr-3 last:pr-0">
                 <p className={`text-xl sm:text-2xl font-black leading-none ${item.color}`}>{item.value}</p>
-                <p className="text-xs text-white/60 uppercase tracking-wide">{item.label}</p>
+                <p className="text-xs text-white/80 uppercase tracking-wide">{item.label}</p>
               </div>
             ))}
           </div>
@@ -270,13 +270,13 @@ export default function DashboardExterne() {
 
         {/* ── KPI CARDS ───────────────────────────────────── */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-2 lg:gap-3">
-          <KpiCard label="Clients" value={compteursClients.total} icon={Users} color="bg-[#5856d6]" onClick={() => setStatModal({ type: "clients", data: clients })} />
-          <KpiCard label="Courses" value={stats.total} icon={Package} color="bg-[#007aff]" />
-          <KpiCard label="En cours" value={stats.enCours} icon={Clock} color="bg-[#ff9500]" onClick={() => setStatModal({ type: "en_traitement", data: coursesEnTraitement })} />
-          <KpiCard label="Livrées" value={stats.livrees} icon={CheckCircle2} color="bg-[#30b85a]" onClick={() => setStatModal({ type: "livrees", data: coursesTerminees.filter(c => c.statut === "livree") })} />
-          <KpiCard label="Annulées" value={stats.annulees} icon={XCircle} color="bg-[#ff3b30]" onClick={() => setStatModal({ type: "annulees", data: coursesTerminees.filter(c => c.statut === "annulee") })} />
-          <KpiCard label="CA du jour" value={stats.ca > 999 ? `${Math.round(stats.ca/1000)}k` : stats.ca} suffix={stats.ca <= 999 ? "F" : "F"} icon={TrendingUp} color="bg-[#5ac8fa]" onClick={() => setStatModal({ type: "ca", data: coursesTerminees.filter(c => c.statut === "livree") })} />
-          <KpiCard label="Disponibles" value={stats.libres} icon={Truck} color="bg-[#00a86b]" onClick={() => setStatModal({ type: "livreurs_dispo", data: livreursEnLigne.filter(l => l.statut === "disponible") })} />
+          <KpiCard label="Clients" value={compteursClients.total} icon={Users} color="bg-primary" onClick={() => setStatModal({ type: "clients", data: clients })} />
+          <KpiCard label="Courses" value={stats.total} icon={Package} color="bg-primary-dark" />
+          <KpiCard label="En cours" value={stats.enCours} icon={Clock} color="bg-warning" onClick={() => setStatModal({ type: "en_traitement", data: coursesEnTraitement })} />
+          <KpiCard label="Livrées" value={stats.livrees} icon={CheckCircle2} color="bg-success" onClick={() => setStatModal({ type: "livrees", data: coursesTerminees.filter(c => c.statut === "livree") })} />
+          <KpiCard label="Annulées" value={stats.annulees} icon={XCircle} color="bg-red-500" onClick={() => setStatModal({ type: "annulees", data: coursesTerminees.filter(c => c.statut === "annulee") })} />
+          <KpiCard label="CA du jour" value={stats.ca > 999 ? `${Math.round(stats.ca/1000)}k` : stats.ca} suffix={stats.ca <= 999 ? "F" : "F"} icon={TrendingUp} color="bg-primary" onClick={() => setStatModal({ type: "ca", data: coursesTerminees.filter(c => c.statut === "livree") })} />
+          <KpiCard label="Disponibles" value={stats.libres} icon={Truck} color="bg-success" onClick={() => setStatModal({ type: "livreurs_dispo", data: livreursEnLigne.filter(l => l.statut === "disponible") })} />
         </div>
 
         {/* ── SANTÉ DU DISPATCH ──────────────────────────── */}
@@ -289,10 +289,10 @@ export default function DashboardExterne() {
         <div>
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 px-1">Activité en direct</p>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div className="bg-[#1e2228] rounded-2xl border border-white/5 shadow-[0_8px_24px_rgba(0,0,0,0.2)] overflow-hidden">
+            <div className="bg-card rounded-2xl border border-border shadow-[0_8px_24px_rgba(0,0,0,0.06)] overflow-hidden">
               <ClientsEnLigne clients={clientsEnLigne} />
             </div>
-            <div className="bg-[#1e2228] rounded-2xl border border-white/5 shadow-[0_8px_24px_rgba(0,0,0,0.2)] overflow-hidden">
+            <div className="bg-card rounded-2xl border border-border shadow-[0_8px_24px_rgba(0,0,0,0.06)] overflow-hidden">
               <LivreursEnLigne livreurs={livreursEnLigne} />
             </div>
           </div>
@@ -304,7 +304,7 @@ export default function DashboardExterne() {
         {/* ── COURSES EN COURS ────────────────────────────── */}
         <div>
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 px-1">Courses en cours</p>
-          <div className="bg-[#1e2228] rounded-2xl border border-white/5 shadow-[0_8px_24px_rgba(0,0,0,0.2)] overflow-hidden">
+          <div className="bg-card rounded-2xl border border-border shadow-[0_8px_24px_rgba(0,0,0,0.06)] overflow-hidden">
             <CoursesEnTraitement
               courses={filtreTypeDashboard === "tous" ? coursesEnTraitement : coursesEnTraitement.filter(c => c.type_course === filtreTypeDashboard)}
               onView={setSelectedCourse}
@@ -316,7 +316,7 @@ export default function DashboardExterne() {
         {/* ── HISTORIQUE DU JOUR ──────────────────────────── */}
         <div>
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 px-1">Historique du jour</p>
-          <div className="bg-[#1e2228] rounded-2xl border border-white/5 shadow-[0_8px_24px_rgba(0,0,0,0.2)] overflow-hidden">
+          <div className="bg-card rounded-2xl border border-border shadow-[0_8px_24px_rgba(0,0,0,0.06)] overflow-hidden">
             <CoursesTerminees
               courses={coursesTerminees}
               onView={setSelectedCourse}

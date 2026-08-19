@@ -5,76 +5,125 @@
 @tailwind utilities;
 
 @layer base {
+  /* ───────────────────────────────────────────────────────────────────────
+     SILGAPP — Design System v2 (Phase 1)
+     Palette cible :
+       primary:      #007AFF  (bleu iOS — couleur de marque)
+       primary-dark: #0051D5  (hover/press)
+       primary-light:#E3F0FF  (fonds clairs, badges)
+       background:   #F5F5F7  (fond principal client/livreur/partenaire)
+       surface:      #FFFFFF  (cartes, modales, inputs)
+       text-primary: #1D1D1F  (titres, texte sur fond clair)
+       text-secondary:#64748B (sous-titres, descriptions)
+       success:      #34C759  (disponible, accepté, livré)
+       danger:       #FF3B30  (annulation, erreur, blocage)
+       warning:      #FF9500  (avertissement, GPS manquant)
+       border:       #E2E8F0  (borders, séparateurs)
+     
+     NOTE : l'application force le mode clair (App.jsx retire .dark).
+     Les valeurs :root ci-dessous sont donc LIGHT par défaut.
+     Les valeurs .dark sont conservées pour sécurité mais inutilisées.
+     ─────────────────────────────────────────────────────────────────────── */
   :root {
     --font-inter: 'Inter', sans-serif;
-    --background: 215 18% 24%;
-    --foreground: 0 0% 95%;
-    --card: 215 18% 28%;
-    --card-foreground: 0 0% 95%;
-    --popover: 215 18% 28%;
-    --popover-foreground: 0 0% 95%;
-    --primary: 152 100% 34%;
-    --primary-foreground: 0 0% 100%;
+
+    /* Couleurs de marque */
+    --primary: 211 100% 50%;            /* #007AFF */
+    --primary-foreground: 0 0% 100%;    /* #FFFFFF */
+    --primary-dark: 218 100% 42%;      /* #0051D5 */
+    --primary-light: 210 100% 95%;     /* #E3F0FF */
+
+    /* Surfaces et fonds */
+    --background: 240 14% 96%;         /* #F5F5F7 */
+    --foreground: 0 0% 12%;            /* #1D1D1F */
+    --card: 0 0% 100%;                 /* #FFFFFF */
+    --card-foreground: 0 0% 12%;       /* #1D1D1F */
+    --popover: 0 0% 100%;              /* #FFFFFF */
+    --popover-foreground: 0 0% 12%;    /* #1D1D1F */
+
+    /* Textes */
+    --text-primary: 0 0% 12%;          /* #1D1D1F */
+    --text-secondary: 215 16% 47%;     /* #64748B */
+
+    /* Couleurs fonctionnelles */
+    --success: 142 71% 45%;            /* #34C759 */
+    --success-foreground: 0 0% 100%;    /* #FFFFFF */
+    --danger: 0 100% 60%;              /* #FF3B30 */
+    --danger-foreground: 0 0% 100%;    /* #FFFFFF */
+    --warning: 37 100% 50%;            /* #FF9500 */
+    --warning-foreground: 0 0% 100%;   /* #FFFFFF */
+
+    /* Bordures et inputs */
+    --border: 214 32% 91%;             /* #E2E8F0 */
+    --input: 214 32% 91%;              /* #E2E8F0 */
+    --ring: 211 100% 50%;              /* #007AFF */
+
+    /* Secondaire (jaune doré conservé pour compatibilité) */
     --secondary: 45 100% 51%;
     --secondary-foreground: 0 0% 8%;
-    --muted: 215 18% 32%;
-    --muted-foreground: 0 0% 65%;
-    --accent: 152 100% 34%;
+    --muted: 240 5% 96%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 211 100% 50%;            /* = primary (bleu) */
     --accent-foreground: 0 0% 100%;
-    --destructive: 0 72% 51%;
+    --destructive: 0 100% 60%;         /* #FF3B30 */
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 20%;
-    --input: 0 0% 20%;
-    --ring: 152 100% 34%;
-    --chart-1: 152 100% 34%;
-    --chart-2: 45 100% 51%;
-    --chart-3: 142 70% 45%;
-    --chart-4: 220 70% 50%;
-    --chart-5: 280 65% 60%;
+
+    /* Charts */
+    --chart-1: 211 100% 50%;           /* #007AFF */
+    --chart-2: 142 71% 45%;            /* #34C759 */
+    --chart-3: 37 100% 50%;            /* #FF9500 */
+    --chart-4: 0 100% 60%;             /* #FF3B30 */
+    --chart-5: 262 83% 58%;            /* #8B5CF6 */
+
     --radius: 0.625rem;
-    --sidebar-background: 215 18% 20%;
+
+    /* Sidebar admin — conserve un fond sombre pour l'admin */
+    --sidebar-background: 210 20% 10%; /* #16191d */
     --sidebar-foreground: 0 0% 95%;
-    --sidebar-primary: 152 100% 34%;
+    --sidebar-primary: 211 100% 50%;   /* #007AFF (bleu marque) */
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 215 18% 26%;
+    --sidebar-accent: 210 20% 14%;     /* #1e2228 */
     --sidebar-accent-foreground: 0 0% 95%;
-    --sidebar-border: 0 0% 24%;
-    --sidebar-ring: 152 100% 34%;
+    --sidebar-border: 0 0% 18%;
+    --sidebar-ring: 211 100% 50%;
   }
 
   .dark {
+    /* Valeurs sombres — conservées mais INUTILISÉES (App.jsx force le mode clair) */
     --background: 0 0% 6%;
     --foreground: 0 0% 95%;
     --card: 0 0% 10%;
     --card-foreground: 0 0% 95%;
     --popover: 0 0% 10%;
     --popover-foreground: 0 0% 95%;
-    --primary: 0 80% 50%;
+    --primary: 211 100% 50%;
     --primary-foreground: 0 0% 100%;
+    --primary-dark: 218 100% 42%;
+    --primary-light: 210 100% 95%;
     --secondary: 45 100% 51%;
     --secondary-foreground: 0 0% 8%;
     --muted: 0 0% 15%;
     --muted-foreground: 0 0% 60%;
-    --accent: 142 70% 45%;
+    --accent: 211 100% 50%;
     --accent-foreground: 0 0% 100%;
-    --destructive: 0 62.8% 30.6%;
+    --destructive: 0 100% 60%;
     --destructive-foreground: 0 0% 98%;
     --border: 0 0% 18%;
     --input: 0 0% 18%;
-    --ring: 0 80% 50%;
-    --chart-1: 0 80% 50%;
+    --ring: 211 100% 50%;
+    --chart-1: 211 100% 50%;
     --chart-2: 45 100% 51%;
-    --chart-3: 142 70% 45%;
-    --chart-4: 220 70% 50%;
+    --chart-3: 142 71% 45%;
+    --chart-4: 0 100% 60%;
     --chart-5: 280 65% 60%;
     --sidebar-background: 0 0% 8%;
     --sidebar-foreground: 0 0% 95%;
-    --sidebar-primary: 0 80% 50%;
+    --sidebar-primary: 211 100% 50%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 0 0% 14%;
     --sidebar-accent-foreground: 0 0% 95%;
     --sidebar-border: 0 0% 18%;
-    --sidebar-ring: 0 80% 50%;
+    --sidebar-ring: 211 100% 50%;
   }
 }
 
@@ -102,6 +151,37 @@
 }
 
 @layer components {
+  /* ───────────────────────────────────────────────────────────────────────
+     EFFET RELIEF 3D SUBTIL — signature SILGAPP
+     Inspiré des lettres blanches en relief sur fond bleu du panneau "Auto service".
+     Réservé aux éléments premium : logo, titres importants, boutons principaux.
+     Discret : légère ombre portée, très faible profondeur, pas de glow.
+     ─────────────────────────────────────────────────────────────────────── */
+  .silgapp-relief {
+    /* Texte blanc en relief sur fond bleu — effet gravure subtile */
+    color: #ffffff;
+    text-shadow:
+      0 1px 0 rgba(0, 0, 0, 0.08),
+      0 -1px 0 rgba(255, 255, 255, 0.15);
+    /* Légère profondeur sans glow ni effet plastique */
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.12),
+      0 1px 2px rgba(0, 0, 0, 0.08);
+  }
+  .silgapp-relief-text {
+    /* Variante texte uniquement (sans box-shadow) — pour titres */
+    color: #ffffff;
+    text-shadow:
+      0 1px 0 rgba(0, 0, 0, 0.08),
+      0 -1px 0 rgba(255, 255, 255, 0.15);
+  }
+  .silgapp-relief-surface {
+    /* Variante surface (fond bleu + relief léger) — pour cartes héro / KPI */
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.1),
+      0 1px 3px rgba(0, 0, 0, 0.06);
+  }
+
   /* ── Transitions fluides pour les marqueurs Leaflet (suivi temps réel) ── */
   .livreur-marker-anim {
     transition: transform 2s linear, -webkit-transform 2s linear;
@@ -154,7 +234,7 @@
   }
 
   /* ── Lisibilité universelle — WCAG AA ── */
-  /* Texte dans les inputs toujours très lisible — thème sombre */
+  /* Texte dans les inputs toujours très lisible */
   input:not([type="checkbox"]):not([type="radio"]),
   textarea,
   select {
@@ -230,8 +310,6 @@
     color: #64748b;
   }
   /* ── Contraste global : texte foncé sur fonds clairs ── */
-  /* text-foreground et text-card-foreground = blanc en :root (thème sombre)
-     Sur fonds clairs, forcer en sombre pour la lisibilité (WCAG AA) */
   .bg-white, .bg-gray-50, .bg-gray-100, .bg-slate-50, .bg-slate-100,
   .bg-green-50, .bg-red-50, .bg-blue-50, .bg-amber-50, .bg-orange-50,
   .bg-purple-50, .bg-sky-50, .bg-violet-50, .bg-rose-50 {
@@ -256,8 +334,6 @@
   .force-light .bg-card {
     background-color: rgb(255 255 255) !important;
   }
-  /* ── Fonds clairs préservés à l'intérieur de force-light ── */
-  /* (les sélecteurs :not(.force-light *) du Level 4 ne marchent pas partout) */
   .force-light .bg-white {
     background-color: rgb(255 255 255) !important;
   }
@@ -297,9 +373,6 @@
   .force-light .bg-violet-50 {
     background-color: rgb(245 243 255) !important;
   }
-  /* ── Empêcher la conversion des fonds clairs sur les inputs ── */
-  /* bg-gray-50 et bg-white sur les inputs restent clairs (pas de conversion sombre) */
-  /* pour que le texte foncé (#111827) reste lisible */
   input.bg-gray-50,
   textarea.bg-gray-50,
   select.bg-gray-50 {
@@ -310,7 +383,6 @@
   select.bg-white {
     background-color: rgb(255 255 255) !important;
   }
-  /* Messages d'erreur toujours bien lisibles */
   .text-red-400 { color: #f87171 !important; }
   .bg-white.text-red-400,
   .bg-white .text-red-400,
@@ -320,7 +392,6 @@
   }
   .text-muted-foreground {
     color: hsl(var(--muted-foreground));
-    /* minimum contrast garantit */
   }
 
   .bg-white.text-gray-300,
