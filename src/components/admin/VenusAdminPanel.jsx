@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import VenusRapportsTab from "./VenusRapportsTab";
+import VenusAdminChat from "./VenusAdminChat";
 
 const VENUS_AVATAR = "https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/17cf522aa_file_0000000034b871f7bf133c0de0c9eb62.png";
 
@@ -122,6 +123,12 @@ export default function VenusAdminPanel({ onClose }) {
             className={cn("px-3 py-1.5 rounded-lg text-xs font-bold", activeTab === "rapports" ? "bg-primary text-white" : "bg-white text-slate-600 border border-slate-200")}
           >
             Rapports
+          </button>
+          <button
+            onClick={() => setActiveTab("conversation")}
+            className={cn("px-3 py-1.5 rounded-lg text-xs font-bold", activeTab === "conversation" ? "bg-primary text-white" : "bg-white text-slate-600 border border-slate-200")}
+          >
+            Conversation
           </button>
         </div>
 
@@ -240,6 +247,7 @@ export default function VenusAdminPanel({ onClose }) {
         </>
         )}
         {activeTab === "rapports" && <VenusRapportsTab />}
+        {activeTab === "conversation" && <VenusAdminChat />}
       </div>
     </div>
   );
