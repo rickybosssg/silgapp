@@ -181,13 +181,10 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
             {showCountryPicker && (
               <div className="px-3 py-2 border-b border-white/5">
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-base pointer-events-none z-10">
-                    {effectiveCountry ? paysListe.find(p => p.code === effectiveCountry)?.emoji_flag || "🌍" : "🌍"}
-                  </span>
                   <select
                     value={effectiveCountry || ""}
                     onChange={(e) => setSelectedCountry(e.target.value)}
-                    className="w-full appearance-none bg-white text-gray-900 text-sm font-semibold rounded-xl pl-10 pr-9 py-2.5 border border-gray-200 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 cursor-pointer"
+                    className="w-full appearance-none bg-white text-gray-900 text-sm font-semibold rounded-xl pl-3 pr-9 py-2.5 border border-gray-200 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 cursor-pointer"
                   >
                     <option value="" className="bg-white text-gray-700">Choisir un pays</option>
                     {paysListe.map((p) => (
