@@ -99,12 +99,16 @@ export default async function handler(req) {
   const availableDrivers = drivers.filter(d => d.statut === 'disponible' && d.actif).length;
   const availableDriversYesterday = drivers.filter(d => d.last_seen_at && DATE_STR(new Date(d.last_seen_at)) === yesterday && d.statut === 'disponible').length;
 
-  // PHASE 5.1: Une course historique ne doit jamais apparaître comme problème opérationnel actuel.
+  // PHASE 5.1.1: Une course annulée n'est pas un problème opérationnel actuel.
+  // Seules les courses ACTIVES et BLOQUÉES méritent une alerte.
   const nowMs = now.getTime();
   const maxAgeMs = SEUILS.problem_course_max_age_hours * 60 * 60 * 1000;
   const problemCourses = courses.filter(c =>
-    (c.statut === 'recherche_livreur' || c.statut === 'annulee' || c.dispatch_status === 'cycle_epuise') &&
-    (nowMs - new Date(c.created_date).getTime()) < maxAgeMs
+    (nowMs - new Date(c.created_date).getTime()) < maxAgeMs &&
+    (
+      (c.statut === 'recherche_livreur') ||
+      (c.dispatch_status === 'cycle_epuise' && c.statut !== 'annulee')
+    )
   );
   const dispatchDelayedCourses = courses.filter(c =>
     c.statut === 'recherche_livreur' &&
