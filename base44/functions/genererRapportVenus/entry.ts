@@ -19,6 +19,14 @@ export default async function handler(req) {
 
   const base44 = createClientFromRequest(req);
 
+  const currentUser = await base44.auth.me().catch(() => null);
+  if (!currentUser || currentUser.role !== 'admin') {
+    return Response.json(
+      { success: false, error: 'Accès refusé — les rapports VENUS sont réservés à l\'administrateur' },
+      { status: 403 }
+    );
+  }
+
   // ── 1. Calcul des périodes ──
   const now = new Date();
   const today = new Date(now.getTime());

@@ -130,14 +130,14 @@ export default function ActiviteTempsReel({ livreurProfil, mesCourses = [], isEx
       return "Recherche en cours — nous te préviendrons dès qu'une mission sera disponible.";
     }
     if (loadingCourses) return "Analyse des courses disponibles autour de toi…";
-    if (coursesWithDistance.length === 0) {
-      return "Aucune course disponible autour de toi pour le moment. Je continue la recherche.";
+    if (eligibleCourses.length === 0) {
+      return "Aucune course disponible pour le moment. Je continue la recherche.";
     }
-    if (coursesWithDistance.length === 1) {
-      return "1 course est actuellement disponible dans ton rayon.";
+    if (eligibleCourses.length === 1) {
+      return "1 course est actuellement disponible.";
     }
-    return `${coursesWithDistance.length} courses sont actuellement disponibles dans ton rayon.`;
-  }, [isExterne, loadingCourses, coursesWithDistance.length]);
+    return `${eligibleCourses.length} courses sont actuellement disponibles.`;
+  }, [isExterne, loadingCourses, eligibleCourses.length]);
 
   // ── Rendu ──
   return (
@@ -164,10 +164,10 @@ export default function ActiviteTempsReel({ livreurProfil, mesCourses = [], isEx
             ) : (
               <p
                 className={`text-sm font-black leading-tight ${
-                  coursesWithDistance.length > 0 ? "text-orange-500" : "text-slate-300"
+                  eligibleCourses.length > 0 ? "text-orange-500" : "text-slate-300"
                 }`}
               >
-                {isExterne ? coursesWithDistance.length : "—"}
+                {isExterne ? eligibleCourses.length : "—"}
               </p>
             )}
           </div>
@@ -193,7 +193,7 @@ export default function ActiviteTempsReel({ livreurProfil, mesCourses = [], isEx
         )}
 
         {/* Aucune course */}
-        {isExterne && !loadingCourses && coursesWithDistance.length === 0 && (
+        {isExterne && !loadingCourses && eligibleCourses.length === 0 && (
           <p className="mt-2 text-[11px] text-slate-400 italic leading-tight">
             Recherche automatique en cours…
           </p>

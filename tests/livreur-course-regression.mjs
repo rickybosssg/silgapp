@@ -50,6 +50,10 @@ const coursesDisponiblesSource = readFileSync(
   new URL("../src/components/livreur/CoursesDisponibles.jsx", import.meta.url),
   "utf8",
 );
+const coursesDisponiblesHookSource = readFileSync(
+  new URL("../src/hooks/useCoursesDisponibles.js", import.meta.url),
+  "utf8",
+);
 const dispatchSource = readFileSync(
   new URL("../base44/functions/dispatchExterneAuto/entry.ts", import.meta.url),
   "utf8",
@@ -62,17 +66,17 @@ const nativePushSource = readFileSync(
 assert.match(livreurAppSource, /id:\s*"disponibles"/, "l'onglet Disponibles doit etre declare");
 assert.match(livreurAppSource, /activeTab === "disponibles"/, "l'onglet Disponibles doit etre rendu");
 assert.match(livreurAppSource, /<CoursesDisponibles/, "le composant CoursesDisponibles doit etre monte");
-assert.match(coursesDisponiblesSource, /\$in:\s*\["disponible_push",\s*"propose"\]/, "la liste V2 doit charger uniquement le fil actif et les propositions compatibles");
-assert.doesNotMatch(coursesDisponiblesSource, /\$in:\s*\[[^\]]*"en_attente"/, "une course en attente ne doit jamais etre chargee dans Disponibles");
-assert.match(coursesDisponiblesSource, /course\.statut !== "recherche_livreur"/, "seules les courses en recherche livreur doivent etre visibles");
-assert.match(coursesDisponiblesSource, /course\.statut === "en_attente"/, "une course en attente doit etre explicitement exclue");
-assert.match(coursesDisponiblesSource, /country_code:\s*countryCode/, "la liste doit rester isolee par pays");
-assert.match(coursesDisponiblesSource, /refusedCourseIds\.includes\(course\.id\)/, "une course refusee ne doit pas reapparaitre");
-assert.match(coursesDisponiblesSource, /livreurDisponible/, "un livreur hors ligne ne doit pas charger les courses disponibles");
+assert.match(coursesDisponiblesHookSource, /\$in:\s*\["disponible_push",\s*"propose"\]/, "la liste V2 doit charger uniquement le fil actif et les propositions compatibles");
+assert.doesNotMatch(coursesDisponiblesHookSource, /\$in:\s*\[[^\]]*"en_attente"/, "une course en attente ne doit jamais etre chargee dans Disponibles");
+assert.match(coursesDisponiblesHookSource, /course\.statut !== "recherche_livreur"/, "seules les courses en recherche livreur doivent etre visibles");
+assert.match(coursesDisponiblesHookSource, /course\.statut === "en_attente"/, "une course en attente doit etre explicitement exclue");
+assert.match(coursesDisponiblesHookSource, /country_code:\s*countryCode/, "la liste doit rester isolee par pays");
+assert.match(coursesDisponiblesHookSource, /refusedCourseIds\.includes\(course\.id\)/, "une course refusee ne doit pas reapparaitre");
+assert.match(coursesDisponiblesHookSource, /livreurDisponible/, "un livreur hors ligne ne doit pas charger les courses disponibles");
 assert.match(coursesDisponiblesSource, /durationSeconds:\s*10/, "la sonnerie V2 doit durer dix secondes");
 assert.match(coursesDisponiblesSource, /action:\s*"accepter_course_v2"/, "l'acceptation doit utiliser le verrou V2 compatible avec en_attente");
 assert.match(coursesDisponiblesSource, /persistDismissedCourse\(course\.id\)/, "un refus doit rester masque apres navigation");
-assert.match(coursesDisponiblesSource, /event\.type === "create"/, "une nouvelle course doit rafraichir le fil en temps reel");
+assert.match(livreurAppSource, /CourseExterne\.subscribe[\s\S]*event\.type === "create"/, "une nouvelle course doit rafraichir le fil en temps reel");
 assert.match(dispatchSource, /getLivreursRefuses/, "le backend doit verifier les refus persistants");
 assert.match(dispatchSource, /isDisponiblePush\s*\?\s*isLivreurDisponible/, "le backend doit autoriser un livreur eligible en mode disponible_push");
 assert.match(dispatchSource, /!refusedIds\.includes\(livreur_id\)/, "le backend doit exclure le livreur ayant refuse cette course");
@@ -92,11 +96,9 @@ const dispatchWatchdogSource = readFileSync(
   new URL("../base44/shared/dispatchWatchdog.ts", import.meta.url),
   "utf8",
 );
-const v2DeclarationIndex = livreurAppSource.indexOf("const { data: isV2Enabled");
-const availableCountIndex = livreurAppSource.indexOf("const { data: availableCoursesCount");
-assert.ok(v2DeclarationIndex >= 0 && availableCountIndex > v2DeclarationIndex, "isV2Enabled doit etre declare avant le compteur de courses");
-assert.match(livreurAppSource, /DispatchNotification\.filter\([\s\S]*statut:\s*"refuse"/, "le badge doit exclure les refus persistants");
-assert.match(livreurAppSource, /dismissedIds\.has\(course\.id\)/, "le badge doit exclure les courses masquees localement");
+assert.match(livreurAppSource, /eligibleCourses:\s*availableCourses,\s*isV2Enabled\s*}\s*=\s*useCoursesDisponibles/, "le badge et l'onglet doivent partager la source V2");
+assert.match(coursesDisponiblesHookSource, /DispatchNotification\.filter\([\s\S]*statut:\s*"refuse"/, "le badge doit exclure les refus persistants");
+assert.match(coursesDisponiblesHookSource, /refusedIds\.includes\(course\.id\)/, "le badge doit exclure les courses masquees localement");
 assert.match(livreurAppSource, /livreurProfil\.statut !== "disponible"[\s\S]*coursesActives\.length === 0[\s\S]*statut: "en_course"/, "une course active doit maintenir le livreur en_course");
 assert.doesNotMatch(dispatchV2Source, /dispatch_status:[^\n]+livreur_id:\s*''/, "le verrou V2 doit accepter un livreur_id null");
 assert.match(dispatchV2Source, /STATUTS_TERMINAUX_COURSE\.includes\(course\.statut\)/, "V2 doit refuser une course terminee ou annulee");

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 
@@ -20,6 +20,21 @@ import { base44 } from "@/api/base44Client";
 
 const FINAL_COURSE_STATUSES = new Set(["livree", "annulee", "completed", "delivered", "canceled"]);
 const DISMISSED_COURSES_KEY = "silgapp_dismissed_courses";
+const DISMISS_TTL_MS = 30 * 60 * 1000;
+
+function readActiveDismissedCourseIds() {
+  try {
+    const now = Date.now();
+    const parsed = JSON.parse(localStorage.getItem(DISMISSED_COURSES_KEY) || "{}");
+    const activeEntries = Object.fromEntries(
+      Object.entries(parsed || {}).filter(([, dismissedAt]) => now - Number(dismissedAt) < DISMISS_TTL_MS)
+    );
+    localStorage.setItem(DISMISSED_COURSES_KEY, JSON.stringify(activeEntries));
+    return Object.keys(activeEntries);
+  } catch {
+    return [];
+  }
+}
 
 export function useCoursesDisponibles(livreurProfil) {
   const livreurId = livreurProfil?.id;
@@ -80,22 +95,28 @@ export function useCoursesDisponibles(livreurProfil) {
   });
 
   // ── Courses dismissées localement (localStorage, TTL 30 min) ──
-  const [refusedIds, setRefusedIds] = useState(() => {
-    try {
-      const stored = localStorage.getItem(DISMISSED_COURSES_KEY);
-      return stored ? Object.keys(JSON.parse(stored)) : [];
-    } catch { return []; }
-  });
+  const [refusedIds, setRefusedIds] = useState(readActiveDismissedCourseIds);
+
+  useEffect(() => {
+    const refreshDismissedIds = () => setRefusedIds(readActiveDismissedCourseIds());
+    window.addEventListener("silgapp:dismissed-courses-changed", refreshDismissedIds);
+    const interval = window.setInterval(refreshDismissedIds, 60000);
+    return () => {
+      window.removeEventListener("silgapp:dismissed-courses-changed", refreshDismissedIds);
+      window.clearInterval(interval);
+    };
+  }, []);
 
   // ── Filtrage d'éligibilité (SOURCE UNIQUE) ──
   const eligibleCourses = useMemo(() => {
+    if (!livreurDisponible || !isV2Enabled) return [];
     return courses.filter(course => {
       if (course.statut === "en_attente") return false;
       if (FINAL_COURSE_STATUSES.has(course.statut)) return false;
       if (course.statut !== "recherche_livreur") return false;
       if (course.dispatch_status !== "disponible_push" && course.dispatch_status !== "propose") return false;
       if (course.dispatch_status === "redispatch") return false;
-      if (course.livreur_id) return false;
+      if (course.livreur_id || course.accepted_by_livreur_id) return false;
       if (refusedIds.includes(course.id)) return false;
       if (course.timeout_expires_at) {
         const expires = new Date(course.timeout_expires_at);
@@ -104,7 +125,7 @@ export function useCoursesDisponibles(livreurProfil) {
       if (refusedCourseIds.includes(course.id)) return false;
       return true;
     });
-  }, [courses, refusedIds, refusedCourseIds, livreurId]);
+  }, [courses, refusedIds, refusedCourseIds, livreurDisponible, isV2Enabled]);
 
   return {
     eligibleCourses,

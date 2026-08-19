@@ -18,7 +18,6 @@ function calculerDistance(lat1, lng1, lat2, lng2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-const FINAL_COURSE_STATUSES = new Set(["livree", "annulee", "completed", "delivered", "canceled"]);
 const DISMISSED_COURSES_KEY = "silgapp_dismissed_courses";
 const DISMISS_TTL_MS = 30 * 60 * 1000;
 
@@ -32,6 +31,7 @@ function persistDismissedCourse(courseId) {
     );
     activeEntries[courseId] = now;
     localStorage.setItem(DISMISSED_COURSES_KEY, JSON.stringify(activeEntries));
+    window.dispatchEvent(new CustomEvent("silgapp:dismissed-courses-changed"));
   } catch {
     // Le refus serveur reste la source de verite si le stockage local est indisponible.
   }
@@ -41,10 +41,10 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
   const queryClient = useQueryClient();
   const [acceptingId, setAcceptingId] = useState(null);
   const knownCourseIdsRef = useRef(new Set());
+  const dispatchNotificationCourseIdsRef = useRef(new Set());
   const courseFeedInitializedRef = useRef(false);
 
   const livreurId = livreurProfil?.id;
-  const countryCode = livreurProfil?.country_code;
   const livreurLat = livreurProfil?.latitude;
   const livreurLng = livreurProfil?.longitude;
 
@@ -62,9 +62,11 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
         { livreur_id: livreurId }, "-date_notification", 200
       ).catch(() => []);
       const existingCourseIds = new Set((existing || []).map(n => n.course_id));
+      existingCourseIds.forEach(courseId => dispatchNotificationCourseIdsRef.current.add(courseId));
       // Créer uniquement pour les courses pas encore notifiées
       courses.forEach((course) => {
-        if (existingCourseIds.has(course.id)) return;
+        if (dispatchNotificationCourseIdsRef.current.has(course.id)) return;
+        dispatchNotificationCourseIdsRef.current.add(course.id);
         base44.entities.DispatchNotification.create({
           course_id: course.id,
           livreur_id: livreurId,
@@ -72,21 +74,12 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
           statut: "notifie",
           date_notification: new Date().toISOString(),
           priorite_dispatch: course.priorite_dispatch || 0,
-        }).catch(() => {});
+        }).catch(() => {
+          dispatchNotificationCourseIdsRef.current.delete(course.id);
+        });
       });
     })();
   }, [courses, livreurId]);
-
-  // Realtime subscription — mise à jour instantanée
-  useEffect(() => {
-    if (!livreurId) return;
-    const unsubscribe = base44.entities.CourseExterne.subscribe((event) => {
-      if (event.type === "create" || event.type === "update" || event.type === "delete") {
-        queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles", livreurId, countryCode] });
-      }
-    });
-    return unsubscribe;
-  }, [livreurId, countryCode, queryClient]);
 
   // ── eligibleCourses provient du hook useCoursesDisponibles (source unique) ──
 

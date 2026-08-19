@@ -46,6 +46,7 @@ import {
   sameLivreurId,
 } from "@/lib/livreurCourseState";
 import CoursesDisponibles from "@/components/livreur/CoursesDisponibles";
+import { useCoursesDisponibles } from "@/hooks/useCoursesDisponibles";
 
 // Haversine — utilisée aussi pour le calcul de prix
 function calculerDistance(lat1, lng1, lat2, lng2) {
@@ -125,6 +126,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   const [showMessages, setShowMessages] = useState(false);
   const [hasNewAvailableCourse, setHasNewAvailableCourse] = useState(false);
   const initialTabSetRef = useRef(false);
+  const tabListRef = useRef(null);
+  const tabButtonRefs = useRef(new Map());
 
   const [sessionId, setSessionId] = useState(() => {
     try { return localStorage.getItem("silgapp_livreur_session_id") || null; } catch { return null; }
@@ -200,71 +203,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     staleTime: 4000,
   });
 
-  // ── Vérifier si le dispatch V2 est activé (fil de courses disponibles) ──
-  const { data: isV2Enabled = true } = useQuery({
-    queryKey: ["dispatch-v2-enabled", livreurProfil?.id],
-    queryFn: async () => {
-      const configs = await base44.entities.AppConfig.filter({ cle: "DISPATCH_V2_ENABLED" });
-      return configs?.[0] ? configs[0].valeur !== "false" : true;
-    },
-    enabled: !!livreurProfil?.id,
-    staleTime: 60000,
-  });
-
-  const livreurCanReceiveV2 =
-    livreurProfil?.type_livreur === "externe" &&
-    livreurProfil?.validation === "valide" &&
-    livreurProfil?.actif === true &&
-    livreurProfil?.statut === "disponible" &&
-    livreurProfil?.bloque_encours !== true &&
-    livreurProfil?.manual_hors_ligne !== true &&
-    livreurProfil?.admin_hors_ligne !== true;
-
-  // Compteur du badge avec les memes exclusions que le fil Dispatch V2.
-  const { data: availableCoursesCount = 0 } = useQuery({
-    queryKey: ["courses-disponibles-count", livreurProfil?.id, livreurProfil?.country_code, isV2Enabled],
-    queryFn: async () => {
-      if (!livreurProfil?.id || !livreurProfil?.country_code || !isV2Enabled) return 0;
-      const [all, refused] = await Promise.all([
-        base44.entities.CourseExterne.filter(
-          { dispatch_status: { $in: ["disponible_push", "propose"] }, country_code: livreurProfil.country_code },
-          "-created_date", 50
-        ),
-        base44.entities.DispatchNotification.filter(
-          { livreur_id: livreurProfil.id, statut: "refuse" },
-          "-date_reponse", 50
-        ).catch(() => []),
-      ]);
-      const refusedIds = new Set((refused || []).map((item) => item.course_id));
-      let dismissedIds = new Set();
-      try {
-        const dismissed = JSON.parse(localStorage.getItem("silgapp_dismissed_courses") || "{}");
-        const now = Date.now();
-        dismissedIds = new Set(
-          Object.entries(dismissed)
-            .filter(([, dismissedAt]) => now - Number(dismissedAt) < DISMISS_TTL_MS)
-            .map(([courseId]) => courseId)
-        );
-      } catch {}
-
-      return (all || []).filter((course) => {
-        if (course.statut !== "recherche_livreur") return false;
-        if (course.dispatch_status !== "disponible_push" && course.dispatch_status !== "propose") return false;
-        if (FINAL_COURSE_STATUSES.has(course.statut)) return false;
-        if (course.livreur_id || course.accepted_by_livreur_id) return false;
-        if (refusedIds.has(course.id) || dismissedIds.has(course.id)) return false;
-        if (course.timeout_expires_at) {
-          const expiresAt = new Date(course.timeout_expires_at).getTime();
-          if (Number.isFinite(expiresAt) && expiresAt < Date.now()) return false;
-        }
-        return true;
-      }).length;
-    },
-    enabled: !!livreurProfil?.id && !!livreurProfil?.country_code && isV2Enabled && livreurCanReceiveV2,
-    refetchInterval: 10000,
-    staleTime: 0,
-    refetchOnWindowFocus: true,
-  });
+  const { eligibleCourses: availableCourses, isV2Enabled } = useCoursesDisponibles(livreurProfil);
+  const availableCoursesCount = availableCourses.length;
 
   // Le point rouge s'affiche dès qu'il y a des courses disponibles ET que le livreur
   // n'est pas sur l'onglet "Disponibles"
@@ -281,13 +221,20 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   // le cache React Query doit être invalidé immédiatement sans attendre le polling.
   useEffect(() => {
     if (!livreurProfil?.id) return;
-    const unsubscribe = base44.entities.CourseExterne.subscribe((event) => {
+    const unsubscribeCourses = base44.entities.CourseExterne.subscribe((event) => {
       if (event.type === "create" || event.type === "update" || event.type === "delete") {
-        queryClient.invalidateQueries({ queryKey: ["courses-disponibles-count"] });
         queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles"] });
       }
     });
-    return unsubscribe;
+    const unsubscribeRefus = base44.entities.DispatchNotification.subscribe((event) => {
+      if (event.type === "create" || event.type === "update" || event.type === "delete") {
+        queryClient.invalidateQueries({ queryKey: ["dispatch-refused-courses", livreurProfil.id] });
+      }
+    });
+    return () => {
+      unsubscribeCourses();
+      unsubscribeRefus();
+    };
   }, [livreurProfil?.id, queryClient]);
 
   const { data: countryCommissionRows = [] } = useQuery({
@@ -312,6 +259,17 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       setActiveTab("courses");
     }
   }, [activeTab, livreurHasPromoCode]);
+
+  useEffect(() => {
+    const activeButton = tabButtonRefs.current.get(activeTab);
+    const tabList = tabListRef.current;
+    if (!activeButton || !tabList) return;
+    const buttonRect = activeButton.getBoundingClientRect();
+    const listRect = tabList.getBoundingClientRect();
+    if (buttonRect.left < listRect.left || buttonRect.right > listRect.right) {
+      activeButton.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+    }
+  }, [activeTab, isV2Enabled, livreurHasPromoCode]);
 
   // Synchroniser le pricingMode depuis le profil BDD au chargement
   useEffect(() => {
@@ -1512,15 +1470,27 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
       {/* ── Navigation sticky en haut ──────────────── */}
       <div className="sticky top-0 z-30 bg-background/90 backdrop-blur-xl px-3 pt-3 pb-2 border-b border-border">
-        <div className="max-w-lg mx-auto flex w-full gap-1 overflow-x-auto overscroll-x-contain bg-card/90 rounded-2xl p-1 shadow-[0_8px_30px_rgba(15,23,42,0.06)] border border-border [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div
+          ref={tabListRef}
+          role="tablist"
+          aria-label="Navigation livreur"
+          className="max-w-lg mx-auto flex w-full gap-1 overflow-x-auto overscroll-x-contain scroll-smooth snap-x snap-proximity scroll-px-1 touch-pan-x bg-card/90 rounded-2xl p-1 shadow-[0_8px_30px_rgba(15,23,42,0.06)] border border-border [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
           {TABS.map(tab => (
             <button
               key={tab.id}
+              ref={(element) => {
+                if (element) tabButtonRefs.current.set(tab.id, element);
+                else tabButtonRefs.current.delete(tab.id);
+              }}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === tab.id}
               onClick={() => {
                 setActiveTab(tab.id);
                 if (tab.id === "disponibles") setHasNewAvailableCourse(false);
               }}
-              className={`relative flex-none min-w-[76px] px-2 flex items-center justify-center py-2.5 rounded-xl text-[11px] font-bold leading-tight text-center whitespace-nowrap transition-all ${
+              className={`relative flex-none min-w-max px-3 snap-start flex items-center justify-center gap-1 py-2.5 rounded-xl text-[11px] font-bold leading-tight text-center whitespace-nowrap transition-all ${
                 activeTab === tab.id
                   ? "bg-primary text-white shadow-sm"
                   : "text-slate-500 hover:text-slate-900"
