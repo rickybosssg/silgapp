@@ -12,6 +12,7 @@ import SystemAlertModal from "@/components/admin/SystemAlertModal";
 import VenusCourseAlertModal from "@/components/admin/VenusCourseAlertModal";
 import VenusIncidentAlertModal from "@/components/admin/VenusIncidentAlertModal";
 import CourseWindowStack from "@/components/admin/CourseWindowStack";
+import VenusFloatingButton from "@/components/client/VenusFloatingButton";
 import { AdminCourseWindowsProvider, useAdminCourseWindows } from "@/context/AdminCourseWindowsContext";
 
 // AppLayout — layout principal admin (desktop sidebar + mobile nav)
@@ -165,6 +166,9 @@ function AppLayoutInner({ reseau }) {
           <Outlet />
         </main>
       </div>
+
+      {/* Assistant VENUS — bouton flottant sur toutes les pages admin */}
+      <VenusFloatingButton />
 
       {/* Mobile layout */}
       <div className="lg:hidden">
