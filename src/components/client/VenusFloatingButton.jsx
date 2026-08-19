@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, Move } from "lucide-react";
 import VenusChat from "./VenusChat";
 import VenusAdminPanel from "@/components/admin/VenusAdminPanel";
+import VenusAdminToast from "@/components/admin/VenusAdminToast";
+import { useVenusAdminNotifications } from "@/hooks/useVenusAdminNotifications";
 import { useAdminContext } from "@/hooks/useAdminContext";
 import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
@@ -17,7 +19,6 @@ export default function VenusFloatingButton({ forcedCountryCode = null }) {
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [constraint, setConstraint] = useState({ left: 0, right: 0, top: 0, bottom: 0 });
   const [isAdmin, setIsAdmin] = useState(false);
-  const [unreadAdminCount, setUnreadAdminCount] = useState(0);
   const imgRef = useRef(null);
   const buttonRef = useRef(null);
 
@@ -71,25 +72,19 @@ export default function VenusFloatingButton({ forcedCountryCode = null }) {
     pubsActives: pubsData?.length ?? 0,
   } : null;
 
-  // Détecter si l'utilisateur est admin + compter les événements non lus
+  // Détecter si l'utilisateur est admin
   useEffect(() => {
-    const checkAdminAndCount = async () => {
+    const checkAdmin = async () => {
       try {
         const user = await base44.auth.me();
-        if (user?.role === "admin") {
-          setIsAdmin(true);
-          // Compter les événements admin non lus
-          const events = await base44.entities.VenusAdminEvent.filter({ status: "new" }, "-created_date", 100);
-          setUnreadAdminCount(events?.length || 0);
-        } else {
-          setIsAdmin(false);
-        }
+        setIsAdmin(user?.role === "admin");
       } catch {}
     };
-    checkAdminAndCount();
-    const interval = setInterval(checkAdminAndCount, 15000);
-    return () => clearInterval(interval);
+    checkAdmin();
   }, []);
+
+  // Hook de notifications admin — realtime, cooldown, regroupement, anti-spam
+  const { activeToast, unreadCount: unreadAdminCount, dismissToast, resetUnread } = useVenusAdminNotifications(isAdmin);
 
   // Préchargement de l'image
   useEffect(() => {
@@ -159,7 +154,7 @@ export default function VenusFloatingButton({ forcedCountryCode = null }) {
         exit={{ scale: 0, opacity: 0 }}
         whileHover={{ scale: isDragging ? 1 : 1.1 }}
         whileTap={{ scale: isDragging ? 1 : 0.95 }}
-        onClick={() => !isDragging && setShowChat(true)}
+        onClick={() => { if (!isDragging) { setShowChat(true); if (isAdmin) resetUnread(); } }}
         className="fixed z-50 flex items-center justify-center w-16 h-16 rounded-full shadow-2xl overflow-hidden border-4 border-white cursor-grab active:cursor-grabbing"
         style={{
           background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
@@ -232,6 +227,9 @@ export default function VenusFloatingButton({ forcedCountryCode = null }) {
           <Move className="w-6 h-6 text-white" />
         </motion.div>
       </motion.button>
+
+      {/* Toast P0/P1 — alertes immédiates pour admin */}
+      {isAdmin && <VenusAdminToast toast={activeToast} onDismiss={dismissToast} />}
 
       {/* Chat VENUS (client/livreur/partenaire) ou Panneau Admin */}
       <AnimatePresence>

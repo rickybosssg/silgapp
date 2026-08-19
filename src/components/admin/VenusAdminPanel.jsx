@@ -39,15 +39,20 @@ export default function VenusAdminPanel({ onClose }) {
   });
 
   const markAsRead = useMutation({
-    mutationFn: (eventId) => base44.entities.VenusAdminEvent.update(eventId, {
-      status: "notified",
-      admin_read_at: new Date().toISOString(),
-    }),
+    mutationFn: (eventIds) => Promise.all(
+      (Array.isArray(eventIds) ? eventIds : [eventIds]).map(id =>
+        base44.entities.VenusAdminEvent.update(id, { status: "notified", admin_read_at: new Date().toISOString() })
+      )
+    ),
     onSuccess: () => queryClient.invalidateQueries(["venus-admin-events"]),
   });
 
   const ignoreEvent = useMutation({
-    mutationFn: (eventId) => base44.entities.VenusAdminEvent.update(eventId, { status: "ignored" }),
+    mutationFn: (eventIds) => Promise.all(
+      (Array.isArray(eventIds) ? eventIds : [eventIds]).map(id =>
+        base44.entities.VenusAdminEvent.update(id, { status: "ignored" })
+      )
+    ),
     onSuccess: () => queryClient.invalidateQueries(["venus-admin-events"]),
   });
 
@@ -55,6 +60,25 @@ export default function VenusAdminPanel({ onClose }) {
     if (filter === "all") return events;
     return events.filter(e => e.priority === filter);
   }, [events, filter]);
+
+  // Regroupement — événements similaires (même type + priorité) dans une fenêtre de 5 min
+  const groupedEvents = useMemo(() => {
+    if (!filteredEvents || filteredEvents.length === 0) return [];
+    const groups = [];
+    let cur = null;
+    for (const evt of filteredEvents) {
+      const t = new Date(evt.created_date).getTime();
+      if (cur && cur.event_type === evt.event_type && cur.priority === evt.priority && (cur.lastTime - t) < 5 * 60 * 1000) {
+        cur.count += 1;
+        cur.lastTime = t;
+        cur.events.push(evt);
+      } else {
+        cur = { ...evt, count: 1, lastTime: t, events: [evt] };
+        groups.push(cur);
+      }
+    }
+    return groups;
+  }, [filteredEvents]);
 
   const unreadCount = events.filter(e => e.status === "new").length;
 
@@ -107,7 +131,7 @@ export default function VenusAdminPanel({ onClose }) {
             <div className="flex items-center justify-center h-full">
               <p className="text-sm text-slate-500">Chargement des événements...</p>
             </div>
-          ) : filteredEvents.length === 0 ? (
+          ) : groupedEvents.length === 0 ? (
             <div className="flex items-center justify-center h-full">
               <div className="text-center space-y-2">
                 <CheckCircle2 className="w-10 h-10 text-slate-300 mx-auto" />
@@ -115,7 +139,7 @@ export default function VenusAdminPanel({ onClose }) {
               </div>
             </div>
           ) : (
-            filteredEvents.map(evt => {
+            groupedEvents.map(evt => {
               const prio = PRIORITY_CONFIG[evt.priority] || PRIORITY_CONFIG.P3;
               const isUnread = evt.status === "new";
               return (
@@ -140,7 +164,12 @@ export default function VenusAdminPanel({ onClose }) {
                         </span>
                         {isUnread && <span className="w-2 h-2 bg-primary rounded-full" />}
                       </div>
-                      <p className="text-sm font-bold text-slate-900 mb-0.5">{evt.title}</p>
+                      <div className="flex items-center gap-1.5 mb-0.5">
+                        <p className="text-sm font-bold text-slate-900">{evt.title}</p>
+                        {evt.count > 1 && (
+                          <span className="text-[10px] font-bold bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded-full">×{evt.count}</span>
+                        )}
+                      </div>
                       <p className="text-xs text-slate-600 leading-relaxed">{evt.summary}</p>
 
                       {/* Actions */}
@@ -165,7 +194,7 @@ export default function VenusAdminPanel({ onClose }) {
                             size="sm"
                             variant="ghost"
                             className="h-7 text-[11px] px-2 ml-auto"
-                            onClick={() => markAsRead.mutate(evt.id)}
+                            onClick={() => markAsRead.mutate(evt.events.map(e => e.id))}
                           >
                             Marquer comme lu
                           </Button>
@@ -175,7 +204,7 @@ export default function VenusAdminPanel({ onClose }) {
                             size="sm"
                             variant="ghost"
                             className="h-7 text-[11px] px-2 text-slate-400"
-                            onClick={() => ignoreEvent.mutate(evt.id)}
+                            onClick={() => ignoreEvent.mutate(evt.events.map(e => e.id))}
                           >
                             <EyeOff className="w-3 h-3" />
                           </Button>
