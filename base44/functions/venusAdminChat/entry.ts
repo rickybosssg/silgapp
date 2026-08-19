@@ -28,6 +28,15 @@ export default async function handler(req) {
 
   const base44 = createClientFromRequest(req);
 
+  // ── 0. Sécurité : VENUS Admin est EXCLUSIVEMENT réservé au rôle admin ──
+  const currentUser = await base44.auth.me().catch(() => null);
+  if (!currentUser || currentUser.role !== 'admin') {
+    return Response.json(
+      { success: false, error: 'Accès refusé — VENUS Admin est réservé à l\'administrateur' },
+      { status: 403 }
+    );
+  }
+
   // ── 1. Périodes ──
   const now = new Date();
   const today = DATE_STR(now);
