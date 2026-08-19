@@ -503,9 +503,11 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-background">
         <div className="text-center space-y-4">
-          <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">
-            <Truck className="w-8 h-8 text-primary animate-pulse" />
-          </div>
+          <img
+            src="https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/962cfba1f_IMG-20260819-WA0003.jpg"
+            alt="SILGAPP"
+            className="w-16 h-16 rounded-2xl object-cover mx-auto shadow-lg"
+          />
           <p className="text-sm text-muted-foreground">Vérification du compte...</p>
         </div>
       </div>
@@ -521,9 +523,11 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
             <div className="absolute bottom-[-70px] left-[-45px] h-44 w-44 rounded-full bg-blue-300/10" />
             <div className="relative">
               <div className="mb-5 flex items-center justify-between">
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/20 bg-white/15 shadow-lg silgapp-relief">
-                  <Truck className="h-7 w-7 text-white" />
-                </div>
+                <img
+                  src="https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/962cfba1f_IMG-20260819-WA0003.jpg"
+                  alt="SILGAPP"
+                  className="h-14 w-14 rounded-2xl border border-white/20 shadow-lg object-cover"
+                />
                 <div className="flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[11px] font-semibold text-blue-50">
                   <ShieldCheck className="h-3.5 w-3.5" />
                   Accès sécurisé
@@ -808,9 +812,11 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-background">
       <div className="text-center space-y-4">
-        <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">
-          <Truck className="w-8 h-8 text-primary animate-pulse" />
-        </div>
+        <img
+          src="https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/962cfba1f_IMG-20260819-WA0003.jpg"
+          alt="SILGAPP"
+          className="w-16 h-16 rounded-2xl object-cover mx-auto shadow-lg"
+        />
         <p className="text-sm text-muted-foreground">Chargement...</p>
       </div>
     </div>

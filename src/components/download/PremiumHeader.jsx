@@ -20,7 +20,7 @@ export default function PremiumHeader({ downloadCount }) {
               className="w-20 h-20 rounded-2xl bg-gradient-to-br from-red-500/10 to-red-600/10 backdrop-blur-sm border border-red-500/20 flex items-center justify-center shadow-2xl shadow-red-500/20 overflow-hidden"
             >
               <img
-                src="https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/d7ba7bd0e_IMG-20260523-WA00033.jpg"
+                src="https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/962cfba1f_IMG-20260819-WA0003.jpg"
                 alt="SILGAPP Logo Officiel"
                 className="w-16 h-16 object-contain drop-shadow-2xl"
                 onError={(e) => {

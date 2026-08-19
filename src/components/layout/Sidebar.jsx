@@ -84,8 +84,8 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, part
       )}>
         <div className="w-9 h-9 rounded-xl bg-sidebar-primary flex items-center justify-center silgapp-relief flex-shrink-0">
           <img 
-            src="https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/2c20ad136_SILGAPPLOGO2.jpg"
-            alt="SILGAPP ET"
+            src="https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/962cfba1f_IMG-20260819-WA0003.jpg"
+            alt="SILGAPP"
             className="w-full h-full rounded-xl object-cover"
           />
         </div>
