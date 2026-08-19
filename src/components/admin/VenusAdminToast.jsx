@@ -14,14 +14,22 @@ export default function VenusAdminToast({ toast, onDismiss }) {
       {toast && (
         <motion.div
           key={toast.id}
-          initial={{ opacity: 0, y: -100, scale: 0.95 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: -100, scale: 0.95 }}
+          initial={{ opacity: 0, y: -100 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -100 }}
           transition={{ duration: 0.3, ease: "easeOut" }}
-          className="fixed top-4 left-0 right-0 mx-auto z-[60] w-full max-w-md px-4 safe-area-top"
+          style={{
+            position: "fixed",
+            top: "max(env(safe-area-inset-top), 16px)",
+            left: "50%",
+            transform: "translateX(-50%)",
+            width: "calc(100vw - 32px)",
+            maxWidth: "28rem",
+            zIndex: 70,
+          }}
         >
           <div className={cn(
-            "flex items-start gap-3 rounded-xl shadow-2xl border-2 p-3 text-white",
+            "flex items-start gap-2 sm:gap-3 rounded-xl shadow-2xl border-2 p-3 text-white",
             PRIORITY_STYLES[toast.priority]?.bg || "bg-orange-500",
             PRIORITY_STYLES[toast.priority]?.border || "border-orange-600"
           )}>
@@ -29,7 +37,7 @@ export default function VenusAdminToast({ toast, onDismiss }) {
               <AlertTriangle className="w-4 h-4 text-white" />
             </div>
             <div className="flex-1 min-w-0 pt-0.5">
-              <div className="flex items-center gap-2 mb-0.5">
+              <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
                 <span className="text-[10px] font-black uppercase tracking-wide bg-white/20 px-1.5 py-0.5 rounded">
                   {PRIORITY_STYLES[toast.priority]?.label || "Important"}
                 </span>
@@ -37,11 +45,11 @@ export default function VenusAdminToast({ toast, onDismiss }) {
                   <span className="text-[10px] font-bold bg-white/20 px-1.5 py-0.5 rounded">×{toast.count}</span>
                 )}
               </div>
-              <p className="text-sm font-semibold leading-snug">{toast.message}</p>
+              <p className="text-sm font-semibold leading-snug break-words whitespace-normal">{toast.message}</p>
             </div>
             <button
               onClick={onDismiss}
-              className="flex-shrink-0 w-6 h-6 rounded-lg hover:bg-white/20 flex items-center justify-center"
+              className="flex-shrink-0 w-7 h-7 rounded-lg hover:bg-white/20 flex items-center justify-center"
             >
               <X className="w-4 h-4 text-white" />
             </button>
