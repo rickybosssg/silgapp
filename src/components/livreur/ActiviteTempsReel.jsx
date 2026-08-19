@@ -1,40 +1,31 @@
 import React, { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
+import { useCoursesDisponibles } from "@/hooks/useCoursesDisponibles";
 import { MapPin, Package, Sparkles, Loader2, Flame } from "lucide-react";
 
 // ── Distance haversine (identique à dispatchConstants/geoUtils) ──
-function haversineKm(lat1, lon1, lat2, lon2) {
+function haversineKm(lat1, lon1, lat2, lng2) {
   if (typeof lat1 !== "number" || typeof lon1 !== "number") return null;
-  if (typeof lat2 !== "number" || typeof lon2 !== "number") return null;
+  if (typeof lat2 !== "number" || typeof lng2 !== "number") return null;
   const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const dLon = ((lng2 - lon1) * Math.PI) / 180;
   const a =
     Math.sin(dLat / 2) ** 2 +
     Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-const RAYON_INITIAL_KM = 3;
-const RAYON_MAX_KM = 8;
-const RAYON_STEPS = [3, 5, 8];
-
 /**
  * ActiviteTempsReel — remplace l'ancienne carte sombre "RECHERCHE ACTIVE".
  * Carte compacte, lecture seule, utilisant uniquement des données réelles.
  *
- * Données affichées:
- *  - Statut: DISPONIBLE — Recherche en cours
- *  - AUTOUR DE MOI: rayon, courses disponibles, livreurs à proximité
- *  - AUJOURD'HUI: courses terminées, montant total, dû SILGAPP
- *  - VENUS: message contextuel discret (pas de grande illustration)
+ * Source de vérité pour les courses disponibles : useCoursesDisponibles (hook partagé
+ * avec CoursesDisponibles — garantit que le compteur et l'onglet "Disponibles"
+ * affichent exactement les mêmes courses).
  *
- * Règles respectées:
- *  - Éligibilité courses: statut "recherche_livreur" + dispatch_status "disponible_push" ou "propose"
- *  - Pas de course refusée (DispatchNotification statut "refuse")
- *  - Pas de course expirée (timeout_expires_at)
- *  - Rayon 3 → 5 → 8 km affiché à titre informatif (aucune règle métier modifiée)
+ * Rayon : provient de Country.rayon_km (base de données), jamais codé en dur.
  */
 export default function ActiviteTempsReel({ livreurProfil, mesCourses = [], isExterne = false }) {
   const {
@@ -43,7 +34,6 @@ export default function ActiviteTempsReel({ livreurProfil, mesCourses = [], isEx
     longitude,
     country_code,
     montant_du_silga = 0,
-    type_livreur,
   } = livreurProfil || {};
 
   const isDisponible = statut === "disponible";
@@ -66,62 +56,37 @@ export default function ActiviteTempsReel({ livreurProfil, mesCourses = [], isEx
     [livreesToday]
   );
 
-  // ── Courses refusées par ce livreur (DispatchNotification) ──
-  const { data: refusedCourseIds = [] } = useQuery({
-    queryKey: ["activite-refused-courses", livreurId],
-    queryFn: async () => {
-      if (!livreurId) return [];
-      const refused = await base44.entities.DispatchNotification.filter(
-        { livreur_id: livreurId, statut: "refuse" },
-        "-date_reponse",
-        50
-      );
-      return (refused || []).map((n) => n.course_id);
-    },
-    enabled: !!livreurId && isDisponible,
-    refetchInterval: 30000,
-    staleTime: 15000,
-  });
+  // ── Courses disponibles (SOURCE UNIQUE — hook partagé avec CoursesDisponibles) ──
+  const { eligibleCourses, isLoading: loadingCourses } = useCoursesDisponibles(livreurProfil);
 
-  // ── AUTOUR DE MOI: courses disponibles (mêmes règles que CoursesDisponibles) ──
-  const { data: coursesDispo = [], isLoading: loadingCourses } = useQuery({
-    queryKey: ["activite-courses-dispo", country_code, livreurId],
-    queryFn: async () => {
-      if (!country_code) return [];
-      const all = await base44.entities.CourseExterne.filter(
-        { dispatch_status: { $in: ["disponible_push", "propose"] }, country_code },
-        "-created_date",
-        50
-      );
-      return (all || []).filter(
-        (c) =>
-          c.statut === "recherche_livreur" &&
-          !c.livreur_id &&
-          c.dispatch_status !== "redispatch" &&
-          (!c.timeout_expires_at || new Date(c.timeout_expires_at) > new Date()) &&
-          !refusedCourseIds.includes(c.id)
-      );
-    },
-    enabled: !!country_code && isDisponible && isExterne,
-    refetchInterval: 15000,
-    staleTime: 10000,
-  });
-
-  // ── Distance de chaque course disponible ──
+  // ── Distance de chaque course disponible (tri par distance croissante) ──
   const coursesWithDistance = useMemo(() => {
-    if (!hasGPS || !coursesDispo.length) return [];
-    return coursesDispo
+    if (!hasGPS || !eligibleCourses.length) return [];
+    return eligibleCourses
       .map((c) => ({
         ...c,
         __distance: haversineKm(latitude, longitude, c.gps_depart_lat, c.gps_depart_lng),
       }))
       .filter((c) => c.__distance !== null)
       .sort((a, b) => a.__distance - b.__distance);
-  }, [coursesDispo, latitude, longitude, hasGPS]);
+  }, [eligibleCourses, latitude, longitude, hasGPS]);
 
   const closestCourse = coursesWithDistance[0] || null;
 
-  // ── Livreurs à proximité (même pays, disponibles, GPS dans le rayon max) ──
+  // ── Rayon d'opération du pays (base de données — jamais codé en dur) ──
+  const { data: countryData } = useQuery({
+    queryKey: ["country-rayon", country_code],
+    queryFn: async () => {
+      if (!country_code) return null;
+      const rows = await base44.entities.Country.filter({ code: country_code });
+      return rows?.[0] || null;
+    },
+    enabled: !!country_code,
+    staleTime: 5 * 60 * 1000,
+  });
+  const rayonKm = countryData?.rayon_km || 30;
+
+  // ── Livreurs à proximité (même pays, disponibles, GPS dans le rayon d'opération) ──
   const { data: nearbyDriversCount = 0 } = useQuery({
     queryKey: ["activite-nearby-drivers", country_code, latitude, longitude, livreurId],
     queryFn: async () => {
@@ -136,7 +101,7 @@ export default function ActiviteTempsReel({ livreurProfil, mesCourses = [], isEx
       );
       return others.filter((d) => {
         const dist = haversineKm(latitude, longitude, d.latitude, d.longitude);
-        return dist !== null && dist <= RAYON_MAX_KM;
+        return dist !== null && dist <= rayonKm;
       }).length;
     },
     enabled: !!country_code && isDisponible && hasGPS,
@@ -192,8 +157,8 @@ export default function ActiviteTempsReel({ livreurProfil, mesCourses = [], isEx
         </div>
         <div className="grid grid-cols-3 gap-1.5">
           <div className="min-w-0">
-            <p className="text-[9px] text-slate-400 leading-tight">Rayon</p>
-            <p className="text-sm font-black text-slate-900 leading-tight">{RAYON_INITIAL_KM} km</p>
+            <p className="text-[9px] text-slate-400 leading-tight">Zone</p>
+            <p className="text-sm font-black text-slate-900 leading-tight">{rayonKm} km</p>
           </div>
           <div className="min-w-0">
             <p className="text-[9px] text-slate-400 leading-tight">Courses dispo</p>
@@ -236,19 +201,6 @@ export default function ActiviteTempsReel({ livreurProfil, mesCourses = [], isEx
             Recherche automatique en cours…
           </p>
         )}
-
-        {/* Rayon extension */}
-        <div className="mt-2 flex items-center gap-2">
-          <div className="flex-1 bg-slate-100 rounded-full h-1 overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-green-400 to-emerald-400 rounded-full"
-              style={{ width: `${(RAYON_INITIAL_KM / RAYON_MAX_KM) * 100}%` }}
-            />
-          </div>
-          <p className="text-[9px] text-slate-400 whitespace-nowrap">
-            {RAYON_STEPS.join(" → ")} km
-          </p>
-        </div>
       </div>
 
       {/* Section: AUJOURD'HUI */}
