@@ -1,4 +1,5 @@
 import React from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -20,15 +21,22 @@ const TOAST_POSITION_STYLE = {
 };
 
 export default function VenusAdminToast({ toast, onDismiss }) {
-  return (
+  // ── Portal vers document.body ──
+  // Le toast DOIT être rendu directement dans document.body, complètement
+  // détaché de tout ancêtre (motion.button drag, AnimatePresence, transform
+  // Framer Motion). Sans cela, Android WebView peut calculer le position: fixed
+  // par rapport à un parent transformé au lieu du viewport réel.
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
     <AnimatePresence>
       {toast && (
         <motion.div
           key={toast.id}
-          initial={{ opacity: 0, y: -80 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -80 }}
-          transition={{ duration: 0.3, ease: "easeOut" }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.25, ease: "easeOut" }}
           style={TOAST_POSITION_STYLE}
         >
           <div className={cn(
@@ -59,6 +67,7 @@ export default function VenusAdminToast({ toast, onDismiss }) {
           </div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }
