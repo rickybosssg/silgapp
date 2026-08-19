@@ -19,6 +19,7 @@
 /**
  * Crée un VenusAdminEvent de manière totalement non-bloquante.
  * Si l'entity n'existe pas ou si la création échoue, SILGAPP continue normalement.
+ * Crée également un AdminInboxItem correspondant pour le Centre de notifications unifié.
  */
 export async function emitVenusAdminEvent(base44: any, params: {
   event_type: string;
@@ -69,6 +70,39 @@ export async function emitVenusAdminEvent(base44: any, params: {
       deduplication_key,
       status: 'new',
     });
+
+    // ── Créer un AdminInboxItem pour le Centre de notifications unifié ──
+    // Mapping event_type → type inbox
+    const inboxType = params.event_type === 'PAYMENT_RECEIVED' ? 'payment'
+      : params.event_type === 'COURSE_CANCELLED' ? 'cancellation'
+      : params.event_type === 'COURSE_CREATED' || params.event_type === 'COURSE_ACCEPTED' || params.event_type === 'COURSE_DELIVERED' ? 'course'
+      : params.event_type === 'DRIVER_DEBT_THRESHOLD' ? 'system'
+      : 'venus';
+
+    const actionUrl = params.course_id ? `/courses` : params.payment_id ? `/admin/paiements` : `/admin/venus`;
+
+    // Non-bloquant : si l'import échoue, SILGAPP continue
+    try {
+      const { createAdminInboxItem } = await import('./adminInbox.ts');
+      await createAdminInboxItem(base44, {
+        type: inboxType as any,
+        priority: params.priority as any,
+        title: params.title,
+        body: params.summary,
+        source_entity: 'VenusAdminEvent',
+        source_id: undefined, // l'ID VenusAdminEvent n'est pas disponible ici (créé ci-dessus sans capture)
+        course_id: params.course_id,
+        livreur_id: params.livreur_id,
+        client_id: params.client_id,
+        payment_id: params.payment_id,
+        message_id: params.message_id,
+        country_code: params.country_code,
+        action_url: actionUrl,
+        deduplication_key: `INBOX_${deduplication_key}`,
+      });
+    } catch (inboxErr) {
+      console.warn('[VenusAdminEventBus] AdminInboxItem non-bloquant:', inboxErr?.message || String(inboxErr));
+    }
   } catch (e) {
     // NON-BLOQUANT — SILGAPP continue même si VENUS échoue
     console.warn('[VenusAdminEventBus] Erreur non-bloquante:', e?.message || String(e));

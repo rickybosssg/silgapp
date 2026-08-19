@@ -1,0 +1,116 @@
+{
+  "name": "AdminInboxItem",
+  "type": "object",
+  "properties": {
+    "type": {
+      "type": "string",
+      "enum": [
+        "message",
+        "venus",
+        "course",
+        "payment",
+        "cancellation",
+        "system"
+      ],
+      "description": "Cat\u00e9gorie de notification"
+    },
+    "priority": {
+      "type": "string",
+      "enum": [
+        "P0",
+        "P1",
+        "P2",
+        "P3"
+      ],
+      "default": "P3",
+      "description": "P0=critique, P1=important, P2=info, P3=routine"
+    },
+    "title": {
+      "type": "string",
+      "description": "Titre court"
+    },
+    "body": {
+      "type": "string",
+      "description": "R\u00e9sum\u00e9 / message affich\u00e9 \u00e0 l'admin"
+    },
+    "source_entity": {
+      "type": "string",
+      "description": "Nom de l'entity source (VenusAdminEvent, Conversation, CourseExterne, PaiementSilgapp, etc.)"
+    },
+    "source_id": {
+      "type": "string",
+      "description": "ID de l'enregistrement source"
+    },
+    "course_id": {
+      "type": "string"
+    },
+    "conversation_id": {
+      "type": "string"
+    },
+    "message_id": {
+      "type": "string"
+    },
+    "payment_id": {
+      "type": "string"
+    },
+    "livreur_id": {
+      "type": "string"
+    },
+    "client_id": {
+      "type": "string"
+    },
+    "country_code": {
+      "type": "string"
+    },
+    "action_url": {
+      "type": "string",
+      "description": "Deep link vers l'\u00e9l\u00e9ment (ex: /admin/centre-notifications/ITEM_ID ou /admin/venus)"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "unread",
+        "read",
+        "archived"
+      ],
+      "default": "unread"
+    },
+    "read_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "deduplication_key": {
+      "type": "string",
+      "description": "Cl\u00e9 anti-doublon (ex: COURSE_CANCELLED_<courseId>)"
+    }
+  },
+  "required": [
+    "type",
+    "priority",
+    "title",
+    "body",
+    "status"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

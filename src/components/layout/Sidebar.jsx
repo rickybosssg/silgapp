@@ -8,6 +8,7 @@ import {
 import { base44 } from "@/api/base44Client";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { useQuery } from "@tanstack/react-query";
 import { useAdminContext } from "@/hooks/useAdminContext.js";
 import { usePaysActifs } from "@/components/international/CountrySelector.jsx";
 import { SILGAPP_LOGO_URL } from "@/lib/branding";
@@ -44,7 +45,7 @@ export const navItems = [
   { path: "/admin/venus-test-lab", label: "Laboratoire de Test VENUS", icon: FlaskConical },
   { path: "/admin/openai-dashboard", label: "Suivi OpenAI", icon: Cpu },
   { path: "/admin/credits-integration", label: "Crédits d'intégration", icon: Zap },
-  { path: "/admin/centre-notifications", label: "Notifications Push", icon: Megaphone },
+  { path: "/admin/centre-notifications", label: "Centre de notifications", icon: Bell },
   { path: "/admin/externe", label: "Config Dispatch", icon: Settings },
   { path: "/admin/livreurs-prioritaires", label: "Livreurs prioritaires", icon: Crown },
   { path: "/admin/demandes-livreurs", label: "Livreurs à valider", icon: UserCheck },
@@ -71,6 +72,18 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, part
   const effectiveCountry = isPays ? adminCountryCode : selectedCountry;
   const showCountryPicker = reseau === "externe" && !isPays;
   const { pays: paysListe } = usePaysActifs();
+
+  // ── Badge non-lu pour le Centre de notifications ──
+  const { data: inboxUnread = 0 } = useQuery({
+    queryKey: ["admin-inbox-unread-count"],
+    queryFn: async () => {
+      try {
+        const items = await base44.entities.AdminInboxItem.filter({ status: "unread" }, "-created_date", 200);
+        return items?.length || 0;
+      } catch { return 0; }
+    },
+    refetchInterval: 30000,
+  });
 
 
   return (
@@ -151,9 +164,14 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, part
                       {livreursBloquesCount}
                     </Badge>
                   )}
+                  {item.path === "/admin/centre-notifications" && inboxUnread > 0 && (
+                    <Badge className="bg-red-500 text-white text-[10px] h-5 min-w-5 flex items-center justify-center px-1 animate-pulse">
+                      {inboxUnread > 99 ? "99+" : inboxUnread}
+                    </Badge>
+                  )}
                 </>
               )}
-              {(item.path === "/notifications" && notificationCount > 0) || (item.path === "/admin/demandes-livreurs" && demandesCount > 0) || (["/admin/boutiques", "/admin/restaurants", "/admin/pharmacies"].includes(item.path) && partenaireDemandesCount > 0) || (item.path === "/admin/neo" && neoCount > 0) || (item.path === "/admin/messages" && messageCount > 0) || (item.path === "/admin/whatsapp" && whatsappMessageCount > 0) || (item.path === "/admin/livreurs-bloques" && livreursBloquesCount > 0) ? (
+              {(item.path === "/notifications" && notificationCount > 0) || (item.path === "/admin/demandes-livreurs" && demandesCount > 0) || (["/admin/boutiques", "/admin/restaurants", "/admin/pharmacies"].includes(item.path) && partenaireDemandesCount > 0) || (item.path === "/admin/neo" && neoCount > 0) || (item.path === "/admin/messages" && messageCount > 0) || (item.path === "/admin/whatsapp" && whatsappMessageCount > 0) || (item.path === "/admin/livreurs-bloques" && livreursBloquesCount > 0) || (item.path === "/admin/centre-notifications" && inboxUnread > 0) ? (
                 collapsed && (
                   <span className="absolute right-1 top-1 w-2 h-2 rounded-full bg-destructive" />
                 )

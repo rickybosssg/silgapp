@@ -243,6 +243,30 @@ export async function sendVenusAdminPush(
       },
     };
 
+    // ── 4b. Créer un AdminInboxItem AVANT l'envoi du push ──
+    // Règle fondamentale : ne jamais envoyer un push sans élément persistant correspondant.
+    let inboxItemId: string | null = null;
+    try {
+      const { createAdminInboxItem } = await import('./adminInbox.ts');
+      inboxItemId = await createAdminInboxItem(base44, {
+        type: 'venus',
+        priority: isP0 ? 'P0' : 'P1',
+        title: pushTitle,
+        body: pushBody,
+        source_entity: 'VenusAdminEvent',
+        country_code: 'ALL',
+        action_url: actionUrl,
+        deduplication_key: `INBOX_${deduplicationKey}`,
+      });
+    } catch (_) {
+      // Non-bloquant — le push est envoyé même si l'inbox item échoue
+    }
+
+    // ── 4c. Inclure l'ID inbox dans le payload FCM pour le deep link ──
+    if (inboxItemId) {
+      (dataPayload as any).inbox_item_id = inboxItemId;
+    }
+
     // 5. Envoyer
     const results = await Promise.all(
       pushableTokens.map((item: any) =>

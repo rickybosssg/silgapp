@@ -10,6 +10,7 @@ import { navItems as allNavItems } from "@/components/layout/Sidebar";
 import { useAdminContext } from "@/hooks/useAdminContext.js";
 import { usePaysActifs } from "@/components/international/CountrySelector.jsx";
 import { SILGAPP_LOGO_URL } from "@/lib/branding";
+import { useQuery } from "@tanstack/react-query";
 
 // Bottom tab bar : items communs aux deux réseaux
 const bottomTabPaths = ["/", "/carte", "/courses", "/livreurs"];
@@ -79,6 +80,18 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
   const showCountryPicker = reseau === "externe" && !isPays;
   const { pays: paysListe = [] } = usePaysActifs();
 
+  // ── Badge non-lu pour le Centre de notifications ──
+  const { data: inboxUnread = 0 } = useQuery({
+    queryKey: ["admin-inbox-unread-count"],
+    queryFn: async () => {
+      try {
+        const items = await base44.entities.AdminInboxItem.filter({ status: "unread" }, "-created_date", 200);
+        return items?.length || 0;
+      } catch { return 0; }
+    },
+    refetchInterval: 30000,
+  });
+
   return (
     <>
       {/* ===== MOBILE HEADER ===== */}
@@ -123,6 +136,14 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
               <MessageCircle className="w-5 h-5 text-slate-400" />
               <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center animate-pulse">
                 {messageCount > 9 ? '9+' : messageCount}
+              </span>
+            </Link>
+          )}
+          {inboxUnread > 0 && (
+            <Link to="/admin/centre-notifications" className="relative">
+              <Bell className="w-5 h-5 text-slate-400" />
+              <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center animate-pulse">
+                {inboxUnread > 9 ? '9+' : inboxUnread}
               </span>
             </Link>
           )}
@@ -223,6 +244,11 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
                         {messageCount}
                       </Badge>
                     )}
+                    {item.path === "/admin/centre-notifications" && inboxUnread > 0 && (
+                      <Badge className="bg-red-500 text-white text-xs animate-pulse">
+                        {inboxUnread > 99 ? "99+" : inboxUnread}
+                      </Badge>
+                    )}
                   </Link>
                 );
               })}
@@ -292,9 +318,9 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
           >
             <div className="w-10 h-6 flex items-center justify-center rounded-full relative">
               <Menu className="w-5 h-5" />
-              {(notificationCount > 0 || demandesCount > 0 || partenaireDemandesCount > 0 || messageCount > 0) && (
+              {(notificationCount > 0 || demandesCount > 0 || partenaireDemandesCount > 0 || messageCount > 0 || inboxUnread > 0) && (
                 <span className="absolute -top-1 right-0 w-3.5 h-3.5 rounded-full bg-destructive text-destructive-foreground text-[8px] font-bold flex items-center justify-center">
-                  {((notificationCount || 0) + (demandesCount || 0) + (partenaireDemandesCount || 0) + (messageCount || 0)) > 9 ? '9+' : (notificationCount || 0) + (demandesCount || 0) + (partenaireDemandesCount || 0) + (messageCount || 0)}
+                  {((notificationCount || 0) + (demandesCount || 0) + (partenaireDemandesCount || 0) + (messageCount || 0) + (inboxUnread || 0)) > 9 ? '9+' : (notificationCount || 0) + (demandesCount || 0) + (partenaireDemandesCount || 0) + (messageCount || 0) + (inboxUnread || 0)}
                 </span>
               )}
             </div>
