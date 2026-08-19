@@ -25,7 +25,8 @@ function haversineKm(lat1, lon1, lat2, lng2) {
  * avec CoursesDisponibles — garantit que le compteur et l'onglet "Disponibles"
  * affichent exactement les mêmes courses).
  *
- * Rayon : provient de Country.rayon_km (base de données), jamais codé en dur.
+ * Rayon d'opération (Country.rayon_km) : utilisé uniquement pour le calcul des
+ * livreurs à proximité, JAMAIS affiché au livreur (Dispatch V2 ne filtre pas par rayon).
  */
 export default function ActiviteTempsReel({ livreurProfil, mesCourses = [], isExterne = false }) {
   const {
@@ -155,11 +156,7 @@ export default function ActiviteTempsReel({ livreurProfil, mesCourses = [], isEx
           <MapPin className="w-3 h-3 text-slate-400 flex-shrink-0" />
           <p className="text-[9px] font-black text-slate-500 uppercase tracking-wider">Autour de moi</p>
         </div>
-        <div className="grid grid-cols-3 gap-1.5">
-          <div className="min-w-0">
-            <p className="text-[9px] text-slate-400 leading-tight">Zone</p>
-            <p className="text-sm font-black text-slate-900 leading-tight">{rayonKm} km</p>
-          </div>
+        <div className="grid grid-cols-2 gap-1.5">
           <div className="min-w-0">
             <p className="text-[9px] text-slate-400 leading-tight">Courses dispo</p>
             {loadingCourses && isExterne ? (
