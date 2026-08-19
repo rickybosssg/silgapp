@@ -149,13 +149,13 @@ export default function VenusFloatingButton({ forcedCountryCode = null }) {
         dragConstraints={constraint}
         onDragStart={() => setIsDragging(true)}
         onDragEnd={handleDragEnd}
-        initial={{ scale: 0, opacity: 0, x: position.x, y: position.y }}
+        initial={{ scale: 1, opacity: 1, x: position.x, y: position.y }}
         animate={{ scale: 1, opacity: 1, x: position.x, y: position.y }}
         exit={{ scale: 0, opacity: 0 }}
         whileHover={{ scale: isDragging ? 1 : 1.1 }}
         whileTap={{ scale: isDragging ? 1 : 0.95 }}
         onClick={() => { if (!isDragging) { setShowChat(true); if (isAdmin) resetUnread(); } }}
-        className="fixed z-50 flex items-center justify-center w-16 h-16 rounded-full shadow-2xl overflow-hidden border-4 border-white cursor-grab active:cursor-grabbing"
+        className="fixed z-[60] flex items-center justify-center w-16 h-16 rounded-full shadow-2xl overflow-hidden border-4 border-white cursor-grab active:cursor-grabbing"
         style={{
           background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
           boxShadow: isDragging
