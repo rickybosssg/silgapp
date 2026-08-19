@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
+import { emitPaymentReceived } from '../../shared/venusAdminEventBus.ts';
 
 Deno.serve(async (req) => {
   try {
@@ -165,6 +166,11 @@ Deno.serve(async (req) => {
       }
     } catch (e) {
       console.error('Push notification error:', e?.message);
+    }
+
+    // VENUS Admin Event (non-bloquant)
+    if (!isRefus) {
+      await emitPaymentReceived(base44, paiement).catch(() => {});
     }
 
     return Response.json({ success: true, statut: isRefus ? 'refuse' : 'traite' });

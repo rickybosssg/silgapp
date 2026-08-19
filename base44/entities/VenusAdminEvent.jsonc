@@ -1,0 +1,92 @@
+{
+  "name": "VenusAdminEvent",
+  "type": "object",
+  "properties": {
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "COURSE_CREATED",
+        "COURSE_ACCEPTED",
+        "COURSE_CANCELLED",
+        "COURSE_DELIVERED",
+        "PRICE_CHANGED",
+        "PAYMENT_RECEIVED",
+        "DRIVER_DEBT_THRESHOLD"
+      ],
+      "description": "Type d'\u00e9v\u00e9nement admin observ\u00e9 par VENUS"
+    },
+    "priority": {
+      "type": "string",
+      "enum": [
+        "P0",
+        "P1",
+        "P2",
+        "P3"
+      ],
+      "default": "P3",
+      "description": "P0=critique, P1=important, P2=info, P3=routine"
+    },
+    "course_id": {
+      "type": "string",
+      "description": "ID CourseExterne si applicable"
+    },
+    "livreur_id": {
+      "type": "string"
+    },
+    "client_id": {
+      "type": "string"
+    },
+    "payment_id": {
+      "type": "string",
+      "description": "ID PaiementSilgapp si applicable"
+    },
+    "message_id": {
+      "type": "string"
+    },
+    "country_code": {
+      "type": "string",
+      "description": "Code pays ISO 2 lettres"
+    },
+    "title": {
+      "type": "string",
+      "description": "Titre court de l'\u00e9v\u00e9nement"
+    },
+    "summary": {
+      "type": "string",
+      "description": "R\u00e9sum\u00e9 d\u00e9terministe affich\u00e9 \u00e0 l'admin"
+    },
+    "payload": {
+      "type": "string",
+      "description": "JSON: donn\u00e9es contextuelles suppl\u00e9mentaires"
+    },
+    "deduplication_key": {
+      "type": "string",
+      "description": "Cl\u00e9 anti-doublon (ex: COURSE_CANCELLED_<courseId>) \u2014 emp\u00eache les notifications r\u00e9p\u00e9t\u00e9es"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "new",
+        "notified",
+        "resolved",
+        "ignored"
+      ],
+      "default": "new",
+      "description": "new=non lu, notified=vu par admin, resolved=trait\u00e9, ignored=ignor\u00e9"
+    },
+    "admin_read_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date de lecture par l'admin"
+    }
+  },
+  "required": [
+    "event_type",
+    "priority",
+    "country_code",
+    "title",
+    "summary",
+    "deduplication_key",
+    "status"
+  ]
+}
