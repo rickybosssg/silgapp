@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Menu, X, LogOut, Bell, ChevronDown, MessageCircle } from "lucide-react";
+import { Menu, X, LogOut, Bell, ChevronDown, MessageCircle, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { clearPersistedToken } from "@/lib/authPersistence";
 import { Badge } from "@/components/ui/badge";
@@ -181,19 +181,44 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
             {showCountryPicker && (
               <div className="px-3 py-2 border-b border-white/5">
                 <div className="relative">
-                  <select
-                    value={effectiveCountry || ""}
-                    onChange={(e) => setSelectedCountry(e.target.value)}
-                    className="w-full appearance-none bg-white text-gray-900 text-sm font-semibold rounded-xl pl-3 pr-9 py-2.5 border border-gray-200 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 cursor-pointer"
+                  <button
+                    type="button"
+                    onClick={() => setCountryOpen(open => !open)}
+                    className="w-full flex items-center justify-between gap-2 bg-white text-gray-900 text-sm font-semibold rounded-xl px-3 py-2.5 border border-gray-200 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
                   >
-                    <option value="" className="bg-white text-gray-700">Choisir un pays</option>
-                    {paysListe.map((p) => (
-                      <option key={p.code} value={p.code} className="bg-white text-gray-900">
-                        {p.emoji_flag} {p.nom}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="w-4 h-4 text-gray-700 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <span className="flex items-center gap-2 min-w-0">
+                      <span className="text-base flex-shrink-0">
+                        {effectiveCountry ? paysListe.find(p => p.code === effectiveCountry)?.emoji_flag : ""}
+                      </span>
+                      <span className="truncate">
+                        {effectiveCountry ? paysListe.find(p => p.code === effectiveCountry)?.nom : "Choisir un pays"}
+                      </span>
+                    </span>
+                    <ChevronDown className={cn("w-4 h-4 text-gray-700 flex-shrink-0 transition-transform", countryOpen && "rotate-180")} />
+                  </button>
+
+                  {countryOpen && (
+                    <>
+                      <div className="fixed inset-0 z-[55]" onClick={() => setCountryOpen(false)} />
+                      <div className="absolute left-0 right-0 top-full mt-2 z-[60] max-h-[60vh] overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-2xl">
+                        {paysListe.map((p) => (
+                          <button
+                            key={p.code}
+                            type="button"
+                            onClick={() => { setSelectedCountry(p.code); setCountryOpen(false); }}
+                            className={cn(
+                              "w-full flex items-center gap-3 px-3 py-3 text-sm text-gray-900 border-b border-gray-100 last:border-0 hover:bg-gray-100",
+                              effectiveCountry === p.code && "bg-blue-50 text-blue-800"
+                            )}
+                          >
+                            <span className="text-lg flex-shrink-0">{p.emoji_flag}</span>
+                            <span className="flex-1 text-left font-medium">{p.nom}</span>
+                            {effectiveCountry === p.code && <Check className="w-4 h-4 text-blue-700 flex-shrink-0" />}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             )}
