@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useAdminCourseWindows } from "@/context/AdminCourseWindowsContext";
 import CourseWindowCard from "./CourseWindowCard";
 import { Layers, X, ChevronRight } from "lucide-react";
@@ -7,6 +7,70 @@ export default function CourseWindowStack() {
   const { windows, removeWindow } = useAdminCourseWindows();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [desktopCollapsed, setDesktopCollapsed] = useState(false);
+  const buttonRef = useRef(null);
+  const dragRef = useRef(null);
+  const didDragRef = useRef(false);
+  const [mobilePosition, setMobilePosition] = useState(null);
+
+  const clampPosition = useCallback((position) => {
+    const buttonSize = 56;
+    const margin = 12;
+    const headerInset = 72;
+    const bottomInset = 80;
+    return {
+      x: Math.min(Math.max(position.x, margin), Math.max(margin, window.innerWidth - buttonSize - margin)),
+      y: Math.min(Math.max(position.y, headerInset), Math.max(headerInset, window.innerHeight - buttonSize - bottomInset)),
+    };
+  }, []);
+
+  useEffect(() => {
+    const defaultPosition = { x: 16, y: window.innerHeight - 56 - 88 };
+    try {
+      const saved = sessionStorage.getItem("silgapp_admin_course_button_position");
+      setMobilePosition(clampPosition(saved ? JSON.parse(saved) : defaultPosition));
+    } catch {
+      setMobilePosition(clampPosition(defaultPosition));
+    }
+
+    const handleResize = () => setMobilePosition(current => current ? clampPosition(current) : current);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [clampPosition]);
+
+  const handlePointerDown = (event) => {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    didDragRef.current = false;
+    dragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      origin: mobilePosition,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handlePointerMove = (event) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId || !drag.origin) return;
+    const dx = event.clientX - drag.startX;
+    const dy = event.clientY - drag.startY;
+    if (Math.hypot(dx, dy) > 5) didDragRef.current = true;
+    if (didDragRef.current) {
+      const nextPosition = clampPosition({ x: drag.origin.x + dx, y: drag.origin.y + dy });
+      drag.lastPosition = nextPosition;
+      setMobilePosition(nextPosition);
+    }
+  };
+
+  const handlePointerUp = (event) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    dragRef.current = null;
+    const positionToSave = drag.lastPosition || mobilePosition;
+    if (positionToSave) {
+      sessionStorage.setItem("silgapp_admin_course_button_position", JSON.stringify(positionToSave));
+    }
+  };
 
   if (windows.length === 0) return null;
 
@@ -49,8 +113,17 @@ export default function CourseWindowStack() {
       {/* Mobile: floating button + overlay */}
       <div className="lg:hidden">
         <button
-          onClick={() => setMobileOpen(true)}
-          className="fixed bottom-20 right-4 z-40 w-14 h-14 rounded-full bg-primary text-white shadow-xl flex items-center justify-center active:scale-95 transition-transform"
+          ref={buttonRef}
+          type="button"
+          aria-label={`Ouvrir les informations des courses actives (${windows.length})`}
+          title="Courses actives"
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={() => { dragRef.current = null; }}
+          onClick={() => { if (!didDragRef.current) setMobileOpen(true); }}
+          className="fixed z-[55] w-14 h-14 rounded-full bg-primary text-white shadow-xl flex items-center justify-center active:scale-95 transition-transform cursor-grab active:cursor-grabbing select-none"
+          style={mobilePosition ? { left: mobilePosition.x, top: mobilePosition.y, touchAction: "none" } : { left: 16, bottom: 88, touchAction: "none" }}
         >
           <Layers className="w-6 h-6" />
           <span className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center border-2 border-white">
@@ -59,7 +132,7 @@ export default function CourseWindowStack() {
         </button>
 
         {mobileOpen && (
-          <div className="fixed inset-0 z-50 bg-black/50 flex justify-end" onClick={() => setMobileOpen(false)}>
+          <div className="fixed inset-0 z-[70] bg-black/50 flex justify-end" onClick={() => setMobileOpen(false)}>
             <div
               className="w-full max-w-sm bg-slate-50 h-full overflow-y-auto"
               onClick={e => e.stopPropagation()}

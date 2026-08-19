@@ -9,7 +9,6 @@ import { ArrowLeft, Send, Loader2, Sparkles, Navigation, Check, Zap } from "luci
 import { useAdminContext } from "@/hooks/useAdminContext";
 import { useAdminCourseWindows } from "@/context/AdminCourseWindowsContext";
 import MapPickerModal from "@/components/admin/MapPickerModal";
-import CourseWindowStack from "@/components/admin/CourseWindowStack";
 import ClientPhoneDetector from "@/components/crm/ClientPhoneDetector";
 import SmartAddressPicker from "@/components/crm/SmartAddressPicker";
 import { upsertCourseAddresses } from "@/lib/addressBook";
@@ -662,9 +661,6 @@ export default function AdminCourseForm() {
           La course sera automatiquement proposée aux livreurs disponibles
         </p>
       </div>
-
-      {/* Panneau des courses actives — affiche le statut en temps réel après validation */}
-      <CourseWindowStack />
 
       {/* Modals de sélection GPS */}
       <MapPickerModal

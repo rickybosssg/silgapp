@@ -220,7 +220,7 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, part
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setCountryOpen(false)} />
                 <div className={cn(
-                  "absolute z-50 bg-sidebar-accent border border-white/5 rounded-xl shadow-2xl max-h-72 overflow-y-auto",
+                  "absolute z-50 bg-white border border-gray-200 rounded-xl shadow-2xl max-h-72 overflow-y-auto",
                   collapsed ? "left-14 bottom-0 w-52" : "left-3 right-3 bottom-full mb-2"
                 )}>
                   {paysListe.map((p) => (
@@ -228,13 +228,13 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, part
                       key={p.code}
                       onClick={() => { setSelectedCountry(p.code); setCountryOpen(false); }}
                       className={cn(
-                        "w-full flex items-center gap-3 px-3 py-2.5 text-sm transition-colors hover:bg-white/5",
-                        effectiveCountry === p.code ? "bg-sidebar-primary/10 text-sidebar-primary" : "text-slate-400"
+                        "w-full flex items-center gap-3 px-3 py-2.5 text-sm text-gray-900 transition-colors hover:bg-gray-100",
+                        effectiveCountry === p.code && "bg-blue-50 text-blue-800"
                       )}
                     >
                       <span className="text-base flex-shrink-0">{p.emoji_flag}</span>
                       <span className="flex-1 text-left font-medium">{p.nom}</span>
-                      {effectiveCountry === p.code && <Check className="w-3.5 h-3.5 text-primary flex-shrink-0" />}
+                      {effectiveCountry === p.code && <Check className="w-3.5 h-3.5 text-blue-700 flex-shrink-0" />}
                     </button>
                   ))}
                 </div>
