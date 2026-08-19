@@ -55,7 +55,7 @@ export async function emitVenusAdminEvent(base44: any, params: {
       }
     }
 
-    await base44.asServiceRole.entities.VenusAdminEvent.create({
+    const venusEvent = await base44.asServiceRole.entities.VenusAdminEvent.create({
       event_type: params.event_type,
       priority: params.priority,
       course_id: params.course_id || undefined,
@@ -90,7 +90,7 @@ export async function emitVenusAdminEvent(base44: any, params: {
         title: params.title,
         body: params.summary,
         source_entity: 'VenusAdminEvent',
-        source_id: undefined, // l'ID VenusAdminEvent n'est pas disponible ici (créé ci-dessus sans capture)
+        source_id: venusEvent?.id,
         course_id: params.course_id,
         livreur_id: params.livreur_id,
         client_id: params.client_id,
