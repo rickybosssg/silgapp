@@ -1,10 +1,11 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Check, X, Clock, Package, Flame, Navigation } from "lucide-react";
 import { toast } from "sonner";
 import { startUrgentCourseAlert, stopUrgentCourseAlert } from "@/lib/livreurUrgentAlert";
 import { getPrixAffichable } from "@/utils/getPrixAffichable";
+import { useCoursesDisponibles } from "@/hooks/useCoursesDisponibles";
 
 function calculerDistance(lat1, lng1, lat2, lng2) {
   if ([lat1, lng1, lat2, lng2].some(value => value == null || Number.isNaN(Number(value)))) return null;
@@ -41,69 +42,14 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
   const [acceptingId, setAcceptingId] = useState(null);
   const knownCourseIdsRef = useRef(new Set());
   const courseFeedInitializedRef = useRef(false);
-  const [refusedIds, setRefusedIds] = useState(() => {
-    try {
-      const stored = localStorage.getItem("silgapp_dismissed_courses");
-      return stored ? Object.keys(JSON.parse(stored)) : [];
-    } catch { return []; }
-  });
 
   const livreurId = livreurProfil?.id;
   const countryCode = livreurProfil?.country_code;
   const livreurLat = livreurProfil?.latitude;
   const livreurLng = livreurProfil?.longitude;
-  const livreurDisponible =
-    livreurProfil?.type_livreur === "externe" &&
-    livreurProfil?.validation === "valide" &&
-    livreurProfil?.actif === true &&
-    livreurProfil?.statut === "disponible" &&
-    livreurProfil?.bloque_encours !== true &&
-    livreurProfil?.manual_hors_ligne !== true &&
-    livreurProfil?.admin_hors_ligne !== true;
 
-  const { data: isV2Enabled = true } = useQuery({
-    queryKey: ["dispatch-v2-enabled", livreurId],
-    queryFn: async () => {
-      const configs = await base44.entities.AppConfig.filter({ cle: "DISPATCH_V2_ENABLED" });
-      return configs?.[0] ? configs[0].valeur !== "false" : true;
-    },
-    enabled: !!livreurId,
-    staleTime: 60000,
-  });
-
-  const { data: courses = [], isLoading } = useQuery({
-    queryKey: ["courses-externes-disponibles", livreurId, countryCode, isV2Enabled],
-    queryFn: async () => {
-      if (!countryCode || !isV2Enabled) return [];
-      const all = await base44.entities.CourseExterne.filter(
-        { dispatch_status: { $in: ["disponible_push", "propose"] }, country_code: countryCode },
-        "-created_date", 50
-      );
-      return all || [];
-    },
-    enabled: !!livreurId && !!countryCode && livreurDisponible && isV2Enabled,
-    refetchInterval: 10000,
-    staleTime: 0,
-    refetchOnWindowFocus: true,
-    refetchOnMount: true,
-  });
-
-  // ── Récupérer les courses refusées par ce livreur depuis DispatchNotification ──
-  // (remplace l'ancien champ JSON dispatch_refused_ids qui n'est plus mis à jour)
-  const { data: refusedCourseIds = [] } = useQuery({
-    queryKey: ["dispatch-refused-courses", livreurId],
-    queryFn: async () => {
-      if (!livreurId) return [];
-      const refused = await base44.entities.DispatchNotification.filter(
-        { livreur_id: livreurId, statut: "refuse" },
-        "-date_reponse", 50
-      );
-      return (refused || []).map(n => n.course_id);
-    },
-    enabled: !!livreurId,
-    refetchInterval: 30000,
-    staleTime: 15000,
-  });
+  // ── Source unique de vérité : hook partagé avec ActiviteTempsReel ──
+  const { eligibleCourses, courses, isLoading, isV2Enabled, livreurDisponible, refusedCourseIds, setRefusedIds } = useCoursesDisponibles(livreurProfil);
 
   // ── Enregistrer les vues de courses dans DispatchNotification ──
   // Crée un enregistrement "notifie" par livreur+course (idempotent) pour
@@ -142,36 +88,7 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
     return unsubscribe;
   }, [livreurId, countryCode, queryClient]);
 
-  // Filtrer les courses éligibles
-  // ⚠️ RÈGLE MÉTIER : une course n'est visible dans "Disponibles" QUE si :
-  //   - statut === "recherche_livreur" (course active, pas en attente/annulée/livrée)
-  //   - dispatch_status === "disponible_push" (V2) ou "propose" (V1 négociation prix)
-  // Une course en_attente (annulée par livreur, suspendue par admin) ne doit JAMAIS
-  // apparaître, quel que soit son dispatch_status résiduel.
-  const eligibleCourses = useMemo(() => {
-    return courses.filter(course => {
-      // ── Garde absolue sur le statut : en_attente = invisible, point final ──
-      if (course.statut === "en_attente") return false;
-      if (FINAL_COURSE_STATUSES.has(course.statut)) return false;
-      // ── Garde positive : seul "recherche_livreur" est un statut disponible ──
-      if (course.statut !== "recherche_livreur") return false;
-      // ── Garde sur dispatch_status : disponible_push (V2) ou propose (V1) ──
-      // ⚠️ "redispatch" = course annulée par un livreur, en attente de décision admin
-      //    Ne doit JAMAIS apparaître dans le fil "Disponibles"
-      if (course.dispatch_status !== "disponible_push" && course.dispatch_status !== "propose") return false;
-      if (course.dispatch_status === "redispatch") return false;
-      if (course.livreur_id) return false;
-      if (refusedIds.includes(course.id)) return false;
-      // Exclure si timeout expiré
-      if (course.timeout_expires_at) {
-        const expires = new Date(course.timeout_expires_at);
-        if (!isNaN(expires.getTime()) && expires < new Date()) return false;
-      }
-      // Exclure si le livreur a déjà refusé cette course (via DispatchNotification)
-      if (refusedCourseIds.includes(course.id)) return false;
-      return true;
-    });
-  }, [courses, refusedIds, refusedCourseIds, livreurId]);
+  // ── eligibleCourses provient du hook useCoursesDisponibles (source unique) ──
 
   useEffect(() => {
     const currentIds = new Set(eligibleCourses.map(course => course.id));
