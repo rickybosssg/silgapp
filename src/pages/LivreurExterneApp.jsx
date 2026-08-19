@@ -23,7 +23,7 @@ import {
 import LivreurHeader from "@/components/livreur/LivreurHeader";
 import LivreurStatsBanner from "@/components/livreur/LivreurStatsBanner";
 import LivreurStatutCard from "@/components/livreur/LivreurStatutCard";
-import EmptyStateAttente from "@/components/livreur/EmptyStateAttente";
+import ActiviteTempsReel from "@/components/livreur/ActiviteTempsReel";
 import CourseEnAttenteModalExterne from "@/components/livreur/CourseEnAttenteModalExterne";
 import CourseActiveCard from "@/components/livreur/CourseActiveCard";
 import LivreurHistorique from "@/components/livreur/LivreurHistorique";
@@ -1687,7 +1687,9 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
               </div>
             )}
 
-            {coursesActives.length === 0 && isEnLigne && <EmptyStateAttente />}
+            {coursesActives.length === 0 && isEnLigne && (
+              <ActiviteTempsReel livreurProfil={livreurProfil} mesCourses={mesCourses} isExterne={true} />
+            )}
 
             {sessionExpired ? (
               <div className="rounded-2xl bg-red-500/15 border border-red-500/30 text-red-400 p-5 text-center space-y-2 shadow-lg">
