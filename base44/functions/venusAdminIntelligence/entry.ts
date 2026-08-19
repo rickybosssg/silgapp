@@ -30,6 +30,15 @@ export default async function handler(req) {
   const countryCode = body.country_code || 'ALL';
   const base44 = createClientFromRequest(req);
 
+  // ── Sécurité : VENUS Admin Intelligence est EXCLUSIVEMENT réservé au rôle admin ──
+  const currentUser = await base44.auth.me().catch(() => null);
+  if (!currentUser || currentUser.role !== 'admin') {
+    return Response.json(
+      { success: false, error: 'Accès refusé — VENUS Admin est réservé à l\'administrateur' },
+      { status: 403 }
+    );
+  }
+
   const now = new Date();
   const today = DATE_STR(now);
   const yesterday = DATE_STR(new Date(now.getTime() - DAY_MS));
