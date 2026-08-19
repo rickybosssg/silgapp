@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { Download, Shield, Smartphone } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { base44 } from "@/api/base44Client";
+import { SILGAPP_LOGO_URL } from "@/lib/branding";
 
 const FALLBACK_APK_URL = "https://drive.google.com/file/d/18-rpsCffZZWdllRzkZvAQ2adNaeszUiG/view?usp=sharing";
 
@@ -57,7 +58,7 @@ export default function TelechargerSILGAPP() {
           className="mx-auto w-20 h-20 rounded-[1.75rem] bg-white shadow-lg shadow-black/5 border border-gray-100 flex items-center justify-center overflow-hidden"
         >
           <img
-            src="https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/962cfba1f_IMG-20260819-WA0003.jpg"
+            src={SILGAPP_LOGO_URL}
             alt="SILGAPP"
             className="w-14 h-14 object-contain"
             onError={(e) => {

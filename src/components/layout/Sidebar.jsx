@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { useAdminContext } from "@/hooks/useAdminContext.js";
 import { usePaysActifs } from "@/components/international/CountrySelector.jsx";
+import { SILGAPP_LOGO_URL } from "@/lib/branding";
 
 const doLogout = () => {
   ['base44_access_token', 'access_token', 'base44_token', 'token'].forEach(k => {
@@ -82,13 +83,11 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, part
         "h-16 flex items-center border-b border-white/5 flex-shrink-0 overflow-hidden",
         collapsed ? "px-4 justify-center" : "px-5 gap-3"
       )}>
-        <div className="w-9 h-9 rounded-xl bg-sidebar-primary flex items-center justify-center silgapp-relief flex-shrink-0">
-          <img 
-            src="https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/962cfba1f_IMG-20260819-WA0003.jpg"
-            alt="SILGAPP"
-            className="w-full h-full rounded-xl object-cover"
-          />
-        </div>
+        <img
+          src={SILGAPP_LOGO_URL}
+          alt="SILGAPP"
+          className="w-9 h-9 rounded-xl object-cover silgapp-relief flex-shrink-0 ring-2 ring-white/10"
+        />
         {!collapsed && (
           <div>
             <h1 className="font-extrabold text-sm text-white tracking-wide">SILGAPP</h1>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { X, Download } from "lucide-react";
 import { base44 } from "@/api/base44Client";
+import { SILGAPP_LOGO_URL } from "@/lib/branding";
 
 const DISMISSAL_KEY = "silgapp_ios_banner_dismissed";
 const DISMISSAL_DAYS = 7;
@@ -46,7 +47,7 @@ export default function IOSAppStoreBanner() {
         <div className="max-w-md mx-auto flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center flex-shrink-0 overflow-hidden">
             <img
-              src="https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/d7ba7bd0e_IMG-20260523-WA00033.jpg"
+              src={SILGAPP_LOGO_URL}
               alt="SILGAPP"
               className="w-7 h-7 rounded-lg object-cover"
               onError={(e) => {

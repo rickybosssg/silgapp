@@ -9,6 +9,7 @@ import { base44 } from "@/api/base44Client";
 import { navItems as allNavItems } from "@/components/layout/Sidebar";
 import { useAdminContext } from "@/hooks/useAdminContext.js";
 import { usePaysActifs } from "@/components/international/CountrySelector.jsx";
+import { SILGAPP_LOGO_URL } from "@/lib/branding";
 
 // Bottom tab bar : items communs aux deux réseaux
 const bottomTabPaths = ["/", "/carte", "/courses", "/livreurs"];
@@ -84,7 +85,7 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
       <header className="lg:hidden fixed top-0 left-0 right-0 bg-sidebar/95 backdrop-blur-xl border-b border-white/5 z-40 flex items-center justify-between px-4 shadow-sm safe-area-top" style={{ minHeight: '3.5rem' }}>
         <div className="flex items-center gap-2.5">
           <img
-            src="https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/962cfba1f_IMG-20260819-WA0003.jpg"
+            src={SILGAPP_LOGO_URL}
             alt="SILGAPP"
             className="w-8 h-8 rounded-xl object-cover"
           />

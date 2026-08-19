@@ -1,0 +1,22 @@
+{
+  "name": "SILGAPP",
+  "short_name": "SILGAPP",
+  "description": "Livraison et services SILGAPP",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F3F7FF",
+  "theme_color": "#0969F2",
+  "icons": [
+    {
+      "src": "/silgapp-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/silgapp-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
+

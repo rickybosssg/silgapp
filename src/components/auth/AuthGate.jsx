@@ -7,6 +7,7 @@ import { registerPushToken } from "@/lib/notifications";
 import { persistToken, clearPersistedToken } from "@/lib/authPersistence";
 import RoleSelection from "@/pages/RoleSelection";
 import BlockedLivreurScreen from "@/components/auth/BlockedLivreurScreen";
+import { SILGAPP_LOGO_URL } from "@/lib/branding";
 
 const AUTH_TOKEN_KEYS = ["base44_access_token", "access_token", "base44_token", "token"];
 
@@ -503,11 +504,7 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-background">
         <div className="text-center space-y-4">
-          <img
-            src="https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/962cfba1f_IMG-20260819-WA0003.jpg"
-            alt="SILGAPP"
-            className="w-16 h-16 rounded-2xl object-cover mx-auto shadow-lg"
-          />
+          <img src={SILGAPP_LOGO_URL} alt="SILGAPP" className="w-16 h-16 rounded-2xl object-cover shadow-lg mx-auto animate-pulse" />
           <p className="text-sm text-muted-foreground">Vérification du compte...</p>
         </div>
       </div>
@@ -523,11 +520,7 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
             <div className="absolute bottom-[-70px] left-[-45px] h-44 w-44 rounded-full bg-blue-300/10" />
             <div className="relative">
               <div className="mb-5 flex items-center justify-between">
-                <img
-                  src="https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/962cfba1f_IMG-20260819-WA0003.jpg"
-                  alt="SILGAPP"
-                  className="h-14 w-14 rounded-2xl border border-white/20 shadow-lg object-cover"
-                />
+                <img src={SILGAPP_LOGO_URL} alt="SILGAPP" className="h-14 w-14 rounded-2xl border border-white/30 object-cover shadow-lg" />
                 <div className="flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[11px] font-semibold text-blue-50">
                   <ShieldCheck className="h-3.5 w-3.5" />
                   Accès sécurisé
@@ -813,7 +806,7 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
     <div className="fixed inset-0 flex items-center justify-center bg-background">
       <div className="text-center space-y-4">
         <img
-          src="https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/962cfba1f_IMG-20260819-WA0003.jpg"
+          src={SILGAPP_LOGO_URL}
           alt="SILGAPP"
           className="w-16 h-16 rounded-2xl object-cover mx-auto shadow-lg"
         />

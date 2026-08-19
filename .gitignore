@@ -25,6 +25,7 @@ work-certs/
 *.aab
 *.jks
 *.keystore
+*.generated.png
 
 # Editor directories and files
 .vscode/*

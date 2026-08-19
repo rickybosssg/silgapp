@@ -2,6 +2,7 @@ import React from "react";
 import { motion } from "framer-motion";
 import { Sparkles, TrendingUp, Star } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { SILGAPP_LOGO_URL } from "@/lib/branding";
 
 export default function PremiumHeader({ downloadCount }) {
   return (
@@ -17,12 +18,12 @@ export default function PremiumHeader({ downloadCount }) {
             <motion.div
               whileHover={{ scale: 1.08, rotate: -5 }}
               transition={{ type: "spring", stiffness: 400, damping: 10 }}
-              className="w-20 h-20 rounded-2xl bg-gradient-to-br from-red-500/10 to-red-600/10 backdrop-blur-sm border border-red-500/20 flex items-center justify-center shadow-2xl shadow-red-500/20 overflow-hidden"
+              className="w-20 h-20 rounded-2xl bg-blue-500/10 backdrop-blur-sm border border-blue-400/20 flex items-center justify-center shadow-2xl shadow-blue-500/20 overflow-hidden"
             >
               <img
-                src="https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/962cfba1f_IMG-20260819-WA0003.jpg"
+                src={SILGAPP_LOGO_URL}
                 alt="SILGAPP Logo Officiel"
-                className="w-16 h-16 object-contain drop-shadow-2xl"
+                className="w-16 h-16 rounded-xl object-cover drop-shadow-2xl"
                 onError={(e) => {
                   e.target.style.display = 'none';
                   e.target.parentElement.innerHTML = '<div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center shadow-2xl shadow-red-500/40"><svg class="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z"/></svg></div>';
