@@ -11,7 +11,7 @@ import GPSIndicateur from "@/components/livreur/GPSIndicateur";
 import LivreurHeader from "@/components/livreur/LivreurHeader";
 import LivreurStatsBanner from "@/components/livreur/LivreurStatsBanner";
 import LivreurStatutCard from "@/components/livreur/LivreurStatutCard";
-import EmptyStateAttente from "@/components/livreur/EmptyStateAttente";
+import ActiviteTempsReel from "@/components/livreur/ActiviteTempsReel";
 import CourseEnAttenteModal from "@/components/livreur/CourseEnAttenteModal";
 import CourseActiveCard from "@/components/livreur/CourseActiveCard";
 import LivreurHistorique from "@/components/livreur/LivreurHistorique";
@@ -473,7 +473,9 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
               </div>
             )}
 
-            {coursesActives.length === 0 && isEnLigne && <EmptyStateAttente />}
+            {coursesActives.length === 0 && isEnLigne && (
+              <ActiviteTempsReel livreurProfil={livreurProfil} mesCourses={mesCourses} isExterne={false} />
+            )}
           </div>
         )}
 
