@@ -1,5 +1,12 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
 import { isV2Enabled, DISPATCH_V2_BUNDLE_VERSION } from '../../shared/dispatchV2.ts';
+import {
+  emitCourseCreated,
+  emitCourseAccepted,
+  emitCourseCancelled,
+  emitCourseDelivered,
+  emitPriceChanged,
+} from '../../shared/venusAdminEventBus.ts';
 
 // 🔖 Redéploiement forcé — 2026-08-14-simplified-3 — rappel T+5min re-notifie les mêmes livreurs libres
 console.log(`[COURSE_ORCHESTRATOR] 🔖 dispatchV2 bundle version: ${DISPATCH_V2_BUNDLE_VERSION}`);
@@ -86,6 +93,9 @@ Deno.serve(async (req) => {
         data,
       });
 
+      // 3. VENUS Admin Event (non-bloquant)
+      await emitCourseCreated(base44, course).catch(() => {});
+
       return Response.json({
         success: true,
         event: 'create',
@@ -153,6 +163,25 @@ Deno.serve(async (req) => {
     // ── 5. Valider prime code promo (si statut → livrée) ──
     if (statutChanged && newStatut === 'livree') {
       await fireInvoke('validerPrimePromo', { event, data, old_data });
+    }
+
+    // ── 6. VENUS Admin Events (non-bloquants) ──
+    // Événements déterministes — pas d'IA, pas de modification de données
+    if (statutChanged) {
+      if (newStatut === 'livreur_en_route' && oldStatut !== newStatut) {
+        await emitCourseAccepted(base44, course).catch(() => {});
+      }
+      if (newStatut === 'annulee') {
+        await emitCourseCancelled(base44, course).catch(() => {});
+      }
+      if (newStatut === 'livree') {
+        await emitCourseDelivered(base44, course).catch(() => {});
+      }
+    }
+
+    // Prix modifié (P2)
+    if (course.prix_final !== oldCourse.prix_final) {
+      await emitPriceChanged(base44, course, oldCourse).catch(() => {});
     }
 
     return Response.json({

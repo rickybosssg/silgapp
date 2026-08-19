@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, Move } from "lucide-react";
 import VenusChat from "./VenusChat";
+import VenusAdminPanel from "@/components/admin/VenusAdminPanel";
 import { useAdminContext } from "@/hooks/useAdminContext";
 import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
@@ -15,6 +16,8 @@ export default function VenusFloatingButton({ forcedCountryCode = null }) {
   const [isDragging, setIsDragging] = useState(false);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [constraint, setConstraint] = useState({ left: 0, right: 0, top: 0, bottom: 0 });
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [unreadAdminCount, setUnreadAdminCount] = useState(0);
   const imgRef = useRef(null);
   const buttonRef = useRef(null);
 
@@ -67,6 +70,26 @@ export default function VenusFloatingButton({ forcedCountryCode = null }) {
     livreursDispos: livreursData?.length ?? null,
     pubsActives: pubsData?.length ?? 0,
   } : null;
+
+  // Détecter si l'utilisateur est admin + compter les événements non lus
+  useEffect(() => {
+    const checkAdminAndCount = async () => {
+      try {
+        const user = await base44.auth.me();
+        if (user?.role === "admin") {
+          setIsAdmin(true);
+          // Compter les événements admin non lus
+          const events = await base44.entities.VenusAdminEvent.filter({ status: "new" }, "-created_date", 100);
+          setUnreadAdminCount(events?.length || 0);
+        } else {
+          setIsAdmin(false);
+        }
+      } catch {}
+    };
+    checkAdminAndCount();
+    const interval = setInterval(checkAdminAndCount, 15000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Préchargement de l'image
   useEffect(() => {
@@ -175,7 +198,7 @@ export default function VenusFloatingButton({ forcedCountryCode = null }) {
         </div>
 
         {/* Badge d'indication */}
-        {!isDragging && (
+        {!isDragging && !isAdmin && (
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
@@ -183,6 +206,20 @@ export default function VenusFloatingButton({ forcedCountryCode = null }) {
             className="absolute -top-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-2 border-white flex items-center justify-center"
           >
             <div className="w-2 h-2 bg-white rounded-full animate-ping" />
+          </motion.div>
+        )}
+
+        {/* Badge événements admin non lus */}
+        {!isDragging && isAdmin && unreadAdminCount > 0 && (
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.3 }}
+            className="absolute -top-1 -right-1 min-w-5 h-5 px-1 bg-red-500 rounded-full border-2 border-white flex items-center justify-center"
+          >
+            <span className="text-[10px] font-black text-white leading-none">
+              {unreadAdminCount > 99 ? "99+" : unreadAdminCount}
+            </span>
           </motion.div>
         )}
 
@@ -196,9 +233,10 @@ export default function VenusFloatingButton({ forcedCountryCode = null }) {
         </motion.div>
       </motion.button>
 
-      {/* Chat VENUS */}
+      {/* Chat VENUS (client/livreur/partenaire) ou Panneau Admin */}
       <AnimatePresence>
-        {showChat && <VenusChat onClose={() => setShowChat(false)} countryContext={countryContext} />}
+        {showChat && isAdmin && <VenusAdminPanel onClose={() => setShowChat(false)} />}
+        {showChat && !isAdmin && <VenusChat onClose={() => setShowChat(false)} countryContext={countryContext} />}
       </AnimatePresence>
 
       {/* Styles CSS pour l'animation */}

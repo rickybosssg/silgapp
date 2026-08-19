@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
+import { emitDriverDebtThreshold } from '../../shared/venusAdminEventBus.ts';
 
 /**
  * Vérifie l'encours d'un livreur après chaque course terminée.
@@ -174,6 +175,10 @@ Deno.serve(async (req) => {
       );
 
       console.log(`[ENCOURS] BLOCAGE : Livreur ${livreurId} — ${nouvelEncours} ${devise}`);
+
+      // VENUS Admin Event (non-bloquant)
+      await emitDriverDebtThreshold(base44, livreur, seuil, nouvelEncours).catch(() => {});
+
       return Response.json({
         success: true,
         bloque: true,
