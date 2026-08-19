@@ -21,6 +21,8 @@ const SEUILS = {
   commission_tolerance: 0.05,
   repetitive_events: 3,
   debtors_threshold: 5,
+  debt_significant_total: 50000,
+  problem_course_max_age_hours: 24,
 };
 
 export default async function handler(req) {
@@ -35,12 +37,17 @@ export default async function handler(req) {
   const twoWeeksAgo = DATE_STR(new Date(now.getTime() - 14 * DAY_MS));
   const currentHour = now.getHours();
 
-  const [allCourses, allDrivers, allPayments, recentEvents] = await Promise.all([
+  const [allCourses, allDrivers, allPayments, recentEvents, countries] = await Promise.all([
     base44.entities.CourseExterne.list('-created_date', 1000),
     base44.entities.Livreur.list('-created_date', 500),
     base44.entities.PaiementSilgapp.filter({ statut: 'traite' }),
     base44.entities.VenusAdminEvent.list('-created_date', 50),
+    base44.entities.Country.list(),
   ]);
+
+  // Map des taux de commission réels par pays (PHASE 5.1: ne plus hardcoder 10%)
+  const commissionByCountry = {};
+  countries.forEach(c => { commissionByCountry[c.code] = (c.commission_pct || 10) / 100; });
 
   const filterCountry = (items) => countryCode === 'ALL' ? items : items.filter(i => i.country_code === countryCode);
   const courses = filterCountry(allCourses);
@@ -62,6 +69,9 @@ export default async function handler(req) {
 
   const caToday = sum(livreesToday, 'prix_final');
   const caYesterday = sum(livreesYesterday, 'prix_final');
+  // PHASE 5.1: Comparer avec la même heure hier, pas la journée complète.
+  const livreesYesterdayUpToHour = yesterdayUpToSameHour.filter(c => c.statut === 'livree');
+  const caYesterdayUpToHour = sum(livreesYesterdayUpToHour, 'prix_final');
   const caWeek = sum(livreesWeek, 'prix_final');
   const caPrevWeek = sum(livreesPrevWeek, 'prix_final');
 
@@ -87,13 +97,29 @@ export default async function handler(req) {
   const availableDrivers = drivers.filter(d => d.statut === 'disponible' && d.actif).length;
   const availableDriversYesterday = drivers.filter(d => d.last_seen_at && DATE_STR(new Date(d.last_seen_at)) === yesterday && d.statut === 'disponible').length;
 
-  const problemCourses = courses.filter(c => c.statut === 'recherche_livreur' || c.statut === 'annulee' || c.dispatch_status === 'cycle_epuise');
+  // PHASE 5.1: Une course historique ne doit jamais apparaître comme problème opérationnel actuel.
+  // On ne compte QUE les courses des dernières 24h.
+  const nowMs = now.getTime();
+  const maxAgeMs = SEUILS.problem_course_max_age_hours * 60 * 60 * 1000;
+  const problemCourses = courses.filter(c =>
+    (c.statut === 'recherche_livreur' || c.statut === 'annulee' || c.dispatch_status === 'cycle_epuise') &&
+    (nowMs - new Date(c.created_date).getTime()) < maxAgeMs
+  );
   const problemCoursesCount = problemCourses.length;
 
-  const nowMs = now.getTime();
-  const dispatchDelayedCourses = courses.filter(c => c.statut === 'recherche_livreur' && (nowMs - new Date(c.created_date).getTime()) > SEUILS.dispatch_delay_min * 60 * 1000);
+  const dispatchDelayedCourses = courses.filter(c =>
+    c.statut === 'recherche_livreur' &&
+    (nowMs - new Date(c.created_date).getTime()) > SEUILS.dispatch_delay_min * 60 * 1000 &&
+    (nowMs - new Date(c.created_date).getTime()) < maxAgeMs
+  );
 
-  const commissionAnomalies = courses.filter(c => c.statut === 'livree' && c.prix_final && c.commission_silga && Math.abs(c.commission_silga - c.prix_final * 0.10) / Math.max(c.prix_final * 0.10, 1) > SEUILS.commission_tolerance);
+  // PHASE 5.1: Utiliser le taux de commission RÉEL du pays, pas un 10% hardcodé.
+  const commissionAnomalies = courses.filter(c => {
+    if (c.statut !== 'livree' || !c.prix_final || !c.commission_silga) return false;
+    const expectedRate = commissionByCountry[c.country_code] || 0.10;
+    const expectedCommission = c.prix_final * expectedRate;
+    return Math.abs(c.commission_silga - expectedCommission) / Math.max(expectedCommission, 1) > SEUILS.commission_tolerance;
+  });
 
   const eventCounts = {};
   recentEvents.forEach(e => { eventCounts[e.event_type] = (eventCounts[e.event_type] || 0) + 1; });
@@ -125,14 +151,15 @@ export default async function handler(req) {
     }
   }
 
-  if (caYesterday > 0) {
-    const caChange = (caToday - caYesterday) / caYesterday;
+  // PHASE 5.1: Comparaison à heure équivalente (évite les fausses alertes matinales).
+  if (caYesterdayUpToHour > 0) {
+    const caChange = (caToday - caYesterdayUpToHour) / caYesterdayUpToHour;
     if (Math.abs(caChange) > SEUILS.ca_change) {
-      insights.push({ id: 'ca_evolution', type: caChange > 0 ? 'ca_hausse' : 'ca_baisse', priority: caChange < 0 ? 'haute' : 'moyenne', confidence: 'eleve', comparison: 'today_vs_yesterday',
-        observation: `CA aujourd'hui: ${caToday} F CFA vs ${caYesterday} F CFA hier (${caChange > 0 ? '+' : ''}${(caChange * 100).toFixed(0)}%)`,
-        analyse: caChange < 0 ? 'Baisse significative du chiffre d\'affaires' : 'Hausse significative du chiffre d\'affaires',
+      insights.push({ id: 'ca_evolution', type: caChange > 0 ? 'ca_hausse' : 'ca_baisse', priority: caChange < 0 ? 'haute' : 'moyenne', confidence: 'eleve', comparison: 'today_vs_yesterday_same_hour',
+        observation: `CA aujourd'hui à ${currentHour}h: ${caToday} F CFA vs ${caYesterdayUpToHour} F CFA à la même heure hier (${caChange > 0 ? '+' : ''}${(caChange * 100).toFixed(0)}%)`,
+        analyse: caChange < 0 ? 'Baisse significative du chiffre d\'affaires à heure équivalente' : 'Hausse significative du chiffre d\'affaires à heure équivalente',
         recommandation: caChange < 0 ? 'Analyser les causes (annulations, moins de courses, prix plus bas)' : 'Maintenir la dynamique',
-        data: { ca_today: caToday, ca_yesterday: caYesterday, change_pct: caChange },
+        data: { ca_today: caToday, ca_yesterday_same_hour: caYesterdayUpToHour, ca_yesterday_full: caYesterday, change_pct: caChange, current_hour: currentHour },
         course_ids: [], livreur_ids: [] });
     }
   }
@@ -149,7 +176,8 @@ export default async function handler(req) {
     }
   }
 
-  if (debtors.length >= SEUILS.debtors_threshold && montantsDus > 0) {
+  // PHASE 5.1: Seuil de significativité — pas d'alerte pour des montants négligeables.
+  if (debtors.length >= SEUILS.debtors_threshold && montantsDus >= SEUILS.debt_significant_total) {
     insights.push({ id: 'dette_accumulation', type: 'dette_accumulation', priority: 'moyenne', confidence: 'eleve', comparison: 'snapshot',
       observation: `${debtors.length} livreurs doivent un total de ${montantsDus} F CFA à SILGAPP`,
       analyse: "L'accumulation des montants dus peut affecter la trésorerie",
@@ -158,7 +186,7 @@ export default async function handler(req) {
       course_ids: [], livreur_ids: topDebiteurs.slice(0, 5).map(d => d.id) });
   }
 
-  if (montantsDus > 0 && debtConcentration > SEUILS.debt_concentration) {
+  if (montantsDus >= SEUILS.debt_significant_total && debtConcentration > SEUILS.debt_concentration) {
     insights.push({ id: 'dette_concentration', type: 'dette_concentration', priority: 'moyenne', confidence: 'eleve', comparison: 'snapshot',
       observation: `Les 3 livreurs les plus endettés concentrent ${(debtConcentration * 100).toFixed(0)}% de la dette totale (${top3Debt} F CFA sur ${montantsDus} F CFA)`,
       analyse: 'La concentration de la dette sur quelques livreurs augmente le risque de non-recouvrement',
