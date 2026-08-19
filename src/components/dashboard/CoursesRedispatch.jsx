@@ -2,12 +2,12 @@ import React, { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
-import { MapPin, Clock, ArrowRight, RotateCw, AlertTriangle } from "lucide-react";
+import { MapPin, Clock, ArrowRight, RotateCw, AlertTriangle, X } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";
 
-function RedispatchCourseItem({ course, onView, onRelaunch }) {
+function RedispatchCourseItem({ course, onView, onRelaunch, onClose }) {
   const expediteur = course.expediteur_nom || course.client_nom || "Client";
 
   return (
@@ -46,6 +46,15 @@ function RedispatchCourseItem({ course, onView, onRelaunch }) {
           <RotateCw className="w-3 h-3 mr-1" />
           Relancer
         </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          className="text-xs h-7 border-red-500/40 text-red-400 hover:bg-red-500/10"
+          onClick={() => onClose(course)}
+        >
+          <X className="w-3 h-3 mr-1" />
+          Fermer
+        </Button>
       </div>
     </div>
   );
@@ -54,6 +63,7 @@ function RedispatchCourseItem({ course, onView, onRelaunch }) {
 export default function CoursesRedispatch({ courses, onView }) {
   const queryClient = useQueryClient();
   const [relaunchingId, setRelaunchingId] = useState(null);
+  const [closingId, setClosingId] = useState(null);
 
   const relaunchMutation = useMutation({
     mutationFn: async (course) => {
@@ -84,6 +94,25 @@ export default function CoursesRedispatch({ courses, onView }) {
     onSettled: () => setRelaunchingId(null),
   });
 
+  const closeMutation = useMutation({
+    mutationFn: async (course) => {
+      return base44.entities.CourseExterne.update(course.id, {
+        statut: "annulee",
+        dispatch_status: "cycle_epuise",
+        notes: (course.notes || "") + ` | [FERMÉE ADMIN — ${format(new Date(), "dd/MM HH:mm", { locale: fr })}]`,
+      });
+    },
+    onMutate: (course) => setClosingId(course.id),
+    onSuccess: (_, course) => {
+      queryClient.invalidateQueries({ queryKey: ["courses-externes-dashboard"] });
+      toast.success(`Course #${course.id.slice(-8)} fermée`);
+    },
+    onError: (e, course) => {
+      toast.error(`Erreur fermeture: ${e.message}`);
+    },
+    onSettled: () => setClosingId(null),
+  });
+
   const redispatchCourses = (courses || []).filter(
     c => c.statut === "en_attente" && c.dispatch_status === "en_attente"
   );
@@ -108,6 +137,7 @@ export default function CoursesRedispatch({ courses, onView }) {
             course={course}
             onView={onView}
             onRelaunch={relaunchMutation.mutate}
+            onClose={closeMutation.mutate}
           />
         ))}
       </div>

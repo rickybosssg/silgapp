@@ -307,8 +307,13 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
     }
 
     if (course.pricing_mode === "admin_manuel" || course.source === "admin") {
-      const montant = parseFloat(prixReel);
-      if (!prixReel || isNaN(montant) || montant <= 0) {
+      // ── RÈGLE MÉTIER : Le prix fixé par l'admin est OBLIGATOIREMENT le prix final. ──
+      // Le livreur ne peut pas le modifier. Si prix_propose_admin est défini, on l'utilise
+      // systématiquement, peu importe ce que le livreur a saisi.
+      const montant = course.prix_propose_admin
+        ? Number(course.prix_propose_admin)
+        : parseFloat(prixReel);
+      if (!montant || isNaN(montant) || montant <= 0) {
         toast.error("Entrez le montant reçu du client");
         return;
       }
@@ -713,7 +718,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
               <p className="text-sm text-gray-500 mt-1">
                 {(course.pricing_mode === "admin_manuel" || course.source === "admin")
                   ? (course.prix_propose_admin
-                    ? "Montant fixé par l'admin — modifiable si nécessaire"
+                    ? "Montant fixé par l'admin — non modifiable"
                     : "Saisissez le montant payé par le client")
                   : "Quel montant avez-vous reçu du client ?"}
               </p>
@@ -725,6 +730,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                 value={prixReel}
                 onChange={(e) => setPrixReel(e.target.value)}
                 className="text-center text-2xl font-black h-16 rounded-2xl border-2 border-gray-100 focus:border-primary pr-16"
+                readOnly={!!((course.pricing_mode === "admin_manuel" || course.source === "admin") && course.prix_propose_admin)}
                 autoFocus
               />
               <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-gray-600">FCFA</span>
@@ -737,7 +743,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                 Annuler
               </button>
               <button
-                className="h-12 rounded-2xl bg-gradient-to-b from-primary to-red-700 text-white font-black text-sm shadow-lg shadow-red-200 disabled:opacity-50"
+                className="h-12 rounded-2xl bg-primary text-white font-black text-sm shadow-lg shadow-primary/20 disabled:opacity-50"
                 onClick={handleConfirmerLivraison}
                 disabled={isPending}
               >
@@ -750,8 +756,8 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
 
       {/* Carte principale */}
       <div className="bg-white rounded-3xl overflow-hidden shadow-lg border border-gray-100">
-        {/* Header de la carte */}
-        <div className="bg-gradient-to-r from-gray-900 to-gray-800 px-5 py-3 flex items-center justify-between">
+       {/* Header de la carte */}
+       <div className="bg-gradient-to-r from-primary-dark to-primary px-5 py-3 flex items-center justify-between silgapp-relief-surface">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
             <p className="text-white text-sm font-bold">Course en cours</p>
@@ -1210,10 +1216,10 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
 
                 {isArrivee && (
                   <button
-                    className="w-full h-14 rounded-2xl bg-gradient-to-b from-primary to-red-700 text-white font-black text-base shadow-lg shadow-red-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
-                    onClick={() => setShowPrixModal(true)}
-                    disabled={isPending}
-                  >
+                       className="w-full h-14 rounded-2xl bg-primary text-white font-black text-base shadow-lg shadow-primary/20 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                       onClick={() => setShowPrixModal(true)}
+                       disabled={isPending}
+                     >
                     <span className="text-xl"></span>
                     SAISIR LE PRIX DE LA COURSE
                   </button>
@@ -1317,7 +1323,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                   !course.is_multi_colis && (
                     <div className="grid grid-cols-2 gap-2">
                       <button
-                        className="h-14 rounded-2xl bg-gradient-to-b from-primary to-red-700 text-white font-black text-sm shadow-lg shadow-red-200 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                        className="h-14 rounded-2xl bg-primary text-white font-black text-sm shadow-lg shadow-primary/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                         onClick={() => setShowQRScanner({ type: "delivery", mode: "camera" })}
                         disabled={isPending}
                       >
@@ -1325,7 +1331,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                         QR Code
                       </button>
                       <button
-                        className="h-14 rounded-2xl bg-gradient-to-b from-red-600 to-red-800 text-white font-black text-sm shadow-lg shadow-red-200 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                        className="h-14 rounded-2xl bg-primary-dark text-white font-black text-sm shadow-lg shadow-primary/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                         onClick={() => setShowQRScanner({ type: "delivery", mode: "code" })}
                         disabled={isPending}
                       >
@@ -1337,7 +1343,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                 ) : (
                   /* ── INTERNE : bouton classique avec GPS + récapitulatif ── */
                   <button
-                    className="w-full h-14 rounded-2xl bg-gradient-to-b from-primary to-red-700 text-white font-black text-base shadow-lg shadow-red-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                    className="w-full h-14 rounded-2xl bg-primary text-white font-black text-base shadow-lg shadow-primary/20 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
                     onClick={() => {
                       navigator.geolocation.getCurrentPosition(
                         () => setShowPrixModal(true),
@@ -1464,7 +1470,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                 </div>
               </div>
               <button
-                className="w-full h-14 rounded-2xl bg-gradient-to-b from-primary to-red-700 text-white font-black text-base shadow-lg shadow-red-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3"
+                className="w-full h-14 rounded-2xl bg-primary text-white font-black text-base shadow-lg shadow-primary/20 active:scale-[0.98] transition-all flex items-center justify-center gap-3"
                 onClick={async () => {
                   const finalData = {
                     ...course,
@@ -1592,7 +1598,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                   </p>
                 )}
                 <button
-                  className="w-full h-12 rounded-2xl bg-gradient-to-b from-primary to-green-700 text-white font-black text-sm shadow-lg shadow-green-200 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                  className="w-full h-12 rounded-2xl bg-primary text-white font-black text-sm shadow-lg shadow-primary/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
                   onClick={() => {
                     onColisLivre({ ...course, statut: "livree" }, null);
                     navigateToRecap({ statut: "livree", heure_livraison: course.heure_livraison || new Date().toISOString() });

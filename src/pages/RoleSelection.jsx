@@ -59,9 +59,11 @@ export default function RoleSelection({ onPartenaire }) {
       <div className="min-h-screen bg-background flex items-center justify-center p-6">
         <div className="w-full max-w-md space-y-8">
           <div className="text-center space-y-3">
-            <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">
-              <Truck className="w-10 h-10 text-primary" />
-            </div>
+            <img
+              src="https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/962cfba1f_IMG-20260819-WA0003.jpg"
+              alt="SILGAPP"
+              className="w-20 h-20 rounded-2xl object-cover mx-auto shadow-lg"
+            />
             <h1 className="text-2xl font-black text-foreground">Bienvenue sur SILGAPP</h1>
             <p className="text-muted-foreground">Comment souhaitez-vous utiliser l'application ?</p>
           </div>

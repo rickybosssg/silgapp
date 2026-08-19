@@ -36,9 +36,9 @@ export default function SplashScreen() {
       {/* Contenu centré */}
       <div className="flex flex-col items-center gap-6 px-8 relative z-10">
         <img
-          src="https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/666943399_IMG-20260523-WA00032.jpg"
+          src="https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/962cfba1f_IMG-20260819-WA0003.jpg"
           alt="SILGAPP Logo"
-          className="w-36 h-36 rounded-3xl shadow-2xl object-contain"
+          className="w-36 h-36 rounded-3xl shadow-2xl object-cover"
         />
         <div className="text-center space-y-2">
           <p className="text-white text-2xl font-extrabold tracking-wide">

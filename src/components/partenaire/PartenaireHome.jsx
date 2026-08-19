@@ -26,25 +26,25 @@ export default function PartenaireHome({ etablissement, etablissementType, onNav
   const idField = isRestaurant ? "restaurant_id" : "boutique_id";
   const theme = isPharmacie
     ? {
-        hero: "from-emerald-700 via-green-600 to-teal-600",
-        shadow: "shadow-emerald-100",
-        accent: "text-emerald-600",
-        softBorder: "border-emerald-100",
+        hero: "from-primary-dark via-primary to-primary-dark",
+        shadow: "shadow-primary/20",
+        accent: "text-primary",
+        softBorder: "border-primary/10",
         label: "Espace pharmacie",
       }
     : isRestaurant
       ? {
-          hero: "from-orange-600 via-amber-500 to-rose-500",
-          shadow: "shadow-orange-100",
-          accent: "text-orange-600",
-          softBorder: "border-orange-100",
+          hero: "from-primary-dark via-primary to-primary-dark",
+          shadow: "shadow-primary/20",
+          accent: "text-primary",
+          softBorder: "border-primary/10",
           label: "Espace restaurant",
         }
       : {
-          hero: "from-sky-700 via-blue-600 to-indigo-600",
-          shadow: "shadow-sky-100",
-          accent: "text-blue-600",
-          softBorder: "border-blue-100",
+          hero: "from-primary-dark via-primary to-primary-dark",
+          shadow: "shadow-primary/20",
+          accent: "text-primary",
+          softBorder: "border-primary/10",
           label: "Espace boutique",
         };
   const queryClient = useQueryClient();
@@ -144,7 +144,7 @@ export default function PartenaireHome({ etablissement, etablissementType, onNav
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative overflow-hidden rounded-[2rem] bg-[#0879e8] text-white shadow-[0_18px_45px_rgba(0,122,255,0.24)] ring-1 ring-white/10 border border-white/20"
+        className="relative overflow-hidden rounded-[2rem] bg-primary text-white shadow-[0_18px_45px_rgba(0,122,255,0.24)] ring-1 ring-white/10 border border-white/20 silgapp-relief-surface"
       >
         <div className="absolute inset-x-0 bottom-0 h-1 bg-white/20" />
 

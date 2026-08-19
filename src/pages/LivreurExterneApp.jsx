@@ -1455,7 +1455,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   ];
 
   return (
-    <div className="min-h-screen bg-[#f5f5f7] text-[#1d1d1f]">
+    <div className="min-h-screen bg-background text-foreground">
       <PullToRefreshIndicator pulling={pulling} refreshing={refreshing} />
       <AlertesLivreurModal
         livreurId={livreurProfil?.id}
@@ -1511,8 +1511,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       )}
 
       {/* ── Navigation sticky en haut ──────────────── */}
-      <div className="sticky top-0 z-30 bg-[#f5f5f7]/90 backdrop-blur-xl px-3 pt-3 pb-2 border-b border-black/5">
-        <div className="max-w-lg mx-auto flex w-full gap-1 overflow-x-auto overscroll-x-contain bg-white/90 rounded-2xl p-1 shadow-[0_8px_30px_rgba(15,23,42,0.06)] border border-black/5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="sticky top-0 z-30 bg-background/90 backdrop-blur-xl px-3 pt-3 pb-2 border-b border-border">
+        <div className="max-w-lg mx-auto flex w-full gap-1 overflow-x-auto overscroll-x-contain bg-card/90 rounded-2xl p-1 shadow-[0_8px_30px_rgba(15,23,42,0.06)] border border-border [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {TABS.map(tab => (
             <button
               key={tab.id}
@@ -1522,7 +1522,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
               }}
               className={`relative flex-none min-w-[76px] px-2 flex items-center justify-center py-2.5 rounded-xl text-[11px] font-bold leading-tight text-center whitespace-nowrap transition-all ${
                 activeTab === tab.id
-                  ? "bg-[#007aff] text-white shadow-sm"
+                  ? "bg-primary text-white shadow-sm"
                   : "text-slate-500 hover:text-slate-900"
               }`}
             >
@@ -1536,7 +1536,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
               )}
               {/* Point rouge : nouvelle course disponible */}
               {tab.id === "disponibles" && hasNewAvailableCourse && activeTab !== "disponibles" && (
-                <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-red-500 border border-[#16191d] animate-pulse" />
+                <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-red-500 border border-background animate-pulse" />
               )}
             </button>
           ))}
@@ -1649,7 +1649,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
                   <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
                     montantDuSilga > 0 ? "bg-orange-500/15" : montantDuSilga < 0 ? "bg-green-500/15" : "bg-white/5"
                   }`}>
-                    <Wallet className={`w-5 h-5 ${montantDuSilga > 0 ? "text-orange-400" : montantDuSilga < 0 ? "text-green-500" : "text-[#00a86b]"}`} />
+                    <Wallet className={`w-5 h-5 ${montantDuSilga > 0 ? "text-orange-400" : montantDuSilga < 0 ? "text-green-500" : "text-primary"}`} />
                   </div>
                   <div>
                     <p className="text-sm font-bold text-slate-900">Payer SILGAPP</p>
@@ -1693,6 +1693,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
               <div className="rounded-2xl bg-red-500/15 border border-red-500/30 text-red-400 p-5 text-center space-y-2 shadow-lg">
                 <p className="text-2xl"></p>
                 <p className="font-black text-base">Session expirée</p>
+
                 <p className="text-red-400/80 text-xs leading-relaxed">
                   Vous avez été déconnecté car une autre session a été ouverte sur un autre appareil.
                 </p>

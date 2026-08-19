@@ -370,7 +370,7 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
 
   if (!livreurProfil) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center bg-[#16191d]">
+      <div className="fixed inset-0 flex items-center justify-center bg-background">
         <div className="text-center space-y-4">
           <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">
             <Truck className="w-8 h-8 text-primary animate-pulse" />
@@ -389,7 +389,7 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
   const livreurVisible = isEnLigne && gpsActif && livreurProfil.latitude && livreurProfil.longitude;
 
   return (
-    <div className="min-h-screen bg-[#16191d] text-white">
+    <div className="min-h-screen bg-background text-foreground">
       <AlertesLivreurModal
         livreurId={livreurProfil?.id}
         livreurNom={`${livreurProfil?.prenom || ""} ${livreurProfil?.nom || ""}`.trim()}
@@ -492,7 +492,7 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
       {/* Bilan du jour - visible sur tous les onglets */}
       {totalEncaisse > 0 && activeTab === "courses" && (
         <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-3xl p-5 border border-amber-100 shadow-sm mt-4 max-w-lg mx-auto">
-          <p className="text-xs text-amber-600 font-bold uppercase tracking-wide mb-1">Bilan du jour</p>
+          <p className="text-xs text-warning font-bold uppercase tracking-wide mb-1">Bilan du jour</p>
           <p className="text-3xl font-black text-amber-700">{totalEncaisse.toLocaleString()} <span className="text-base font-semibold text-amber-500">FCFA</span></p>
           <p className="text-xs text-amber-500 mt-1">Montant à reverser à SILGAPP Livraison</p>
         </div>

@@ -45,8 +45,18 @@ Deno.serve(async (req) => {
     if (commissionPct == null) {
       try {
         const configs = await base44.asServiceRole.entities.CommissionConfig.filter({ pays_code: etablissement.pays_code });
-        commissionPct = configs?.[0]?.[`commission_${type}_defaut`] ?? 10;
-      } catch (_) { commissionPct = 10; }
+        commissionPct = configs?.[0]?.[`commission_${type}_defaut`] ?? null;
+      } catch (_) {}
+    }
+    // ⚠️ Dernier recours : commission du pays (Country.commission_pct), jamais 10% hardcodé.
+    if (commissionPct == null) {
+      try {
+        const countries = await base44.asServiceRole.entities.Country.filter({ code: etablissement.pays_code, actif: true });
+        commissionPct = countries?.[0]?.commission_pct ?? null;
+      } catch (_) {}
+    }
+    if (commissionPct == null) {
+      return Response.json({ error: `Commission non configurée pour le pays ${etablissement.pays_code}` }, { status: 400 });
     }
     const commissionMontant = Math.round((total || 0) * (commissionPct / 100));
 

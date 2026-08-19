@@ -224,6 +224,15 @@ export default function CourseDetailDialog({ course: courseProp, open, onClose, 
     if (newStatut === "livree") {
       updateData.heure_livraison = new Date().toISOString();
     }
+    // ── Quand l'admin repasse manuellement la course en "recherche_livreur",
+    //    il faut aussi mettre dispatch_status à "disponible_push" pour qu'elle
+    //    apparaisse dans le fil "Disponibles" des livreurs. Sinon le statut reste
+    //    "redispatch" (suite à une annulation livreur) et la course est invisible. ──
+    if (newStatut === "recherche_livreur" && reseau === "externe") {
+      updateData.dispatch_status = "disponible_push";
+      updateData.heure_sollicitation = new Date().toISOString();
+      updateData.timeout_expires_at = null;
+    }
     updateMutation.mutate({ id: course.id, data: updateData });
   };
 

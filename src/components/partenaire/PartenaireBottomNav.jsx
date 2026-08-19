@@ -3,7 +3,7 @@ import { Home, Package, ShoppingBag, MessageCircle, BarChart3, Truck, Pill, Gift
 
 export default function PartenaireBottomNav({ tab, setTab, badgeCount = 0, messageBadge = 0, etablissementType, showPromo = true }) {
   const isPharmacie = etablissementType === "pharmacie";
-  const activeClasses = { text: "text-[#007aff]", bar: "bg-[#007aff]" };
+  const activeClasses = { text: "text-primary", bar: "bg-primary" };
   const baseItems = isPharmacie ? [
     { id: "home", icon: Home, label: "Accueil" },
     { id: "messages", icon: MessageCircle, label: "Messages", badge: messageBadge },

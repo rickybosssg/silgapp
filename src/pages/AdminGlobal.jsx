@@ -138,17 +138,17 @@ export default function AdminGlobal() {
     <div className="p-4 lg:p-6 space-y-5 max-w-7xl mx-auto">
 
       {/* ── HERO HEADER ──────────────────────────────── */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-800 via-slate-700 to-slate-900 p-5 shadow-xl">
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-primary-dark via-primary to-primary-dark p-5 shadow-xl silgapp-relief-surface">
         <div className="absolute inset-0 opacity-10">
           <div className="absolute -top-8 -right-8 w-40 h-40 bg-white rounded-full" />
           <div className="absolute -bottom-12 -left-6 w-56 h-56 bg-white rounded-full" />
         </div>
         <div className="relative flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-2xl"></div>
+            <div className="w-11 h-11 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-2xl silgapp-relief"></div>
             <div>
-              <h1 className="text-xl font-black text-white tracking-tight">Admin Global SILGAPP</h1>
-              <p className="text-white/60 text-xs mt-0.5">Supervision de toutes les opérations multi-pays</p>
+              <h1 className="text-xl font-black text-white tracking-tight silgapp-relief-text">Admin Global SILGAPP</h1>
+              <p className="text-white/70 text-xs mt-0.5">Supervision de toutes les opérations multi-pays</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -175,15 +175,15 @@ export default function AdminGlobal() {
       {/* ── KPI GLOBAUX ──────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5">
         {[
-          { label: "Pays actifs", value: globalStats.paysActifs, grad: "from-emerald-500 to-teal-500", icon: "" },
-          { label: "Clients", value: globalStats.totalClients, grad: "from-violet-500 to-purple-600", icon: "" },
-          { label: "Livreurs", value: globalStats.totalLivreurs, grad: "from-blue-500 to-indigo-600", icon: "" },
-          { label: "Actifs", value: globalStats.livreursActifs, grad: "from-cyan-500 to-sky-500", icon: "" },
-          { label: "Courses auj.", value: globalStats.coursesToday, grad: "from-orange-500 to-amber-500", icon: "" },
-          { label: "Livrées auj.", value: globalStats.livreesToday, grad: "from-green-500 to-emerald-500", icon: "" },
-          { label: "CA du jour", value: `${globalStats.caToday.toLocaleString()}`, grad: "from-primary to-red-600", icon: "" },
+          { label: "Pays actifs", value: globalStats.paysActifs, grad: "from-primary to-primary-dark", icon: "" },
+          { label: "Clients", value: globalStats.totalClients, grad: "from-primary to-primary-light", icon: "" },
+          { label: "Livreurs", value: globalStats.totalLivreurs, grad: "from-primary-dark to-primary", icon: "" },
+          { label: "Actifs", value: globalStats.livreursActifs, grad: "from-success to-success", icon: "" },
+          { label: "Courses auj.", value: globalStats.coursesToday, grad: "from-warning to-warning", icon: "" },
+          { label: "Livrées auj.", value: globalStats.livreesToday, grad: "from-success to-success", icon: "" },
+          { label: "CA du jour", value: `${globalStats.caToday.toLocaleString()}`, grad: "from-primary-dark to-primary", icon: "" },
         ].map(s => (
-          <div key={s.label} className={`bg-gradient-to-br ${s.grad} rounded-2xl p-3 text-white shadow-md`}>
+          <div key={s.label} className={`bg-gradient-to-br ${s.grad} rounded-2xl p-3 text-white shadow-md silgapp-relief-surface`}>
             <div className="flex items-center justify-between mb-1.5">
               <p className="text-[9px] font-semibold opacity-80 uppercase tracking-wide leading-tight">{s.label}</p>
               <span className="text-sm">{s.icon}</span>
@@ -196,7 +196,7 @@ export default function AdminGlobal() {
       {/* ── TABLEAU PAR PAYS ─────────────────────────── */}
       <div className="bg-white rounded-2xl border border-gray-100 p-5">
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-slate-700 to-slate-900 flex items-center justify-center shadow-sm">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary-dark to-primary flex items-center justify-center shadow-sm silgapp-relief-surface">
             <Globe className="w-4 h-4 text-white" />
           </div>
           <div>
@@ -262,7 +262,7 @@ export default function AdminGlobal() {
                     </Button>
                     <Button
                       size="sm"
-                      className="gap-1.5 text-xs rounded-xl bg-gradient-to-r from-slate-700 to-slate-900"
+                      className="gap-1.5 text-xs rounded-xl bg-gradient-to-r from-primary-dark to-primary"
                       onClick={() => navigate(`/admin/pays/${code}`)}
                       disabled={!actif}
                     >
