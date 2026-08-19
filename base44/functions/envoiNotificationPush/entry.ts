@@ -359,6 +359,34 @@ Deno.serve(async (req) => {
       lue: false,
     });
 
+    // ── Si le destinataire est admin, créer un AdminInboxItem persistant ──
+    // Règle fondamentale : ne jamais envoyer un push admin sans élément persistant.
+    let inboxItemId: string | null = null;
+    if (String(user_type || '') === 'admin') {
+      try {
+        const { createAdminInboxItem } = await import('../../shared/adminInbox.ts');
+        const inboxType = String(type || '').includes('annul') ? 'cancellation'
+          : String(type || '').includes('paiement') || String(type || '').includes('payment') ? 'payment'
+          : String(type || '').includes('course') ? 'course'
+          : String(type || '').includes('message') ? 'message'
+          : 'system';
+        inboxItemId = await createAdminInboxItem(base44, {
+          type: inboxType as any,
+          priority: 'P2',
+          title: personalizedTitre,
+          body: personalizedMessage,
+          source_entity: 'Notification',
+          source_id: notification.id,
+          course_id: course_id || undefined,
+          country_code: 'ALL',
+          action_url: course_id ? '/courses' : '/admin/centre-notifications',
+          deduplication_key: `INBOX_NOTIF_${notification.id}`,
+        });
+      } catch (_) {
+        // Non-bloquant
+      }
+    }
+
     if (tokens.length === 0) {
       return Response.json({
         success: false,
@@ -409,6 +437,7 @@ Deno.serve(async (req) => {
       client_id: String(client_id || ''),
       course_id: String(course_id || ''),
       notification_id: String(notification.id),
+      inbox_item_id: String(inboxItemId || ''),
       click_action: ANDROID_CLICK_ACTION,
       alert_duration_seconds: String(alert_duration_seconds || 300),
       alert_interval_seconds: String(alert_interval_seconds || 5),

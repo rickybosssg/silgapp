@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 import { envoyerWhatsAppRaw } from '../../shared/twilioWhatsApp.ts';
+import { createAdminInboxItem } from '../../shared/adminInbox.ts';
 
 /**
  * Envoi sécurisé d'un message de messagerie SILGAPP.
@@ -285,6 +286,39 @@ Deno.serve(async (req) => {
         }
       } catch (waErr) {
         console.warn(`[envoyerMessage] ⚠️ Erreur relayage WhatsApp: ${waErr.message}`);
+      }
+    }
+
+    // ── 7. Créer un AdminInboxItem pour chaque admin destinataire ──
+    // Règle : un message interne dirigé vers l'admin DOIT créer un élément
+    // persistant dans le Centre de notifications, pour le deep link push.
+    if (sender_type !== 'admin') {
+      const adminRecipients = [];
+      for (const recipientStr of recipients) {
+        try {
+          const r = JSON.parse(recipientStr);
+          if (r.user_type === 'admin') adminRecipients.push(r);
+        } catch (_) {}
+      }
+      for (const admin of adminRecipients) {
+        try {
+          await createAdminInboxItem(base44, {
+            type: 'message',
+            priority: 'P2',
+            title: pushTitle,
+            body: msgPreview,
+            source_entity: 'Message',
+            source_id: message.id,
+            course_id: course_id || undefined,
+            conversation_id: conversation_id || undefined,
+            message_id: message.id,
+            country_code: 'ALL',
+            action_url: conversation_id ? `/admin/messages?conv=${conversation_id}` : (course_id ? '/admin/messages' : '/admin/centre-notifications'),
+            deduplication_key: `INBOX_MSG_${message.id}_${admin.email}`,
+          });
+        } catch (_) {
+          // Non-bloquant
+        }
       }
     }
 
