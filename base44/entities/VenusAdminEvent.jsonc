@@ -11,7 +11,8 @@
         "COURSE_DELIVERED",
         "PRICE_CHANGED",
         "PAYMENT_RECEIVED",
-        "DRIVER_DEBT_THRESHOLD"
+        "DRIVER_DEBT_THRESHOLD",
+        "VENUS_ADMIN_PUSH"
       ],
       "description": "Type d'\u00e9v\u00e9nement admin observ\u00e9 par VENUS"
     },
