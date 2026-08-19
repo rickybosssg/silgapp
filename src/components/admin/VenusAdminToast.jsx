@@ -18,7 +18,7 @@ export default function VenusAdminToast({ toast, onDismiss }) {
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -100, scale: 0.95 }}
           transition={{ duration: 0.3, ease: "easeOut" }}
-          className="fixed top-4 left-1/2 -translate-x-1/2 z-[60] w-full max-w-md px-4 safe-area-top"
+          className="fixed top-4 left-0 right-0 mx-auto z-[60] w-full max-w-md px-4 safe-area-top"
         >
           <div className={cn(
             "flex items-start gap-3 rounded-xl shadow-2xl border-2 p-3 text-white",
