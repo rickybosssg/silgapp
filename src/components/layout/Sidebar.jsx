@@ -183,17 +183,17 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, part
             ) : (
               <button
                 onClick={() => setCountryOpen(!countryOpen)}
-                className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 transition-colors"
+                className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-white hover:bg-gray-50 transition-colors"
               >
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="text-base flex-shrink-0">
                     {effectiveCountry ? paysListe.find(p => p.code === effectiveCountry)?.emoji_flag || "🌍" : "🌍"}
                   </span>
-                  <span className="text-xs font-semibold text-slate-400 truncate">
+                  <span className="text-xs font-semibold text-gray-900 truncate">
                     {effectiveCountry ? paysListe.find(p => p.code === effectiveCountry)?.nom : "Choisir un pays"}
                   </span>
                 </div>
-                <ChevronDown className={cn("w-3.5 h-3.5 text-slate-400 flex-shrink-0 transition-transform", countryOpen && "rotate-180")} />
+                <ChevronDown className={cn("w-3.5 h-3.5 text-gray-500 flex-shrink-0 transition-transform", countryOpen && "rotate-180")} />
               </button>
             )}
 
