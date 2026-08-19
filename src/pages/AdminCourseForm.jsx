@@ -182,7 +182,8 @@ export default function AdminCourseForm() {
       }
 
       // contact_createur_course = contact principal pour le livreur (téléphone du client)
-      const contactCreateurCourse = clientTel;
+      // Fallback : si le client n'a pas de téléphone, utiliser l'expéditeur ou le destinataire
+      const contactCreateurCourse = clientTel || finalExpediteurTel || finalDestinataireTel || "";
 
       const courseData = {
         country_code: countryCode,
