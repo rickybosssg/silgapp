@@ -100,16 +100,16 @@ Deno.serve(async (req) => {
       return Response.json({ success: true, skipped: true, reason: 'commission_nulle' });
     }
 
-    // ── Recalculer l'encours RÉEL depuis les courses livrées non payées ──
-    //    Au lieu d'accumuler dans un snapshot qui peut se désynchroniser,
-    //    on recalcule à chaque fois la somme des commissions impayées.
-    const livrees = await base44.asServiceRole.entities.CourseExterne.filter({
-      livreur_id: livreurId, statut: 'livree',
-    });
-    const encoursAvant = livrees
-      .filter(c => c.statut_paiement_livreur !== 'paye')
-      .reduce((s, c) => s + (c.commission_silga || 0), 0);
-    const nouvelEncours = encoursAvant; // déjà inclut la commission de cette course
+    // ── Accumuler la commission dans le solde existant ──
+    //    On AJOUTE la commission au solde actuel (montant_du_silga).
+    //    Idempotent via encours_comptabilise_at (vérifié plus haut).
+    //
+    //    ⚠️ Ne JAMAIS recalculer depuis les courses non payées.
+    //    Un paiement partiel ne marque pas les courses comme "payées"
+    //    (seul un solde à 0 le fait). Un recalcul recréerait donc une
+    //    commission déjà réglée par un paiement partiel.
+    const encoursAvant = livreur.montant_du_silga ?? livreur.encours ?? 0;
+    const nouvelEncours = encoursAvant + commission;
 
     // Pourcentage du seuil atteint
     const pourcentage = seuil > 0 ? Math.round((nouvelEncours / seuil) * 100) : 0;
@@ -420,13 +420,10 @@ async function handleGetBloques(base44, body) {
     const seuil = seuilsParPays[l.country_code]?.seuil || 5000;
     const devise = seuilsParPays[l.country_code]?.devise || 'FCFA';
 
-    // Recalculer depuis les courses livrées non payées
-    const livrees = await base44.asServiceRole.entities.CourseExterne.filter({
-      livreur_id: l.id, statut: 'livree',
-    });
-    const encoursReel = livrees
-      .filter(c => c.statut_paiement_livreur !== 'paye')
-      .reduce((s, c) => s + (c.commission_silga || 0), 0);
+    // Utiliser le solde persisté (montant_du_silga) — source de vérité unique.
+    // Ne pas recalculer depuis les courses : un paiement partiel ne marque pas
+    // les courses comme payées, donc un recalcul recréerait une dette déjà réglée.
+    const encoursReel = l.montant_du_silga ?? l.encours ?? 0;
 
     // Auto-déblocage si la dette réelle est sous le seuil
     if (encoursReel < seuil) {
