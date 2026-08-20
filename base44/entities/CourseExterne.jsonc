@@ -132,6 +132,24 @@
     "gps_arrivee_lng": {
       "type": "number"
     },
+    "gps_depart_source": {
+      "type": "string",
+      "enum": [
+        "exact",
+        "quartier",
+        "geocodage"
+      ],
+      "description": "Source du GPS de depart: exact (GPS telephone ou carte), quartier (centre approximatif du quartier), geocodage (adresse geocodee). Null si GPS non disponible."
+    },
+    "gps_arrivee_source": {
+      "type": "string",
+      "enum": [
+        "exact",
+        "quartier",
+        "geocodage"
+      ],
+      "description": "Source du GPS d'arrivee: exact (GPS telephone ou carte), quartier (centre approximatif du quartier), geocodage (adresse geocodee). Null si GPS non disponible."
+    },
     "passager_nom": {
       "type": "string"
     },

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { base44 } from "@/api/base44Client";
 import { MapPin, Search, X } from "lucide-react";
+import { searchQuartiers, resolveQuartier } from "@/lib/quartierResolver";
 
 /**
  * QuartierSelect — champ de recherche avec suggestions en temps réel.
@@ -62,23 +63,17 @@ export default function QuartierSelect({
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // ── Suggestions filtrées par la requête ──
+  // ── Suggestions filtrées par la requête (normalisé + fuzzy) ──
   const suggestions = React.useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return quartiers.slice(0, 50);
-    return quartiers
-      .filter((qu) => qu.nom.toLowerCase().includes(q))
-      .slice(0, 50);
+    return searchQuartiers(query, quartiers, 50);
   }, [query, quartiers]);
 
   // ── Auto-remplir le GPS quand un quartier connu est matché ──
   const tryAutoFillGps = (nom) => {
     if (!nom || !onGpsSelect) return;
-    const match = quartiers.find(
-      (q) => q.nom.toLowerCase() === nom.trim().toLowerCase() && q.latitude && q.longitude
-    );
-    if (match) {
-      onGpsSelect({ lat: match.latitude, lng: match.longitude });
+    const result = resolveQuartier(nom, quartiers);
+    if (result.match && result.match.latitude && result.match.longitude) {
+      onGpsSelect({ lat: result.match.latitude, lng: result.match.longitude });
     }
   };
 

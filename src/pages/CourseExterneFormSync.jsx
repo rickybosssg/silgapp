@@ -11,6 +11,7 @@ import { sauvegarderContactDB } from "@/components/client/CarnetAdresses";
 import LivreurRechercheAnimation from "@/components/client/LivreurRechercheAnimation";
 import InvitationWhatsAppModal from "@/components/client/InvitationWhatsAppModal";
 import { normalizePhone, phoneVariants } from "@/lib/phoneUtils";
+import { resolveGpsForCourse, GPS_BLOCK_MESSAGE } from "@/lib/gpsResolution";
 
 // Génère les IDs de colis : A, B, C...
 const COLIS_LETTERS = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"];
@@ -635,6 +636,39 @@ export default function CourseExterneFormSync() {
       }
     }
 
+    // ── Résolution GPS : exact → quartier → blocage ──
+    // Pour "recevoir" : l'arrivée est la position du client (GPS exact)
+    // Pour "expedier"/"deplacement" : le départ est la position du client (GPS exact)
+    let quartiersList = [];
+    try {
+      quartiersList = await base44.entities.Quartier.filter({ country_code: courseCountryCode, actif: true }, "nom", 500);
+    } catch (_) {}
+
+    const departGps = resolveGpsForCourse({
+      exactLat: formData.gps_depart_lat,
+      exactLng: formData.gps_depart_lng,
+      quartierName: formData.quartier_depart,
+      quartiers: quartiersList,
+    });
+    const arriveeGps = isMulti ? null : resolveGpsForCourse({
+      exactLat: gpsArriveLat,
+      exactLng: gpsArriveLng,
+      quartierName: formData.quartier_arrivee,
+      quartiers: quartiersList,
+    });
+
+    // Blocage si aucun GPS disponible (sauf multi-colis où chaque colis a son propre GPS)
+    if (!departGps) {
+      toast.error(`Point de départ : ${GPS_BLOCK_MESSAGE}`);
+      setIsSubmitting(false);
+      return;
+    }
+    if (!isMulti && !arriveeGps) {
+      toast.error(`Point d'arrivée : ${GPS_BLOCK_MESSAGE}`);
+      setIsSubmitting(false);
+      return;
+    }
+
     const nbColis = isDeplacement ? 1 : (formData.nb_colis || 1);
     const isMulti = isExpedie && nbColis > 1;
 
@@ -673,10 +707,12 @@ export default function CourseExterneFormSync() {
       quartier_arrivee: formData.quartier_arrivee || null,
       type_colis: isDeplacement ? "autre" : (isMulti ? (colis[0]?.type_colis || "petit_colis") : formData.type_colis),
       notes: formData.notes,
-      gps_depart_lat: formData.gps_depart_lat,
-      gps_depart_lng: formData.gps_depart_lng,
-      gps_arrivee_lat: isMulti ? null : gpsArriveLat,
-      gps_arrivee_lng: isMulti ? null : gpsArriveLng,
+      gps_depart_lat: departGps.lat,
+      gps_depart_lng: departGps.lng,
+      gps_depart_source: departGps.source,
+      gps_arrivee_lat: isMulti ? null : (arriveeGps?.lat || null),
+      gps_arrivee_lng: isMulti ? null : (arriveeGps?.lng || null),
+      gps_arrivee_source: isMulti ? null : (arriveeGps?.source || null),
       destination_inconnue: destInconnue,
       prix_estimate: isMulti ? 0 : prixEstime,
       prix_propose_admin: isMulti ? 0 : (formData.prix_propose || prixEstime),

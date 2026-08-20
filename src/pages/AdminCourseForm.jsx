@@ -15,6 +15,7 @@ import SmartAddressPicker from "@/components/crm/SmartAddressPicker";
 import { upsertCourseAddresses } from "@/lib/addressBook";
 import { upsertClientsFromCourseContacts, normalizePhone } from "@/lib/crmUtils";
 import { calculerPrixApproximatif } from "@/lib/priceEstimate";
+import { resolveGpsForCourse, isGpsValid, GPS_BLOCK_MESSAGE } from "@/lib/gpsResolution";
 
 function generarQRData() {
   const pickupQrToken = crypto.randomUUID().replace(/-/g, "");
@@ -89,12 +90,26 @@ export default function AdminCourseForm() {
   const [quartierArrivee, setQuartierArrivee] = useState("");
   const [gpsDepart, setGpsDepart] = useState(null);
   const [gpsArrivee, setGpsArrivee] = useState(null);
+  const [gpsDepartSource, setGpsDepartSource] = useState(null); // "exact" | "quartier" | "geocodage"
+  const [gpsArriveeSource, setGpsArriveeSource] = useState(null);
+  const [quartiers, setQuartiers] = useState([]);
   const [mapModal, setMapModal] = useState(null); // null | 'depart' | 'arrivee'
   const [detectedClient, setDetectedClient] = useState(null);
   const [quickMode, setQuickMode] = useState(false);
   const [prixApproximatif, setPrixApproximatif] = useState(null);
   const [prixProposeAdmin, setPrixProposeAdmin] = useState("");
   const prixProposeManuelModifie = useRef(false);
+
+  // ── Charger les quartiers du pays pour la résolution GPS de fallback ──
+  useEffect(() => {
+    if (!countryCode) { setQuartiers([]); return; }
+    let cancelled = false;
+    base44.entities.Quartier
+      .filter({ country_code: countryCode, actif: true }, "nom", 500)
+      .then((data) => { if (!cancelled) setQuartiers(data || []); })
+      .catch(() => { if (!cancelled) setQuartiers([]); });
+    return () => { cancelled = true; };
+  }, [countryCode]);
 
   const selectedPays = PAYS.find(p => p.code === countryCode);
 
@@ -130,6 +145,8 @@ export default function AdminCourseForm() {
     setQuartierArrivee("");
     setGpsDepart(null);
     setGpsArrivee(null);
+    setGpsDepartSource(null);
+    setGpsArriveeSource(null);
     setClientNom("");
     setClientTelephone("");
     setExpediteurNom("");
@@ -185,6 +202,31 @@ export default function AdminCourseForm() {
       // Fallback : si le client n'a pas de téléphone, utiliser l'expéditeur ou le destinataire
       const contactCreateurCourse = clientTel || finalExpediteurTel || finalDestinataireTel || "";
 
+      // ── Résolution GPS : exact → quartier → blocage ──
+      const departGps = resolveGpsForCourse({
+        exactLat: gpsDepart?.lat,
+        exactLng: gpsDepart?.lng,
+        quartierName: quartierDepart,
+        quartiers,
+      });
+      const arriveeGps = resolveGpsForCourse({
+        exactLat: gpsArrivee?.lat,
+        exactLng: gpsArrivee?.lng,
+        quartierName: quartierArrivee,
+        quartiers,
+      });
+
+      if (!departGps) {
+        toast.error(`Point de départ : ${GPS_BLOCK_MESSAGE}`);
+        setSubmitting(false);
+        return;
+      }
+      if (!arriveeGps) {
+        toast.error(`Point d'arrivée : ${GPS_BLOCK_MESSAGE}`);
+        setSubmitting(false);
+        return;
+      }
+
       const courseData = {
         country_code: countryCode,
         source: "admin",
@@ -193,10 +235,12 @@ export default function AdminCourseForm() {
         adresse_arrivee: adresseArrivee.trim() || "—",
         quartier_depart: quartierDepart || null,
         quartier_arrivee: quartierArrivee || null,
-        gps_depart_lat: gpsDepart?.lat || null,
-        gps_depart_lng: gpsDepart?.lng || null,
-        gps_arrivee_lat: gpsArrivee?.lat || null,
-        gps_arrivee_lng: gpsArrivee?.lng || null,
+        gps_depart_lat: departGps.lat,
+        gps_depart_lng: departGps.lng,
+        gps_depart_source: departGps.source,
+        gps_arrivee_lat: arriveeGps.lat,
+        gps_arrivee_lng: arriveeGps.lng,
+        gps_arrivee_source: arriveeGps.source,
         client_nom: clientNom.trim() || "Client",
         client_telephone: clientTel,
         contact_createur_course: contactCreateurCourse,
@@ -507,6 +551,7 @@ export default function AdminCourseForm() {
                 onSelect={(r) => {
                   if (r?.latitude && r?.longitude) {
                     setGpsDepart({ lat: r.latitude, lng: r.longitude });
+                    setGpsDepartSource("geocodage");
                     if (r.quartier) setQuartierDepart(r.quartier);
                   }
                 }}
@@ -547,6 +592,7 @@ export default function AdminCourseForm() {
                 onSelect={(r) => {
                   if (r?.latitude && r?.longitude) {
                     setGpsArrivee({ lat: r.latitude, lng: r.longitude });
+                    setGpsArriveeSource("geocodage");
                     if (r.quartier) setQuartierArrivee(r.quartier);
                   }
                 }}
@@ -674,7 +720,10 @@ export default function AdminCourseForm() {
         initialLat={gpsDepart?.lat}
         initialLng={gpsDepart?.lng}
         label="Localiser le point de départ"
-        onSelect={(lat, lng) => setGpsDepart({ lat, lng })}
+        onSelect={(lat, lng) => {
+          setGpsDepart({ lat, lng });
+          setGpsDepartSource("exact");
+        }}
       />
       <MapPickerModal
         open={mapModal === 'arrivee'}
@@ -683,7 +732,10 @@ export default function AdminCourseForm() {
         initialLat={gpsArrivee?.lat}
         initialLng={gpsArrivee?.lng}
         label="Localiser le point d'arrivée"
-        onSelect={(lat, lng) => setGpsArrivee({ lat, lng })}
+        onSelect={(lat, lng) => {
+          setGpsArrivee({ lat, lng });
+          setGpsArriveeSource("exact");
+        }}
       />
     </div>
   );
