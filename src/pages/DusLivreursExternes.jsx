@@ -73,6 +73,13 @@ function DetailModal({ entry, livreurInfo, onClose, onPaiement, onBloquer, onDeb
               {formatMontantCredit(entry.montantDu)}<span className="text-lg font-normal ml-1 opacity-70">F</span>
             </p>
             <span className={`inline-block mt-2 text-xs px-3 py-1 rounded-full font-bold ${sf.color}`}>{sf.label}</span>
+            {entry.divergence > 0 && (
+              <div className="mt-3 bg-amber-100 border border-amber-300 rounded-xl p-2 text-left">
+                <p className="text-xs text-amber-800 font-bold flex items-center gap-1"><AlertCircle className="w-3 h-3" /> Solde incohérent</p>
+                <p className="text-xs text-amber-700 mt-1">Stocké : <b>{entry.montantDu.toLocaleString()} F</b> — Calcul réel : <b>{entry.soldeTheorique.toLocaleString()} F</b></p>
+                <p className="text-xs text-amber-600 mt-0.5">Écart : {entry.divergence.toLocaleString()} F</p>
+              </div>
+            )}
             {montantSaisiNum > 0 && (
               <p className="text-xs text-gray-400 mt-2">
                 Après paiement : <span className={`font-semibold ${resteApres < 0 ? "text-blue-600" : "text-gray-600"}`}>{formatMontantCredit(resteApres)} F</span>
@@ -302,6 +309,8 @@ export default function DusLivreursExternes() {
         map[c.livreur_id].nbCoursesJour += 1;
       }
       if (c.statut_paiement_livreur === "paye") map[c.livreur_id].montantPaye += (c.commission_silga ?? 0);
+      // Solde théorique = commissions dues - commissions déjà réglées
+      map[c.livreur_id].soldeTheorique = map[c.livreur_id].commissionTotal - map[c.livreur_id].montantPaye;
     });
     // Inclure TOUS les livreurs — ceux sans course livrée et sans dette
     // doivent apparaître dans le filtre "À jour" (montantDu = 0)
@@ -318,6 +327,9 @@ export default function DusLivreursExternes() {
         // Pas d'info livreur — calcul de secours basé sur les courses impayées
         entry.montantDu = entry.commissionTotal - entry.montantPaye;
       }
+      // Détecter la divergence entre solde stocké et solde théorique
+      entry.soldeTheorique = entry.commissionTotal - entry.montantPaye;
+      entry.divergence = entry.montantDu !== entry.soldeTheorique ? Math.abs(entry.montantDu - entry.soldeTheorique) : 0;
     });
     let result = Object.values(map);
     const totalCommissionJour = result.reduce((s, r) => s + (r.commissionJour || 0), 0);
@@ -412,10 +424,14 @@ export default function DusLivreursExternes() {
   // ── Mutations (inchangées) ──
   const paiementMutation = useMutation({
     mutationFn: async ({ entry, montant }) => {
-      const nouveauSolde = (entry.montantDu ?? 0) - montant;
-      const impayees = nouveauSolde <= 0 ? entry.courses.filter(c => c.statut_paiement_livreur !== "paye").map(c => c.id) : [];
-      const res = await base44.functions.invoke("updateLivreur", { id: entry.id, data: { encours: nouveauSolde, montant_du_silga: nouveauSolde }, mark_courses_paid: impayees });
+      const res = await base44.functions.invoke("paiementLivreur", {
+        livreur_id: entry.id,
+        montant,
+        courses_ids: entry.courses.filter(c => c.statut_paiement_livreur !== "paye").map(c => c.id),
+        request_id: `DUS-${entry.id}-${Date.now()}`,
+      });
       if (res?.data && res.data.success === false) throw new Error(res.data.error || "Échec");
+      const nouveauSolde = res?.data?.nouveau_solde ?? ((entry.montantDu ?? 0) - montant);
       return { nouveauSolde, montant, entry };
     },
     onMutate: async ({ entry, montant }) => {

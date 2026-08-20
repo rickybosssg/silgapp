@@ -24,12 +24,22 @@ Deno.serve(async (req) => {
 
     // ── Garde-fou : ne JAMAIS recalculer le prix si un humain l'a déjà défini ──
     // Protège : admin_manuel (admin), prix_propose_client (client), prix_final (confirmé)
+    // Le PRIX est verrouillé, mais la COMMISSION doit quand même être comptabilisée
+    // dans la dette du livreur via verifierEncoursLivreur (qui utilise encours_comptabilise_at
+    // comme garde d'idempotence dédiée — ne pas confondre avec crm_stats_synced).
     if (course.pricing_mode === 'admin_manuel' || course.source === 'admin') {
+      // Prix verrouillé — ne pas recalculer. Mais s'assurer que la commission
+      // est comptabilisée dans l'encours du livreur (idempotent via encours_comptabilise_at).
+      try {
+        await base44.asServiceRole.functions.invoke('verifierEncoursLivreur', { course_id });
+      } catch (encoursErr) {
+        console.error('[calculPrixCourseExterne] verifierEncoursLivreur error:', encoursErr?.message || encoursErr);
+      }
       return Response.json({
         success: false,
         skipped: true,
         reason: 'admin_manuel_price_locked',
-        message: 'Le prix de cette course est défini par l\'admin — recalcul automatique désactivé.',
+        message: 'Le prix de cette course est défini par l\'admin — recalcul automatique désactivé. Commission comptabilisée via verifierEncoursLivreur.',
         prix_final: course.prix_final || course.prix_propose_admin || null,
       });
     }
