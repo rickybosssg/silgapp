@@ -1075,6 +1075,26 @@ export default function CourseStepForm({
           </div>
         )}
 
+        {/* ── Prompt recalcul tarif (coords changées après modif manuelle) ── */}
+        {recalculerDisponible && (
+          <div className="flex items-center justify-between rounded-xl border px-4 py-3" style={{ background: COLORS.primaryLight, borderColor: COLORS.primary }}>
+            <div className="flex items-center gap-2">
+              <Navigation className="w-4 h-4 flex-shrink-0" style={{ color: COLORS.primary }} />
+              <p className="text-xs font-semibold" style={{ color: COLORS.primary }}>
+                Coordonnées modifiées. Recalculer le tarif conseillé ?
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleRecalculerTarif}
+              className="px-3 py-1.5 rounded-lg text-white text-xs font-bold transition-all"
+              style={{ background: COLORS.primary }}
+            >
+              Recalculer
+            </button>
+          </div>
+        )}
+
         {/* Prix proposé — sauf multi-colis */}
         {!isMulti && (
           <>

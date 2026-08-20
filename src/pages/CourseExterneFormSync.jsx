@@ -705,6 +705,20 @@ export default function CourseExterneFormSync() {
       return;
     }
 
+    // ── Garde-fou >25 km : aucune course ne doit partir avec prix nul ou ambigu ──
+    // Pour le BF (Grand Ouaga), si la distance tarifaire dépasse 25 km, le tarif
+    // automatique est null. Le client DOIT saisir un prix personnalisé avant dispatch.
+    if (!isMulti && isPaysTarificationGrandOuaga(courseCountryCode)) {
+      const tarif = formData._tarifGrandOuaga;
+      const isHorsTarif = tarif && tarif.prix === null;
+      const prixClientSaisi = Number(formData.prix_propose) || 0;
+      if (isHorsTarif && prixClientSaisi <= 0) {
+        toast.error("Distance supérieure à 25 km — vous devez saisir un prix personnalisé avant de créer la course.");
+        setIsSubmitting(false);
+        return;
+      }
+    }
+
     const nbColis = isDeplacement ? 1 : (formData.nb_colis || 1);
     const isMulti = isExpedie && nbColis > 1;
 

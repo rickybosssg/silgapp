@@ -300,6 +300,16 @@ export default function AdminCourseForm() {
         return;
       }
 
+      // ── Garde-fou >25 km : aucune course admin ne doit partir avec prix nul ──
+      if (isPaysTarificationGrandOuaga(countryCode) && prixApproximatif?.prix === null) {
+        const prixAdminSaisi = prixProposeAdmin ? Number(prixProposeAdmin) : 0;
+        if (prixAdminSaisi <= 0) {
+          toast.error("Distance supérieure à 25 km — vous devez saisir un prix personnalisé avant de créer la course.");
+          setSubmitting(false);
+          return;
+        }
+      }
+
       const courseData = {
         country_code: countryCode,
         source: "admin",

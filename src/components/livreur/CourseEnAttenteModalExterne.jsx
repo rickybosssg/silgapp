@@ -3,6 +3,7 @@ import { MapPin, Navigation, Check, X, Package, Clock, Ruler, AlertCircle } from
 import { base44 } from "@/api/base44Client";
 import { cn } from "@/lib/utils";
 import ManualPriceModal from "./ManualPriceModal";
+import { isPaysTarificationGrandOuaga } from "@/lib/tarifGrandOuaga";
 import { stopUrgentCourseAlert, useUrgentCourseAlert } from "@/lib/livreurUrgentAlert";
 
 function haversine(lat1, lon1, lat2, lon2) {
@@ -133,6 +134,14 @@ export default function CourseEnAttenteModalExterne({
 
   const handleAccepterClick = () => {
     if (isSubmitting) return;
+    // ── Garde-fou Grand Ouaga (BF) : tarif fixe, pas de prix manuel livreur ──
+    // Les courses BF utilisant la tarification Grand Ouaga ont un prix fixe
+    // (1250 / 1750 F) ou personnalisé admin (>25 km). Le livreur ne peut pas
+    // proposer son propre prix.
+    if (isPaysTarificationGrandOuaga(course?.country_code)) {
+      handleAccepterAuto();
+      return;
+    }
     // Si mode manuel → afficher le modal de saisie du prix d'abord
     if (pricingMode === "manual") {
       setShowManualPriceModal(true);

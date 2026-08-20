@@ -33,7 +33,41 @@ Deno.serve(async (req) => {
         prix_final: course.prix_final || course.prix_propose_admin || null,
       });
     }
+
+    // Déterminer le pays de la course — PAS de fallback BF arbitraire
+    const countryCode = course.country_code;
+    if (!countryCode) {
+      return Response.json({ error: 'country_code manquant sur la course — impossible de calculer le prix' }, { status: 400 });
+    }
+
+    // ── Charger la commission du pays AVANT tout garde-fou qui l'utilise ──
+    // (Correction TDZ : commissionPct était utilisé avant sa déclaration)
+    let tarif = { ...FALLBACK_TARIF };
+    let commissionPct = null;
+    try {
+      const c = await chargerConfigPays(base44, countryCode);
+      if (c) {
+        tarif = {
+          prix_par_km: c.prix_par_km ?? FALLBACK_TARIF.prix_par_km,
+          prix_minimum: c.prix_minimum ?? FALLBACK_TARIF.prix_minimum,
+          devise: c.devise || FALLBACK_TARIF.devise,
+        };
+        commissionPct = normalizeCommissionPct(c.commission_pct);
+      }
+    } catch (_) {
+      // Fallback silencieux — le blocage commissionPct === null empêche un prix erroné
+    }
+
+    if (commissionPct === null) {
+      return Response.json({
+        error: `Commission non configuree pour le pays ${countryCode}`,
+        blocked_reason: 'missing_country_commission_pct',
+      }, { status: 400 });
+    }
+
     // ── Garde-fou Client : prix_propose_client est la source de vérité si défini ──
+    // Le prix Client/Admin retenu reste intact ; seule la commission 20 % et le
+    // montant livreur sont calculés dessus.
     if (course.pricing_mode === 'manual' && course.prix_propose_client && course.prix_propose_client > 0) {
       const prixRetenu = course.prix_final || course.prix_propose_client;
       const commissionSilga = Math.round(prixRetenu * (commissionPct / 100));
@@ -61,36 +95,6 @@ Deno.serve(async (req) => {
     if (!hasDepart || !hasArrivee) {
       return Response.json({
         error: 'Positions GPS départ/arrivée de la course manquantes'
-      }, { status: 400 });
-    }
-
-    // Déterminer le pays de la course — PAS de fallback BF arbitraire
-    const countryCode = course.country_code;
-    if (!countryCode) {
-      return Response.json({ error: 'country_code manquant sur la course — impossible de calculer le prix' }, { status: 400 });
-    }
-
-    // Récupérer la config depuis la DB (Country) — aucune valeur codée en dur
-    let tarif = { ...FALLBACK_TARIF };
-    let commissionPct = null;
-    try {
-      const c = await chargerConfigPays(base44, countryCode);
-      if (c) {
-        tarif = {
-          prix_par_km: c.prix_par_km ?? FALLBACK_TARIF.prix_par_km,
-          prix_minimum: c.prix_minimum ?? FALLBACK_TARIF.prix_minimum,
-          devise: c.devise || FALLBACK_TARIF.devise,
-        };
-        commissionPct = normalizeCommissionPct(c.commission_pct);
-      }
-    } catch (_) {
-      // Fallback silencieux — le blocage commissionPct === null empêche un prix erroné
-    }
-
-    if (commissionPct === null) {
-      return Response.json({
-        error: `Commission non configuree pour le pays ${countryCode}`,
-        blocked_reason: 'missing_country_commission_pct',
       }, { status: 400 });
     }
 
