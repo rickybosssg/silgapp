@@ -126,10 +126,14 @@ Deno.serve(async (req) => {
       country_code: livreur.country_code,
     });
 
-    // ── Marquer les courses concernées comme payées (si solde soldé) ──
-    if (nouveauSolde <= 0 && coursesConcernees.length > 0) {
+    // ── Marquer les courses comme payées (si solde soldé) ──
+    if (nouveauSolde <= 0) {
+      // Solde à 0 → marquer TOUTES les courses impayées comme payées
+      // (pas seulement celles de coursesConcernees — la FIFO peut en exclure
+      // quand le montant ne "couvre" pas toutes les commissions, mais le
+      // solde est quand même à 0 donc tout est réglé)
       await base44.asServiceRole.entities.CourseExterne.updateMany(
-        { id: { $in: coursesConcernees } },
+        { livreur_id, statut: 'livree', statut_paiement_livreur: 'non_paye' },
         { $set: { statut_paiement_livreur: 'paye', heure_paiement: now } }
       );
     } else if (course_id) {
