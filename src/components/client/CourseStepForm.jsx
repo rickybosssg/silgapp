@@ -229,13 +229,25 @@ export default function CourseStepForm({
   const isRecevoir = formData.type_course === "recevoir";
   const isDeplacement = formData.type_course === "deplacement";
 
-  // ── Pré-remplir le prix proposé avec le tarif Grand Ouaga (ORS) pour le BF ──
+  // ── Source unique : calcul ORS Grand Ouaga (BF uniquement) ──────────────
+  // Un SEUL appel ORS par paire de coordonnées. Le résultat complet est
+  // stocké dans formData._tarifGrandOuaga et réutilisé par CourseExterneFormSync.
   const prixManuelModifie = useRef(false);
+  const derniereCleCoords = useRef("");
+  const [recalculerDisponible, setRecalculerDisponible] = useState(false);
+
   useEffect(() => {
     if (!isPaysTarificationGrandOuaga(activeCountry)) return;
-    if (prixManuelModifie.current) return;
     if (!formData.gps_depart_lat || !formData.gps_depart_lng ||
         !formData.gps_arrivee_lat || !formData.gps_arrivee_lng) return;
+
+    const cleCoords = `${formData.gps_depart_lat},${formData.gps_depart_lng},${formData.gps_arrivee_lat},${formData.gps_arrivee_lng}`;
+
+    // Si les coordonnées ont changé après une modif manuelle → proposer recalcul
+    if (prixManuelModifie.current && derniereCleCoords.current && derniereCleCoords.current !== cleCoords) {
+      setRecalculerDisponible(true);
+      return;
+    }
 
     let cancelled = false;
     calculerTarifGrandOuagaAsync(
@@ -245,11 +257,19 @@ export default function CourseStepForm({
       formData.gps_depart_source,
       formData.gps_arrivee_source
     ).then((tarif) => {
-      if (cancelled || !tarif || !tarif.prix) return;
-      setFormData(prev => ({
-        ...prev,
-        prix_propose: tarif.prix,
-      }));
+      if (cancelled || !tarif) return;
+      derniereCleCoords.current = cleCoords;
+      // Ne pas écraser le prix si l'utilisateur l'a modifié manuellement
+      if (!prixManuelModifie.current) {
+        setFormData(prev => ({
+          ...prev,
+          prix_propose: tarif.prix || prev.prix_propose,
+          _tarifGrandOuaga: tarif,
+        }));
+      } else {
+        // Garder le résultat pour CourseExterneFormSync, mais ne pas écraser le prix
+        setFormData(prev => ({ ...prev, _tarifGrandOuaga: tarif }));
+      }
     }).catch(() => {});
 
     return () => { cancelled = true; };
@@ -257,6 +277,27 @@ export default function CourseStepForm({
       formData.gps_arrivee_lat, formData.gps_arrivee_lng,
       formData.gps_depart_source, formData.gps_arrivee_source,
       activeCountry]);
+
+  // ── Recalculer le tarif après modif manuelle + changement de coordonnées ──
+  const handleRecalculerTarif = async () => {
+    if (!formData.gps_depart_lat || !formData.gps_arrivee_lat) return;
+    const tarif = await calculerTarifGrandOuagaAsync(
+      formData.gps_depart_lat, formData.gps_depart_lng,
+      formData.gps_arrivee_lat, formData.gps_arrivee_lng,
+      activeCountry,
+      formData.gps_depart_source,
+      formData.gps_arrivee_source
+    );
+    if (tarif?.prix) {
+      prixManuelModifie.current = false;
+      setRecalculerDisponible(false);
+      setFormData(prev => ({
+        ...prev,
+        prix_propose: tarif.prix,
+        _tarifGrandOuaga: tarif,
+      }));
+    }
+  };
 
   // ─── Titre de l'étape courante ──────────────────────────────────────────────
   const stepTitles = isExpedie

@@ -22,15 +22,36 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Course introuvable' }, { status: 404 });
     }
 
-    // ── Garde-fou : ne JAMAIS recalculer le prix des courses admin_manuel ──
-    // Le prix proposé (prix_propose_admin) est la source de vérité unique.
+    // ── Garde-fou : ne JAMAIS recalculer le prix si un humain l'a déjà défini ──
+    // Protège : admin_manuel (admin), prix_propose_client (client), prix_final (confirmé)
     if (course.pricing_mode === 'admin_manuel' || course.source === 'admin') {
       return Response.json({
         success: false,
         skipped: true,
         reason: 'admin_manuel_price_locked',
-        message: 'Le prix de cette course est défini par l\'admin/client — recalcul automatique désactivé.',
+        message: 'Le prix de cette course est défini par l\'admin — recalcul automatique désactivé.',
         prix_final: course.prix_final || course.prix_propose_admin || null,
+      });
+    }
+    // ── Garde-fou Client : prix_propose_client est la source de vérité si défini ──
+    if (course.pricing_mode === 'manual' && course.prix_propose_client && course.prix_propose_client > 0) {
+      const prixRetenu = course.prix_final || course.prix_propose_client;
+      const commissionSilga = Math.round(prixRetenu * (commissionPct / 100));
+      const montantLivreur = prixRetenu - commissionSilga;
+      const courseUpdated = await base44.asServiceRole.entities.CourseExterne.update(course_id, {
+        prix_final: prixRetenu,
+        commission_silga: commissionSilga,
+        montant_livreur: montantLivreur,
+        statut: 'livree',
+        heure_livraison: new Date().toISOString(),
+      });
+      return Response.json({
+        success: true,
+        course: courseUpdated,
+        prix_final: prixRetenu,
+        commission_silga: commissionSilga,
+        montant_livreur: montantLivreur,
+        prix_source: 'prix_propose_client_locked',
       });
     }
 

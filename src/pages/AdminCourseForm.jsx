@@ -100,6 +100,8 @@ export default function AdminCourseForm() {
   const [prixApproximatif, setPrixApproximatif] = useState(null);
   const [prixProposeAdmin, setPrixProposeAdmin] = useState("");
   const prixProposeManuelModifie = useRef(false);
+  const derniereCleCoordsAdmin = useRef("");
+  const [recalculerDisponibleAdmin, setRecalculerDisponibleAdmin] = useState(false);
 
   // ── Charger les quartiers du pays pour la résolution GPS de fallback ──
   useEffect(() => {
@@ -121,6 +123,13 @@ export default function AdminCourseForm() {
     if (!gpsDepart?.lat || !gpsDepart?.lng || !gpsArrivee?.lat || !gpsArrivee?.lng || !countryCode) {
       setPrixApproximatif(null);
       if (!prixProposeManuelModifie.current) setPrixProposeAdmin("");
+      return;
+    }
+
+    // Si les coordonnées ont changé après une modif manuelle → proposer recalcul
+    const cleCoords = `${gpsDepart.lat},${gpsDepart.lng},${gpsArrivee.lat},${gpsArrivee.lng}`;
+    if (prixProposeManuelModifie.current && derniereCleCoordsAdmin.current && derniereCleCoordsAdmin.current !== cleCoords) {
+      setRecalculerDisponibleAdmin(true);
       return;
     }
 
@@ -148,6 +157,7 @@ export default function AdminCourseForm() {
       if (cancelled) return;
 
       setPrixApproximatif(result);
+      derniereCleCoordsAdmin.current = cleCoords;
       if (!prixProposeManuelModifie.current) {
         setPrixProposeAdmin(result?.prix ? String(result.prix) : "");
       }
@@ -156,6 +166,30 @@ export default function AdminCourseForm() {
     compute();
     return () => { cancelled = true; };
   }, [gpsDepart, gpsArrivee, countryCode, gpsDepartSource, gpsArriveeSource]);
+
+  // ── Recalculer le tarif après modif manuelle + changement de coordonnées ──
+  const handleRecalculerTarifAdmin = async () => {
+    if (!gpsDepart?.lat || !gpsArrivee?.lat || !countryCode) return;
+    let result = null;
+    if (isPaysTarificationGrandOuaga(countryCode)) {
+      result = await calculerTarifGrandOuagaAsync(
+        gpsDepart.lat, gpsDepart.lng,
+        gpsArrivee.lat, gpsArrivee.lng,
+        countryCode, gpsDepartSource, gpsArriveeSource
+      );
+    } else {
+      result = calculerPrixApproximatif(
+        gpsDepart.lat, gpsDepart.lng,
+        gpsArrivee.lat, gpsArrivee.lng, countryCode
+      );
+    }
+    if (result?.prix) {
+      prixProposeManuelModifie.current = false;
+      setRecalculerDisponibleAdmin(false);
+      setPrixApproximatif(result);
+      setPrixProposeAdmin(String(result.prix));
+    }
+  };
 
   const fillFromTemplate = (template) => {
     setTypeCourse(template.type_course);
@@ -666,6 +700,25 @@ export default function AdminCourseForm() {
             </div>
           )}
         </div>
+
+        {/* ── Prompt recalcul tarif (coords changées après modif manuelle) ── */}
+        {recalculerDisponibleAdmin && (
+          <div className="flex items-center justify-between rounded-xl bg-blue-50 border border-blue-200 px-4 py-3">
+            <div className="flex items-center gap-2">
+              <Navigation className="w-4 h-4 text-blue-500 flex-shrink-0" />
+              <p className="text-[11px] font-semibold text-blue-700">
+                Coordonnées modifiées. Recalculer le tarif conseillé ?
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleRecalculerTarifAdmin}
+              className="px-3 py-1.5 rounded-lg bg-blue-500 text-white text-[11px] font-bold hover:bg-blue-600 transition-all"
+            >
+              Recalculer
+            </button>
+          </div>
+        )}
 
         {/* ── Prix de la course ── */}
         <div className="bg-white rounded-[1.5rem] border border-gray-100 shadow-lg shadow-gray-100/50 p-5 space-y-4">

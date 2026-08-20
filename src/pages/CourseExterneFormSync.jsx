@@ -588,7 +588,8 @@ export default function CourseExterneFormSync() {
       expediteurTel,
     });
 
-    // Calcul prix — sécurisé : uniquement si les 4 coordonnées GPS sont valides
+    // ── Calcul prix — SOURCE UNIQUE : formData._tarifGrandOuaga (déjà calculé par CourseStepForm) ──
+    // AUCUN re-appel ORS ici : le résultat est réutilisé depuis CourseStepForm.
     let prixEstime = 0;
     let distanceTarifaireKm = null;
     let distanceTarifaireSource = null;
@@ -597,18 +598,21 @@ export default function CourseExterneFormSync() {
       formData.gps_arrivee_lat && formData.gps_arrivee_lng
     ) {
       if (isPaysTarificationGrandOuaga(courseCountryCode)) {
-        // Tarification Grand Ouaga : ORS (distance routière) avec fallback Haversine
-        const tarif = await calculerTarifGrandOuagaAsync(
-          formData.gps_depart_lat, formData.gps_depart_lng,
-          formData.gps_arrivee_lat, formData.gps_arrivee_lng,
-          courseCountryCode,
-          formData.gps_depart_source,
-          formData.gps_arrivee_source
-        );
+        // Grand Ouaga : utiliser le résultat déjà calculé par CourseStepForm (ORS + cache)
+        const tarif = formData._tarifGrandOuaga;
         if (tarif) {
           prixEstime = tarif.prix || 0;
           distanceTarifaireKm = tarif.distanceKm;
           distanceTarifaireSource = tarif.distanceSource;
+        }
+        // Si pas de résultat pré-calculé (reload, deep link), fallback Haversine local
+        if (!tarif || prixEstime === 0) {
+          const distance = calculerDistance(
+            formData.gps_depart_lat, formData.gps_depart_lng,
+            formData.gps_arrivee_lat, formData.gps_arrivee_lng
+          );
+          prixEstime = Math.max(Math.round(distance * 100), 1000);
+          distanceTarifaireSource = "haversine_fallback";
         }
       } else {
         const distance = calculerDistance(
@@ -746,12 +750,14 @@ export default function CourseExterneFormSync() {
       gps_arrivee_lng: isMulti ? null : (arriveeGps?.lng || null),
       gps_arrivee_source: isMulti ? null : (arriveeGps?.source || null),
       destination_inconnue: destInconnue,
+      // prix_estimate = prix automatique conseillé par SILGAPP (jamais modifié par l'utilisateur)
+      // prix_propose_client = prix réellement choisi par le client (formData.prix_propose)
       prix_estimate: isMulti ? 0 : prixEstime,
-      prix_propose_admin: isMulti ? 0 : (formData.prix_propose || prixEstime),
-      prix_propose_client: isMulti ? 0 : (formData.prix_propose || 0),
+      prix_propose_admin: 0, // Jamais défini par le client — réservé à l'admin
+      prix_propose_client: isMulti ? 0 : (formData.prix_propose || prixEstime),
       distance_tarifaire_km: isMulti ? null : distanceTarifaireKm,
       distance_tarifaire_source: isMulti ? null : distanceTarifaireSource,
-      pricing_mode: isMulti ? "automatic" : "admin_manuel",
+      pricing_mode: isMulti ? "automatic" : (formData.prix_propose && formData.prix_propose !== prixEstime ? "manual" : "automatic"),
       statut: formData.date_souhaitee ? "programmee" : "recherche_livreur",
       dispatch_status: "en_attente",
       date_souhaitee: formData.date_souhaitee || null,
