@@ -89,18 +89,35 @@ Deno.serve(async (req) => {
 
     const distanceReelle = haversineKm(lat1, lng1, lat2, lng2) ?? 0;
 
-    // Calculer le prix final selon les tarifs du pays (100% depuis Country)
-    const prixBrut = distanceReelle * tarif.prix_par_km;
-    const prixFinal = Math.max(Math.round(prixBrut), tarif.prix_minimum);
+    // ── Déterminer le prix finalement retenu ──────────────────────────────
+    // Règle : ne JAMAIS écraser un prix déjà modifié par le client ou l'admin.
+    //   1. prix_final (déjà confirmé) → source de vérité
+    //   2. prix_propose_client (client a modifié) → utiliser tel quel
+    //   3. Sinon → calcul automatique (distance × prix_par_km, min prix_minimum)
+    let prixRetenu;
+    let prixSource;
 
-    // Commission Silga et montant livreur
-    const commissionSilga = Math.round(prixFinal * (commissionPct / 100));
-    const montantLivreur = prixFinal - commissionSilga;
+    if (course.prix_final && course.prix_final > 0) {
+      prixRetenu = course.prix_final;
+      prixSource = 'prix_final_existant';
+    } else if (course.prix_propose_client && course.prix_propose_client > 0) {
+      prixRetenu = course.prix_propose_client;
+      prixSource = 'prix_propose_client';
+    } else {
+      // Calcul automatique uniquement si aucun prix humain n'a été défini
+      const prixBrut = distanceReelle * tarif.prix_par_km;
+      prixRetenu = Math.max(Math.round(prixBrut), tarif.prix_minimum);
+      prixSource = 'calcul_automatique';
+    }
+
+    // Commission Silga et montant livreur — calculés sur le prix finalement retenu
+    const commissionSilga = Math.round(prixRetenu * (commissionPct / 100));
+    const montantLivreur = prixRetenu - commissionSilga;
 
     // Mettre à jour la course
     const courseUpdated = await base44.asServiceRole.entities.CourseExterne.update(course_id, {
       distance_reelle_km: distanceReelle,
-      prix_final: prixFinal,
+      prix_final: prixRetenu,
       commission_silga: commissionSilga,
       montant_livreur: montantLivreur,
       statut: 'livree',
@@ -129,9 +146,10 @@ Deno.serve(async (req) => {
       devise: tarif.devise,
       distance_km: distanceReelle.toFixed(2),
       prix_par_km: tarif.prix_par_km,
-      prix_final: prixFinal,
+      prix_final: prixRetenu,
       commission_silga: commissionSilga,
       montant_livreur: montantLivreur,
+      prix_source: prixSource,
     });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });

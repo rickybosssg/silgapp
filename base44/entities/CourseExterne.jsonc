@@ -189,6 +189,18 @@
     "distance_reelle_km": {
       "type": "number"
     },
+    "distance_tarifaire_km": {
+      "type": "number",
+      "description": "Distance routi\u00e8re ORS (ou fallback Haversine) utilis\u00e9e pour d\u00e9terminer le tarif Grand Ouaga. Calcul\u00e9e une seule fois \u00e0 la cr\u00e9ation. Distincte de distance_reelle_km qui sert \u00e0 d'autres usages."
+    },
+    "distance_tarifaire_source": {
+      "type": "string",
+      "enum": [
+        "ors",
+        "haversine_fallback"
+      ],
+      "description": "Source de la distance tarifaire : ors (route r\u00e9elle OpenRouteService) ou haversine_fallback (ORS indisponible). Permet de savoir si le tarif a \u00e9t\u00e9 calcul\u00e9 avec une route r\u00e9elle ou un fallback."
+    },
     "devise": {
       "type": "string",
       "default": "FCFA"

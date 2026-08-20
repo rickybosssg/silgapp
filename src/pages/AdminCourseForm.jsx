@@ -15,6 +15,7 @@ import SmartAddressPicker from "@/components/crm/SmartAddressPicker";
 import { upsertCourseAddresses } from "@/lib/addressBook";
 import { upsertClientsFromCourseContacts, normalizePhone } from "@/lib/crmUtils";
 import { calculerPrixApproximatif } from "@/lib/priceEstimate";
+import { isPaysTarificationGrandOuaga, calculerTarifGrandOuagaAsync } from "@/lib/tarifGrandOuaga";
 import { resolveGpsForCourse, isGpsValid, GPS_BLOCK_MESSAGE } from "@/lib/gpsResolution";
 
 function generarQRData() {
@@ -114,22 +115,47 @@ export default function AdminCourseForm() {
   const selectedPays = PAYS.find(p => p.code === countryCode);
 
   // ── Calcul automatique du prix approximatif dès que le GPS est connu ──
+  // Tarification Grand Ouaga : utilise ORS (distance routière) pour le BF,
+  // fallback Haversine pour les autres pays.
   useEffect(() => {
-    if (gpsDepart?.lat && gpsDepart?.lng && gpsArrivee?.lat && gpsArrivee?.lng && countryCode) {
-      const result = calculerPrixApproximatif(
-        gpsDepart.lat, gpsDepart.lng,
-        gpsArrivee.lat, gpsArrivee.lng,
-        countryCode
-      );
-      setPrixApproximatif(result);
-      if (!prixProposeManuelModifie.current) {
-        setPrixProposeAdmin(result ? String(result.prix) : "");
-      }
-    } else {
+    if (!gpsDepart?.lat || !gpsDepart?.lng || !gpsArrivee?.lat || !gpsArrivee?.lng || !countryCode) {
       setPrixApproximatif(null);
       if (!prixProposeManuelModifie.current) setPrixProposeAdmin("");
+      return;
     }
-  }, [gpsDepart, gpsArrivee, countryCode]);
+
+    let cancelled = false;
+
+    const compute = async () => {
+      let result = null;
+
+      if (isPaysTarificationGrandOuaga(countryCode)) {
+        result = await calculerTarifGrandOuagaAsync(
+          gpsDepart.lat, gpsDepart.lng,
+          gpsArrivee.lat, gpsArrivee.lng,
+          countryCode,
+          gpsDepartSource,
+          gpsArriveeSource
+        );
+      } else {
+        result = calculerPrixApproximatif(
+          gpsDepart.lat, gpsDepart.lng,
+          gpsArrivee.lat, gpsArrivee.lng,
+          countryCode
+        );
+      }
+
+      if (cancelled) return;
+
+      setPrixApproximatif(result);
+      if (!prixProposeManuelModifie.current) {
+        setPrixProposeAdmin(result?.prix ? String(result.prix) : "");
+      }
+    };
+
+    compute();
+    return () => { cancelled = true; };
+  }, [gpsDepart, gpsArrivee, countryCode, gpsDepartSource, gpsArriveeSource]);
 
   const fillFromTemplate = (template) => {
     setTypeCourse(template.type_course);
@@ -268,6 +294,8 @@ export default function AdminCourseForm() {
         pricing_mode: "admin_manuel",
         prix_estimate: prixApproximatif?.prix || 0,
         prix_propose_admin: prixProposeAdmin ? Number(prixProposeAdmin) : (prixApproximatif?.prix || 0),
+        distance_tarifaire_km: prixApproximatif?.distanceKm || null,
+        distance_tarifaire_source: prixApproximatif?.distanceSource || null,
         tracking_token: trackingToken,
         tracking_link: trackingLink,
         pickup_qr_token: pickupQrToken,
@@ -655,9 +683,13 @@ export default function AdminCourseForm() {
             {prixApproximatif ? (
               <div className="text-right">
                 <p className="text-xl font-black text-amber-700">
-                  {prixApproximatif.prix.toLocaleString()} <span className="text-xs font-bold">{prixApproximatif.devise}</span>
+                  {prixApproximatif.prix ? prixApproximatif.prix.toLocaleString() : "—"} <span className="text-xs font-bold">{prixApproximatif.devise}</span>
                 </p>
-                <p className="text-[10px] text-amber-400 mt-0.5">{prixApproximatif.distance} km</p>
+                <p className="text-[10px] text-amber-400 mt-0.5">
+                  {prixApproximatif.distanceKm || prixApproximatif.distance} km
+                  {prixApproximatif.distanceSource === "ors" && " (route)"}
+                  {prixApproximatif.distanceSource === "haversine_fallback" && " (vol d'oiseau)"}
+                </p>
               </div>
             ) : (
               <p className="text-[10px] text-gray-400 italic max-w-[140px] text-right">

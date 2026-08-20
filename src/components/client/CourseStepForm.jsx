@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,6 +12,7 @@ import {
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
 import { calculerPrixApproximatif } from "@/lib/priceEstimate";
+import { isPaysTarificationGrandOuaga, calculerTarifGrandOuagaAsync } from "@/lib/tarifGrandOuaga";
 import CarnetAdresses from "@/components/client/CarnetAdresses";
 import ContactPickerButton from "@/components/client/ContactPickerButton";
 import { SILGAPP_COUNTRIES, phoneVariants } from "@/lib/phoneUtils";
@@ -227,6 +228,35 @@ export default function CourseStepForm({
   const isExpedie = formData.type_course === "expedier";
   const isRecevoir = formData.type_course === "recevoir";
   const isDeplacement = formData.type_course === "deplacement";
+
+  // ── Pré-remplir le prix proposé avec le tarif Grand Ouaga (ORS) pour le BF ──
+  const prixManuelModifie = useRef(false);
+  useEffect(() => {
+    if (!isPaysTarificationGrandOuaga(activeCountry)) return;
+    if (prixManuelModifie.current) return;
+    if (!formData.gps_depart_lat || !formData.gps_depart_lng ||
+        !formData.gps_arrivee_lat || !formData.gps_arrivee_lng) return;
+
+    let cancelled = false;
+    calculerTarifGrandOuagaAsync(
+      formData.gps_depart_lat, formData.gps_depart_lng,
+      formData.gps_arrivee_lat, formData.gps_arrivee_lng,
+      activeCountry,
+      formData.gps_depart_source,
+      formData.gps_arrivee_source
+    ).then((tarif) => {
+      if (cancelled || !tarif || !tarif.prix) return;
+      setFormData(prev => ({
+        ...prev,
+        prix_propose: tarif.prix,
+      }));
+    }).catch(() => {});
+
+    return () => { cancelled = true; };
+  }, [formData.gps_depart_lat, formData.gps_depart_lng,
+      formData.gps_arrivee_lat, formData.gps_arrivee_lng,
+      formData.gps_depart_source, formData.gps_arrivee_source,
+      activeCountry]);
 
   // ─── Titre de l'étape courante ──────────────────────────────────────────────
   const stepTitles = isExpedie
@@ -1016,7 +1046,10 @@ export default function CourseStepForm({
                   type="number"
                   inputMode="numeric"
                   value={formData.prix_propose || ""}
-                  onChange={(e) => setFormData({ ...formData, prix_propose: parseInt(e.target.value) || 0 })}
+                  onChange={(e) => {
+                    prixManuelModifie.current = true;
+                    setFormData({ ...formData, prix_propose: parseInt(e.target.value) || 0 });
+                  }}
                   className="h-16 rounded-xl border-2 bg-white px-4 text-2xl font-black text-center pr-20 focus:outline-none"
                   style={{ borderColor: COLORS.borderInput }}
                   placeholder="1500"

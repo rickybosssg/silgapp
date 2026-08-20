@@ -12,6 +12,7 @@ import LivreurRechercheAnimation from "@/components/client/LivreurRechercheAnima
 import InvitationWhatsAppModal from "@/components/client/InvitationWhatsAppModal";
 import { normalizePhone, phoneVariants } from "@/lib/phoneUtils";
 import { resolveGpsForCourse, GPS_BLOCK_MESSAGE } from "@/lib/gpsResolution";
+import { isPaysTarificationGrandOuaga, calculerTarifGrandOuagaAsync } from "@/lib/tarifGrandOuaga";
 
 // Génère les IDs de colis : A, B, C...
 const COLIS_LETTERS = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"];
@@ -589,16 +590,34 @@ export default function CourseExterneFormSync() {
 
     // Calcul prix — sécurisé : uniquement si les 4 coordonnées GPS sont valides
     let prixEstime = 0;
+    let distanceTarifaireKm = null;
+    let distanceTarifaireSource = null;
     if (
       formData.gps_depart_lat && formData.gps_depart_lng &&
       formData.gps_arrivee_lat && formData.gps_arrivee_lng
     ) {
-      const distance = calculerDistance(
-        formData.gps_depart_lat, formData.gps_depart_lng,
-        formData.gps_arrivee_lat, formData.gps_arrivee_lng
-      );
-      // Règle : prix minimum SILGAPP = 1 000 F CFA
-      prixEstime = Math.max(Math.round(distance * 100), 1000);
+      if (isPaysTarificationGrandOuaga(courseCountryCode)) {
+        // Tarification Grand Ouaga : ORS (distance routière) avec fallback Haversine
+        const tarif = await calculerTarifGrandOuagaAsync(
+          formData.gps_depart_lat, formData.gps_depart_lng,
+          formData.gps_arrivee_lat, formData.gps_arrivee_lng,
+          courseCountryCode,
+          formData.gps_depart_source,
+          formData.gps_arrivee_source
+        );
+        if (tarif) {
+          prixEstime = tarif.prix || 0;
+          distanceTarifaireKm = tarif.distanceKm;
+          distanceTarifaireSource = tarif.distanceSource;
+        }
+      } else {
+        const distance = calculerDistance(
+          formData.gps_depart_lat, formData.gps_depart_lng,
+          formData.gps_arrivee_lat, formData.gps_arrivee_lng
+        );
+        // Règle : prix minimum SILGAPP = 1 000 F CFA
+        prixEstime = Math.max(Math.round(distance * 100), 1000);
+      }
     }
 
     // Pour "recevoir" : la destination = position du client destinataire (jamais inconnue)
@@ -730,6 +749,8 @@ export default function CourseExterneFormSync() {
       prix_estimate: isMulti ? 0 : prixEstime,
       prix_propose_admin: isMulti ? 0 : (formData.prix_propose || prixEstime),
       prix_propose_client: isMulti ? 0 : (formData.prix_propose || 0),
+      distance_tarifaire_km: isMulti ? null : distanceTarifaireKm,
+      distance_tarifaire_source: isMulti ? null : distanceTarifaireSource,
       pricing_mode: isMulti ? "automatic" : "admin_manuel",
       statut: formData.date_souhaitee ? "programmee" : "recherche_livreur",
       dispatch_status: "en_attente",
