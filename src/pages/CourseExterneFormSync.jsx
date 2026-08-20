@@ -657,13 +657,26 @@ export default function CourseExterneFormSync() {
       quartiers: quartiersList,
     });
 
+    // ── Gestion des ambiguïtés : ne jamais choisir silencieusement ──
+    if (departGps?.ambiguous) {
+      const names = departGps.suggestions.map(s => s.nom).join(", ");
+      toast.error(`Point de départ ambigu : plusieurs quartiers correspondent (${names}). Sélectionnez-en un dans la liste.`);
+      setIsSubmitting(false);
+      return;
+    }
+    if (!isMulti && arriveeGps?.ambiguous) {
+      const names = arriveeGps.suggestions.map(s => s.nom).join(", ");
+      toast.error(`Point d'arrivée ambigu : plusieurs quartiers correspondent (${names}). Sélectionnez-en un dans la liste.`);
+      setIsSubmitting(false);
+      return;
+    }
     // Blocage si aucun GPS disponible (sauf multi-colis où chaque colis a son propre GPS)
-    if (!departGps) {
+    if (!departGps || !departGps.lat) {
       toast.error(`Point de départ : ${GPS_BLOCK_MESSAGE}`);
       setIsSubmitting(false);
       return;
     }
-    if (!isMulti && !arriveeGps) {
+    if (!isMulti && (!arriveeGps || !arriveeGps.lat)) {
       toast.error(`Point d'arrivée : ${GPS_BLOCK_MESSAGE}`);
       setIsSubmitting(false);
       return;
@@ -707,9 +720,9 @@ export default function CourseExterneFormSync() {
       quartier_arrivee: formData.quartier_arrivee || null,
       type_colis: isDeplacement ? "autre" : (isMulti ? (colis[0]?.type_colis || "petit_colis") : formData.type_colis),
       notes: formData.notes,
-      gps_depart_lat: departGps.lat,
-      gps_depart_lng: departGps.lng,
-      gps_depart_source: departGps.source,
+      gps_depart_lat: departGps?.lat || null,
+      gps_depart_lng: departGps?.lng || null,
+      gps_depart_source: departGps?.source || null,
       gps_arrivee_lat: isMulti ? null : (arriveeGps?.lat || null),
       gps_arrivee_lng: isMulti ? null : (arriveeGps?.lng || null),
       gps_arrivee_source: isMulti ? null : (arriveeGps?.source || null),

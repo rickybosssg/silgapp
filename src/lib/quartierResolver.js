@@ -130,11 +130,10 @@ export function resolveQuartier(input, quartiers) {
   if (fuzzyMatches.length === 1) {
     return { match: fuzzyMatches[0].quartier, ambiguous: false, suggestions: [fuzzyMatches[0].quartier] };
   }
-  if (fuzzyMatches.length > 1 && fuzzyMatches[0].distance < fuzzyMatches[1].distance) {
-    // Un match clairement meilleur que les autres
-    return { match: fuzzyMatches[0].quartier, ambiguous: false, suggestions: [fuzzyMatches[0].quartier] };
-  }
   if (fuzzyMatches.length > 1) {
+    // CRITIQUE : Ne jamais choisir silencieusement entre plusieurs matchs.
+    // Même si un match est meilleur, si les coordonnées sont très différentes,
+    // l'utilisateur doit choisir explicitement.
     return { match: null, ambiguous: true, suggestions: fuzzyMatches.map((f) => f.quartier) };
   }
 

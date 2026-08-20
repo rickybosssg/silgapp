@@ -35,6 +35,11 @@ export function resolveGpsForCourse({ exactLat, exactLng, quartierName, quartier
   // B — Quartier reconnu → utiliser ses coordonnées
   if (quartierName && quartiers && quartiers.length > 0) {
     const result = resolveQuartier(quartierName, quartiers);
+    if (result.ambiguous) {
+      // CRITIQUE : Ambiguïté détectée — ne jamais choisir automatiquement.
+      // L'appelant doit afficher les suggestions et demander à l'utilisateur de choisir.
+      return { ambiguous: true, suggestions: result.suggestions };
+    }
     if (result.match && result.match.latitude && result.match.longitude) {
       return {
         lat: result.match.latitude,

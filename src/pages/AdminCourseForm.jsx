@@ -216,12 +216,25 @@ export default function AdminCourseForm() {
         quartiers,
       });
 
-      if (!departGps) {
+      // ── Gestion des ambiguïtés : ne jamais choisir silencieusement ──
+      if (departGps?.ambiguous) {
+        const names = departGps.suggestions.map(s => s.nom).join(", ");
+        toast.error(`Point de départ ambigu : plusieurs quartiers correspondent (${names}). Sélectionnez-en un dans la liste.`);
+        setSubmitting(false);
+        return;
+      }
+      if (arriveeGps?.ambiguous) {
+        const names = arriveeGps.suggestions.map(s => s.nom).join(", ");
+        toast.error(`Point d'arrivée ambigu : plusieurs quartiers correspondent (${names}). Sélectionnez-en un dans la liste.`);
+        setSubmitting(false);
+        return;
+      }
+      if (!departGps || !departGps.lat) {
         toast.error(`Point de départ : ${GPS_BLOCK_MESSAGE}`);
         setSubmitting(false);
         return;
       }
-      if (!arriveeGps) {
+      if (!arriveeGps || !arriveeGps.lat) {
         toast.error(`Point d'arrivée : ${GPS_BLOCK_MESSAGE}`);
         setSubmitting(false);
         return;
@@ -235,12 +248,12 @@ export default function AdminCourseForm() {
         adresse_arrivee: adresseArrivee.trim() || "—",
         quartier_depart: quartierDepart || null,
         quartier_arrivee: quartierArrivee || null,
-        gps_depart_lat: departGps.lat,
-        gps_depart_lng: departGps.lng,
-        gps_depart_source: departGps.source,
-        gps_arrivee_lat: arriveeGps.lat,
-        gps_arrivee_lng: arriveeGps.lng,
-        gps_arrivee_source: arriveeGps.source,
+        gps_depart_lat: departGps?.lat || null,
+        gps_depart_lng: departGps?.lng || null,
+        gps_depart_source: departGps?.source || null,
+        gps_arrivee_lat: arriveeGps?.lat || null,
+        gps_arrivee_lng: arriveeGps?.lng || null,
+        gps_arrivee_source: arriveeGps?.source || null,
         client_nom: clientNom.trim() || "Client",
         client_telephone: clientTel,
         contact_createur_course: contactCreateurCourse,

@@ -68,10 +68,16 @@ export default function QuartierSelect({
     return searchQuartiers(query, quartiers, 50);
   }, [query, quartiers]);
 
-  // ── Auto-remplir le GPS quand un quartier connu est matché ──
+  // ── Auto-remplir le GPS quand un quartier est sélectionné ──
+  // Si ambigu : ne PAS remplir le GPS, l'utilisateur doit choisir explicitement.
   const tryAutoFillGps = (nom) => {
     if (!nom || !onGpsSelect) return;
     const result = resolveQuartier(nom, quartiers);
+    if (result.ambiguous) {
+      // Ambiguïté : ne pas choisir automatiquement, effacer le GPS
+      onGpsSelect(null);
+      return;
+    }
     if (result.match && result.match.latitude && result.match.longitude) {
       onGpsSelect({ lat: result.match.latitude, lng: result.match.longitude });
     }
@@ -82,7 +88,12 @@ export default function QuartierSelect({
     setShowSuggestions(false);
     setHighlightIndex(-1);
     onChange(nom);
-    tryAutoFillGps(nom);
+    // Quand l'utilisateur sélectionne explicitement dans la liste,
+    // on utilise les coordonnées de ce quartier précis (pas ambigu)
+    const selected = quartiers.find(q => q.nom === nom);
+    if (selected && selected.latitude && selected.longitude && onGpsSelect) {
+      onGpsSelect({ lat: selected.latitude, lng: selected.longitude });
+    }
   };
 
   const handleChange = (e) => {
