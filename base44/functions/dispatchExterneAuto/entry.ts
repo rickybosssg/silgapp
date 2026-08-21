@@ -318,14 +318,21 @@ Deno.serve(async (req) => {
         return Response.json({ success: false, error: 'Course expirée', expired: true });
       }
 
-      // Prix minimum dynamique selon le pays
-      let PRIX_MIN = 1000; // default FCFA
+      // Prix minimum dynamique selon le pays — BLOQUANT si non configuré (sécurité)
+      let PRIX_MIN: number | null = null;
       try {
         const countryConfig = await chargerConfigPays(base44, course.country_code);
-        if (countryConfig?.prix_minimum) {
+        if (countryConfig?.prix_minimum && countryConfig.prix_minimum > 0) {
           PRIX_MIN = countryConfig.prix_minimum;
         }
-      } catch (_) { /* fallback 1000 FCFA */ }
+      } catch (_) {}
+      if (PRIX_MIN === null) {
+        return Response.json({
+          success: false,
+          error: `Prix minimum non configuré pour le pays ${course.country_code}`,
+          blocked_reason: 'missing_country_prix_minimum',
+        }, { status: 400 });
+      }
       const deviseMin = course.devise || 'FCFA';
 
       if (pricing_mode === 'manual') {
@@ -405,7 +412,8 @@ Deno.serve(async (req) => {
         updateData.manual_price = Number(manual_price);
         updateData.manual_price_status = 'pending_client_validation';
         updateData.proposed_by_livreur_id = livreur_id;
-        updateData.timeout_expires_at = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+        const dispatchConfig = await chargerConfigDispatch(base44);
+        updateData.timeout_expires_at = new Date(Date.now() + dispatchConfig.manualPriceTimeoutSec * 1000).toISOString();
       }
 
       // 🛡️ CHECK FINAL ATOMIQUE ANTI-DOUBLON — juste avant l'updateMany, on refait

@@ -88,6 +88,21 @@
       "default": 5000,
       "description": "Seuil d'encours maximum avant blocage automatique du livreur (en devise locale)"
     },
+    "seuil_alerte_encours_pct": {
+      "type": "number",
+      "default": 80,
+      "description": "Pourcentage du seuil d'encours \u00e0 partir duquel une alerte est envoy\u00e9e au livreur (d\u00e9faut 80%)"
+    },
+    "gps_expire_seuil_min": {
+      "type": "number",
+      "default": 30,
+      "description": "D\u00e9lai maximum (en minutes) avant qu'un GPS livreur soit consid\u00e9r\u00e9 comme expir\u00e9 c\u00f4t\u00e9 backend. Un livreur avec GPS > cette valeur est exclu du dispatch (sauf prioritaires). D\u00e9faut 30 min."
+    },
+    "gps_max_stale_min": {
+      "type": "number",
+      "default": 120,
+      "description": "D\u00e9lai maximum (en minutes) avant exclusion d\u00e9finitive du dispatch pour GPS trop ancien. Au-del\u00e0, m\u00eame les livreurs non-prioritaires avec GPS sont exclus. D\u00e9faut 120 min (2h)."
+    },
     "ville_principale": {
       "type": "string",
       "description": "Ville principale d'op\u00e9ration (ex: Ouagadougou, Abidjan)"

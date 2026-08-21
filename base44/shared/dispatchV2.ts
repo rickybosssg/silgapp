@@ -31,9 +31,10 @@
 // VERSION: 2026-08-11 — Version stable figée. Ne pas modifier sans validation.
 
 import { waitUntil } from 'base44:runtime';
-import { STATUTS_ACTIFS_COURSE, STATUTS_TERMINAUX_COURSE, calculerDistance } from './dispatchConstants.ts';
+import { STATUTS_ACTIFS_COURSE, STATUTS_TERMINAUX_COURSE, calculerDistance, chargerConfigPays } from './dispatchConstants.ts';
 import { dispatchLog, reponseDejaPrise, generateToken, generatePIN, journaliserDispatch } from './dispatchUtils.ts';
 import { enregistrerNotification, getLivreursNotifies, getLivreursRefuses, marquerAccepte } from './dispatchNotifications.ts';
+import { chargerConfigDispatch } from './dispatchConfig.ts';
 
 // ── Version du bundle (pour vérifier que la production charge la dernière version) ──
 export const DISPATCH_V2_BUNDLE_VERSION = '2026-08-17-fix-en-attente-accept';
@@ -335,8 +336,13 @@ export async function accepterCourseV2(base44: any, courseId: string, livreurId:
     return { success: false, error: 'Course expirée', expired: true };
   }
 
-  // 7. Prix minimum
-  const isManual = pricing_mode === 'manual' && manual_price && Number(manual_price) >= 1000;
+  // 7. Prix minimum — dynamique selon le pays (bloquant si non configuré)
+  const countryConfig = await chargerConfigPays(base44, course.country_code);
+  const PRIX_MIN = countryConfig?.prix_minimum ?? null;
+  if (PRIX_MIN === null) {
+    return { success: false, error: `Prix minimum non configuré pour le pays ${course.country_code}`, blocked_reason: 'missing_country_prix_minimum' };
+  }
+  const isManual = pricing_mode === 'manual' && manual_price && Number(manual_price) >= PRIX_MIN;
 
   // 8. Tokens/PINs (préserver existants)
   const pickupToken = course.pickup_qr_token || generateToken();
@@ -370,7 +376,8 @@ export async function accepterCourseV2(base44: any, courseId: string, livreurId:
     updateData.manual_price = Number(manual_price);
     updateData.manual_price_status = 'pending_client_validation';
     updateData.proposed_by_livreur_id = livreurId;
-    updateData.timeout_expires_at = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+    const dispatchConfig = await chargerConfigDispatch(base44);
+    updateData.timeout_expires_at = new Date(Date.now() + dispatchConfig.manualPriceTimeoutSec * 1000).toISOString();
   }
 
   // Le statut constitue le verrou atomique. Ne pas filtrer livreur_id avec une

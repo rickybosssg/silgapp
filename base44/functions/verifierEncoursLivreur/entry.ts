@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
 import { emitDriverDebtThreshold } from '../../shared/venusAdminEventBus.ts';
+import { chargerConfigPays } from '../../shared/dispatchConstants.ts';
 
 /**
  * Vérifie l'encours d'un livreur après chaque course terminée.
@@ -70,15 +71,23 @@ Deno.serve(async (req) => {
       return Response.json({ success: true, skipped: true, reason: 'deja_bloque' });
     }
 
-    // Récupérer le seuil du pays
+    // Récupérer le seuil du pays — BLOQUANT si non configuré (sécurité financière)
     const countryCode = course.country_code || livreur.country_code;
     if (!countryCode) {
       return Response.json({ success: false, error: 'Code pays manquant' }, { status: 400 });
     }
 
-    const countries = await base44.asServiceRole.entities.Country.filter({ code: countryCode, actif: true });
-    const seuil = countries?.[0]?.seuil_encours_max || 5000;
-    const devise = countries?.[0]?.devise || 'FCFA';
+    const countryConfig = await chargerConfigPays(base44, countryCode);
+    const seuil = countryConfig?.seuil_encours_max ?? null;
+    if (seuil === null || seuil <= 0) {
+      return Response.json({
+        success: false,
+        error: `Seuil d'encours non configuré pour le pays ${countryCode}`,
+        blocked_reason: 'missing_country_seuil_encours_max',
+      }, { status: 400 });
+    }
+    const devise = countryConfig?.devise || 'FCFA';
+    const seuilAlertePct = countryConfig?.seuil_alerte_encours_pct ?? 80;
 
     // Calculer la commission de cette course
     let commission = 0;
