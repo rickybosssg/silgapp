@@ -16,7 +16,16 @@
         "type": "string"
       },
       "default": [],
-      "description": "Tableau des User.id autorisés à lire ce message. Résolu côté backend depuis la conversation parente. Sert de base à la RLS read/update."
+      "description": "Tableau des User.id autoris\u00e9s \u00e0 lire ce message. R\u00e9solu c\u00f4t\u00e9 backend depuis la conversation parente. Sert de base \u00e0 la RLS read/update quand security_status=secured."
+    },
+    "security_status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "secured"
+      ],
+      "default": "pending",
+      "description": "Statut de s\u00e9curit\u00e9. pending = cr\u00e9ation non s\u00e9curis\u00e9e (seul le cr\u00e9ateur peut lire via created_by_id). secured = participant_user_ids r\u00e9solu c\u00f4t\u00e9 backend (seuls les participants peuvent lire). Toute cr\u00e9ation directe via SDK d\u00e9marre en pending \u2014 l'automation backfillMessageParticipants passe en secured apr\u00e8s validation."
     },
     "sender_type": {
       "type": "string",
@@ -42,7 +51,7 @@
     },
     "client_message_id": {
       "type": "string",
-      "description": "Clé idempotente générée par le client pour empêcher les doublons d'envoi"
+      "description": "Cl\u00e9 idempotente g\u00e9n\u00e9r\u00e9e par le client pour emp\u00eacher les doublons d'envoi"
     },
     "message_type": {
       "type": "string",
@@ -71,7 +80,7 @@
     },
     "transcription_brute": {
       "type": "string",
-      "description": "Transcription brute avant nettoyage (ce que Whisper/Gemini a reellement retourne) — pour diagnostic"
+      "description": "Transcription brute avant nettoyage (ce que Whisper/Gemini a reellement retourne) \u2014 pour diagnostic"
     },
     "transcription_confidence": {
       "type": "number",
@@ -162,10 +171,24 @@
     "read": {
       "$or": [
         {
-          "data.participant_user_ids": "{{user.id}}"
+          "$and": [
+            {
+              "data.security_status": "secured"
+            },
+            {
+              "data.participant_user_ids": "{{user.id}}"
+            }
+          ]
         },
         {
-          "created_by_id": "{{user.id}}"
+          "$and": [
+            {
+              "data.security_status": "pending"
+            },
+            {
+              "created_by_id": "{{user.id}}"
+            }
+          ]
         },
         {
           "user_condition": {
@@ -178,10 +201,14 @@
     "update": {
       "$or": [
         {
-          "data.participant_user_ids": "{{user.id}}"
-        },
-        {
-          "created_by_id": "{{user.id}}"
+          "$and": [
+            {
+              "data.security_status": "secured"
+            },
+            {
+              "data.participant_user_ids": "{{user.id}}"
+            }
+          ]
         },
         {
           "user_condition": {
