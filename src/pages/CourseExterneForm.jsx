@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card } from "@/components/ui/card";
 import { ArrowLeft, MapPin, Navigation, AlertCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { getCountryTarifConfig } from "@/lib/priceEstimate";
+import { getCountryTarifConfig, haversineKm } from "@/lib/priceEstimate";
 
 export default function CourseExterneForm() {
   const location = useLocation();
@@ -111,16 +111,7 @@ export default function CourseExterneForm() {
       return;
     }
 
-    const R = 6371;
-    const dLat = ((formData.gps_arrivee_lat - formData.gps_depart_lat) * Math.PI) / 180;
-    const dLon = ((formData.gps_arrivee_lng - formData.gps_depart_lng) * Math.PI) / 180;
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos((formData.gps_depart_lat * Math.PI) / 180) *
-      Math.cos((formData.gps_arrivee_lat * Math.PI) / 180) *
-      Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    const distanceEstimee = R * c;
+    const distanceEstimee = haversineKm(formData.gps_depart_lat, formData.gps_depart_lng, formData.gps_arrivee_lat, formData.gps_arrivee_lng) || 0;
     const tarif = getCountryTarifConfig(courseCountryCode);
     const prixEstime = Math.round(distanceEstimee * (tarif.prix_par_km || 100));
 

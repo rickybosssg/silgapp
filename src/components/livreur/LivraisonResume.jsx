@@ -2,22 +2,7 @@ import React, { useState, useEffect } from "react";
 import { MapPin, Navigation, Clock, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
-
-/**
- * Calcule la distance entre 2 points GPS (formule Haversine)
- */
-function calculerDistance(lat1, lon1, lat2, lon2) {
-  const R = 6371; // Rayon terre en km
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) *
-    Math.cos((lat2 * Math.PI) / 180) *
-    Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-}
+import { haversineKm } from "@/lib/priceEstimate";
 
 export default function LivraisonResume({
   course,
@@ -34,7 +19,7 @@ export default function LivraisonResume({
     if (!gpsDepart || !gpsArrivee) return;
 
     // Calcul distance
-    const dist = calculerDistance(
+    const dist = haversineKm(
       gpsDepart.lat,
       gpsDepart.lng,
       gpsArrivee.lat,
