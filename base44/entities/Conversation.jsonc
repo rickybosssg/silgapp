@@ -12,7 +12,7 @@
         "type": "string"
       },
       "default": [],
-      "description": "Tableau des User.id autoris\u00e9s \u00e0 acc\u00e9der \u00e0 cette conversation. R\u00e9solu c\u00f4t\u00e9 backend UNIQUEMENT (jamais fourni par le frontend). Sert de base \u00e0 la RLS read/update."
+      "description": "Tableau des User.id autorisés à accéder à cette conversation. Résolu côté backend UNIQUEMENT (jamais fourni par le frontend). Sert de base à la RLS read/update."
     },
     "last_message": {
       "type": "string"
@@ -115,19 +115,23 @@
           "data.participant_user_ids": "{{user.id}}"
         },
         {
+          "created_by_id": "{{user.id}}"
+        },
+        {
           "user_condition": {
             "role": "admin"
           }
         }
       ]
     },
-    "create": {
-      "data.participant_user_ids": "{{user.id}}"
-    },
+    "create": {},
     "update": {
       "$or": [
         {
           "data.participant_user_ids": "{{user.id}}"
+        },
+        {
+          "created_by_id": "{{user.id}}"
         },
         {
           "user_condition": {
