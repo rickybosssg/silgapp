@@ -35,7 +35,7 @@ function cleanPhone(phone, countryCode) {
   let digits = (phone || "").replace(/\D/g, "");
   if (!digits) return "";
 
-  const dial = COUNTRY_DIAL_CODE[countryCode] || "226";
+  const dial = COUNTRY_DIAL_CODE[countryCode] || "";
 
   // Déjà au format international (commence par l'indicatif)
   if (digits.startsWith(dial) && digits.length >= dial.length + 6) return digits;
@@ -77,7 +77,7 @@ export default function AdminCourseForm() {
   const [typeCourse, setTypeCourse] = useState("expedier");
   const [adresseDepart, setAdresseDepart] = useState("");
   const [adresseArrivee, setAdresseArrivee] = useState("");
-  const [countryCode, setCountryCode] = useState(adminCountryCode || "BF");
+  const [countryCode, setCountryCode] = useState(adminCountryCode || "");
 
   const [clientNom, setClientNom] = useState("");
   const [clientTelephone, setClientTelephone] = useState("");
@@ -221,6 +221,10 @@ export default function AdminCourseForm() {
   };
 
   const handleSubmit = async () => {
+    if (!countryCode) {
+      toast.error("Le pays est obligatoire. Sélectionnez un pays avant de créer la course (COUNTRY_REQUIRED).");
+      return;
+    }
     setSubmitting(true);
     try {
       const { pickupQrToken, deliveryQrToken, pickupCode4, deliveryCode4 } = generarQRData();

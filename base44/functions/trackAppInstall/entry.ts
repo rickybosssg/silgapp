@@ -31,7 +31,7 @@ Deno.serve(async (req) => {
     await base44.asServiceRole.entities.AppInstall.create({
       device_id,
       platform,
-      country_code: country_code || 'BF',
+      country_code: country_code || 'INCONNU',
       first_opened_at: now,
       last_seen_at: now,
       app_version: app_version || null,

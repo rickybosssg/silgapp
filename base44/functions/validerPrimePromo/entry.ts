@@ -119,7 +119,7 @@ Deno.serve(async (req) => {
       prix_course: prixFinal,
       reduction_client: PRIME_FIXE,
       prime_proprietaire: PRIME_FIXE,
-      country_code: course.country_code || 'BF',
+      country_code: course.country_code || null,
       statut: 'validee',
       validee_at: new Date().toISOString(),
     });

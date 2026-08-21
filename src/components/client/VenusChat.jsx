@@ -223,7 +223,7 @@ export default function VenusChat({ onClose, countryContext }) {
               conversation_id: conversationId,
               user_id: userEmail || "anonymous",
               user_type: detectedUserType,
-              country_code: countryContext?.code || "BF",
+              country_code: countryContext?.code || null,
               ville: countryContext?.ville || "",
               question: userQuestion,
               reponse: lastAssistant.content.substring(0, 500),

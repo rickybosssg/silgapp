@@ -35,6 +35,10 @@ export default function FeedbackModal({ clientProfil, onClose }) {
       toast.error("Sélectionnez une note");
       return;
     }
+    if (!clientProfil?.country_code) {
+      toast.error("Pays introuvable — impossible de créer un feedback sans pays (COUNTRY_REQUIRED).");
+      return;
+    }
     setLoading(true);
     try {
       await base44.entities.Feedback.create({
@@ -45,7 +49,7 @@ export default function FeedbackModal({ clientProfil, onClose }) {
         note,
         categorie,
         commentaire: commentaire || null,
-        country_code: clientProfil?.country_code || "BF",
+        country_code: clientProfil?.country_code || null,
         statut: "nouveau",
       });
       setDone(true);

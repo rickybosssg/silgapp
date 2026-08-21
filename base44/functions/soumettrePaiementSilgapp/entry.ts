@@ -12,6 +12,10 @@ Deno.serve(async (req) => {
       return Response.json({ success: false, error: 'Champs manquants' }, { status: 400 });
     }
 
+    if (!country_code) {
+      return Response.json({ success: false, error: 'COUNTRY_REQUIRED: Le pays est obligatoire pour créer un paiement' }, { status: 400 });
+    }
+
     if (request_id) {
       const existing = await base44.asServiceRole.entities.PaiementSilgapp.filter({ request_id }, '-created_date', 1);
       if (existing?.[0]) return Response.json({ success: true, paiement: existing[0], duplicate: true });
@@ -34,7 +38,7 @@ Deno.serve(async (req) => {
       request_id: request_id || crypto.randomUUID(),
       statut: 'en_attente',
       date_envoi: new Date().toISOString(),
-      country_code: country_code || 'BF',
+      country_code,
     });
 
     return Response.json({ success: true, paiement });

@@ -127,7 +127,7 @@ export default function CitiesTab() {
 function CityForm({ initial, countries, onSave, onCancel }) {
   const [form, setForm] = useState({
     id: initial?.id,
-    country_code: initial?.country_code || 'BF',
+    country_code: initial?.country_code || '',
     nom: initial?.nom || '',
     nom_alternatif: initial?.nom_alternatif || '',
     type_zone: initial?.type_zone || 'ville',
@@ -203,7 +203,12 @@ function CityForm({ initial, countries, onSave, onCancel }) {
         </div>
         <div className="flex gap-2 justify-end">
           <Button variant="outline" onClick={onCancel}><X className="w-4 h-4 mr-2" /> Annuler</Button>
-          <Button onClick={() => onSave(form)}><Save className="w-4 h-4 mr-2" /> Enregistrer</Button>
+          <Button
+            onClick={() => {
+              if (!form.country_code) { alert('Le pays est obligatoire (COUNTRY_REQUIRED)'); return; }
+              onSave(form);
+            }}
+          ><Save className="w-4 h-4 mr-2" /> Enregistrer</Button>
         </div>
       </CardContent>
     </Card>

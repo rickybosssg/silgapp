@@ -76,6 +76,10 @@ export default function SupportClient() {
 
   const handleCreate = () => {
     if (!sujet.trim() || !message.trim()) return;
+    if (!clientProfil?.country_code) {
+      toast.error("Pays introuvable — impossible de créer un ticket sans pays (COUNTRY_REQUIRED).");
+      return;
+    }
     createMutation.mutate({
       sujet: sujet.trim(),
       message: message.trim(),
@@ -84,7 +88,7 @@ export default function SupportClient() {
       client_nom: clientProfil?.nom || "",
       client_telephone: clientProfil?.telephone || "",
       client_email: userEmail || "",
-      country_code: clientProfil?.country_code || "BF",
+      country_code: clientProfil?.country_code || null,
     });
   };
 

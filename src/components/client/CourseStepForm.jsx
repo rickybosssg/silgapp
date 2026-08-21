@@ -217,8 +217,8 @@ export default function CourseStepForm({
   savedLat,
   savedLng,
 }) {
-  const activeCountry = countryCode || "BF";
-  const phonePlaceholder = getPhonePlaceholder(activeCountry);
+  const activeCountry = countryCode || "";
+  const phonePlaceholder = activeCountry ? getPhonePlaceholder(activeCountry) : "";
   const [expediteurFound, setExpediteurFound] = useState(null);
   const [destinataireFound, setDestinataireFound] = useState(null);
   const [verifying, setVerifying] = useState(false);
@@ -1359,6 +1359,16 @@ export default function CourseStepForm({
 
   const isLastStep = step === totalSteps - 1;
   const currentStepTitle = stepTitles[step] || "";
+
+  if (!activeCountry) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+        <AlertCircle className="w-10 h-10 text-amber-500 mb-3" />
+        <p className="text-sm font-semibold text-gray-900">Pays requis</p>
+        <p className="text-xs text-gray-500 mt-1">Impossible de déterminer le pays. L'opération ne peut pas continuer sans pays explicite (COUNTRY_REQUIRED).</p>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full">
