@@ -9,6 +9,7 @@ import { useHeartbeat } from "@/hooks/useHeartbeat";
 import { useGPSNatif } from "@/hooks/useGPSNatif";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
+import { haversineKm } from "@/lib/priceEstimate";
 
 import { registerPushToken, subscribeToNotifications, consumePendingNotificationData } from "@/lib/notifications";
 import { usePushTokenRetry } from "@/hooks/usePushTokenRetry";
@@ -47,16 +48,7 @@ import {
 } from "@/lib/livreurCourseState";
 import CoursesDisponibles from "@/components/livreur/CoursesDisponibles";
 
-// Haversine — utilisée aussi pour le calcul de prix
-function haversineKm(lat1, lng1, lat2, lng2) {
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lng2 - lng1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
+// haversineKm importé depuis priceEstimate (source canonique)
 
 const saveLivreur = (id, data) => base44.functions.invoke('updateLivreur', { id, data });
 

@@ -8,6 +8,7 @@ import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import CourseStepForm from "@/components/client/CourseStepForm";
 import { sauvegarderContactDB } from "@/components/client/CarnetAdresses";
+import { haversineKm } from "@/lib/priceEstimate";
 import LivreurRechercheAnimation from "@/components/client/LivreurRechercheAnimation";
 import InvitationWhatsAppModal from "@/components/client/InvitationWhatsAppModal";
 import { normalizePhone, phoneVariants } from "@/lib/phoneUtils";
@@ -39,15 +40,7 @@ function createColisDefaults(nb) {
   }));
 }
 
-// Haversine
-function haversineKm(lat1, lng1, lat2, lng2) {
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lng2 - lng1) * Math.PI) / 180;
-  const a = Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
+// haversineKm importé depuis priceEstimate (source canonique)
 
 const STORAGE_KEY = "silgapp_course_draft";
 const STEP_KEY = "silgapp_course_step";
