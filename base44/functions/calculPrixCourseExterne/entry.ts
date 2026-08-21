@@ -1,6 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
 import { haversineKm } from '../../shared/geoUtils.ts';
-import { normalizeCommissionPct, chargerConfigPays } from '../../shared/dispatchConstants.ts';
+import { normalizeCommissionPct, chargerConfigPays, chargerTarifZone } from '../../shared/dispatchConstants.ts';
 
 // ⚠️ Aucun tarif codé en dur — tous les paramètres proviennent de l'entité Country.
 // Fallback générique unique (ne suppose aucun pays) utilisé uniquement si la BDD
@@ -140,9 +140,41 @@ Deno.serve(async (req) => {
       prixSource = 'prix_propose_client';
     } else {
       // Calcul automatique uniquement si aucun prix humain n'a été défini
-      const prixBrut = distanceReelle * tarif.prix_par_km;
-      prixRetenu = Math.max(Math.round(prixBrut), tarif.prix_minimum);
-      prixSource = 'calcul_automatique';
+      // 1. TarifZone (paliers) si le pays a une zone tarifaire configurée
+      // 2. Sinon : distance × prix_par_km (formule générique Country)
+      const tarifZone = await chargerTarifZone(base44, countryCode, course.ville_arrivee || course.ville_depart);
+      if (tarifZone) {
+        const distTarif = course.distance_tarifaire_km || distanceReelle;
+        const sourcesApprox = ['quartier', 'geocodage'];
+        const approx = sourcesApprox.includes(course.gps_depart_source) || sourcesApprox.includes(course.gps_arrivee_source);
+        const palier1KmMax = tarifZone.palier_1_km_max;
+        const palier2KmMax = tarifZone.palier_2_km_max;
+        const tolMin = tarifZone.tolerance_min_km;
+        const tolMax = tarifZone.tolerance_max_km;
+        const seuilStrict = tarifZone.seuil_strict_km;
+
+        if (distTarif > palier2KmMax) {
+          return Response.json({
+            error: `Distance (${distTarif.toFixed(2)} km) supérieure à ${palier2KmMax} km — tarif personnalisé requis`,
+            blocked_reason: 'distance_exceeds_tarif_zone',
+          }, { status: 400 });
+        }
+
+        if (approx && distTarif >= tolMin && distTarif <= tolMax) {
+          prixRetenu = tarifZone.palier_1_prix;
+          prixSource = 'tarif_zone_palier_1_tolerance';
+        } else if (distTarif <= seuilStrict) {
+          prixRetenu = tarifZone.palier_1_prix;
+          prixSource = 'tarif_zone_palier_1';
+        } else {
+          prixRetenu = tarifZone.palier_2_prix;
+          prixSource = 'tarif_zone_palier_2';
+        }
+      } else {
+        const prixBrut = distanceReelle * tarif.prix_par_km;
+        prixRetenu = Math.max(Math.round(prixBrut), tarif.prix_minimum);
+        prixSource = 'calcul_automatique';
+      }
     }
 
     // Commission Silga et montant livreur — calculés sur le prix finalement retenu

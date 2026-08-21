@@ -30,7 +30,10 @@ const FALLBACK_CONFIG = {
 
 const CACHE_KEY = "silgapp_tarif_grand_ouaga";
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 min en mémoire
-const PERSIST_TTL_MS = 24 * 60 * 60 * 1000; // 24h en localStorage
+// Pas de TTL sur le cache localStorage : la dernière config connue reste
+// valide indéfiniment. Un téléphone jamais synchronisé utilisera la dernière
+// config reçue plutôt qu'un tarif figé dans l'APK. Le fallback hardcodé
+// n'est utilisé QUE si aucune config n'a JAMAIS été reçue.
 
 let memoryCache = null;
 let memoryCacheExpires = 0;
@@ -69,12 +72,14 @@ async function loadTarifConfig() {
     // Backend indisponible — essayer le cache persistant
   }
 
-  // 3. Cache persistant (localStorage) — hors-ligne
+  // 3. Cache persistant (localStorage) — hors-ligne, sans expiration
+  //    La dernière config connue reste valide indéfiniment. Le fallback
+  //    hardcodé n'est utilisé QUE si aucune config n'a jamais été reçue.
   try {
     const raw = localStorage.getItem(CACHE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (parsed.config && Date.now() - (parsed.saved_at || 0) < PERSIST_TTL_MS) {
+      if (parsed.config) {
         memoryCache = parsed.config;
         memoryCacheExpires = Date.now() + CACHE_TTL_MS;
         return parsed.config;
