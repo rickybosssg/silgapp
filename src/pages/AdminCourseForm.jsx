@@ -18,6 +18,25 @@ import { calculerPrixApproximatif } from "@/lib/priceEstimate";
 import { isPaysTarificationGrandOuaga, calculerTarifGrandOuagaAsync } from "@/lib/tarifGrandOuaga";
 import { resolveGpsForCourse, isGpsValid, GPS_BLOCK_MESSAGE } from "@/lib/gpsResolution";
 
+const DRAFT_KEY = "silgapp_admin_course_draft";
+
+function saveDraft(state) {
+  try {
+    sessionStorage.setItem(DRAFT_KEY, JSON.stringify(state));
+  } catch (_) {}
+}
+
+function loadDraft() {
+  try {
+    const raw = sessionStorage.getItem(DRAFT_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (_) { return null; }
+}
+
+function clearDraft() {
+  try { sessionStorage.removeItem(DRAFT_KEY); } catch (_) {}
+}
+
 function generarQRData() {
   const pickupQrToken = crypto.randomUUID().replace(/-/g, "");
   const deliveryQrToken = crypto.randomUUID().replace(/-/g, "");
@@ -79,6 +98,57 @@ export default function AdminCourseForm() {
   const prixProposeManuelModifie = useRef(false);
   const derniereCleCoordsAdmin = useRef("");
   const [recalculerDisponibleAdmin, setRecalculerDisponibleAdmin] = useState(false);
+  const skipNextSave = useRef(true);
+
+  // ── Persistance du brouillon : restauration après remount/rechargement ──
+  useEffect(() => {
+    console.log("[ADMIN_COURSE_FORM_MOUNT]");
+    const draft = loadDraft();
+    if (draft) {
+      console.log("[ADMIN_COURSE_DRAFT_RESTORED]", { clientTelephone: draft.clientTelephone });
+      if (draft.typeCourse) setTypeCourse(draft.typeCourse);
+      if (draft.adresseDepart) setAdresseDepart(draft.adresseDepart);
+      if (draft.adresseArrivee) setAdresseArrivee(draft.adresseArrivee);
+      if (draft.countryCode) setCountryCode(draft.countryCode);
+      if (draft.clientNom) setClientNom(draft.clientNom);
+      if (draft.clientTelephone) setClientTelephone(draft.clientTelephone);
+      if (draft.expediteurNom) setExpediteurNom(draft.expediteurNom);
+      if (draft.expediteurTelephone) setExpediteurTelephone(draft.expediteurTelephone);
+      if (draft.destinataireNom) setDestinataireNom(draft.destinataireNom);
+      if (draft.destinataireTelephone) setDestinataireTelephone(draft.destinataireTelephone);
+      if (draft.typeColis) setTypeColis(draft.typeColis);
+      if (draft.notes) setNotes(draft.notes);
+      if (draft.quartierDepart) setQuartierDepart(draft.quartierDepart);
+      if (draft.quartierArrivee) setQuartierArrivee(draft.quartierArrivee);
+      if (draft.gpsDepart) setGpsDepart(draft.gpsDepart);
+      if (draft.gpsArrivee) setGpsArrivee(draft.gpsArrivee);
+      if (draft.gpsDepartSource) setGpsDepartSource(draft.gpsDepartSource);
+      if (draft.gpsArriveeSource) setGpsArriveeSource(draft.gpsArriveeSource);
+      if (draft.prixProposeAdmin) setPrixProposeAdmin(draft.prixProposeAdmin);
+    }
+    return () => {
+      console.log("[ADMIN_COURSE_FORM_UNMOUNT]");
+    };
+  }, []);
+
+  // ── Sauvegarde automatique du brouillon (après restauration) ──
+  useEffect(() => {
+    if (skipNextSave.current) {
+      skipNextSave.current = false;
+      return;
+    }
+    saveDraft({
+      typeCourse, adresseDepart, adresseArrivee, countryCode,
+      clientNom, clientTelephone, expediteurNom, expediteurTelephone,
+      destinataireNom, destinataireTelephone, typeColis, notes,
+      quartierDepart, quartierArrivee, gpsDepart, gpsArrivee,
+      gpsDepartSource, gpsArriveeSource, prixProposeAdmin,
+    });
+  }, [typeCourse, adresseDepart, adresseArrivee, countryCode,
+      clientNom, clientTelephone, expediteurNom, expediteurTelephone,
+      destinataireNom, destinataireTelephone, typeColis, notes,
+      quartierDepart, quartierArrivee, gpsDepart, gpsArrivee,
+      gpsDepartSource, gpsArriveeSource, prixProposeAdmin]);
 
   // ── Charger les quartiers du pays pour la résolution GPS de fallback ──
   useEffect(() => {
@@ -200,6 +270,10 @@ export default function AdminCourseForm() {
   const handleSubmit = async () => {
     if (!countryCode) {
       toast.error("Le pays est obligatoire. Sélectionnez un pays avant de créer la course (COUNTRY_REQUIRED).");
+      return;
+    }
+    if (!clientTelephone.trim()) {
+      toast.error("Le numéro du client est obligatoire");
       return;
     }
     setSubmitting(true);
@@ -335,7 +409,11 @@ export default function AdminCourseForm() {
         destinataire_phone_normalized: finalDestinataireTel ? normalizePhone(finalDestinataireTel, countryCode) : null,
       };
 
-      const course = await base44.entities.CourseExterne.create(courseData);
+      const result = await base44.functions.invoke('creerCourseAdmin', courseData);
+      if (!result?.success || result?.error) {
+        throw new Error(result?.error || 'Erreur inconnue');
+      }
+      const course = result.course;
 
       // CRM - Créer ou mettre à jour les fiches pour les 3 contacts (sans stats)
       try {
@@ -357,6 +435,7 @@ export default function AdminCourseForm() {
 
       // Réinitialiser le formulaire pour permettre la création d'une autre course
       resetForm();
+      clearDraft();
     } catch (err) {
       toast.error("Erreur création: " + (err?.message || "inconnue"));
     } finally {
@@ -470,7 +549,7 @@ export default function AdminCourseForm() {
           <div className="flex items-center gap-2">
             <div className="w-1 h-4 bg-gradient-to-b from-sky-500 to-blue-500 rounded-full" />
             <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Contacts</p>
-            <span className="text-[10px] bg-sky-50 text-sky-600 px-2 py-0.5 rounded-full font-semibold border border-sky-100">Optionnel</span>
+            <span className="text-[10px] bg-rose-50 text-rose-600 px-2 py-0.5 rounded-full font-semibold border border-rose-100">Téléphone obligatoire</span>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -487,7 +566,10 @@ export default function AdminCourseForm() {
               <p className="text-[10px] text-gray-400 mb-1 font-semibold uppercase tracking-wide">Téléphone</p>
               <Input
                 value={clientTelephone}
-                onChange={e => setClientTelephone(e.target.value)}
+                onChange={e => {
+                  console.log("[CLIENT_PHONE_CHANGE]", `"${clientTelephone}" → "${e.target.value}"`);
+                  setClientTelephone(e.target.value);
+                }}
                 placeholder="+226 XX XX XX XX"
                 className="rounded-xl h-11 bg-blue-50 border-blue-200/60 text-sm focus:ring-blue-300/50 focus:border-blue-400"
               />
@@ -775,7 +857,7 @@ export default function AdminCourseForm() {
           <div className="absolute inset-0 bg-gradient-to-r from-rose-600 to-orange-500 rounded-2xl blur-md opacity-30" />
           <Button
             onClick={handleSubmit}
-            disabled={submitting}
+            disabled={submitting || !clientTelephone.trim()}
             className="relative w-full h-14 rounded-2xl gap-2.5 font-bold text-base bg-gradient-to-r from-rose-600 via-red-600 to-orange-500 hover:from-rose-700 hover:via-red-700 hover:to-orange-600 shadow-xl shadow-red-200/50 transition-all active:scale-[0.98] border border-white/10"
           >
             {submitting ? (
