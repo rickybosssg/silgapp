@@ -153,22 +153,24 @@ export function searchQuartiers(query, quartiers, limit = 50) {
   const normalizedQuery = normalizeQuartierName(query);
 
   if (!normalizedQuery) {
-    return quartiers.slice(0, limit);
+    return deduplicateByNomAffiche(quartiers).slice(0, limit);
   }
 
-  return quartiers
+  const scored = quartiers
     .map((q) => {
       const normNom = normalizeQuartierName(q.nom);
+      const normAffiche = normalizeQuartierName(q.nom_affiche || q.nom);
       let score = 0;
 
-      // Match exact normalisé
-      if (normNom === normalizedQuery) score = 100;
+      // Match exact normalisé (sur nom OU nom_affiche)
+      if (normNom === normalizedQuery || normAffiche === normalizedQuery) score = 100;
       // Commence par la requête
-      else if (normNom.startsWith(normalizedQuery)) score = 90;
+      else if (normNom.startsWith(normalizedQuery) || normAffiche.startsWith(normalizedQuery)) score = 90;
       // La requête est un token du nom
-      else if (normNom.split(" ").some((token) => token.startsWith(normalizedQuery))) score = 80;
+      else if (normNom.split(" ").some((token) => token.startsWith(normalizedQuery)) ||
+               normAffiche.split(" ").some((token) => token.startsWith(normalizedQuery))) score = 80;
       // Le nom contient la requête
-      else if (normNom.includes(normalizedQuery)) score = 60;
+      else if (normNom.includes(normalizedQuery) || normAffiche.includes(normalizedQuery)) score = 60;
       // Recherche dans les variantes
       else if (q.variantes) {
         const variantes = q.variantes.split(",").map((v) => v.trim()).filter(Boolean);
@@ -190,7 +192,43 @@ export function searchQuartiers(query, quartiers, limit = 50) {
       return { quartier: q, score };
     })
     .filter(({ score }) => score > 0)
-    .sort((a, b) => b.score - a.score || a.quartier.nom.localeCompare(b.quartier.nom, "fr"))
-    .slice(0, limit)
-    .map(({ quartier }) => quartier);
+    .sort((a, b) => b.score - a.score || a.quartier.nom.localeCompare(b.quartier.nom, "fr"));
+
+  // ── Dédupliquer par nom_affiche : une seule ligne visible par quartier parent ──
+  const seen = new Set();
+  const deduped = [];
+  for (const { quartier } of scored) {
+    const affiche = quartier.nom_affiche || quartier.nom;
+    const key = `${quartier.country_code || ""}|${normalizeQuartierName(affiche)}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      deduped.push(quartier);
+    }
+  }
+
+  return deduped.slice(0, limit);
+}
+
+/**
+ * Déduplique une liste de quartiers par nom_affiche.
+ * Garde le premier enregistrement (préférence: nom sans numéro, qui sort premier
+ * dans le tri alphabétique) pour chaque groupe.
+ */
+function deduplicateByNomAffiche(quartiers) {
+  const seen = new Set();
+  const deduped = [];
+  // Trier par nom_affiche puis par nom (le nom sans numéro sort avant le numéroté)
+  const sorted = [...quartiers].sort((a, b) =>
+    (a.nom_affiche || a.nom).localeCompare(b.nom_affiche || b.nom, "fr") ||
+    a.nom.localeCompare(b.nom, "fr")
+  );
+  for (const q of sorted) {
+    const affiche = q.nom_affiche || q.nom;
+    const key = `${q.country_code || ""}|${normalizeQuartierName(affiche)}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      deduped.push(q);
+    }
+  }
+  return deduped;
 }

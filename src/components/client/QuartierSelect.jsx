@@ -70,29 +70,40 @@ export default function QuartierSelect({
 
   // ── Auto-remplir le GPS quand un quartier est sélectionné ──
   // Si ambigu : ne PAS remplir le GPS, l'utilisateur doit choisir explicitement.
+  // Si le quartier fait partie d'un groupe (quartier_parent défini) : ne PAS
+  // auto-remplir le GPS — la position exacte doit venir du GPS client / carte.
   const tryAutoFillGps = (nom) => {
     if (!nom || !onGpsSelect) return;
     const result = resolveQuartier(nom, quartiers);
     if (result.ambiguous) {
-      // Ambiguïté : ne pas choisir automatiquement, effacer le GPS
       onGpsSelect(null);
       return;
     }
     if (result.match && result.match.latitude && result.match.longitude) {
-      onGpsSelect({ lat: result.match.latitude, lng: result.match.longitude });
+      if (result.match.quartier_parent) {
+        // Groupe de zones : le GPS du quartier n'est qu'un point de secours
+        onGpsSelect(null);
+      } else {
+        onGpsSelect({ lat: result.match.latitude, lng: result.match.longitude });
+      }
     }
   };
 
-  const handleSelect = (nom) => {
-    setQuery(nom);
+  const handleSelect = (quartier) => {
+    const displayName = quartier.nom_affiche || quartier.nom;
+    setQuery(displayName);
     setShowSuggestions(false);
     setHighlightIndex(-1);
-    onChange(nom);
-    // Quand l'utilisateur sélectionne explicitement dans la liste,
-    // on utilise les coordonnées de ce quartier précis (pas ambigu)
-    const selected = quartiers.find(q => q.nom === nom);
-    if (selected && selected.latitude && selected.longitude && onGpsSelect) {
-      onGpsSelect({ lat: selected.latitude, lng: selected.longitude });
+    onChange(displayName);
+    // Si le quartier fait partie d'un groupe (quartier_parent défini),
+    // ne pas auto-remplir le GPS — la position exacte doit venir du GPS client / carte.
+    // Sinon, utiliser les coordonnées de ce quartier comme point de secours.
+    if (onGpsSelect) {
+      if (quartier.quartier_parent) {
+        onGpsSelect(null);
+      } else if (quartier.latitude && quartier.longitude) {
+        onGpsSelect({ lat: quartier.latitude, lng: quartier.longitude });
+      }
     }
   };
 
@@ -114,9 +125,9 @@ export default function QuartierSelect({
       e.preventDefault();
       setHighlightIndex((prev) => (prev <= 0 ? suggestions.length - 1 : prev - 1));
     } else if (e.key === "Enter" && highlightIndex >= 0) {
-      e.preventDefault();
-      handleSelect(suggestions[highlightIndex].nom);
-    } else if (e.key === "Escape") {
+        e.preventDefault();
+        handleSelect(suggestions[highlightIndex]);
+      } else if (e.key === "Escape") {
       setShowSuggestions(false);
     }
   };
@@ -165,7 +176,7 @@ export default function QuartierSelect({
               <button
                 key={q.id || idx}
                 type="button"
-                onClick={() => handleSelect(q.nom)}
+                onClick={() => handleSelect(q)}
                 onMouseEnter={() => setHighlightIndex(idx)}
                 className={`flex items-center gap-2 w-full text-left px-4 py-2.5 text-sm transition-colors ${
                   idx === highlightIndex
@@ -174,7 +185,7 @@ export default function QuartierSelect({
                 } ${idx > 0 ? "border-t border-gray-50" : ""}`}
               >
                 <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                <span>{q.nom}</span>
+                <span>{q.nom_affiche || q.nom}</span>
                 {q.ville && (
                   <span className="text-[10px] text-gray-400 ml-auto">{q.ville}</span>
                 )}
