@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { resolveParticipantUserIds } from '../../shared/conversationSecurity.ts';
 
 /**
  * Démarre ou récupère une conversation entre un client et une pharmacie.
@@ -48,16 +49,19 @@ Deno.serve(async (req) => {
     }
 
     // ── Créer la conversation ──
-    const participants = JSON.stringify([
+    const participantsArray = [
       { type: 'partenaire', id: pharmacie_id, name: pharmacie.nom || 'Pharmacie' },
       { type: 'client', id: client.id, name: clientName },
-    ]);
+    ];
+
+    const { userIds: participantUserIds } = await resolveParticipantUserIds(base44, participantsArray);
 
     const conv = await asService.entities.Conversation.create({
-      participants,
+      participants: JSON.stringify(participantsArray),
       title: `${pharmacie.nom || 'Pharmacie'} · ${clientName}`,
       group_type: 'direct',
       last_message: '',
+      participant_user_ids: participantUserIds,
     });
 
     console.log(`[demarrerConversationPharmacie] ✅ Conversation créée: ${conv.id}`);

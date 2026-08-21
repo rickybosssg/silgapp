@@ -6,6 +6,14 @@
       "type": "string",
       "description": "JSON: [{type: 'client'|'livreur'|'admin'|'partenaire', id: string, name: string}]"
     },
+    "participant_user_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Tableau des User.id autoris\u00e9s \u00e0 acc\u00e9der \u00e0 cette conversation. R\u00e9solu c\u00f4t\u00e9 backend UNIQUEMENT (jamais fourni par le frontend). Sert de base \u00e0 la RLS read/update."
+    },
     "last_message": {
       "type": "string"
     },
@@ -99,5 +107,39 @@
   },
   "required": [
     "participants"
-  ]
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "data.participant_user_ids": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "create": {
+      "data.participant_user_ids": "{{user.id}}"
+    },
+    "update": {
+      "$or": [
+        {
+          "data.participant_user_ids": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
 }

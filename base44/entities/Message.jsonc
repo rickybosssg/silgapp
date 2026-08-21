@@ -10,6 +10,14 @@
       "type": "string",
       "description": "ID de la conversation"
     },
+    "participant_user_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Tableau des User.id autoris\u00e9s \u00e0 lire ce message. R\u00e9solu c\u00f4t\u00e9 backend depuis la conversation parente. Sert de base \u00e0 la RLS read/update."
+    },
     "sender_type": {
       "type": "string",
       "enum": [
@@ -149,5 +157,39 @@
     "sender_type",
     "sender_id",
     "sender_name"
-  ]
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "data.participant_user_ids": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "create": {
+      "data.participant_user_ids": "{{user.id}}"
+    },
+    "update": {
+      "$or": [
+        {
+          "data.participant_user_ids": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
 }
