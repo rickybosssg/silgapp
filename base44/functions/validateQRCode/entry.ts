@@ -1,13 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
-
-function haversine(lat1, lon1, lat2, lon2) {
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a = Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
+import { haversineKm } from '../../shared/geoUtils.ts';
 
 function normalizeCommissionPct(value) {
   const pct = Number(value);
@@ -193,9 +185,9 @@ Deno.serve(async (req) => {
         const lngRecupAdmin = course.longitude_recuperation;
         let distAdmin = null;
         if (course.gps_depart_lat && course.gps_depart_lng && course.gps_arrivee_lat && course.gps_arrivee_lng) {
-          distAdmin = haversine(course.gps_depart_lat, course.gps_depart_lng, course.gps_arrivee_lat, course.gps_arrivee_lng);
+          distAdmin = haversineKm(course.gps_depart_lat, course.gps_depart_lng, course.gps_arrivee_lat, course.gps_arrivee_lng);
         } else if (latRecupAdmin && lngRecupAdmin && latitude && longitude) {
-          distAdmin = haversine(latRecupAdmin, lngRecupAdmin, latitude, longitude);
+          distAdmin = haversineKm(latRecupAdmin, lngRecupAdmin, latitude, longitude);
         }
 
         const adminUpdateData = {
@@ -259,7 +251,7 @@ Deno.serve(async (req) => {
       // Si le trajet livreur est < 0.1 km (GPS n'a pas bougé, ex: PIN secours),
       // on retombe sur la distance tarifaire (adresse départ → arrivée)
       let distReelle = (latRecup && lngRecup && latLivr && lngLivr)
-        ? haversine(latRecup, lngRecup, latLivr, lngLivr)
+        ? haversineKm(latRecup, lngRecup, latLivr, lngLivr)
         : null;
       if (distReelle !== null && distReelle < 0.1) {
         distReelle = null; // trop petit → fallback sur distTarifaire
@@ -272,7 +264,7 @@ Deno.serve(async (req) => {
       const lngArrivee = course.gps_arrivee_lng;
 
       const distTarifaire = (latDepart && lngDepart && latArrivee && lngArrivee)
-        ? haversine(latDepart, lngDepart, latArrivee, lngArrivee)
+        ? haversineKm(latDepart, lngDepart, latArrivee, lngArrivee)
         : null;
 
       // Récupérer le tarif du pays depuis la DB (pour mode automatique uniquement)
@@ -330,7 +322,7 @@ Deno.serve(async (req) => {
         updateData.longitude_arrivee_livraison = longitude;
       } else if (latDepart && lngDepart && latArrivee && lngArrivee) {
         // ── MODE PRIX AUTOMATIQUE : calcul basé sur la distance ──
-        const dist = haversine(latDepart, lngDepart, latArrivee, lngArrivee);
+        const dist = haversineKm(latDepart, lngDepart, latArrivee, lngArrivee);
         const distArrondie = Math.max(Number(dist) || 0, 0.01);
 
         // Règle SILGAPP : ≤10km = 1000 F minimum, >10km = distance × 100 F (minimum 1000 F)

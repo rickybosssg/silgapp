@@ -34,15 +34,7 @@ async function chargerTarifPays(base44, countryCode) {
   return { prixParKm, prixMinimum };
 }
 
-function haversine(lat1, lon1, lat2, lon2) {
-  if (!lat1 || !lon1 || !lat2 || !lon2) return null;
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a = Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
+import { haversineKm } from '../../shared/geoUtils.ts';
 
 Deno.serve(async (req) => {
   try {
@@ -69,7 +61,7 @@ Deno.serve(async (req) => {
       // Règle métier : distance = GPS récupération → GPS livraison UNIQUEMENT
       if (course.latitude_recuperation && course.longitude_recuperation &&
           course.latitude_livraison && course.longitude_livraison) {
-        distanceKm = haversine(
+        distanceKm = haversineKm(
           course.latitude_recuperation, course.longitude_recuperation,
           course.latitude_livraison, course.longitude_livraison
         );

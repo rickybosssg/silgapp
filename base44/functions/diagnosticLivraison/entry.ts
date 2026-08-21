@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { haversineKm } from '../../shared/geoUtils.ts';
 
 Deno.serve(async (req) => {
   try {
