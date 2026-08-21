@@ -18,6 +18,7 @@ import {
   repondreWorkflow,
 } from '../../shared/venusWorkflowEngine.ts';
 import { getMaintenanceMode } from '../../shared/venusSupervisionEngine.ts';
+import { resolveParticipantUserIds } from '../../shared/conversationSecurity.ts';
 import {
   peutAgirSurAudio,
   genererMessageRepetitionAudio,
@@ -287,12 +288,16 @@ Deno.serve(async (req) => {
       }
       venusLog(`[WebhookVenus] ✅ ÉTAPE 2 — Conversation existante trouvée: ${conversation.id} | venus_active: ${conversation.venus_active} | from_number: ${fromNumber}`);
     } else {
-      const participants = JSON.stringify([
+      const participantsArray = [
         { type: 'client', id: normalizedTel, name: profileName || telephone },
         { type: 'admin', id: 'all', name: 'Admin SILGAPP' },
-      ]);
+      ];
+      const participants = JSON.stringify(participantsArray);
+      // ── Sécurité : résoudre participant_user_ids côté backend ──
+      const { userIds: convUserIds } = await resolveParticipantUserIds(base44, participantsArray);
       conversation = await base44.asServiceRole.entities.Conversation.create({
         participants,
+        participant_user_ids: convUserIds,
         title: profileName || telephone,
         whatsapp_phone: normalizedTel,
         silgapp_from_number: fromNumber,
@@ -367,6 +372,7 @@ Deno.serve(async (req) => {
 
     await base44.asServiceRole.entities.Message.create({
       conversation_id: conversation.id,
+      participant_user_ids: conversation.participant_user_ids || [],
       sender_type: 'client',
       sender_id: normalizedTel,
       sender_name: profileName || telephone,
@@ -1037,6 +1043,7 @@ Deno.serve(async (req) => {
     // ── 5. Créer le Message de réponse Venus ──
     await base44.asServiceRole.entities.Message.create({
       conversation_id: conversation.id,
+      participant_user_ids: conversation.participant_user_ids || [],
       sender_type: 'admin',
       sender_id: 'venus',
       sender_name: 'VENUS',
