@@ -107,14 +107,15 @@ async function notifierLivreursEligiblesV2(base44: any, course: any, options: an
   );
 
   // ── Créer les notifications utilisateur (inbox) ──
-  // Une seule Notification par livreur/course (idempotente via course_id + destinataire_email)
+  // Idempotence via deduplication_key = COURSE_DISPATCH_<courseId>_<livreurId>
+  // Deux événements différents (dispatch vs rappel vs attribution) utilisent des
+  // clés différentes. Un retry du même événement est bloqué.
   await Promise.allSettled(
     candidats.map((livreur: any) => {
       if (!livreur.user_email) return Promise.resolve();
+      const dedupKey = `COURSE_DISPATCH_${course.id}_${livreur.id}`;
       return base44.asServiceRole.entities.Notification.filter({
-        course_id: course.id,
-        destinataire_email: livreur.user_email,
-        type: 'nouvelle_course',
+        deduplication_key: dedupKey,
       }).then((existing: any) => {
         if (existing && existing.length > 0) return; // déjà notifié — pas de doublon
         return base44.asServiceRole.entities.Notification.create({
@@ -123,6 +124,7 @@ async function notifierLivreursEligiblesV2(base44: any, course: any, options: an
           type: 'nouvelle_course',
           course_id: course.id,
           destinataire_email: livreur.user_email,
+          deduplication_key: dedupKey,
           lue: false,
         });
       }).catch(() => {});
