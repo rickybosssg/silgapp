@@ -225,7 +225,15 @@ function EtapeProfil({ clientProfil, onSuccess }) {
             </div>
             <CountrySelect
               value={countryCode}
-              onChange={(code) => { setCountryCode(code); setTelAffiche(""); }}
+              onChange={(code) => {
+                setCountryCode(code);
+                // Tronquer l'affichage téléphone à la nouvelle longueur max du pays.
+                // La validation est recalculée immédiatement (re-render React).
+                const newCountry = countries.find(c => c.code === code);
+                const newMaxLen = newCountry?.phone_max_length || 8;
+                const digits = telAffiche.replace(/\D/g, "").slice(0, newMaxLen);
+                setTelAffiche(formaterAffichage(digits, newMaxLen));
+              }}
             />
           </div>
 

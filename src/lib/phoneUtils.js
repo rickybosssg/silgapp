@@ -99,8 +99,12 @@ export function extractLocalPhone(phone, countryCode = "") {
   }
 
   const maxLen = country.max_len || country.len || 8;
+  const minLen = country.min_len || country.len || 8;
 
-  if (digits.startsWith("0") && digits.length > maxLen) {
+  // Strip leading 0 (trunk prefix) si le résultat reste valide (>= minLen).
+  // Ex: Ghana "0241234567" (10) → "241234567" (9 >= 9) → strip ✓
+  //     CI "0701234567" (10) → "701234567" (9 < 10) → keep 0 (national format)
+  if (digits.startsWith("0") && digits.length - 1 >= minLen) {
     digits = digits.slice(1);
   }
 
