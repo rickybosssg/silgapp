@@ -72,6 +72,7 @@ Deno.serve(async (req) => {
     // ── Créer le Message ──
     const message = await base44.asServiceRole.entities.Message.create({
       conversation_id,
+      participant_user_ids: conv.participant_user_ids || [],
       sender_type: 'admin',
       sender_id: user.email,
       sender_name: user.full_name || user.email,

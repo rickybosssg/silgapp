@@ -7,6 +7,7 @@ import { lancerDispatchMulti } from '../../shared/dispatchEngine.ts';
 import { runWatchdog } from '../../shared/dispatchWatchdog.ts';
 import { marquerRefuse, marquerAccepte, getLivreursNotifies, getLivreursRefuses, resetNotifications as resetNotifsEntity } from '../../shared/dispatchNotifications.ts';
 import { accepterCourseV2, publierCourseDansFil, isV2Enabled, secoursDispatchV2, isPilotLivreur, DISPATCH_V2_BUNDLE_VERSION } from '../../shared/dispatchV2.ts';
+import { resolveCourseParticipantUserIds } from '../../shared/conversationSecurity.ts';
 
 // 🔖 Redéploiement forcé — 2026-08-14-simplified-3 — rappel T+5min re-notifie les mêmes livreurs libres
 console.log(`[DISPATCH_EXTERNE_AUTO] 🔖 dispatchV2 bundle version: ${DISPATCH_V2_BUNDLE_VERSION}`);
@@ -473,8 +474,10 @@ Deno.serve(async (req) => {
               client_message_id: idempotencyKey,
             });
             if (!existing || existing.length === 0) {
+              const courseMsgUserIds = await resolveCourseParticipantUserIds(base44, course.livreur_id, course.expediteur_client_id || course.destinataire_client_id);
               await base44.asServiceRole.entities.Message.create({
                 course_id: course_id,
+                participant_user_ids: courseMsgUserIds,
                 sender_type: 'admin',
                 sender_id: 'silgapp_system',
                 sender_name: 'SILGAPP',

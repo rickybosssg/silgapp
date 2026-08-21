@@ -112,3 +112,47 @@ export async function resolveParticipantUserIds(
 
   return { userIds: [...userIds], unresolved };
 }
+
+/**
+ * Résout les User.id des participants d'une course (livreur + client + admins).
+ * Utilisé pour les messages système liés à une course (sans conversation).
+ */
+export async function resolveCourseParticipantUserIds(
+  base44: any,
+  livreurId?: string,
+  clientId?: string
+): Promise<string[]> {
+  const userIds = new Set<string>();
+
+  // Résoudre le livreur
+  if (livreurId) {
+    try {
+      const livreur = await base44.asServiceRole.entities.Livreur.get(livreurId).catch(() => null);
+      if (livreur?.user_email) {
+        const users = await base44.asServiceRole.entities.User.filter({ email: livreur.user_email });
+        if (users?.[0]?.id) userIds.add(users[0].id);
+      }
+    } catch {}
+  }
+
+  // Résoudre le client
+  if (clientId) {
+    try {
+      const client = await base44.asServiceRole.entities.ClientExterne.get(clientId).catch(() => null);
+      if (client?.user_email) {
+        const users = await base44.asServiceRole.entities.User.filter({ email: client.user_email });
+        if (users?.[0]?.id) userIds.add(users[0].id);
+      }
+    } catch {}
+  }
+
+  // Résoudre les admins
+  try {
+    const admins = await base44.asServiceRole.entities.User.filter({ role: 'admin' });
+    for (const a of admins || []) {
+      if (a.id) userIds.add(a.id);
+    }
+  } catch {}
+
+  return [...userIds];
+}

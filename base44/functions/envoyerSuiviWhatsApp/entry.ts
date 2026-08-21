@@ -460,6 +460,7 @@ Deno.serve(async (req) => {
         if (conversationForSend) {
           await base44.asServiceRole.entities.Message.create({
             conversation_id: conversationForSend.id,
+            participant_user_ids: conversationForSend.participant_user_ids || [],
             sender_type: 'admin',
             sender_id: 'venus',
             sender_name: 'VENUS',
