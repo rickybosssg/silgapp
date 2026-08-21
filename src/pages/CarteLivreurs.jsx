@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
+import { getDialCodeSync } from "@/lib/countryService";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -32,16 +33,11 @@ function isEnLigne(livreur) {
   return (Date.now() - new Date(livreur.last_seen_at).getTime()) < 3 * 60 * 1000;
 }
 
-const INDICATIFS = {
-  BF: "+226", CI: "+225", TG: "+228", BJ: "+229",
-  SN: "+221", ML: "+223", GN: "+224", NE: "+227",
-};
-
-function formatTel(tel, countryCode = "BF") {
+function formatTel(tel, countryCode) {
   if (!tel) return "";
   let cleaned = tel.replace(/\s/g, "");
   if (!cleaned.startsWith("+")) {
-    const indicatif = INDICATIFS[countryCode] || "";
+    const indicatif = countryCode ? getDialCodeSync(countryCode) : "";
     if (indicatif) cleaned = `${indicatif}${cleaned}`;
   }
   // Formatage avec espaces : +226 XX XX XX XX
