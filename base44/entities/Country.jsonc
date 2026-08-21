@@ -93,6 +93,16 @@
       "default": 80,
       "description": "Pourcentage du seuil d'encours \u00e0 partir duquel une alerte est envoy\u00e9e au livreur (d\u00e9faut 80%)"
     },
+    "gps_seuil_min": {
+      "type": "number",
+      "default": 5,
+      "description": "D\u00e9lai (en minutes) en-dessous duquel le GPS est consid\u00e9r\u00e9 comme r\u00e9cent (badge vert). Source unique frontend+backend."
+    },
+    "gps_dispatch_seuil_min": {
+      "type": "number",
+      "default": 10,
+      "description": "D\u00e9lai (en minutes) en-dessous duquel le GPS est \u00e9ligible au dispatch prioritaire (niveau 1). Au-del\u00e0, le livreur reste \u00e9ligible mais sans priorit\u00e9 GPS."
+    },
     "gps_expire_seuil_min": {
       "type": "number",
       "default": 30,
@@ -102,6 +112,21 @@
       "type": "number",
       "default": 120,
       "description": "D\u00e9lai maximum (en minutes) avant exclusion d\u00e9finitive du dispatch pour GPS trop ancien. Au-del\u00e0, m\u00eame les livreurs non-prioritaires avec GPS sont exclus. D\u00e9faut 120 min (2h)."
+    },
+    "gps_client_seuil_min": {
+      "type": "number",
+      "default": 30,
+      "description": "D\u00e9lai (en minutes) en-dessous duquel le GPS client est consid\u00e9r\u00e9 comme valide pour l'affichage sur la carte. Au-del\u00e0, le client appara\u00eet comme 'noir' (GPS expir\u00e9). D\u00e9faut 30 min."
+    },
+    "heartbeat_seuil_min": {
+      "type": "number",
+      "default": 2,
+      "description": "D\u00e9lai (en minutes) en-dessous duquel l'app est consid\u00e9r\u00e9e comme active (badge vert). D\u00e9termine aussi le niveau 1 de dispatch (prioritaire) et le canal de notification (SILGAPP vs WhatsApp)."
+    },
+    "heartbeat_on_seuil_min": {
+      "type": "number",
+      "default": 10,
+      "description": "D\u00e9lai (en minutes) en-dessous duquel un livreur est consid\u00e9r\u00e9 comme 'ON' (connect\u00e9). D\u00e9termine aussi le niveau 2 de dispatch (secours)."
     },
     "ville_principale": {
       "type": "string",

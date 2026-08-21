@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
+import { getConfig } from "@/lib/dispatchConfigStore";
 import {
   isNativeMobile,
   isNativeAndroid,
@@ -71,16 +72,17 @@ export function useHeartbeat({ user_type, position, enabled = true, debugLabel =
 
     intervalRef.current = setInterval(() => {
       syncHeartbeat(position);
-    }, 30000);
+    }, getConfig().heartbeat_web_interval_ms);
 
     let cancelled = false;
     let nativeBgHeartbeatStop = null;
 
     if (isNativeMobile()) {
+      const nativeConfig = getConfig();
       startNativeLocationSync({
         enabled,
-        intervalMs: 5000,
-        distanceFilter: 3,
+        intervalMs: nativeConfig.gps_native_interval_ms,
+        distanceFilter: nativeConfig.gps_distance_filter_m,
         backgroundTitle: "SILGAPP GPS actif",
         backgroundMessage: "Synchronisation precise de votre position",
         onPosition: (pos) => syncHeartbeat(pos, false),
@@ -95,7 +97,7 @@ export function useHeartbeat({ user_type, position, enabled = true, debugLabel =
         startNativeBackgroundHeartbeat({
           userType: user_type,
           sessionId: session_id || "",
-          intervalMs: 15000,
+          intervalMs: getConfig().heartbeat_bg_interval_ms,
           distanceFilter: 0,
         }).then((stop) => {
           if (cancelled) stop?.();
