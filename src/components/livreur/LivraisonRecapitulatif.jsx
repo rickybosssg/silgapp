@@ -16,15 +16,6 @@ export default function LivraisonRecapitulatif({ course, onClose }) {
     staleTime: 30000,
   });
   const commissionPct = normalizeCommissionPct(countryCommissionRows?.[0]?.commission_pct);
-  // Calcul distance avec fallback (comme ClientSuiviCourse)
-  function haversine(lat1, lon1, lat2, lon2) {
-    if (!lat1 || !lon1 || !lat2 || !lon2) return null;
-    const R = 6371;
-    const dLat = ((lat2 - lat1) * Math.PI) / 180;
-    const dLon = ((lon2 - lon1) * Math.PI) / 180;
-    const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  }
 
   // Fallbacks pour données manquantes
   const distance = Number(course.distance_reelle_km) > 0

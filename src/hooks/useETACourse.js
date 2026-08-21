@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { haversineKm } from "@/lib/priceEstimate";
 
 // ── Constantes ──────────────────────────────────────────────────────────
 const STALE_WARN_MS = 2 * 60 * 1000;   // 2 min — ETA figé + avertissement
@@ -6,18 +7,6 @@ const STALE_CRITICAL_MS = 5 * 60 * 1000; // 5 min — ETA masqué
 const ORS_RECALC_DISTANCE_M = 300;      // 300m de déplacement minimum
 const ORS_RECALC_INTERVAL_MS = 5 * 60 * 1000; // 5 min minimum entre appels
 const FALLBACK_SPEED_KMH = 25;          // 25 km/h — fallback Haversine
-
-// ── Haversine (km) ───────────────────────────────────────────────────────
-function haversineKm(lat1, lng1, lat2, lng2) {
-  if (lat1 == null || lng1 == null || lat2 == null || lng2 == null) return null;
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLng = ((lng2 - lng1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
 
 function computeFallbackEta(distKm) {
   if (!distKm || distKm <= 0) return null;

@@ -9,15 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { MapPin, Package, CheckCircle2, Clock, Star, XCircle, ArrowLeft, Share2, Ruler, Banknote } from "lucide-react";
 import { getPrixAffichable } from "@/utils/getPrixAffichable";
 import { getCourseStatusLabel, getCourseStatusColor } from "@/lib/courseStatuses";
-
-function haversineKm(lat1, lon1, lat2, lon2) {
-  if (!lat1 || !lon1 || !lat2 || !lon2) return null;
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-}
+import { haversineKm } from "@/lib/priceEstimate";
 import LivreurAssigneCard from "@/components/client/LivreurAssigneCard";
 
 // Ouvre WhatsApp via wa.me (fonctionne sur Android/iOS, ouvre l'app si installée)
