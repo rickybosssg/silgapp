@@ -84,7 +84,7 @@ Deno.serve(async (req) => {
     const livreurs = await base44.asServiceRole.entities.Livreur.filter(livreursQuery);
     let encoursTotal = 0, nbBloques = 0, nbLivreursActifs = 0;
     livreurs.forEach(l => {
-      encoursTotal += (l.montant_du_silga ?? l.encours ?? 0);
+      encoursTotal += (l.montant_du_silga ?? 0);
       if (l.bloque_encours) nbBloques++;
       if (l.actif && l.validation === 'valide') nbLivreursActifs++;
     });
@@ -106,8 +106,8 @@ Deno.serve(async (req) => {
         const l = livreurs.find(lv => lv.id === id) || {};
         return {
           id, ...data,
-          encours: l.montant_du_silga ?? l.encours ?? 0,
-          montant_du_silga: l.montant_du_silga ?? l.encours ?? 0,
+          encours: l.montant_du_silga ?? 0,
+          montant_du_silga: l.montant_du_silga ?? 0,
           bloque_encours: !!l.bloque_encours,
           statut_paiement: l.statut_paiement || 'non_paye',
           pays_code: l.country_code || '',

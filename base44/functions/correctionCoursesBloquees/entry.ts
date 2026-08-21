@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { recalculerSoldeLivreur } from '../../shared/recalculerSoldeLivreur.ts';
 
 function normalizeCommissionPct(value) {
     const pct = Number(value);
@@ -94,14 +95,12 @@ Deno.serve(async (req) => {
             });
 
             if (course.livreur_id) {
+                await recalculerSoldeLivreur(base44, course.livreur_id).catch((err: any) =>
+                    console.warn('[CORRECTION] recalculerSoldeLivreur error:', err?.message)
+                );
                 const livreur = livreurParId(course.livreur_id);
-                if (livreur) {
-                    await asService.entities.Livreur.update(livreur.id, {
-                        montant_du_silga: (livreur.montant_du_silga || 0) + commission,
-                    });
-                    if (livreur.statut === "en_course") {
-                        await asService.entities.Livreur.update(livreur.id, { statut: "disponible" });
-                    }
+                if (livreur?.statut === "en_course") {
+                    await asService.entities.Livreur.update(livreur.id, { statut: "disponible" });
                 }
             }
 

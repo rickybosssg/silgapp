@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
 import { emitPaymentReceived } from '../../shared/venusAdminEventBus.ts';
+import { recalculerSoldeLivreur } from '../../shared/recalculerSoldeLivreur.ts';
 
 Deno.serve(async (req) => {
   try {
@@ -56,44 +57,25 @@ Deno.serve(async (req) => {
             );
           }
 
-          // Recalculer le VRAI solde dû = somme des commissions encore impayées
-          const coursesRestantesImpayees = await base44.asServiceRole.entities.CourseExterne.filter(
-            { livreur_id: livreur.id, statut: 'livree', statut_paiement_livreur: 'non_paye' },
-            null, 200
-          );
-          const nouveauSoldeReel = (coursesRestantesImpayees || []).reduce((s, c) => s + (c.commission_silga ?? 0), 0);
-
-          // ── Surplus = montant payé supérieur à la dette réelle ──
-          // montant_du_silga peut être négatif (crédit en faveur du livreur)
-          const surplus = (paiement.montant_paye || 0) - (paiement.montant_du || 0);
-          const soldeFinal = nouveauSoldeReel - Math.max(0, surplus);
-
-          // encours suit la même logique (réduit du paiement, floor à 0)
-          const nouvelEncours = Math.max(0, soldeFinal);
-
-          // Récupérer le seuil du pays pour savoir si on peut débloquer
-          const countries = await base44.asServiceRole.entities.Country.filter({ code: livreur.country_code, actif: true });
-          const seuil = countries?.[0]?.seuil_encours_max || 5000;
-
-          // Si l'encours repasse sous le seuil, débloquer le livreur
-          const peutDebloquer = nouvelEncours < seuil;
-
-          const updateData = {
-            montant_du_silga: soldeFinal,
-            encours: nouvelEncours,
-            statut_paiement: soldeFinal <= 0 ? 'paye' : 'non_paye',
+          // ── Mettre à jour montant_paye et dernier_paiement_date ──
+          await base44.asServiceRole.entities.Livreur.update(livreur.id, {
             montant_paye: (livreur.montant_paye || 0) + paiement.montant_paye,
             dernier_paiement_date: new Date().toISOString(),
-          };
+          });
 
-          if (peutDebloquer) {
-            updateData.bloque_encours = false;
-            updateData.encours_bloque_at = null;
-            updateData.admin_hors_ligne = false;
-            updateData.admin_statut_log = 'Déblocage après paiement validé par admin';
+          // ── Recalculer le solde depuis les sources financières ──
+          // montant_du_silga = projection = somme des commissions non payées
+          // (les courses marquées payées ci-dessus ne sont plus comptées)
+          const resultat = await recalculerSoldeLivreur(base44, livreur.id);
+          const { solde: nouveauSolde, seuil, bloque: encoreBloque } = resultat;
+
+          if (seuil === null || seuil <= 0) {
+            return Response.json({
+              success: false,
+              error: `Seuil d'encours non configuré pour le pays ${livreur.country_code}`,
+              blocked_reason: 'missing_country_seuil_encours_max',
+            }, { status: 400 });
           }
-
-          await base44.asServiceRole.entities.Livreur.update(livreur.id, updateData);
 
           // Historique
           try {
@@ -103,10 +85,10 @@ Deno.serve(async (req) => {
               livreur_nom: `${livreur.prenom || ''} ${livreur.nom || ''}`.trim(),
               livreur_telephone: livreur.telephone || '',
               pays_code: livreur.country_code,
-              encours_avant: livreur.encours || 0,
-              encours_apres: nouvelEncours,
+              encours_avant: livreur.montant_du_silga ?? 0,
+              encours_apres: nouveauSolde,
               seuil_applicable: seuil,
-              pourcentage_atteint: seuil > 0 ? Math.round((nouvelEncours / seuil) * 100) : 0,
+              pourcentage_atteint: seuil > 0 ? Math.round((nouveauSolde / seuil) * 100) : 0,
               action_par: user.email,
               commentaire: `Paiement de ${paiement.montant_paye} FCFA validé (${coursesAPayer.length} course(s) soldée(s))`,
               date_action: new Date().toISOString(),

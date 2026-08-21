@@ -4,6 +4,7 @@
  * À appeler manuellement depuis l'admin ou via une automatisation.
  */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { recalculerSoldeLivreur } from '../../shared/recalculerSoldeLivreur.ts';
 
 function normalizeCommissionPct(value) {
   const pct = Number(value);
@@ -95,14 +96,11 @@ Deno.serve(async (req) => {
         montant_livreur: montantLivreur,
       });
 
-      // Mettre à jour montant_du_silga du livreur
+      // Recalculer le solde du livreur depuis les sources financières
       if (course.livreur_id) {
-        const livreur = await base44.asServiceRole.entities.Livreur.get(course.livreur_id).catch(() => null);
-        if (livreur) {
-          await base44.asServiceRole.entities.Livreur.update(course.livreur_id, {
-            montant_du_silga: (Number(livreur.montant_du_silga) || 0) + commission,
-          }).catch(() => null);
-        }
+        await recalculerSoldeLivreur(base44, course.livreur_id).catch((err: any) =>
+          console.warn('[RETRO] recalculerSoldeLivreur error:', err?.message)
+        );
       }
 
       corrigees++;

@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
+import { recalculerSoldeLivreur } from '../../shared/recalculerSoldeLivreur.ts';
 
 /**
  * PAIEMENT LIVREUR — Enregistre un paiement de commission Silga
@@ -55,7 +56,10 @@ Deno.serve(async (req) => {
     }
 
     const now = new Date().toISOString();
-    const ancienSolde = livreur.montant_du_silga ?? livreur.encours ?? 0;
+    // ── Recalculer le solde depuis les sources financières ──
+    // montant_du_silga = projection = somme des commissions non payées
+    const resultatSolde = await recalculerSoldeLivreur(base44, livreur_id);
+    const ancienSolde = resultatSolde.solde;
 
     // ── Déterminer les courses concernées et le type de paiement ──
     let coursesConcernees: string[] = [];
@@ -144,40 +148,17 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ── Mettre à jour le livreur ──
-    const updateData = {
-      statut_paiement: nouveauSolde <= 0 ? 'paye' : 'non_paye',
+    // ── Mettre à jour montant_paye et dernier_paiement_date ──
+    await base44.entities.Livreur.update(livreur_id, {
       montant_paye: (livreur.montant_paye || 0) + montant,
-      encours: nouveauSolde,
-      montant_du_silga: nouveauSolde,
       dernier_paiement_date: now,
       heure_paiement: now,
       admin_paiement: user.full_name || user.email || 'admin',
-    };
+    });
 
-    // Débloquer si l'encours repasse sous le seuil
-    if (livreur.bloque_encours && nouveauSolde > 0) {
-      const countries = await base44.asServiceRole.entities.Country
-        .filter({ code: livreur.country_code }).catch(() => []);
-      const seuil = countries?.[0]?.seuil_encours_max || 5000;
-      if (nouveauSolde < seuil) {
-        Object.assign(updateData, {
-          bloque_encours: false,
-          encours_bloque_at: null,
-          admin_hors_ligne: false,
-          admin_statut_log: 'Déblocage après paiement validé par admin',
-        });
-      }
-    } else if (livreur.bloque_encours && nouveauSolde <= 0) {
-      Object.assign(updateData, {
-        bloque_encours: false,
-        encours_bloque_at: null,
-        admin_hors_ligne: false,
-        admin_statut_log: 'Déblocage après paiement intégral',
-      });
-    }
-
-    await base44.entities.Livreur.update(livreur_id, updateData);
+    // ── Recalculer le solde depuis les sources financières ──
+    // (gère montant_du_silga, encours alias, statut_paiement, bloque_encours)
+    await recalculerSoldeLivreur(base44, livreur_id);
 
     // ── Historique encours ──
     try {

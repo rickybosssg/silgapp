@@ -99,30 +99,31 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Vérification minimale : au moins une source de coordonnées de départ ET d'arrivée
-    const hasDepart = course.latitude_recuperation || course.gps_depart_lat;
-    const hasArrivee = course.latitude_livraison || course.latitude_arrivee_livraison || course.gps_arrivee_lat;
-    if (!hasDepart || !hasArrivee) {
-      return Response.json({
-        error: 'Positions GPS départ/arrivée de la course manquantes'
-      }, { status: 400 });
+    // ── DISTANCE TARIFAIRE : utiliser la distance de référence persistée ──
+    // RÈGLE ABSOLUE : la distance tarifaire est calculée à la création et figée.
+    // Le scan du colis ou la position du livreur NE DOIT PAS la modifier rétroactivement.
+    // Si non persistée (course legacy), calculer depuis les coordonnées de CRÉATION.
+    let distanceReelle = 0;
+
+    if (course.distance_tarifaire_km && Number(course.distance_tarifaire_km) > 0) {
+      // Distance de référence déjà persistée — l'utiliser telle quelle
+      distanceReelle = Number(course.distance_tarifaire_km);
+    } else {
+      // Course legacy sans distance persistée — calculer depuis les coordonnées de CRÉATION
+      // (gps_depart_lat/lng, gps_arrivee_lat/lng), PAS depuis les positions de scan
+      const lat1 = course.gps_depart_lat;
+      const lng1 = course.gps_depart_lng;
+      const lat2 = course.gps_arrivee_lat;
+      const lng2 = course.gps_arrivee_lng;
+
+      if (!lat1 || !lng1 || !lat2 || !lng2) {
+        return Response.json({
+          error: 'Coordonnées GPS de création manquantes — distance tarifaire impossible à calculer'
+        }, { status: 400 });
+      }
+
+      distanceReelle = haversineKm(lat1, lng1, lat2, lng2) ?? 0;
     }
-
-    // Calculer la distance tarifaire avec les positions GPS réelles si disponibles
-    // Priorité : GPS réel récupération → GPS réel livraison (positions au moment du scan)
-    // Fallback : coordonnées fixes enregistrées à la création de la course
-    const lat1 = course.latitude_recuperation || course.gps_depart_lat;
-    const lng1 = course.longitude_recuperation || course.gps_depart_lng;
-    const lat2 = course.latitude_livraison || course.latitude_arrivee_livraison || course.gps_arrivee_lat;
-    const lng2 = course.longitude_livraison || course.longitude_arrivee_livraison || course.gps_arrivee_lng;
-
-    if (!lat1 || !lng1 || !lat2 || !lng2) {
-      return Response.json({
-        error: 'Positions GPS récupération/livraison manquantes'
-      }, { status: 400 });
-    }
-
-    const distanceReelle = haversineKm(lat1, lng1, lat2, lng2) ?? 0;
 
     // ── Déterminer le prix finalement retenu ──────────────────────────────
     // Règle : ne JAMAIS écraser un prix déjà modifié par le client ou l'admin.
@@ -191,18 +192,16 @@ Deno.serve(async (req) => {
       heure_livraison: new Date().toISOString(),
     });
 
-    // Accumuler la commission dans l'encours du livreur (cumulatif, pour suivi opérationnel)
-    // + incrémenter montant_du_silga (le vrai dû — décrémenté par les paiements admin)
+    // ── Comptabiliser la commission dans le solde du livreur ──
+    // La projection montant_du_silga est gérée UNIQUEMENT par verifierEncoursLivreur
+    // (source unique de la comptabilisation financière, idempotente).
+    // ⚠️ NE JAMAIS incrémenter montant_du_silga/encours directement ici —
+    //    c'était la cause racine du double comptage des commissions.
     if (course.livreur_id) {
-      const livreur = await base44.asServiceRole.entities.Livreur.get(course.livreur_id);
-      if (livreur) {
-        const nouvelEncours = (livreur.encours || 0) + commissionSilga;
-        const nouveauDuSilga = (Number(livreur.montant_du_silga) || 0) + commissionSilga;
-        await base44.asServiceRole.entities.Livreur.update(course.livreur_id, {
-          encours: nouvelEncours,
-          montant_du_silga: nouveauDuSilga,
-          statut_paiement: 'non_paye',
-        });
+      try {
+        await base44.asServiceRole.functions.invoke('verifierEncoursLivreur', { course_id });
+      } catch (encoursErr) {
+        console.error('[calculPrixCourseExterne] verifierEncoursLivreur error:', encoursErr?.message || encoursErr);
       }
     }
 

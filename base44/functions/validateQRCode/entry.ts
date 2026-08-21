@@ -357,7 +357,9 @@ Deno.serve(async (req) => {
 
       await base44.asServiceRole.entities.CourseExterne.update(course_id, updateData);
 
-      // Mettre à jour le livreur : montant_du_silga + courses_du_jour + statut
+      // Mettre à jour le livreur : courses_du_jour + statut
+      // ⚠️ montant_du_silga est géré par verifierEncoursLivreur (source unique, idempotente)
+      //    NE JAMAIS incrémenter montant_du_silga directement ici.
       if (course.livreur_id) {
         try {
           const livreur = await base44.asServiceRole.entities.Livreur.get(course.livreur_id);
@@ -365,12 +367,8 @@ Deno.serve(async (req) => {
             const livreurUpdate = {
               statut: livreur.bloque_encours ? 'hors_ligne' : 'disponible',
               ...(livreur.bloque_encours ? { admin_hors_ligne: true } : {}),
+              courses_du_jour: (Number(livreur.courses_du_jour) || 0) + 1,
             };
-            if (updateData.commission_silga) {
-              livreurUpdate.montant_du_silga = (Number(livreur.montant_du_silga) || 0) + updateData.commission_silga;
-            }
-            // Incrémenter courses_du_jour
-            livreurUpdate.courses_du_jour = (Number(livreur.courses_du_jour) || 0) + 1;
             await base44.asServiceRole.entities.Livreur.update(course.livreur_id, livreurUpdate);
           }
         } catch (livreurError) {

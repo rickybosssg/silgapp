@@ -106,6 +106,29 @@ async function notifierLivreursEligiblesV2(base44: any, course: any, options: an
     candidats.map((livreur: any) => enregistrerNotification(base44, course.id, livreur, 0, { country_code: course.country_code }))
   );
 
+  // ── Créer les notifications utilisateur (inbox) ──
+  // Une seule Notification par livreur/course (idempotente via course_id + destinataire_email)
+  await Promise.allSettled(
+    candidats.map((livreur: any) => {
+      if (!livreur.user_email) return Promise.resolve();
+      return base44.asServiceRole.entities.Notification.filter({
+        course_id: course.id,
+        destinataire_email: livreur.user_email,
+        type: 'nouvelle_course',
+      }).then((existing: any) => {
+        if (existing && existing.length > 0) return; // déjà notifié — pas de doublon
+        return base44.asServiceRole.entities.Notification.create({
+          titre: 'Nouvelle course SILGAPP',
+          message: `${course.quartier_depart || course.adresse_depart || 'Départ'} → ${course.quartier_arrivee || course.adresse_arrivee || 'destination'}`,
+          type: 'nouvelle_course',
+          course_id: course.id,
+          destinataire_email: livreur.user_email,
+          lue: false,
+        });
+      }).catch(() => {});
+    })
+  );
+
   // 📤 Envoi push batch : 1 seule invocation backend pour tous les livreurs prioritaires
   if (candidats.length > 0) {
     const batchResult = await base44.asServiceRole.functions.invoke('envoiNotificationPushBatch', {
