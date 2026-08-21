@@ -16,18 +16,22 @@
 import { base44 } from "@/api/base44Client";
 import { haversineKm } from "./priceEstimate";
 
-// ── Fallback générique (uniquement si aucune config backend jamais reçue) ──
-// Aucun pays codé en dur — valeurs neutres utilisées uniquement avant la
-// première synchronisation avec le backend.
+// ── Fallback de secours (uniquement si aucune config backend jamais reçue) ──
+// ⚠️  Les prix sont à null : si aucune config backend/cache n'est disponible,
+//     l'application NE DOIT PAS calculer un faux prix à 0 F.
+//     Elle doit afficher une erreur ou demander une connexion au backend.
+//     Les seuils km sont conservés à des fins de comparaison structurelle
+//     uniquement, mais aucun prix n'est jamais retourné avec ce fallback.
 const FALLBACK_CONFIG = {
   palier_1_km_max: 15,
-  palier_1_prix: 0,
+  palier_1_prix: null,
   palier_2_km_max: 25,
-  palier_2_prix: 0,
+  palier_2_prix: null,
   tolerance_min_km: 14,
   tolerance_max_km: 16,
   seuil_strict_km: 15,
   devise: "FCFA",
+  _is_fallback: true,
 };
 
 const CACHE_KEY = "silgapp_tarif_grand_ouaga";

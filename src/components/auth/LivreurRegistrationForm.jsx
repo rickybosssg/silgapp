@@ -1,10 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Loader2, Phone, Camera, Upload, MapPin } from "lucide-react";
 import { SILGAPP_COUNTRIES } from "@/lib/phoneUtils";
+import { getDefaultCountryCode } from "@/lib/countryService";
 import SmartAddressInput from "@/components/location/SmartAddressInput";
 
 export default function LivreurRegistrationForm({ user, onComplete }) {
@@ -12,10 +13,21 @@ export default function LivreurRegistrationForm({ user, onComplete }) {
     nom: user?.full_name || "",
     prenom: "",
     telephone: "",
-    country_code: "BF",
+    country_code: null,
     ville: "",
     quartier: "",
   });
+
+  // Charger le pays par défaut dynamiquement (contexte > backend)
+  useEffect(() => {
+    let mounted = true;
+    getDefaultCountryCode().then(code => {
+      if (mounted && code && !form.country_code) {
+        setForm(f => ({ ...f, country_code: code }));
+      }
+    }).catch(() => {});
+    return () => { mounted = false; };
+  }, []);
   const [photoProfil, setPhotoProfil] = useState(null);
   const [cnibRecto, setCnibRecto] = useState(null);
   const [cnibVerso, setCnibVerso] = useState(null);

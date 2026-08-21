@@ -23,16 +23,15 @@ import { useAdminContext } from "@/hooks/useAdminContext.js";
 import { MessageSquareWarning } from "lucide-react";
 import AdminETABadge from "./AdminETABadge";
 import { getPrixAffichable } from "@/utils/getPrixAffichable";
+import { COURSE_STATUSES } from "@/lib/courseStatuses";
 
 const STATUTS_INTERNE = [
   "nouvelle", "en_attente_livreur", "acceptee", "en_route_recuperation",
   "colis_recupere", "en_livraison", "livree", "annulee"
 ];
 
-const STATUTS_EXTERNE = [
-  "nouvelle", "en_attente", "recherche_livreur", "livreur_en_route", "arrive_prise_en_charge",
-  "colis_recupere", "passager_embarque", "en_livraison", "livree", "annulee"
-];
+// Statuts externes centralisés — source unique dans courseStatuses.js
+const STATUTS_EXTERNE = Object.values(COURSE_STATUSES);
 
 const TYPE_LABELS = { expedier: "📦 Expédition", recevoir: "📥 Réception", deplacement: "👤 Déplacement" };
 

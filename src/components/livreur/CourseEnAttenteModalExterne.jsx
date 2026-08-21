@@ -3,7 +3,7 @@ import { MapPin, Navigation, Check, X, Package, Clock, Ruler, AlertCircle } from
 import { base44 } from "@/api/base44Client";
 import { cn } from "@/lib/utils";
 import ManualPriceModal from "./ManualPriceModal";
-import { isPaysTarificationGrandOuaga } from "@/lib/tarifGrandOuaga";
+import { isPaysTarificationParPaliers } from "@/lib/tarifGrandOuaga";
 import { stopUrgentCourseAlert, useUrgentCourseAlert } from "@/lib/livreurUrgentAlert";
 
 function haversine(lat1, lon1, lat2, lon2) {
@@ -46,6 +46,17 @@ export default function CourseEnAttenteModalExterne({
   const [courseExpiree, setCourseExpiree] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showManualPriceModal, setShowManualPriceModal] = useState(false);
+  const [_paysAvecPaliers, _setPaysAvecPaliers] = useState(false);
+
+  // Vérifier dynamiquement si le pays utilise la tarification par paliers
+  useEffect(() => {
+    let mounted = true;
+    if (!course?.country_code) { _setPaysAvecPaliers(false); return; }
+    isPaysTarificationParPaliers(course.country_code).then(has => {
+      if (mounted) _setPaysAvecPaliers(has);
+    }).catch(() => { if (mounted) _setPaysAvecPaliers(false); });
+    return () => { mounted = false; };
+  }, [course?.country_code]);
 
   // Course admin : Accepter / Refuser uniquement, quel que soit le mode du livreur
   const isAdminCourse = course?.source === "admin" || course?.pricing_mode === "admin_manuel";
@@ -134,11 +145,14 @@ export default function CourseEnAttenteModalExterne({
 
   const handleAccepterClick = () => {
     if (isSubmitting) return;
-    // ── Garde-fou Grand Ouaga (BF) : tarif fixe, pas de prix manuel livreur ──
-    // Les courses BF utilisant la tarification Grand Ouaga ont un prix fixe
-    // (1250 / 1750 F) ou personnalisé admin (>25 km). Le livreur ne peut pas
+    // ── Garde-fou tarification par paliers : tarif fixe, pas de prix manuel livreur ──
+    // Les pays avec une TarifZone configurée ont un prix fixe par paliers
+    // ou un prix personnalisé admin (> palier_2_km_max). Le livreur ne peut pas
     // proposer son propre prix.
-    if (isPaysTarificationGrandOuaga(course?.country_code)) {
+    // ⚠️ isPaysTarificationParPaliers est async — on utilise une vérification
+    //    non-bloquante : si le pays n'est pas encore résolu, on laisse le comportement
+    //    par défaut (mode manuel autorisé). Le backend reste l'autorité finale.
+    if (course?.country_code && _paysAvecPaliers) {
       handleAccepterAuto();
       return;
     }
