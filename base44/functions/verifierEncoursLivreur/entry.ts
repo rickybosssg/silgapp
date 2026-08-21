@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
     if (course.commission_silga && course.commission_silga > 0) {
       commission = course.commission_silga;
     } else if (course.prix_final && course.prix_final > 0) {
-      const pct = Number(countries?.[0]?.commission_pct);
+      const pct = Number(countryConfig?.commission_pct);
       if (!Number.isFinite(pct) || pct < 0 || pct > 100) {
         return Response.json({
           success: false,
@@ -198,8 +198,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ── ALERTE 80% ──
-    if (pourcentage >= 80 && pourcentage < 100) {
+    // ── ALERTE — seuil dynamique (défaut 80%) ──
+    if (pourcentage >= seuilAlertePct && pourcentage < 100) {
       // Ne pas spammer : envoyer l'alerte max 1x par heure
       const derniereAlerte = livreur.encours_alerte_at ? new Date(livreur.encours_alerte_at) : null;
       const maintenant = new Date();
@@ -227,7 +227,7 @@ Deno.serve(async (req) => {
         await base44.asServiceRole.entities.Livreur.update(livreurId, {
           encours_alerte_at: now,
         });
-        console.log(`[ENCOURS] ALERTE 80% : Livreur ${livreurId} — ${pourcentage}%`);
+        console.log(`[ENCOURS] ALERTE ${seuilAlertePct}% : Livreur ${livreurId} — ${pourcentage}%`);
       }
     }
 
@@ -244,7 +244,7 @@ Deno.serve(async (req) => {
     return Response.json({
       success: true,
       bloque: false,
-      alerte: pourcentage >= 80,
+      alerte: pourcentage >= seuilAlertePct,
       encours: nouvelEncours,
       pourcentage,
       seuil,
@@ -283,8 +283,15 @@ async function handleDeblocage(base44, body) {
   }
 
   const countryCode = livreur.country_code;
-  const countries = await base44.asServiceRole.entities.Country.filter({ code: countryCode, actif: true });
-  const seuil = countries?.[0]?.seuil_encours_max || 5000;
+  const countryConfig = await chargerConfigPays(base44, countryCode);
+  const seuil = countryConfig?.seuil_encours_max ?? null;
+  if (seuil === null || seuil <= 0) {
+    return Response.json({
+      success: false,
+      error: `Seuil d'encours non configuré pour le pays ${countryCode}`,
+      blocked_reason: 'missing_country_seuil_encours_max',
+    }, { status: 400 });
+  }
   const pourcentageApres = seuil > 0 ? Math.round((nouvelEncours / seuil) * 100) : 0;
   const encoreBloque = seuil > 0 && nouvelEncours >= seuil;
 
@@ -317,7 +324,7 @@ async function handleDeblocage(base44, body) {
 
   // Notifier le livreur
   if (livreur.user_email) {
-    const devise = countries?.[0]?.devise || 'FCFA';
+    const devise = countryConfig?.devise || 'FCFA';
     await base44.asServiceRole.entities.Notification.create({
       titre: encoreBloque ? ' Encours réduit' : ' Compte réactivé',
       message: encoreBloque
@@ -352,8 +359,15 @@ async function handleAjustement(base44, body) {
 
   const encoursAvant = livreur.montant_du_silga ?? livreur.encours ?? 0;
   const countryCode = livreur.country_code;
-  const countries = await base44.asServiceRole.entities.Country.filter({ code: countryCode, actif: true });
-  const seuil = countries?.[0]?.seuil_encours_max || 5000;
+  const countryConfig = await chargerConfigPays(base44, countryCode);
+  const seuil = countryConfig?.seuil_encours_max ?? null;
+  if (seuil === null || seuil <= 0) {
+    return Response.json({
+      success: false,
+      error: `Seuil d'encours non configuré pour le pays ${countryCode}`,
+      blocked_reason: 'missing_country_seuil_encours_max',
+    }, { status: 400 });
+  }
   const now = new Date().toISOString();
 
   const seraBloque = seuil > 0 && nouvel_encours >= seuil;
@@ -410,14 +424,22 @@ async function handleGetBloques(base44, body) {
   const filter = { bloque_encours: true, type_livreur: 'externe', country_code: effectiveCountry };
   const bloques = await base44.asServiceRole.entities.Livreur.filter(filter);
 
-  // Enrichir avec les seuils pays
+  // Enrichir avec les seuils pays — bloquant si non configuré
   const paysCodes = [...new Set(bloques.map(l => l.country_code).filter(Boolean))];
   const seuilsParPays = {};
   for (const code of paysCodes) {
-    const countries = await base44.asServiceRole.entities.Country.filter({ code, actif: true });
+    const countryConfig = await chargerConfigPays(base44, code);
+    const seuil = countryConfig?.seuil_encours_max ?? null;
+    if (seuil === null || seuil <= 0) {
+      return Response.json({
+        success: false,
+        error: `Seuil d'encours non configuré pour le pays ${code}`,
+        blocked_reason: 'missing_country_seuil_encours_max',
+      }, { status: 400 });
+    }
     seuilsParPays[code] = {
-      seuil: countries?.[0]?.seuil_encours_max || 5000,
-      devise: countries?.[0]?.devise || 'FCFA',
+      seuil,
+      devise: countryConfig?.devise || 'FCFA',
     };
   }
 
@@ -426,7 +448,7 @@ async function handleGetBloques(base44, body) {
   const enriched = [];
   const now = new Date().toISOString();
   for (const l of bloques) {
-    const seuil = seuilsParPays[l.country_code]?.seuil || 5000;
+    const seuil = seuilsParPays[l.country_code]?.seuil;
     const devise = seuilsParPays[l.country_code]?.devise || 'FCFA';
 
     // Utiliser le solde persisté (montant_du_silga) — source de vérité unique.
