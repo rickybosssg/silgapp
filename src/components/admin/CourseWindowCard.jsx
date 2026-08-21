@@ -3,6 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, Copy, ExternalLink, MessageCircle, Package, Loader2, ChevronDown, ChevronUp, Check } from "lucide-react";
 import { toast } from "sonner";
+import { getCourseStatusLabel, getCourseStatusColor } from "@/lib/courseStatuses";
 import AdminETABadge from "@/components/courses/AdminETABadge";
 import { getPrixAffichable } from "@/utils/getPrixAffichable";
 
@@ -61,19 +62,6 @@ const TYPE_LABELS = {
   deplacement: "Déplacement",
 };
 
-const STATUT_LABELS = {
-  nouvelle: { label: "Nouvelle", color: "text-gray-600 bg-gray-100" },
-  recherche_livreur: { label: "Recherche livreur", color: "text-orange-600 bg-orange-100" },
-  livreur_en_route: { label: "Livreur en route", color: "text-blue-600 bg-blue-100" },
-  arrive_prise_en_charge: { label: "Arrivé", color: "text-blue-600 bg-blue-100" },
-  colis_recupere: { label: "Colis récupéré", color: "text-blue-600 bg-blue-100" },
-  pris_en_charge: { label: "Pris en charge", color: "text-blue-600 bg-blue-100" },
-  en_livraison: { label: "En livraison", color: "text-blue-600 bg-blue-100" },
-  arrivee: { label: "Arrivé", color: "text-green-600 bg-green-100" },
-  livree: { label: "Livrée", color: "text-green-600 bg-green-100" },
-  annulee: { label: "Annulée", color: "text-red-600 bg-red-100" },
-};
-
 export default function CourseWindowCard({ courseId, formData, onClose }) {
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -114,7 +102,7 @@ export default function CourseWindowCard({ courseId, formData, onClose }) {
   const destinatairePhone = course.destinataire_telephone || formData?.destinataireTelephone || "";
   const expediteurName = course.expediteur_nom || course.client_nom || formData?.expediteurNom || formData?.clientNom || "Client";
   const destinataireName = course.destinataire_nom || formData?.destinataireNom || "";
-  const statutInfo = STATUT_LABELS[course.statut] || { label: course.statut, color: "text-gray-600 bg-gray-100" };
+  const statutInfo = { label: getCourseStatusLabel(course.statut), color: getCourseStatusColor(course.statut) };
   const isTerminal = course.statut === "livree" || course.statut === "annulee";
 
   const msgExpediteur = [

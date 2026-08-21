@@ -3,8 +3,9 @@ import { base44 } from "@/api/base44Client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Truck, Package, MapPin, Phone, Pill, MessageCircle, QrCode, KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { getCourseStatusLabel, STATUTS_ACTIFS_COURSE } from "@/lib/courseStatuses";
 
-const activeStatuses = ["nouvelle", "recherche_livreur", "livreur_en_route", "arrive_prise_en_charge", "colis_recupere", "en_livraison"];
+const activeStatuses = STATUTS_ACTIFS_COURSE;
 
 export default function PharmacieLivraisons({ pharmacieId, pharmacieNom, onNavigate }) {
   const queryClient = useQueryClient();
@@ -178,14 +179,7 @@ export default function PharmacieLivraisons({ pharmacieId, pharmacieNom, onNavig
 }
 
 function CourseCard({ course }) {
-  const statusLabel = {
-    nouvelle: "Nouvelle",
-    recherche_livreur: "Recherche livreur",
-    livreur_en_route: "Livreur en route",
-    arrive_prise_en_charge: "Livreur arrive",
-    colis_recupere: "Colis recupere",
-    en_livraison: "En livraison",
-  }[course.statut] || course.statut;
+  const statusLabel = getCourseStatusLabel(course.statut);
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 space-y-3">
