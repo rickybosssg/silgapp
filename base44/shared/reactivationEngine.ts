@@ -298,12 +298,8 @@ export async function selectTargets(base44: any, params: TargetSelectionParams):
   }
 
   // ── Anti-spam : exclure les clients déjà ciblés dans les dernières 48h ──
-  const recentRecipients = await base44.asServiceRole.entities.ReactivationCampaignRecipient.filter({
-    client_telephone: "",
-  }, "-sent_at", 10000);
-
-  // Better approach: fetch recent recipients and build a set
   const antiSpamMs = DEFAULT_ANTI_SPAM_HOURS * 3600000;
+  const recentRecipients = await base44.asServiceRole.entities.ReactivationCampaignRecipient.list();
   const recentSet = new Set<string>();
   for (const r of recentRecipients) {
     if (r.sent_at && (now - new Date(r.sent_at).getTime()) < antiSpamMs) {
@@ -339,7 +335,14 @@ export async function selectTargets(base44: any, params: TargetSelectionParams):
 // ── Attribution des conversions ──────────────────────────────────────────────
 
 export async function attributeConversions(base44: any): Promise<{ attributed: number; revenueTotal: number; commissionTotal: number }> {
-  const windowHours = DEFAULT_ATTRIBUTION_WINDOW_HOURS;
+  // Lire la fenêtre d'attribution depuis AppConfig (configurable)
+  let windowHours = DEFAULT_ATTRIBUTION_WINDOW_HOURS;
+  try {
+    const configs = await base44.asServiceRole.entities.AppConfig.filter({ cle: "REACTIVATION_ATTRIBUTION_WINDOW_HOURS" });
+    if (configs?.length > 0 && configs[0].valeur) {
+      windowHours = Number(configs[0].valeur) || DEFAULT_ATTRIBUTION_WINDOW_HOURS;
+    }
+  } catch {}
   const windowMs = windowHours * 3600000;
   const now = Date.now();
 

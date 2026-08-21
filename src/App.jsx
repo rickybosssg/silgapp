@@ -415,7 +415,6 @@ function AppContent() {
           <Route path="/admin/test-dispatch-livreur" element={<AnimatedRoutes><TestDispatchLivreur /></AnimatedRoutes>} />
           <Route path="/admin/centre-notifications" element={<AnimatedRoutes><CentreNotifications /></AnimatedRoutes>} />
           <Route path="/admin/tarification" element={<AnimatedRoutes><TarificationAdmin /></AnimatedRoutes>} />
-          <Route path="/admin/reactivation-clients" element={<AnimatedRoutes><ReactivationClients /></AnimatedRoutes>} />
           <Route path="/admin/demandes-livreurs" element={<AnimatedRoutes><DemandesLivreursAdmin /></AnimatedRoutes>} />
           <Route path="/admin/livreurs-bloques" element={<AnimatedRoutes><LivreursBloquesEncours /></AnimatedRoutes>} />
           <Route path="/admin/comptabilite" element={<AnimatedRoutes><Comptabilite /></AnimatedRoutes>} />
@@ -429,6 +428,7 @@ function AppContent() {
           <Route path="/admin/dispatch-logs" element={<AnimatedRoutes><DispatchLogs /></AnimatedRoutes>} />
           <Route path="/admin/livreurs-prioritaires" element={<AnimatedRoutes><LivreursPrioritaires /></AnimatedRoutes>} />
           <Route path="/admin/crm-clients" element={<AnimatedRoutes><ClientsCRM /></AnimatedRoutes>} />
+          <Route path="/admin/reactivation-clients" element={<AnimatedRoutes><ReactivationClients /></AnimatedRoutes>} />
           <Route path="/admin/messages" element={<AnimatedRoutes><AdminMessages /></AnimatedRoutes>} />
           <Route path="/admin/whatsapp" element={<AnimatedRoutes><WhatsAppAdmin /></AnimatedRoutes>} />
           <Route path="/admin/venus" element={<AnimatedRoutes><VenusAdminCenter /></AnimatedRoutes>} />

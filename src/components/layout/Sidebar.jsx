@@ -37,6 +37,7 @@ export const navItems = [
   { path: "/admin/tarification", label: "Tarification", icon: Coins },
   { path: "/admin/gestion-pays", label: "Gestion des pays", icon: Settings },
   { path: "/admin/crm-clients", label: "CRM Clients", icon: Users },
+  { path: "/admin/reactivation-clients", label: "Réactivation Clients", icon: Bell },
   { path: "/admin/externe/clients", label: "Clients externes", icon: Users },
   { path: "/admin/publicites", label: "Publicités", icon: Megaphone },
   { path: "/admin/venus-brain", label: "Cerveau de VENUS", icon: Brain },

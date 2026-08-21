@@ -8,8 +8,6 @@ export default async function(req: Request): Promise<Response> {
     if (!user) return Response.json({ error: 'Authentification requise' }, { status: 401 });
     if (user.role !== 'admin') return Response.json({ error: 'Réservé aux administrateurs' }, { status: 403 });
 
-    // Accept both GET (direct) and POST (via base44.functions.invoke)
-
     const stats = await computeSegmentStats(base44);
 
     // Récupérer le nombre de campagnes
