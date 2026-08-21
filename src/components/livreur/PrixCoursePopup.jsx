@@ -1,21 +1,12 @@
 import React from "react";
 import { Banknote, MapPin, Check } from "lucide-react";
+import { haversineKm as haversine } from "@/lib/priceEstimate";
 
 /**
  * Pop-up obligatoire affiché une seule fois par course après livraison.
  * Montre le prix final = distance réelle × 100 F
  */
 export default function PrixCoursePopup({ course, onClose }) {
-  // Distance réelle entre récupération et livraison
-  function haversine(lat1, lon1, lat2, lon2) {
-    if (!lat1 || !lon1 || !lat2 || !lon2) return null;
-    const R = 6371;
-    const dLat = ((lat2 - lat1) * Math.PI) / 180;
-    const dLon = ((lon2 - lon1) * Math.PI) / 180;
-    const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  }
-
   // Priorité 1 : distance déjà calculée et stockée
   const distStockee =
     (Number(course.distance_reelle_km) > 0 ? Number(course.distance_reelle_km) : null) ||

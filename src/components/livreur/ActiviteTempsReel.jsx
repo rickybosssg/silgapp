@@ -3,19 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { useCoursesDisponibles } from "@/hooks/useCoursesDisponibles";
 import { MapPin, Package, Sparkles, Loader2, Flame } from "lucide-react";
-
-// ── Distance haversine (identique à dispatchConstants/geoUtils) ──
-function haversineKm(lat1, lon1, lat2, lng2) {
-  if (typeof lat1 !== "number" || typeof lon1 !== "number") return null;
-  if (typeof lat2 !== "number" || typeof lng2 !== "number") return null;
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lng2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
+import { haversineKm } from "@/lib/priceEstimate";
 
 /**
  * ActiviteTempsReel — remplace l'ancienne carte sombre "RECHERCHE ACTIVE".
