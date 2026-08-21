@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { haversineKm as haversineKmShared } from '../../shared/geoUtils.ts';
 
 // ─── Quartiers de référence (Ouagadougou) ────────────────────────────────────
 const QUARTIERS_REF = [
@@ -100,13 +101,7 @@ async function sendFcm(projectId, accessToken, fcmToken, titre, message) {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-function haversineKm(lat1, lon1, lat2, lon2) {
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
+// haversineKm importé depuis geoUtils (source canonique)
 
 function isRecentMin(dateStr, minutes) {
   if (!dateStr) return false;

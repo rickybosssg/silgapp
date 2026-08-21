@@ -48,7 +48,7 @@ import {
 import CoursesDisponibles from "@/components/livreur/CoursesDisponibles";
 
 // Haversine — utilisée aussi pour le calcul de prix
-function calculerDistance(lat1, lng1, lat2, lng2) {
+function haversineKm(lat1, lng1, lat2, lng2) {
   const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLon = ((lng2 - lng1) * Math.PI) / 180;
@@ -1275,7 +1275,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       if (!course.distance_reelle_km || course.distance_reelle_km === 0) {
         let dist = null;
         if (course.gps_depart_lat && course.gps_depart_lng && course.gps_arrivee_lat && course.gps_arrivee_lng) {
-          dist = calculerDistance(course.gps_depart_lat, course.gps_depart_lng, course.gps_arrivee_lat, course.gps_arrivee_lng);
+          dist = haversineKm(course.gps_depart_lat, course.gps_depart_lng, course.gps_arrivee_lat, course.gps_arrivee_lng);
         }
         if (!dist || dist < 0.1) {
           const lat1 = course.latitude_recuperation ?? course.gps_depart_lat;
@@ -1283,7 +1283,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
           const lat2 = course.latitude_livraison ?? course.latitude_arrivee_livraison ?? course.gps_arrivee_lat;
           const lng2 = course.longitude_livraison ?? course.longitude_arrivee_livraison ?? course.gps_arrivee_lng;
           if (lat1 && lng1 && lat2 && lng2) {
-            dist = calculerDistance(lat1, lng1, lat2, lng2);
+            dist = haversineKm(lat1, lng1, lat2, lng2);
           }
         }
         if (dist && dist >= 0.1) distUpdate.distance_reelle_km = Number(dist.toFixed(2));
@@ -1322,7 +1322,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     const baseData = { statut: "livree", heure_livraison: new Date().toISOString() };
 
     if (gpsArrivee && course.latitude_recuperation && course.longitude_recuperation) {
-      const distance = calculerDistance(
+      const distance = haversineKm(
         course.latitude_recuperation, course.longitude_recuperation,
         gpsArrivee.lat, gpsArrivee.lng
       );

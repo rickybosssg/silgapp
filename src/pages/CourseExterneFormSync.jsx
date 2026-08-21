@@ -40,7 +40,7 @@ function createColisDefaults(nb) {
 }
 
 // Haversine
-function calculerDistance(lat1, lng1, lat2, lng2) {
+function haversineKm(lat1, lng1, lat2, lng2) {
   const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLon = ((lng2 - lng1) * Math.PI) / 180;
@@ -607,7 +607,7 @@ export default function CourseExterneFormSync() {
         }
         // Si pas de résultat pré-calculé (reload, deep link), fallback Haversine local
         if (!tarif || prixEstime === 0) {
-          const distance = calculerDistance(
+          const distance = haversineKm(
             formData.gps_depart_lat, formData.gps_depart_lng,
             formData.gps_arrivee_lat, formData.gps_arrivee_lng
           );
@@ -615,7 +615,7 @@ export default function CourseExterneFormSync() {
           distanceTarifaireSource = "haversine_fallback";
         }
       } else {
-        const distance = calculerDistance(
+        const distance = haversineKm(
           formData.gps_depart_lat, formData.gps_depart_lng,
           formData.gps_arrivee_lat, formData.gps_arrivee_lng
         );
