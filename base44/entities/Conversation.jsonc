@@ -12,7 +12,16 @@
         "type": "string"
       },
       "default": [],
-      "description": "Tableau des User.id autorisés à accéder à cette conversation. Résolu côté backend UNIQUEMENT (jamais fourni par le frontend). Sert de base à la RLS read/update."
+      "description": "Tableau des User.id autoris\u00e9s \u00e0 acc\u00e9der \u00e0 cette conversation. R\u00e9solu c\u00f4t\u00e9 backend UNIQUEMENT (jamais fourni par le frontend). Sert de base \u00e0 la RLS read/update quand security_status=secured."
+    },
+    "security_status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "secured"
+      ],
+      "default": "pending",
+      "description": "Statut de s\u00e9curit\u00e9. pending = cr\u00e9ation non s\u00e9curis\u00e9e (seul le cr\u00e9ateur peut lire via created_by_id). secured = participant_user_ids r\u00e9solu c\u00f4t\u00e9 backend (seuls les participants peuvent lire). Toute cr\u00e9ation directe via SDK d\u00e9marre en pending \u2014 l'automation backfillConversationParticipants passe en secured apr\u00e8s r\u00e9solution."
     },
     "last_message": {
       "type": "string"
@@ -112,10 +121,24 @@
     "read": {
       "$or": [
         {
-          "data.participant_user_ids": "{{user.id}}"
+          "$and": [
+            {
+              "data.security_status": "secured"
+            },
+            {
+              "data.participant_user_ids": "{{user.id}}"
+            }
+          ]
         },
         {
-          "created_by_id": "{{user.id}}"
+          "$and": [
+            {
+              "data.security_status": "pending"
+            },
+            {
+              "created_by_id": "{{user.id}}"
+            }
+          ]
         },
         {
           "user_condition": {
@@ -128,10 +151,14 @@
     "update": {
       "$or": [
         {
-          "data.participant_user_ids": "{{user.id}}"
-        },
-        {
-          "created_by_id": "{{user.id}}"
+          "$and": [
+            {
+              "data.security_status": "secured"
+            },
+            {
+              "data.participant_user_ids": "{{user.id}}"
+            }
+          ]
         },
         {
           "user_condition": {
