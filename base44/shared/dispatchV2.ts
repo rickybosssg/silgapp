@@ -35,6 +35,7 @@ import { STATUTS_ACTIFS_COURSE, STATUTS_TERMINAUX_COURSE, calculerDistance, char
 import { dispatchLog, reponseDejaPrise, generateToken, generatePIN, journaliserDispatch } from './dispatchUtils.ts';
 import { enregistrerNotification, getLivreursNotifies, getLivreursRefuses, marquerAccepte } from './dispatchNotifications.ts';
 import { chargerConfigDispatch } from './dispatchConfig.ts';
+import { resolveCourseParticipantUserIds } from './conversationSecurity.ts';
 
 // ── Version du bundle (pour vérifier que la production charge la dernière version) ──
 export const DISPATCH_V2_BUNDLE_VERSION = '2026-08-17-fix-en-attente-accept';
@@ -453,6 +454,22 @@ export async function accepterCourseV2(base44: any, courseId: string, livreurId:
             : (course.prix_estimate ? `Prix estimé : ${Number(course.prix_estimate).toLocaleString()} ${course.devise || 'FCFA'}` : '');
           const messageContent = `🔑 Code de récupération : ${pickupPIN}\n📦 Code de livraison : ${deliveryPIN}${prixLabel ? `\n💰 ${prixLabel}` : ''}`;
 
+          // 🔒 Résolution des participants côté backend (jamais du frontend)
+          // Le message contient les codes PIN — il doit être sécurisé immédiatement.
+          let participantUserIds: string[] = [];
+          let messageSecurityStatus: 'secured' | 'pending' = 'pending';
+          try {
+            const clientId = courseVerifie.expediteur_client_id || courseVerifie.destinataire_client_id;
+            participantUserIds = await resolveCourseParticipantUserIds(base44, livreurId, clientId);
+            if (participantUserIds.length > 0) {
+              messageSecurityStatus = 'secured';
+            } else {
+              dispatchLog(`[V2] ⚠️ [SECURITÉ] Message PIN course ${courseId}: resolveCourseParticipantUserIds a retourné 0 User.id — message créé en pending (backfill nécessaire)`);
+            }
+          } catch (err: any) {
+            dispatchLog(`[V2] ❌ [SECURITÉ] Message PIN course ${courseId}: échec résolution participants — ${err?.message} — message créé en pending (backfill nécessaire)`);
+          }
+
           await base44.asServiceRole.entities.Message.create({
             course_id: courseId,
             sender_type: 'admin',
@@ -462,6 +479,8 @@ export async function accepterCourseV2(base44: any, courseId: string, livreurId:
             content: messageContent,
             source: 'app',
             client_message_id: idempotencyKey,
+            participant_user_ids: participantUserIds,
+            security_status: messageSecurityStatus,
           });
 
           // 📤 Push notification au livreur avec PIN + prix

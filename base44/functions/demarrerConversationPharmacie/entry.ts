@@ -62,6 +62,7 @@ Deno.serve(async (req) => {
       group_type: 'direct',
       last_message: '',
       participant_user_ids: participantUserIds,
+      security_status: participantUserIds.length > 0 ? 'secured' : 'pending',
     });
 
     console.log(`[demarrerConversationPharmacie] ✅ Conversation créée: ${conv.id}`);

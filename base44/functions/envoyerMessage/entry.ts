@@ -178,6 +178,7 @@ Deno.serve(async (req) => {
       audio_url: audio_url || null,
       photo_url: photo_url || null,
       participant_user_ids: messageParticipantUserIds,
+      security_status: messageParticipantUserIds.length > 0 ? 'secured' : 'pending',
     });
 
     // ── 4. Mettre à jour la conversation (last_message) ──

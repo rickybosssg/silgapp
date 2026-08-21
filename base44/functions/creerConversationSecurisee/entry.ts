@@ -74,6 +74,7 @@ Deno.serve(async (req) => {
       group_type: group_type || 'direct',
       title: title || '',
       participant_user_ids: userIds,
+      security_status: userIds.length > 0 ? 'secured' : 'pending',
     });
 
     return Response.json({

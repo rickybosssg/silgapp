@@ -478,6 +478,7 @@ Deno.serve(async (req) => {
               await base44.asServiceRole.entities.Message.create({
                 course_id: course_id,
                 participant_user_ids: courseMsgUserIds,
+                security_status: courseMsgUserIds.length > 0 ? 'secured' : 'pending',
                 sender_type: 'admin',
                 sender_id: 'silgapp_system',
                 sender_name: 'SILGAPP',

@@ -461,6 +461,7 @@ Deno.serve(async (req) => {
           await base44.asServiceRole.entities.Message.create({
             conversation_id: conversationForSend.id,
             participant_user_ids: conversationForSend.participant_user_ids || [],
+            security_status: (conversationForSend.participant_user_ids && conversationForSend.participant_user_ids.length > 0) ? 'secured' : 'pending',
             sender_type: 'admin',
             sender_id: 'venus',
             sender_name: 'VENUS',

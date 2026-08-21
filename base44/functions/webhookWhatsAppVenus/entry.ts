@@ -298,6 +298,7 @@ Deno.serve(async (req) => {
       conversation = await base44.asServiceRole.entities.Conversation.create({
         participants,
         participant_user_ids: convUserIds,
+        security_status: convUserIds.length > 0 ? 'secured' : 'pending',
         title: profileName || telephone,
         whatsapp_phone: normalizedTel,
         silgapp_from_number: fromNumber,
@@ -373,6 +374,7 @@ Deno.serve(async (req) => {
     await base44.asServiceRole.entities.Message.create({
       conversation_id: conversation.id,
       participant_user_ids: conversation.participant_user_ids || [],
+      security_status: (conversation.participant_user_ids && conversation.participant_user_ids.length > 0) ? 'secured' : 'pending',
       sender_type: 'client',
       sender_id: normalizedTel,
       sender_name: profileName || telephone,
@@ -1044,6 +1046,7 @@ Deno.serve(async (req) => {
     await base44.asServiceRole.entities.Message.create({
       conversation_id: conversation.id,
       participant_user_ids: conversation.participant_user_ids || [],
+      security_status: (conversation.participant_user_ids && conversation.participant_user_ids.length > 0) ? 'secured' : 'pending',
       sender_type: 'admin',
       sender_id: 'venus',
       sender_name: 'VENUS',
