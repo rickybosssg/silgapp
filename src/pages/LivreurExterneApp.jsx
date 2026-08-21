@@ -106,6 +106,7 @@ function logAcceptationLivreur(event, details = {}) {
 export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("courses");
+  const [pendingConversationId, setPendingConversationId] = useState(null);
   const [gpsActif, setGpsActif] = useState(false);
   const [onboardingTermine, setOnboardingTermine] = useState(false);
   const [showMesInfos, setShowMesInfos] = useState(false);
@@ -438,6 +439,13 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   useEffect(() => {
     const handleNotificationOpened = (event) => {
       const data = event?.detail || {};
+      // ── Deep-link messages : ouvrir la conversation concernée ──
+      if (data.type === "nouveau_message") {
+        const convId = String(data.conversation_id || "").trim();
+        setPendingConversationId(convId || null);
+        setActiveTab("messages");
+        return;
+      }
       if (data.type !== "nouvelle_course" && data.type !== "course_assignee") return;
       stopUrgentCourseAlert("app-opened");
       if (data.course_id) setNotificationCourseId(data.course_id);
@@ -1714,7 +1722,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
             myType="livreur"
             myId={livreurProfil?.id}
             myName={`${livreurProfil?.prenom || ""} ${livreurProfil?.nom || ""}`.trim() || livreurProfil?.telephone}
-            onBack={() => setActiveTab("courses")}
+            initialConversationId={pendingConversationId}
+            onBack={() => { setPendingConversationId(null); setActiveTab("courses"); }}
           />
         )}
 

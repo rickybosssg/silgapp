@@ -359,6 +359,19 @@ export default function MessagesPage({ myType, myId, myName, onBack, initialConv
     setLoading(false);
   };
 
+  // ── Sécurité : vérifier que initialConversationId appartient bien à l'utilisateur ──
+  // Si la conversation n'est pas dans la liste de l'utilisateur connecté, on l'ignore
+  // et on affiche la liste générale. Empêche l'accès à une conversation non autorisée
+  // via un payload FCM falsifié ou obsolète.
+  useEffect(() => {
+    if (loading) return;
+    if (!activeConvId) return;
+    const isMine = conversations.some(c => c.id === activeConvId);
+    if (!isMine) {
+      setActiveConvId(null);
+    }
+  }, [activeConvId, conversations, loading]);
+
   // Marquer une conversation comme lue côté admin à l'ouverture + update locale
   const markConversationRead = async (convId) => {
     if (myType !== "admin") return;

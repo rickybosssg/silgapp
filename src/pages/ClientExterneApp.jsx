@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { useHeartbeat } from "@/hooks/useHeartbeat";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { useClientNotifications } from "@/hooks/useClientNotifications";
-import { registerPushToken } from "@/lib/notifications";
+import { registerPushToken, consumePendingNotificationData } from "@/lib/notifications";
 import { usePushTokenRetry } from "@/hooks/usePushTokenRetry";
 import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
@@ -83,6 +83,7 @@ export default function ClientExterneApp() {
   const [notationShownFor, setNotationShownFor] = useState(null);
   const [courseAnnuleeRelance, setCourseAnnuleeRelance] = useState(null); // course annulée auto → proposer relance
   const [showMessages, setShowMessages] = useState(false);
+  const [pendingConversationId, setPendingConversationId] = useState(null);
   const [showNotificationsPanel, setShowNotificationsPanel] = useState(false);
   const [notificationPanelItems, setNotificationPanelItems] = useState([]);
   const [sessionId, setSessionId] = useState(() => {
@@ -358,6 +359,21 @@ export default function ClientExterneApp() {
     user_type: "client",
     client_id: clientProfil.id,
   } : null);
+
+  // ── Deep-link : clic sur notification "nouveau_message" → ouvrir la conversation ──
+  useEffect(() => {
+    const handleMessageNotification = (event) => {
+      const data = event?.detail || {};
+      if (data.type !== "nouveau_message") return;
+      const convId = String(data.conversation_id || "").trim();
+      setPendingConversationId(convId || null);
+      setShowMessages(true);
+    };
+    window.addEventListener("silgapp:notification-opened", handleMessageNotification);
+    // Cold start : vérifier si l'app a été ouverte depuis une notification
+    consumePendingNotificationData();
+    return () => window.removeEventListener("silgapp:notification-opened", handleMessageNotification);
+  }, []);
 
   useEffect(() => {
     loadProfil();
@@ -1496,7 +1512,8 @@ export default function ClientExterneApp() {
             myType="client"
             myId={clientProfil?.id}
             myName={prenom}
-            onBack={() => setShowMessages(false)}
+            initialConversationId={pendingConversationId}
+            onBack={() => { setPendingConversationId(null); setShowMessages(false); }}
           />
         </div>
       )}
