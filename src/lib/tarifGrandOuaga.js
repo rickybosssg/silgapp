@@ -16,12 +16,14 @@
 import { base44 } from "@/api/base44Client";
 import { haversineKm } from "./priceEstimate";
 
-// ── Fallback hardcoded (uniquement si aucune config backend jamais reçue) ──
+// ── Fallback générique (uniquement si aucune config backend jamais reçue) ──
+// Aucun pays codé en dur — valeurs neutres utilisées uniquement avant la
+// première synchronisation avec le backend.
 const FALLBACK_CONFIG = {
   palier_1_km_max: 15,
-  palier_1_prix: 1250,
+  palier_1_prix: 0,
   palier_2_km_max: 25,
-  palier_2_prix: 1750,
+  palier_2_prix: 0,
   tolerance_min_km: 14,
   tolerance_max_km: 16,
   seuil_strict_km: 15,
@@ -35,68 +37,94 @@ const CACHE_TTL_MS = 5 * 60 * 1000; // 5 min en mémoire
 // config reçue plutôt qu'un tarif figé dans l'APK. Le fallback hardcodé
 // n'est utilisé QUE si aucune config n'a JAMAIS été reçue.
 
-let memoryCache = null;
+let memoryCache = {};
 let memoryCacheExpires = 0;
 
 /**
  * Charge la config tarifaire Grand Ouaga depuis le backend.
  * Cache en mémoire (5 min) + localStorage (24h) pour le hors-ligne.
  */
-async function loadTarifConfig() {
-  // 1. Cache en mémoire
-  if (memoryCache && Date.now() < memoryCacheExpires) {
-    return memoryCache;
+async function loadTarifConfig(countryCode = null) {
+  // 1. Cache en mémoire (clé par pays)
+  const cacheKey = countryCode || "default";
+  if (memoryCache?.[cacheKey] && Date.now() < memoryCacheExpires) {
+    return memoryCache[cacheKey];
   }
 
-  // 2. Tentative backend
-  try {
-    const res = await base44.functions.invoke("getTarifZones", { country_code: "BF" });
-    const data = res?.data || res;
-    const zones = data?.zones || [];
-    const ouagaZone = zones.find(
-      (z) => z.zone_tarifaire === "GRAND_OUAGA" || (!z.ville || z.ville === "Ouagadougou")
-    );
-    if (ouagaZone) {
-      memoryCache = ouagaZone;
-      memoryCacheExpires = Date.now() + CACHE_TTL_MS;
-      // Persister en localStorage pour le hors-ligne
-      try {
-        localStorage.setItem(
-          CACHE_KEY,
-          JSON.stringify({ config: ouagaZone, saved_at: Date.now() })
-        );
-      } catch (_) {}
-      return ouagaZone;
+  // 2. Tentative backend (country_code dynamique — aucun pays codé en dur)
+  if (countryCode) {
+    try {
+      const res = await base44.functions.invoke("getTarifZones", { country_code: countryCode });
+      const data = res?.data || res;
+      const zones = data?.zones || [];
+      // Sélectionner la zone applicable (ville ou pays)
+      const zone = zones[0];
+      if (zone) {
+        if (!memoryCache) memoryCache = {};
+        memoryCache[cacheKey] = zone;
+        memoryCacheExpires = Date.now() + CACHE_TTL_MS;
+        try {
+          localStorage.setItem(
+            CACHE_KEY + "_" + cacheKey,
+            JSON.stringify({ config: zone, saved_at: Date.now() })
+          );
+        } catch (_) {}
+        return zone;
+      }
+    } catch (err) {
+      // Backend indisponible — essayer le cache persistant
     }
-  } catch (err) {
-    // Backend indisponible — essayer le cache persistant
   }
 
   // 3. Cache persistant (localStorage) — hors-ligne, sans expiration
-  //    La dernière config connue reste valide indéfiniment. Le fallback
-  //    hardcodé n'est utilisé QUE si aucune config n'a jamais été reçue.
   try {
-    const raw = localStorage.getItem(CACHE_KEY);
+    const raw = localStorage.getItem(CACHE_KEY + "_" + (countryCode || "default"));
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed.config) {
-        memoryCache = parsed.config;
+        if (!memoryCache) memoryCache = {};
+        memoryCache[cacheKey] = parsed.config;
         memoryCacheExpires = Date.now() + CACHE_TTL_MS;
         return parsed.config;
       }
     }
   } catch (_) {}
 
-  // 4. Fallback hardcoded (dernier recours)
+  // 4. Fallback générique (dernier recours — aucun pays codé en dur)
   return FALLBACK_CONFIG;
 }
 
 /**
- * Vérifie si un pays est éligible à la tarification Grand Ouaga.
- * Actuellement : Burkina Faso uniquement.
+ * Vérifie si un pays est éligible à une tarification par paliers.
+ * Dynamique : interroge le backend pour savoir si une TarifZone existe.
+ * Cache le résultat en localStorage (24h) pour éviter les requêtes répétées.
+ */
+export async function isPaysTarificationParPaliers(countryCode) {
+  if (!countryCode) return false;
+  const key = "silgapp_has_tarif_zone_" + countryCode;
+  try {
+    const cached = localStorage.getItem(key);
+    if (cached !== null) return cached === "true";
+  } catch (_) {}
+  try {
+    const res = await base44.functions.invoke("getTarifZones", { country_code: countryCode });
+    const data = res?.data || res;
+    const zones = data?.zones || [];
+    const has = zones.length > 0;
+    try { localStorage.setItem(key, String(has)); } catch (_) {}
+    return has;
+  } catch (_) {
+    return false;
+  }
+}
+
+/**
+ * @deprecated Utiliser isPaysTarificationParPaliers (async) à la place.
+ * Conserver uniquement pour rétrocompatibilité — retourne true pour tout pays
+ * pouvant avoir une TarifZone configurée.
  */
 export function isPaysTarificationGrandOuaga(countryCode) {
-  return String(countryCode || "").toUpperCase() === "BF";
+  return !!countryCode;
 }
 
 /**
@@ -118,14 +146,14 @@ export function isGpsApproximatif(sourceDepart, sourceArrivee) {
  * @returns {Promise<{prix: number, tranche: string, source: string, devise: string}|null>}
  *   null = distance > palier_2_km_max (pas de tarif automatique, intervention Admin requise)
  */
-export async function calculerTarifGrandOuaga(distanceKm, sourceDepart, sourceArrivee) {
+export async function calculerTarifGrandOuaga(distanceKm, sourceDepart, sourceArrivee, countryCode = null) {
   if (distanceKm === null || distanceKm === undefined || isNaN(Number(distanceKm))) {
     return null;
   }
 
   const dist = Number(distanceKm);
   const approx = isGpsApproximatif(sourceDepart, sourceArrivee);
-  const config = await loadTarifConfig();
+  const config = await loadTarifConfig(countryCode);
 
   const palier1KmMax = config.palier_1_km_max ?? FALLBACK_CONFIG.palier_1_km_max;
   const palier1Prix = config.palier_1_prix ?? FALLBACK_CONFIG.palier_1_prix;
@@ -223,16 +251,19 @@ export async function calculerTarifGrandOuagaAsync(
   fromLat, fromLng, toLat, toLng,
   countryCode, sourceDepart, sourceArrivee, courseId = null
 ) {
-  if (!isPaysTarificationGrandOuaga(countryCode)) return null;
+  if (!countryCode) return null;
   if (!fromLat || !fromLng || !toLat || !toLng) return null;
+
+  const hasTarifZone = await isPaysTarificationParPaliers(countryCode);
+  if (!hasTarifZone) return null;
 
   const { distanceKm, source: distanceSource, error } = await fetchDistanceTarifaireORS(
     fromLat, fromLng, toLat, toLng, countryCode, courseId
   );
 
-  const tarif = await calculerTarifGrandOuaga(distanceKm, sourceDepart, sourceArrivee);
+  const tarif = await calculerTarifGrandOuaga(distanceKm, sourceDepart, sourceArrivee, countryCode);
   if (!tarif) {
-    const config = await loadTarifConfig();
+    const config = await loadTarifConfig(countryCode);
     const palier2KmMax = config.palier_2_km_max ?? FALLBACK_CONFIG.palier_2_km_max;
     return {
       prix: null,
