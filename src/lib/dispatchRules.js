@@ -193,3 +193,14 @@ export function isClientNoir(client) {
   if (!client.latitude || !client.longitude) return true;
   return !isClientGPSRecent(client);
 }
+
+// ── Exports rétrocompatibles (anciennes constantes) ───────────────────────
+// Résolus une fois au chargement du module (depuis le cache ou les defaults).
+// Pour des valeurs toujours à jour, utiliser les fonctions get*().
+export const GPS_SEUIL_MIN = getGpsSeuilMin();
+export const GPS_DISPATCH_SEUIL_MIN = getGpsDispatchSeuilMin();
+export const GPS_EXPIRE_SEUIL_MIN = getGpsExpireSeuilMin();
+export const GPS_CLIENT_SEUIL_MIN = getGpsClientSeuilMin();
+export const GPS_MAX_STALE_MIN = getConfig().gps_max_stale_min;
+export const HEARTBEAT_SEUIL_MIN = getHeartbeatSeuilMin();
+export const HEARTBEAT_ON_SEUIL_MIN = getHeartbeatOnSeuilMin();

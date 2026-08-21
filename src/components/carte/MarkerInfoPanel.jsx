@@ -3,9 +3,7 @@ import { X, Phone, MessageCircle, MapPin, Wifi, WifiOff, Truck, User, Store, Ute
 import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
-
-const GPS_SEUIL_MIN = 5;
-const GPS_CLIENT_SEUIL_MIN = 30;
+import { GPS_SEUIL_MIN, GPS_CLIENT_SEUIL_MIN } from "@/lib/dispatchRules";
 
 function isEnLigne(entity) {
   if (!entity?.app_active) return false;
