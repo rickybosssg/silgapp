@@ -48,7 +48,19 @@
     },
     "format_numero": {
       "type": "string",
-      "description": "Format des num\u00e9ros locaux (ex: XX XX XX XX)"
+      "description": "Format des num\u00e9ros locaux (ex: XX XX XX XX). Informatif uniquement \u2014 la validation utilise phone_min_length / phone_max_length."
+    },
+    "phone_min_length": {
+      "type": "number",
+      "description": "Longueur minimale du num\u00e9ro national (sans l'indicatif international). Ex: 8 pour BF, 10 pour CI et BJ. Source unique pour la validation frontend et backend."
+    },
+    "phone_max_length": {
+      "type": "number",
+      "description": "Longueur maximale du num\u00e9ro national (sans l'indicatif international). Ex: 8 pour BF, 10 pour CI et BJ, 11 pour NG (avec leading 0). Source unique pour la validation frontend et backend."
+    },
+    "phone_pattern": {
+      "type": "string",
+      "description": "Pattern regex optionnel pour valider le format du num\u00e9ro national (ex: ^[0-9]{8}$). Si vide, la validation utilise phone_min_length / phone_max_length uniquement."
     },
     "format_adresse": {
       "type": "string",

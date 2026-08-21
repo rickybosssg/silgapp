@@ -7,37 +7,49 @@
  * ⚠️ Aucun pays codé en dur — la liste SILGAPP_COUNTRIES ci-dessous est un
  *    FALLBACK minimal (BF uniquement) utilisé uniquement avant le chargement
  *    de la BDD. La liste réelle est chargée dynamiquement depuis Country.
+ *
+ * Les règles téléphone (min_len, max_len) proviennent de l'entité Country
+ * (champs phone_min_length / phone_max_length). Aucune limite universelle de
+ * 8 chiffres — chaque pays a ses propres règles.
  */
 
 import { base44 } from "@/api/base44Client";
 
 // Fallback minimal — uniquement utilisé si la BDD n'est pas encore chargée
 export const SILGAPP_COUNTRIES = [
-  { code: "BF", dial: "226", len: 8, name: "Burkina Faso", flag: "" },
+  { code: "BF", dial: "226", len: 8, min_len: 8, max_len: 8, name: "Burkina Faso", flag: "" },
 ];
 
 let _dynamicCountriesLoaded = false;
 
 /**
- * Charge dynamiquement les configs pays depuis Country (indicatif, format).
+ * Charge dynamiquement les configs pays depuis Country (indicatif, format, règles téléphone).
  * Idempotent — ne charge qu'une seule fois.
  */
 export async function loadCountryPhoneConfigs() {
   if (_dynamicCountriesLoaded) return;
   try {
     const countries = await base44.entities.Country.filter({ actif: true });
-    const dynamic = (countries || []).map(c => ({
-      code: c.code,
-      dial: String(c.indicatif || "").replace("+", "").replace(/\s/g, ""),
-      len: c.format_numero ? parseInt(c.format_numero.replace(/\D/g, "").length) || 8 : 8,
-      name: c.nom,
-      flag: c.emoji_flag || "",
-    })).filter(c => c.code && c.dial);
+    const dynamic = (countries || []).map(c => {
+      const minLen = c.phone_min_length || 8;
+      const maxLen = c.phone_max_length || minLen;
+      return {
+        code: c.code,
+        dial: String(c.indicatif || "").replace("+", "").replace(/\s/g, ""),
+        len: maxLen, // backward compat
+        min_len: minLen,
+        max_len: maxLen,
+        name: c.nom,
+        flag: c.emoji_flag || "",
+      };
+    }).filter(c => c.code && c.dial);
 
-    // Fusionner sans doublons (priorité à la BDD)
-    const existingCodes = new Set(SILGAPP_COUNTRIES.map(c => c.code));
+    // Fusionner sans doublons (priorité à la BDD — remplace le fallback)
     for (const c of dynamic) {
-      if (!existingCodes.has(c.code)) {
+      const idx = SILGAPP_COUNTRIES.findIndex(s => s.code === c.code);
+      if (idx >= 0) {
+        SILGAPP_COUNTRIES[idx] = c;
+      } else {
         SILGAPP_COUNTRIES.push(c);
       }
     }
@@ -86,11 +98,13 @@ export function extractLocalPhone(phone, countryCode = "") {
     digits = digits.slice(country.dial.length);
   }
 
-  if (digits.startsWith("0") && digits.length > country.len) {
+  const maxLen = country.max_len || country.len || 8;
+
+  if (digits.startsWith("0") && digits.length > maxLen) {
     digits = digits.slice(1);
   }
 
-  return digits.slice(0, country.len);
+  return digits.slice(0, maxLen);
 }
 
 export function formatLocalPhone(phone, countryCode = "") {
@@ -102,7 +116,32 @@ export function formatLocalPhone(phone, countryCode = "") {
 }
 
 export function phonePlaceholder(countryCode = "") {
-  return "XX XX XX XX";
+  const country = getCountryConfig(countryCode);
+  if (!country) return "XX XX XX XX";
+  const maxLen = country.max_len || country.len || 8;
+  return "X".repeat(maxLen).replace(/(.{2})/g, "$1 ").trim();
+}
+
+/**
+ * Valide un numéro local selon les règles du pays.
+ * @returns {{ valid: boolean, error: string|null, length: number, min: number, max: number }}
+ */
+export function validateLocalPhone(phone, countryCode = "") {
+  const country = getCountryConfig(countryCode);
+  const digits = onlyDigits(phone);
+  if (!country) {
+    return { valid: digits.length > 0, error: null, length: digits.length, min: 0, max: 0 };
+  }
+  const min = country.min_len || country.len || 8;
+  const max = country.max_len || country.len || 8;
+  const len = digits.length;
+  if (len < min) {
+    return { valid: false, error: `Trop court (${len}/${min} chiffres minimum)`, length: len, min, max };
+  }
+  if (len > max) {
+    return { valid: false, error: `Trop long (${len}/${max} chiffres maximum)`, length: len, min, max };
+  }
+  return { valid: true, error: null, length: len, min, max };
 }
 
 export function normalizePhone(phone, countryCode = null) {
@@ -120,7 +159,8 @@ export function normalizePhone(phone, countryCode = null) {
     const country = getCountryConfig(countryCode);
     if (country) {
       const local = extractLocalPhone(n, country.code);
-      if (local.length === country.len) return country.dial + local;
+      const maxLen = country.max_len || country.len || 8;
+      if (local.length >= (country.min_len || country.len || 8) && local.length <= maxLen) return country.dial + local;
     }
   }
 
