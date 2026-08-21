@@ -1,29 +1,35 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { resolveDialCode } from '../../shared/countryResolver.ts';
 
 /**
  * Normalise un numéro de téléphone :
  * - Supprime les espaces, tirets, points
- * - Ajoute l'indicatif 226 si manquant
- * - Retourne uniquement les chiffres
+ * - Retire l'indicatif pays si présent
+ * - Retourne uniquement les chiffres locaux
  */
-function normalizePhone(phone) {
+async function normalizePhone(base44, phone, countryCode) {
   if (!phone) return "";
-
-  // Supprimer tous les caractères non numériques sauf +
   let cleaned = phone.replace(/[^\d+]/g, "");
 
-  // Gérer l'indicatif
-  if (cleaned.startsWith("+226")) {
-    cleaned = cleaned.substring(4);
-  } else if (cleaned.startsWith("226")) {
-    cleaned = cleaned.substring(3);
-  } else if (cleaned.startsWith("+")) {
+  // Retirer l'indicatif pays résolu dynamiquement
+  if (countryCode) {
+    const dial = await resolveDialCode(base44, countryCode);
+    if (dial) {
+      const dialDigits = dial.replace(/^\+/, "");
+      if (cleaned.startsWith("+" + dialDigits)) {
+        cleaned = cleaned.substring(dialDigits.length + 1);
+      } else if (cleaned.startsWith(dialDigits)) {
+        cleaned = cleaned.substring(dialDigits.length);
+      }
+    }
+  }
+
+  // Retirer un + générique restant
+  if (cleaned.startsWith("+")) {
     cleaned = cleaned.substring(1);
   }
 
-  // Garder uniquement les chiffres
   cleaned = cleaned.replace(/\D/g, "");
-
   return cleaned;
 }
 
@@ -40,13 +46,13 @@ Deno.serve(async (req) => {
 
     // Action 1: Normaliser un numéro
     if (action === "normalize") {
-      const normalized = normalizePhone(phone);
+      const normalized = await normalizePhone(base44, phone, body.country_code);
       return Response.json({ normalized });
     }
 
     // Action 2: Trouver un client par téléphone normalisé
     if (action === "find_client") {
-      const normalized = normalizePhone(phone);
+      const normalized = await normalizePhone(base44, phone, body.country_code);
 
       const clients = await base44.entities.ClientExterne.filter({
         actif: true
@@ -54,7 +60,7 @@ Deno.serve(async (req) => {
 
       // Chercher un client dont le téléphone correspond
       const foundClient = clients.find(client => {
-        const clientNormalized = normalizePhone(client.telephone);
+        const clientNormalized = normalizePhone(base44, client.telephone, client.country_code);
         return clientNormalized === normalized;
       });
 

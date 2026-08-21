@@ -313,3 +313,17 @@ export async function resolveDialCode(countryCode) {
   const config = await getCountryConfig(countryCode);
   return config?.indicatif || '';
 }
+
+/**
+ * Version synchrone : utilise le cache en mémoire/localStorage uniquement.
+ * Retourne "" si le cache n'est pas encore chargé (jamais de fallback "+226").
+ *
+ * @param {string} [countryCode] - code pays ISO 2 lettres (si omis, utilise le pays par défaut de la session)
+ * @returns {string} indicatif (ex: "+226") ou ""
+ */
+export function getDialCodeSync(countryCode) {
+  const code = countryCode || getDefaultCountryCodeSync();
+  if (!code || !_countriesCache) return '';
+  const config = _countriesCache.find(c => c.code === code);
+  return config?.indicatif || '';
+}

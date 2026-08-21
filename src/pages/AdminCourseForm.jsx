@@ -26,29 +26,6 @@ function generarQRData() {
   return { pickupQrToken, deliveryQrToken, pickupCode4, deliveryCode4 };
 }
 
-const COUNTRY_DIAL_CODE = {
-  BF: "226", CI: "225", TG: "228", BJ: "229", SN: "221",
-  ML: "223", GN: "224", NE: "227", GH: "233",
-};
-
-function cleanPhone(phone, countryCode) {
-  let digits = (phone || "").replace(/\D/g, "");
-  if (!digits) return "";
-
-  const dial = COUNTRY_DIAL_CODE[countryCode] || "";
-
-  // Déjà au format international (commence par l'indicatif)
-  if (digits.startsWith(dial) && digits.length >= dial.length + 6) return digits;
-
-  // Format local avec 0 initial → retirer le 0
-  if (digits.startsWith("0")) digits = digits.slice(1);
-
-  // Ajouter l'indicatif pays si le numéro est court (format local)
-  if (digits.length <= 9) return dial + digits;
-
-  return digits;
-}
-
 const PAYS = [
   { code: "BF", nom: "Burkina Faso", drapeau: "🇧🇫" },
   { code: "CI", nom: "Côte d'Ivoire", drapeau: "🇨🇮" },

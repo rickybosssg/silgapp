@@ -61,7 +61,7 @@ const normalizeSearch = (value) =>
 const onlyDigits = (value) => String(value || "").replace(/\D/g, "");
 
 export function getCountryConfig(countryCode = "") {
-  return SILGAPP_COUNTRIES.find((item) => item.code === countryCode) || SILGAPP_COUNTRIES[0];
+  return SILGAPP_COUNTRIES.find((item) => item.code === countryCode) || null;
 }
 
 export function getCountryLabel(countryCode) {
@@ -80,6 +80,7 @@ export function searchCountries(query) {
 export function extractLocalPhone(phone, countryCode = "") {
   const country = getCountryConfig(countryCode);
   let digits = onlyDigits(phone);
+  if (!country) return digits;
 
   if (digits.startsWith(country.dial)) {
     digits = digits.slice(country.dial.length);
@@ -94,6 +95,7 @@ export function extractLocalPhone(phone, countryCode = "") {
 
 export function formatLocalPhone(phone, countryCode = "") {
   const country = getCountryConfig(countryCode);
+  if (!country) return onlyDigits(phone);
   const local = extractLocalPhone(phone, country.code);
 
   return local.match(/.{1,2}/g)?.join(" ") || local;
@@ -116,8 +118,10 @@ export function normalizePhone(phone, countryCode = null) {
 
   if (countryCode) {
     const country = getCountryConfig(countryCode);
-    const local = extractLocalPhone(n, country.code);
-    if (local.length === country.len) return country.dial + local;
+    if (country) {
+      const local = extractLocalPhone(n, country.code);
+      if (local.length === country.len) return country.dial + local;
+    }
   }
 
   if (n.startsWith("0")) {

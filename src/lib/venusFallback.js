@@ -17,15 +17,15 @@ const PAYS_INFOS = {
 const SUPPORT_PHONE = "+226 66 92 51 90";
 
 function getPaysInfo(countryContext) {
-  if (!countryContext?.code) return PAYS_INFOS.BF;
+  if (!countryContext?.code) return null;
   return PAYS_INFOS[countryContext.code] || {
-    ...PAYS_INFOS.BF,
     nom: countryContext.nom || countryContext.code,
     devise: countryContext.devise || "FCFA",
     prix_km: countryContext.prix_par_km || 100,
     minimum: countryContext.prix_minimum || 1000,
     ville: countryContext.ville || "",
     indicatif: countryContext.indicatif || "",
+    emoji: countryContext.emoji_flag || "",
   };
 }
 
