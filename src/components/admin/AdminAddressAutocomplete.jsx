@@ -106,6 +106,10 @@ export default function AdminAddressAutocomplete({
       }
 
       // 2. Enregistrer le nouveau quartier en base
+      if (!countryCode) {
+        toast?.error?.("Pays requis pour créer un quartier (COUNTRY_REQUIRED).");
+        return;
+      }
       const nouveauQuartier = await base44.entities.Quartier.create({
         country_code: countryCode,
         nom: nomQuartier,

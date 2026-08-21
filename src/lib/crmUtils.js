@@ -91,6 +91,10 @@ export async function upsertClientsFromCourseContacts(courseData, countryCode) {
  * Crée ou met à jour une fiche client SANS statistiques.
  */
 async function upsertClientContact(phone, countryCode, name, role, courseData) {
+  if (!countryCode) {
+    console.error("[crmUtils] upsertClientContact: countryCode manquant (COUNTRY_REQUIRED). Aucune fiche client créée.");
+    return null;
+  }
   const normalized = normalizePhone(phone, countryCode);
   if (!normalized || normalized.length < 8) return null;
 

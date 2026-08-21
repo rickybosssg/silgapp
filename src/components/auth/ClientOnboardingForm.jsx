@@ -64,6 +64,11 @@ export default function ClientOnboardingForm({ user, onComplete }) {
       return;
     }
 
+    if (!form.country_code) {
+      setError("Le pays est obligatoire. Sélectionnez votre pays avant de continuer (COUNTRY_REQUIRED).");
+      return;
+    }
+
     if (localPhone.length !== selectedCountry.len) {
       setError(`Le numéro ${selectedCountry.name} doit contenir ${selectedCountry.len} chiffres.`);
       return;

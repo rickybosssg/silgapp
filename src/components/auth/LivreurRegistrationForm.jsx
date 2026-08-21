@@ -96,6 +96,11 @@ export default function LivreurRegistrationForm({ user, onComplete }) {
       setError("La photo de profil est obligatoire.");
       return;
     }
+    if (!form.country_code) {
+      setError("Le pays est obligatoire. Sélectionnez votre pays avant de continuer (COUNTRY_REQUIRED).");
+      return;
+    }
+
     if (!cnibRecto || !cnibVerso) {
       setError("Les photos CNIB recto et verso sont obligatoires.");
       return;
