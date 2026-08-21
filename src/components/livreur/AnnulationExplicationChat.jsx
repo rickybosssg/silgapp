@@ -63,12 +63,17 @@ export default function AnnulationExplicationChat({
         if (found) {
           setConversationId(found.id);
         } else {
-          const conv = await base44.entities.Conversation.create({
-            participants: JSON.stringify(participants),
+          // ── Sécurité : création via backend pour résoudre participant_user_ids côté serveur ──
+          const res = await base44.functions.invoke("creerConversationSecurisee", {
+            participants,
             group_type: "direct",
             title: `Annulation course #${(course.id || "").slice(-6)}`,
           });
-          setConversationId(conv.id);
+          if (res?.data?.success && res.data.conversation) {
+            setConversationId(res.data.conversation.id);
+          } else {
+            throw new Error(res?.data?.error || "Échec création conversation");
+          }
         }
       } catch (err) {
         console.error("Erreur init conversation annulation:", err);

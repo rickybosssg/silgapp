@@ -50,21 +50,21 @@ export default function SupportChatWindow({ livreurId, livreurName, myType, myId
         if (existing) {
           setConversationId(existing.id);
         } else {
-          // Créer une nouvelle conversation de support
-          const participants = JSON.stringify([
-            { type: "livreur", id: livreurId, name: livreurName || "Livreur" },
-            { type: "admin", id: "support", name: "Support SILGAPP" },
-          ]);
-          const conv = await base44.entities.Conversation.create({
-            participants,
+          // ── Sécurité : création via backend pour résoudre participant_user_ids côté serveur ──
+          const res = await base44.functions.invoke("creerConversationSecurisee", {
+            participants: [
+              { type: "livreur", id: livreurId, name: livreurName || "Livreur" },
+              { type: "admin", id: "support", name: "Support SILGAPP" },
+            ],
             title: `Support - ${livreurName || "Livreur"}`,
-            source: "app",
             group_type: "direct",
-            last_message: "",
-            last_message_date: new Date().toISOString(),
           });
           if (cancelled) return;
-          setConversationId(conv.id);
+          if (res?.data?.success && res.data.conversation) {
+            setConversationId(res.data.conversation.id);
+          } else {
+            throw new Error(res?.data?.error || "Échec création conversation");
+          }
         }
         setLoading(false);
       } catch (err) {
