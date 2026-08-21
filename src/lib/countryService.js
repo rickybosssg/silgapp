@@ -3,9 +3,13 @@
 // ═══════════════════════════════════════════════════════════════════════════
 //
 // ⚠️  Aucun composant ne doit décider localement que le pays par défaut est "BF".
-//     Tous les fallbacks de pays doivent passer par getDefaultCountryCode().
+//     Tous les fallbacks de pays doivent passer par resolveCountryCode() ou
+//     requireCountryCode() pour les décisions métier critiques.
 //
 // Ce service centralise :
+//   - resolveCountryCode(context) : résolution hiérarchique (entity > profil > session > backend)
+//   - requireCountryCode(context) : idem mais retourne { status: "COUNTRY_REQUIRED" } si null
+//   - resolveDialCode(countryCode) : indicatif téléphonique depuis Country
 //   - getDefaultCountryCode() : pays par défaut (contexte > localStorage > backend)
 //   - getCountryConfig(code) : config complète d'un pays (depuis Country)
 //   - getActiveCountries() : liste des pays actifs (depuis Country)
@@ -13,6 +17,13 @@
 //   - getCountryDial(code) : indicatif téléphonique
 //   - getCountryCurrency(code) : monnaie + symbole
 //   - getCountryCommissionPct(code) : % commission
+//
+// Hiérarchie de résolution (resolveCountryCode) :
+//   1. context.entity?.country_code  — pays explicitement associé à l'objet métier
+//   2. context.userProfile?.country_code — pays du profil/compte concerné
+//   3. getDefaultCountryCodeSync()  — pays actif de la session (localStorage)
+//   4. await getDefaultCountryCode() — backend Country
+//   5. null — aucune source disponible
 //
 // Le backend (entity Country) reste l'autorité absolue.
 // Cache en mémoire (TTL 5 min) + localStorage (24h) pour le hors-ligne.
@@ -226,4 +237,79 @@ export function useActiveCountries() {
   }, []);
 
   return { countries, loading };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// RESOLVEUR HIÉRARCHIQUE — Source unique pour toute décision métier
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Hiérarchie :
+//   1. context.entity?.country_code    — pays de l'objet métier (course, livreur, client…)
+//   2. context.userProfile?.country_code — pays du profil/compte concerné
+//   3. getDefaultCountryCodeSync()      — pays actif de la session (localStorage)
+//   4. await getDefaultCountryCode()   — backend Country
+//   5. null — aucune source disponible
+//
+// ⚠️ Aucun fallback silencieux vers "BF". Le backend Country reste l'autorité.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Résout le code pays depuis un contexte hiérarchique.
+ *
+ * @param {object} [context] - contexte de résolution
+ * @param {object} [context.entity] - objet métier (course, livreur, client…) avec country_code
+ * @param {object} [context.userProfile] - profil utilisateur avec country_code
+ * @returns {Promise<string|null>} code pays ISO 2 lettres, ou null si introuvable
+ */
+export async function resolveCountryCode(context = {}) {
+  // 1. Pays de l'objet métier
+  const entityCC = context.entity?.country_code;
+  if (entityCC) return entityCC;
+
+  // 2. Pays du profil utilisateur
+  const profileCC = context.userProfile?.country_code;
+  if (profileCC) return profileCC;
+
+  // 3. Pays actif de la session (sync — localStorage)
+  const sessionCC = getDefaultCountryCodeSync();
+  if (sessionCC) return sessionCC;
+
+  // 4. Backend Country (async)
+  const backendCC = await getDefaultCountryCode();
+  if (backendCC) return backendCC;
+
+  // 5. Aucune source disponible
+  return null;
+}
+
+/**
+ * Résout le code pays pour une opération métier CRITIQUE.
+ *
+ * Si aucun pays ne peut être résolu, retourne un objet d'erreur explicite
+ * au lieu de supposer un pays par défaut.
+ *
+ * @param {object} [context] - contexte de résolution (voir resolveCountryCode)
+ * @returns {Promise<string|{status: 'COUNTRY_REQUIRED', message: string}>}
+ *   - string : code pays résolu
+ *   - { status: 'COUNTRY_REQUIRED' } : aucun pays trouvé, l'opération doit s'arrêter
+ */
+export async function requireCountryCode(context = {}) {
+  const code = await resolveCountryCode(context);
+  if (code) return code;
+  return {
+    status: 'COUNTRY_REQUIRED',
+    message: "Impossible de déterminer le pays. Aucun country_code sur l'objet, le profil utilisateur, la session ou le backend.",
+  };
+}
+
+/**
+ * Résout l'indicatif téléphonique d'un pays depuis le backend Country.
+ *
+ * @param {string} countryCode - code pays ISO 2 lettres
+ * @returns {Promise<string>} indicatif (ex: "+226") ou "" si introuvable
+ */
+export async function resolveDialCode(countryCode) {
+  if (!countryCode) return '';
+  const config = await getCountryConfig(countryCode);
+  return config?.indicatif || '';
 }

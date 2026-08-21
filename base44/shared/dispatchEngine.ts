@@ -7,6 +7,7 @@ import { dispatchLog, normalizeNom, supprimerNotificationsCourse, journaliserDis
 import { chargerConfigDispatch, chargerLivreursEnCourse, chargerConfigVaguesGPS } from './dispatchConfig.ts';
 import { chargerConfigPays } from './dispatchConstants.ts';
 import { envoyerWhatsAppRaw } from './twilioWhatsApp.ts';
+import { resolveDialCode } from './countryResolver.ts';
 import { notifierRedispatchClient } from './venusRedispatchNotifier.ts';
 import {
   getLivreursNotifies,
@@ -271,7 +272,12 @@ export async function notifierLivreur(base44, courseId, course, livreur, timeout
     const waPromise = (async () => {
       try {
         if (waOptIn === false && !waOptInDate) return;
-        const indicatif = INDICATIFS[livreurCountry] || '+226';
+        // ⚠️ Phase A — Indicatif résolu depuis le backend Country, plus de map hardcodée.
+        const indicatif = await resolveDialCode(base44, livreurCountry);
+        if (!indicatif) {
+          console.warn('[DISPATCH] ⚠️ Indicatif introuvable pour', livreurCountry, '— WhatsApp ignoré');
+          return;
+        }
         let tel = livreurTel.replace(/\s+/g, '').replace(/[^\d+]/g, '');
         if (!tel.startsWith('+')) tel = indicatif + tel;
 

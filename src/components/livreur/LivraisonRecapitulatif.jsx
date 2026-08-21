@@ -3,6 +3,7 @@ import { CheckCircle2, MapPin, Banknote, Clock, TrendingUp, Star } from "lucide-
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { normalizeCommissionPct, resolveStoredOrDynamicSplit } from "@/lib/commissionUtils";
+import { haversineKm } from "@/lib/priceEstimate";
 
 /**
  * Écran récapitulatif après livraison confirmée (côté livreur externe).
@@ -20,8 +21,8 @@ export default function LivraisonRecapitulatif({ course, onClose }) {
   // Fallbacks pour données manquantes
   const distance = Number(course.distance_reelle_km) > 0
     ? Number(course.distance_reelle_km)
-    : haversine(course.latitude_recuperation, course.longitude_recuperation, course.latitude_livraison, course.longitude_livraison)
-    || haversine(course.gps_depart_lat, course.gps_depart_lng, course.gps_arrivee_lat, course.gps_arrivee_lng)
+    : haversineKm(course.latitude_recuperation, course.longitude_recuperation, course.latitude_livraison, course.longitude_livraison)
+    || haversineKm(course.gps_depart_lat, course.gps_depart_lng, course.gps_arrivee_lat, course.gps_arrivee_lng)
     || 0;
 
   // Prix manuel accepté → priorité absolue, ne jamais recalculer à partir de la distance

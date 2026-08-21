@@ -167,7 +167,25 @@ Deno.serve(async (req) => {
     const telephone = from.replace('whatsapp:', '');
     const detectedCountry = detecterPaysDepuisTelephone(telephone);
     const paysInconnu = !detectedCountry;
-    const countryCode = detectedCountry || 'BF';
+    // ⚠️ Phase A — Plus de fallback "BF". Si le pays ne peut être détecté depuis
+    // le téléphone, on demande à l'utilisateur de préciser son pays.
+    const countryCode = detectedCountry;
+    if (!countryCode) {
+      // Tenter de résoudre depuis le backend (premier pays actif)
+      try {
+        const countries = await base44.asServiceRole.entities.Country.filter({ actif: true }, "ordre", 1);
+        if (countries?.[0]?.code) {
+          return Response.json({
+            reponse: "Bonjour ! Je n'ai pas pu déterminer votre pays depuis votre numéro de téléphone. Pourriez-vous m'indiquer votre pays (ex: Burkina Faso, Côte d'Ivoire, Togo) ?",
+            country_required: true,
+          });
+        }
+      } catch (_) {}
+      return Response.json({
+        reponse: "Bonjour ! Je n'ai pas pu déterminer votre pays. Pourriez-vous m'indiquer votre pays (ex: Burkina Faso, Côte d'Ivoire, Togo) ?",
+        country_required: true,
+      });
+    }
     const countryConfig = await chargerConfigPays(base44, countryCode);
     const tarifs = {
       nom: countryConfig.nom,

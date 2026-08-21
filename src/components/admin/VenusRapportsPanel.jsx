@@ -94,7 +94,9 @@ export default function VenusRapportsPanel() {
   const [lastRapport, setLastRapport] = useState(null);
   const [showRapport, setShowRapport] = useState(false);
 
-  const countryParam = isGlobalAdmin && viewAllCountries ? "ALL" : (selectedCountry || "BF");
+  const countryParam = isGlobalAdmin && viewAllCountries ? "ALL" : (selectedCountry || null);
+  // ⚠️ Si selectedCountry est null, l'admin global n'a pas sélectionné de pays.
+  // Le hook venusAnalytics recevra null et devra gérer ce cas explicitement.
 
   const { data: stats, isLoading, refetch } = useQuery({
     queryKey: ["venus-stats", countryParam, periode, topN],

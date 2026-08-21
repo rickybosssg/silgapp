@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { getPrixAffichable } from "@/utils/getPrixAffichable";
 import { getCourseStatusLabel, getCourseStatusColor } from "@/lib/courseStatuses";
+import { haversineKm } from "@/lib/priceEstimate";
 import {
   MapPin,
   Package,

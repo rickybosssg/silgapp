@@ -431,7 +431,14 @@ Deno.serve(async (req) => {
       pushesEnvoyes.push({ zone: zone.nom, envoyees: notifsEnvoyees, echouees: notifsEchouees });
 
       // 3. Sauvegarder historique
-      const paysCode = countryCode || "BF";
+      // ⚠️ Phase A — Plus de fallback "BF". Le pays doit venir du contexte d'appel.
+      // countryCode est déjà résolu plus haut dans la fonction depuis les courses analysées.
+      // Si null, on ne crée pas d'historique avec un pays approximatif.
+      const paysCode = countryCode;
+      if (!paysCode) {
+        console.warn('[ZonesChaudes] ⚠️ country_code non résolu — historique zone chaude ignoré');
+        continue;
+      }
       const villeNom = pays?.ville_principale || pays?.nom || "Ouagadougou";
       try {
         await base44.asServiceRole.entities.ZoneChaudeHistorique.create({

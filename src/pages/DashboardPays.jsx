@@ -31,7 +31,9 @@ export default function DashboardPays() {
 
   // L'admin pays est restreint à son propre country_code
   // L'admin global utilise selectedCountry (depuis localStorage ou URL)
-  const effectiveCode = isPays ? adminCountryCode : (codeParam || selectedCountry || "BF");
+  const effectiveCode = isPays ? adminCountryCode : (codeParam || selectedCountry || null);
+  // ⚠️ Si null : l'admin global n'a pas sélectionné de pays. Le composant
+  // doit afficher le CountrySelector au lieu de supposer "BF".
 
   const paysInfo = paysListe.find(p => p.code === effectiveCode) || { code: effectiveCode, nom: effectiveCode, emoji_flag: "", devise: "FCFA" };
 

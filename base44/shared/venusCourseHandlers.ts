@@ -16,6 +16,7 @@ import {
 } from './venusCourseModifierEngine.ts';
 import { trouverCourseActive } from './venusReasoningEngine.ts';
 import { envoyerWhatsAppRaw } from './twilioWhatsApp.ts';
+import { resolveDialCode } from './countryResolver.ts';
 
 export async function handleConsultationCourse(base44, telephone, userMessage, profileName) {
   const telDigits = telephone.replace(/\D/g, '');
@@ -326,8 +327,12 @@ export async function handleContactLivreur(base44: any, conversation: any, userM
     const fromNumber = Deno.env.get('TWILIO_WHATSAPP_FROM') || 'whatsapp:+14155238886';
 
     if (accountSid && authToken) {
-      const INDICATIFS: any = { BF: '+226', CI: '+225', TG: '+228', BJ: '+229', SN: '+221', ML: '+223', GN: '+224', NE: '+227', GH: '+233' };
-      const indicatif = INDICATIFS[course.country_code] || '+226';
+      // ⚠️ Phase A — Indicatif résolu depuis le backend Country, plus de map hardcodée.
+      const indicatif = await resolveDialCode(base44, course.country_code);
+      if (!indicatif) {
+        console.warn('[WebhookVenus] ⚠️ Indicatif introuvable pour', course.country_code, '— WhatsApp ignoré');
+        return;
+      }
       let tel = livreurTel.replace(/\s+/g, '').replace(/[^\d+]/g, '');
       if (!tel.startsWith('+')) tel = indicatif + tel;
       try {

@@ -276,7 +276,16 @@ Deno.serve(async (req) => {
         : null;
 
       // Récupérer le tarif du pays depuis la DB (pour mode automatique uniquement)
-      const countryCode = course.country_code || "BF";
+      const countryCode = course.country_code;
+      if (!countryCode) {
+        console.error('[validateQRCode][COUNTRY_REQUIRED]', { course_id });
+        return Response.json({
+          success: false,
+          error: 'COUNTRY_REQUIRED',
+          message: "Impossible de déterminer le pays de cette course.",
+          blocked_reason: 'missing_country_code',
+        }, { status: 400 });
+      }
       let prixParKm = 100;
       let prixMinimumPays = 500;
       let commissionPct = null;
