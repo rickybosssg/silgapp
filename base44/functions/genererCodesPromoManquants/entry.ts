@@ -31,12 +31,16 @@ Deno.serve(async (req) => {
 
     for (const client of clients) {
       try {
+        if (!client.country_code) {
+          results.erreurs.push(`Client ${client.id}: country_code manquant, ignoré`);
+          continue;
+        }
         const res = await ensureCodePromo(base44.asServiceRole, {
           proprietaire_type: 'client',
           proprietaire_id: client.id,
           proprietaire_nom: client.nom || client.prenom || 'Client',
           proprietaire_email: client.user_email || '',
-          country_code: client.country_code || 'BF',
+          country_code: client.country_code,
         });
 
         if (res.created) {
@@ -56,12 +60,16 @@ Deno.serve(async (req) => {
 
     for (const livreur of livreurs) {
       try {
+        if (!livreur.country_code) {
+          results.erreurs.push(`Livreur ${livreur.id}: country_code manquant, ignoré`);
+          continue;
+        }
         const res = await ensureCodePromo(base44.asServiceRole, {
           proprietaire_type: 'livreur',
           proprietaire_id: livreur.id,
           proprietaire_nom: livreur.nom || livreur.prenom || 'Livreur',
           proprietaire_email: livreur.user_email || '',
-          country_code: livreur.country_code || 'BF',
+          country_code: livreur.country_code,
         });
 
         if (res.created) {

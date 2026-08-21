@@ -53,11 +53,19 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 3. Créer le livreur externe automatiquement
+    // 3. Valider le country_code (pas de fallback BF)
+    if (!client.country_code) {
+      return Response.json({
+        error: 'Client sans country_code',
+        message: 'Ce client n\'a pas de country_code. Vérifier et attribuer un pays dans le CRM avant la migration.'
+      }, { status: 400 });
+    }
+
+    // 4. Créer le livreur externe automatiquement
     const nouveauLivreur = {
       reseau: 'externe',
       type_livreur: 'externe',
-      country_code: client.country_code || 'BF',
+      country_code: client.country_code,
       prenom: client.prenom || '',
       nom: client.nom || '',
       telephone: client.telephone || '',
@@ -81,11 +89,11 @@ Deno.serve(async (req) => {
       statut_paiement: 'non_paye',
     };
 
-    // 4. Créer le livreur
+    // 5. Créer le livreur
     const created = await base44.entities.Livreur.create(nouveauLivreur);
 
-    // 5. Générer code d'identification unique
-    const codeIdentification = `LIV${client.country_code || 'BF'}${Date.now().toString().slice(-6)}`;
+    // 6. Générer code d'identification unique
+    const codeIdentification = `LIV${client.country_code}${Date.now().toString().slice(-6)}`;
     await base44.entities.Livreur.update(created.id, {
       code_identification: codeIdentification
     });

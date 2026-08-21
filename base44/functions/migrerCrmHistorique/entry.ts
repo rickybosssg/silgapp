@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
 import { normalizePhone, upsertClientContact, recalculateClientStats } from "../../shared/crmEngine.ts";
+import { resolveCountryCode } from "../../shared/countryResolver.ts";
 
 export default async function(req: Request): Promise<Response> {
   try {
@@ -39,7 +40,8 @@ export default async function(req: Request): Promise<Response> {
 
       for (const course of batch) {
         const updates: any = {};
-        const cc = course.country_code || "BF";
+        const cc = course.country_code || await resolveCountryCode({ entity: course });
+        if (!cc) { report.errors.push(`Course ${course.id}: country_code manquant, ignoré`); continue; }
 
         // Normaliser client_telephone
         const clientNorm = normalizePhone(course.client_telephone, cc);
@@ -94,7 +96,8 @@ export default async function(req: Request): Promise<Response> {
       report.courses_livrees += batch.length;
 
       for (const course of batch) {
-        const cc = course.country_code || "BF";
+        const cc = course.country_code || await resolveCountryCode({ entity: course });
+        if (!cc) { report.errors.push(`Course ${course.id}: country_code manquant, ignoré`); continue; }
 
         // Upsert client
         const clientPhone = course.client_telephone || course.contact_createur_course;
@@ -170,7 +173,8 @@ export default async function(req: Request): Promise<Response> {
         if (!batch || batch.length === 0) break;
 
         for (const c of batch) {
-          const norm = c.telephone_normalized || normalizePhone(c.telephone, c.country_code || "BF");
+          const cc = c.country_code || await resolveCountryCode({ entity: c });
+          const norm = c.telephone_normalized || (cc ? normalizePhone(c.telephone, cc) : "");
           if (norm) {
             if (!phoneToClients[norm]) phoneToClients[norm] = [];
             phoneToClients[norm].push(c);
