@@ -25,7 +25,7 @@ function getPaysInfo(countryContext) {
     prix_km: countryContext.prix_par_km || 100,
     minimum: countryContext.prix_minimum || 1000,
     ville: countryContext.ville || "",
-    indicatif: countryContext.indicatif || "+226",
+    indicatif: countryContext.indicatif || "",
   };
 }
 

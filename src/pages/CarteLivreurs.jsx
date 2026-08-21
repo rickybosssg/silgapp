@@ -41,7 +41,7 @@ function formatTel(tel, countryCode = "BF") {
   if (!tel) return "";
   let cleaned = tel.replace(/\s/g, "");
   if (!cleaned.startsWith("+")) {
-    const indicatif = INDICATIFS[countryCode];
+    const indicatif = INDICATIFS[countryCode] || "";
     if (indicatif) cleaned = `${indicatif}${cleaned}`;
   }
   // Formatage avec espaces : +226 XX XX XX XX

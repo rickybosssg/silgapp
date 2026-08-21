@@ -19,7 +19,7 @@ const COUNTRY_LOCAL_LEN = {
 function cleanPhone(phone, countryCode) {
   let digits = (phone || "").replace(/\D/g, "");
   if (!digits) return "";
-  const dial = COUNTRY_DIAL_CODE[countryCode] || "226";
+  const dial = COUNTRY_DIAL_CODE[countryCode] || "";
   const localLen = COUNTRY_LOCAL_LEN[countryCode] || 8;
 
   // Déjà au format international

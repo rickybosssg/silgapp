@@ -10,7 +10,7 @@ import { SILGAPP_COUNTRIES, getCountryLabel } from "@/lib/phoneUtils";
 import SmartAddressInput from "@/components/location/SmartAddressInput";
 
 export default function LivreurMesInfosModal({ livreurProfil, onSave }) {
-  const countryCode = livreurProfil?.country_code || "BF";
+  const countryCode = livreurProfil?.country_code || "";
   const countryInfo = SILGAPP_COUNTRIES.find(x => x.code === countryCode) || SILGAPP_COUNTRIES[0];
   const dialCode = `+${countryInfo.dial}`;
   const localLen = countryInfo.len;

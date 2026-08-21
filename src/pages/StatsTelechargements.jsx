@@ -120,7 +120,7 @@ export default function StatsTelechargements() {
       }
 
       // By country
-      const cc = record.country_code || "BF";
+      const cc = record.country_code || "Inconnu";
       if (result.byCountry[cc]) {
         result.byCountry[cc].visits += visits;
         result.byCountry[cc].clicks += clicks;

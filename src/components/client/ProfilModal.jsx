@@ -31,7 +31,7 @@ function formaterAffichage(raw, maxDigits = 8) {
 export default function ProfilModal({ clientProfil, onClose, onSave }) {
   const [nom, setNom] = useState(clientProfil?.nom || "");
   const [prenom, setPrenom] = useState(clientProfil?.prenom || "");
-  const [countryCode, setCountryCode] = useState(clientProfil?.country_code || "BF");
+  const [countryCode, setCountryCode] = useState(clientProfil?.country_code || "");
   const countryInfo = getCountryInfo(countryCode);
   const initTel = clientProfil?.telephone ? formaterAffichage(extraireLocal(clientProfil.telephone, countryCode), countryInfo.len) : "";
   const [telAffiche, setTelAffiche] = useState(initTel);

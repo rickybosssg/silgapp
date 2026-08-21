@@ -42,7 +42,7 @@ function getCouleurAvatar(nom) {
 function AttribuerCodePromoModal({ client, onClose, onDone }) {
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
-  const countryCode = client.country_code || "BF";
+  const countryCode = client.country_code || "—";
 
   const handleAttribuer = async () => {
     if (!code.trim()) { toast.error("Code requis"); return; }

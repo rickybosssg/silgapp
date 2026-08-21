@@ -26,7 +26,7 @@ export default function TelechargerSILGAPP() {
     const country = (() => {
       const lang = navigator.language || "fr-FR";
       const map = { "fr-BF": "BF", "fr-CI": "CI", "fr-TG": "TG", "fr-BJ": "BJ", "fr-SN": "SN", "fr-ML": "ML", "fr-GN": "GN", "fr-NE": "NE" };
-      return map[lang] || "BF";
+      return map[lang] || null;
     })();
     const platform = /Android/i.test(navigator.userAgent) ? "android" : /iPhone|iPad/i.test(navigator.userAgent) ? "ios" : "web";
 
@@ -34,7 +34,7 @@ export default function TelechargerSILGAPP() {
   }, []);
 
   const trackDownload = () => {
-    const country = navigator.language?.includes("BF") ? "BF" : navigator.language?.includes("CI") ? "CI" : "BF";
+    const country = navigator.language?.includes("BF") ? "BF" : navigator.language?.includes("CI") ? "CI" : null;
     const platform = /Android/i.test(navigator.userAgent) ? "android" : "web";
     base44.functions.invoke("trackDownloadPublic", { event_type: "apk_download", country_code: country, platform, referrer: "direct" }).catch(() => {});
   };

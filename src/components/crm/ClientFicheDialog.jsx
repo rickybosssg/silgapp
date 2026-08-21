@@ -41,7 +41,7 @@ export default function ClientFicheDialog({ open, onClose, client: initialClient
     const loadCourses = async () => {
       setLoading(true);
       try {
-        const normalized = client.telephone_normalized || normalizePhone(client.telephone, client.country_code || "BF");
+        const normalized = client.telephone_normalized || normalizePhone(client.telephone, client.country_code || "");
         // Requêtes filtrées par telephone_normalized — pas de chargement de 50 courses
         const results = [];
         const seenIds = new Set();

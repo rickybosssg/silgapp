@@ -1,6 +1,7 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { Navigation, Phone } from "lucide-react";
+import { SILGAPP_COUNTRIES } from "@/lib/phoneUtils";
 
 /**
  * Navigation GPS intelligente pour livreurs
@@ -88,11 +89,13 @@ export default function NavigationGPSButton({ course, isExterne = false }) {
 export function WhatsAppButton({ phone, message = "", course }) {
   const normalizePhone = (num) => {
     let normalized = num?.replace(/\D/g, "") || "";
-    if (normalized.startsWith("0") && normalized.length <= 9) {
-      normalized = "226" + normalized.slice(1);
+    const cc = course?.country_code || "";
+    const dial = cc ? (SILGAPP_COUNTRIES.find(c => c.code === cc)?.dial || "") : "";
+    if (normalized.startsWith("0") && normalized.length <= 9 && dial) {
+      normalized = dial + normalized.slice(1);
     }
-    if (normalized.length === 8) {
-      normalized = "226" + normalized;
+    if (normalized.length === 8 && dial) {
+      normalized = dial + normalized;
     }
     return normalized;
   };

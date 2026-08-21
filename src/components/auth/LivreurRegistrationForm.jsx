@@ -229,7 +229,7 @@ export default function LivreurRegistrationForm({ user, onComplete }) {
           </Label>
           <div className="relative mt-1.5">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm font-mono font-bold">
-              {selectedCountry ? `+${selectedCountry.dial}` : "+226"}
+              {selectedCountry ? `+${selectedCountry.dial}` : "—"}
             </span>
             <Input
               type="tel" value={form.telephone} onChange={e => setForm({ ...form, telephone: e.target.value })}

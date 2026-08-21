@@ -30,7 +30,7 @@ Deno.serve(async (req) => {
             await asService.entities.Notification.create({
                 type: "demande_livreur",
                 titre: " Nouveau livreur en attente",
-                message: `${dernier.prenom || ""} ${dernier.nom || "Inconnu"} · ${dernier.telephone || "N/A"} · ${dernier.country_code || "BF"}`,
+                message: `${dernier.prenom || ""} ${dernier.nom || "Inconnu"} · ${dernier.telephone || "N/A"} · ${dernier.country_code || "—"}`,
                 lien: "/admin/demandes-livreurs",
                 lue: false,
                 priorite: "haute",

@@ -47,7 +47,7 @@ const COLORS = {
 // ─── Helpers téléphone ────────────────────────────────────────────────────────
 function getDialCode(countryCode) {
   const c = SILGAPP_COUNTRIES.find(x => x.code === countryCode);
-  return c ? `+${c.dial}` : "+226";
+  return c ? `+${c.dial}` : "—";
 }
 function getPhonePlaceholder(countryCode) {
   const c = SILGAPP_COUNTRIES.find(x => x.code === countryCode);

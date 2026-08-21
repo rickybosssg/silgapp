@@ -13,12 +13,12 @@ export default function StatsPays({ courses = [], livreurs = [], clients = [] })
 
   const statsByPays = useMemo(() => {
     return pays.map((p) => {
-      const c = courses.filter((x) => (x.country_code || "BF") === p.code);
+      const c = courses.filter((x) => x.country_code === p.code);
       const livrees = c.filter((x) => x.statut === "livree");
       const enCours = c.filter((x) => !["livree", "annulee"].includes(x.statut));
       const ca = livrees.reduce((s, x) => s + (x.prix_final || 0), 0);
-      const lvrs = livreurs.filter((x) => (x.country_code || "BF") === p.code);
-      const cls = clients.filter((x) => (x.country_code || "BF") === p.code);
+      const lvrs = livreurs.filter((x) => x.country_code === p.code);
+      const cls = clients.filter((x) => x.country_code === p.code);
       return { pays: p, total: c.length, livrees: livrees.length, enCours: enCours.length, ca, livreurs: lvrs.length, clients: cls.length };
     }).filter((s) => s.total > 0).sort((a, b) => b.total - a.total);
   }, [pays, courses, livreurs, clients]);

@@ -33,7 +33,7 @@ export default function DownloadStatsPanel() {
       const visits = record.page_visits || 0;
       const downloads = record.downloads || 0;
       const recordDate = new Date(record.created_date);
-      const country = record.country_code || "BF";
+      const country = record.country_code || "Inconnu";
 
       totalVisits += visits;
       totalDownloads += downloads;

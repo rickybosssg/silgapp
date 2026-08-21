@@ -82,7 +82,7 @@ export default function DownloadStatsWidget() {
         result.today.downloads += downloads;
       }
 
-      const cc = record.country_code || "BF";
+      const cc = record.country_code || "Inconnu";
       if (result.byCountry[cc]) {
         result.byCountry[cc].visits += visits;
         result.byCountry[cc].clicks += clicks;

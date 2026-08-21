@@ -5,13 +5,13 @@ const COUNTRY_DIAL_CODE = {
   ML: "223", GN: "224", NE: "227", GH: "233",
 };
 
-export function normalizePhone(phone, countryCode = "BF") {
+export function normalizePhone(phone, countryCode = "") {
   let digits = (phone || "").replace(/\D/g, "");
   if (!digits) return "";
-  const dial = COUNTRY_DIAL_CODE[countryCode] || "226";
-  if (digits.startsWith(dial) && digits.length >= dial.length + 6) return digits;
+  const dial = COUNTRY_DIAL_CODE[countryCode] || "";
+  if (dial && digits.startsWith(dial) && digits.length >= dial.length + 6) return digits;
   if (digits.startsWith("0")) digits = digits.slice(1);
-  if (digits.length <= 9) return dial + digits;
+  if (dial && digits.length <= 9) return dial + digits;
   return digits;
 }
 

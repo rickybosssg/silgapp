@@ -91,7 +91,7 @@ Deno.serve(async (req) => {
         conversation_id,
         user_id,
         user_type: user_type || 'client',
-        country_code: country_code || 'BF',
+        country_code: country_code || null,
         ville: ville || '',
         question,
         reponse: (reponse || '').substring(0, 500),
