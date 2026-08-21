@@ -2,29 +2,13 @@ import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { requestNativeAppPermissions } from "@/lib/nativePermissions";
 import { toast } from "sonner";
-import { User, Check, Loader2, Phone, Gift, Sparkles } from "lucide-react";
-import CountryCodeSelect from "@/components/ui/CountryCodeSelect";
-import { SILGAPP_COUNTRIES } from "@/lib/phoneUtils";
-
-// ─── Pays disponibles ─────────────────────────────────────────────────────────
-export const PAYS_LISTE = SILGAPP_COUNTRIES.map((country) => ({
-  code: country.code,
-  nom: country.name,
-  emoji: country.flag,
-  indicatif: `+${country.dial}`,
-  digits: country.len,
-}));
+import { User, Check, Loader2, Phone, Gift, Sparkles, Globe, Home } from "lucide-react";
+import { useActiveCountries } from "@/lib/countryService";
+import { normalizePhone, validateLocalPhone } from "@/lib/phoneUtils";
+import CountrySelect from "@/components/ui/CountrySelect";
+import SmartAddressInput from "@/components/location/SmartAddressInput";
 
 // ─── Helpers téléphone ────────────────────────────────────────────────────────
-export function normaliserTelephone(raw, countryCode = "BF") {
-  if (!raw) return "";
-  const digits = raw.replace(/\D/g, "");
-  const pays = PAYS_LISTE.find(p => p.code === countryCode) || PAYS_LISTE[0];
-  const indicatifDigits = pays.indicatif.replace("+", "");
-  if (digits.startsWith(indicatifDigits)) return "+" + digits;
-  return pays.indicatif + digits;
-}
-
 function formaterAffichage(raw, maxDigits = 8) {
   const digits = (raw || "").replace(/\D/g, "").slice(0, maxDigits);
   return digits.replace(/(\d{2})(?=\d)/g, "$1 ").trim();
@@ -67,6 +51,7 @@ async function requestPostGpsPermissions(clientProfil) {
 // GPS is requested with native permissions after profile detection; it must not block onboarding.
 // ─── Profil ────────────────────────────────────────────────────────────────────
 function EtapeProfil({ clientProfil, onSuccess }) {
+  const { countries, loading: countriesLoading } = useActiveCountries();
   const [nom, setNom] = useState(clientProfil?.nom || "");
   const [prenom, setPrenom] = useState(clientProfil?.prenom || "");
   const [countryCode, setCountryCode] = useState(clientProfil?.country_code || "");
@@ -98,21 +83,23 @@ function EtapeProfil({ clientProfil, onSuccess }) {
     }
   };
 
-  const paysSelectionne = PAYS_LISTE.find(p => p.code === countryCode);
+  const paysSelectionne = countries.find(c => c.code === countryCode);
+  const phoneMinLen = paysSelectionne?.phone_min_length || 8;
+  const phoneMaxLen = paysSelectionne?.phone_max_length || phoneMinLen;
 
   const handleTelChange = (e) => {
-    const maxDigits = paysSelectionne?.digits || 8;
-    const raw = e.target.value.replace(/\D/g, "").slice(0, maxDigits);
-    setTelAffiche(formaterAffichage(raw, maxDigits));
+    const raw = e.target.value.replace(/\D/g, "").slice(0, phoneMaxLen);
+    setTelAffiche(formaterAffichage(raw, phoneMaxLen));
   };
 
   const telDigits = telAffiche.replace(/\D/g, "");
-  const telValide = paysSelectionne ? telDigits.length === paysSelectionne.digits : false;
+  const telValidation = validateLocalPhone(telDigits, countryCode);
+  const telValide = paysSelectionne ? telValidation.valid : telDigits.length > 0;
   const peutSauvegarder = nom.trim() && prenom.trim() && telValide && countryCode && ville.trim() && quartier.trim();
 
   const handleSave = async () => {
     if (!peutSauvegarder) return;
-    const telNormalise = normaliserTelephone(telDigits, countryCode);
+    const telNormalise = normalizePhone(telDigits, countryCode);
     setLoading(true);
     try {
       let gpsData = null;
@@ -120,7 +107,7 @@ function EtapeProfil({ clientProfil, onSuccess }) {
 
       // Vérifier cohérence pays / indicatif téléphonique
       if (telDigits.length > 0 && paysSelectionne) {
-        const indicatifDigits = paysSelectionne.indicatif.replace("+", "");
+        const indicatifDigits = (paysSelectionne.indicatif || "").replace("+", "");
         if (telDigits.startsWith(indicatifDigits) && !telDigits.replace(indicatifDigits, "").length) {
           toast.error(`L'indicatif ${paysSelectionne.indicatif} ne correspond pas au pays sélectionné`);
           setLoading(false);
@@ -132,7 +119,7 @@ function EtapeProfil({ clientProfil, onSuccess }) {
       const profileData = {
         nom: nom.trim(),
         prenom: prenom.trim(),
-        telephone: telNormalise,
+        telephone: telNormalise ? "+" + telNormalise : telNormalise,
         country_code: countryCode,
         ville: ville.trim(),
         quartier: quartier.trim(),
@@ -150,7 +137,7 @@ function EtapeProfil({ clientProfil, onSuccess }) {
         const user = await base44.auth.me();
         let existing = null;
         try {
-          const found = await base44.entities.ClientExterne.filter({ telephone: telNormalise });
+          const found = await base44.entities.ClientExterne.filter({ telephone: profileData.telephone });
           if (found?.length > 0) existing = found[0];
         } catch (_) {}
         if (existing) {
@@ -193,118 +180,155 @@ function EtapeProfil({ clientProfil, onSuccess }) {
     }
   };
 
-  const inputClass = "w-full h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 placeholder-slate-400 shadow-sm outline-none transition-all focus:border-blue-500 focus:ring-4 focus:ring-blue-100";
+  const inputClass = "w-full h-12 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 placeholder-slate-400 shadow-sm outline-none transition-all focus:border-blue-500 focus:ring-4 focus:ring-blue-100";
   const labelClass = "text-[11px] font-black uppercase tracking-[0.14em] text-slate-600 mb-1.5 block";
 
   return (
-    <div className="fixed inset-0 bg-[radial-gradient(circle_at_top,#dbeafe_0,#eef6ff_34%,#f8fafc_72%)] flex items-center justify-center p-4 z-50 overflow-y-auto">
-      <div className="max-w-md w-full my-4 overflow-hidden rounded-[2rem] bg-white shadow-2xl shadow-blue-950/15 border border-white/80">
+    <div className="fixed inset-0 bg-gradient-to-br from-blue-50 via-white to-emerald-50/30 flex items-center justify-center p-3 z-50 overflow-y-auto">
+      <div className="max-w-md w-full my-4 rounded-[1.75rem] bg-white shadow-2xl shadow-blue-950/10 border border-white overflow-hidden">
+        {/* Header — dégradé bleu SILGAPP avec relief */}
         <div className="relative bg-gradient-to-br from-primary-dark via-primary to-primary-dark px-6 py-7 text-white silgapp-relief-surface">
           <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-white/10" />
           <div className="absolute -left-12 bottom-0 h-28 w-28 rounded-full bg-sky-300/20" />
-          <div className="relative grid grid-cols-[64px_1fr] gap-4 [&>p]:col-start-2 [&>p]:m-0 [&>p:first-of-type]:text-2xl [&>p:first-of-type]:font-black [&>p:first-of-type]:leading-tight [&>p:first-of-type]:text-white [&>p:last-of-type]:text-sm [&>p:last-of-type]:leading-relaxed [&>p:last-of-type]:text-blue-100">
-          <div className="w-16 h-16 rounded-3xl bg-white/15 border border-white/20 flex items-center justify-center shadow-lg shadow-primary/20 silgapp-relief">
-            <User className="w-8 h-8 text-white" />
+          <div className="relative flex items-center gap-4">
+            <div className="w-16 h-16 rounded-3xl bg-white/15 border border-white/20 flex items-center justify-center shadow-lg shadow-primary/20 silgapp-relief">
+              <User className="w-8 h-8 text-white" />
+            </div>
+            <div>
+              <h2 className="text-xl font-black leading-tight text-white">Créez votre profil client</h2>
+              <p className="text-sm leading-relaxed text-blue-100 mt-0.5">
+                Ces informations serviront pour vos courses et livraisons.
+              </p>
+            </div>
           </div>
-          <p className="text-2xl font-black leading-tight text-white">Complétez vos informations</p>
-          <p className="text-sm leading-relaxed text-blue-100">Ces informations permettent de synchroniser vos courses.</p>
-        </div>
         </div>
 
         <div className="p-5 sm:p-6 space-y-4">
-          <div className="rounded-3xl border border-blue-100 bg-blue-50/70 p-4">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-white text-blue-700 flex items-center justify-center shadow-sm">
-                <Sparkles className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="text-sm font-black text-slate-900">Une seule fiche a remplir</p>
-                <p className="text-xs text-slate-600 leading-relaxed mt-0.5">
-                  Selectionnez votre pays, ajoutez vos coordonnees et accedez directement au tableau de bord.
-                </p>
-              </div>
+          {/* Carte info */}
+          <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-4 flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-white text-blue-700 flex items-center justify-center shadow-sm shrink-0">
+              <Sparkles className="w-5 h-5" />
             </div>
-          </div>
-          {/* Pays */}
-          <div>
-            <label className={labelClass}>Pays d'utilisation *</label>
-            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-1">
-              <CountryCodeSelect
-                value={countryCode}
-                onChange={(code) => { setCountryCode(code); setTelAffiche(""); }}
-              />
+            <div>
+              <p className="text-sm font-black text-slate-900">Une seule fiche à remplir</p>
+              <p className="text-xs text-slate-600 leading-relaxed mt-0.5">
+                Sélectionnez votre pays, ajoutez vos coordonnées et accédez directement au tableau de bord.
+              </p>
             </div>
           </div>
 
-          <div>
-            <label className={labelClass}>Nom *</label>
-            <input
-              value={nom}
-              onChange={e => setNom(e.target.value)}
-              placeholder="Votre nom de famille"
-              className={inputClass}
+          {/* Section : Pays */}
+          <div className="rounded-2xl border border-slate-100 bg-slate-50/50 p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <Globe className="w-4 h-4 text-blue-600" />
+              <span className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-600">Pays</span>
+            </div>
+            <CountrySelect
+              value={countryCode}
+              onChange={(code) => { setCountryCode(code); setTelAffiche(""); }}
             />
           </div>
-          <div>
-            <label className="text-xs font-bold text-gray-800 mb-1 block">Prénom *</label>
-            <input
-              value={prenom}
-              onChange={e => setPrenom(e.target.value)}
-              placeholder="Votre prénom"
-              className={inputClass}
-            />
+
+          {/* Section : Identité */}
+          <div className="rounded-2xl border border-slate-100 bg-slate-50/50 p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <User className="w-4 h-4 text-blue-600" />
+              <span className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-600">Identité</span>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={labelClass}>Nom *</label>
+                <input
+                  value={nom}
+                  onChange={e => setNom(e.target.value)}
+                  placeholder="Votre nom"
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Prénom *</label>
+                <input
+                  value={prenom}
+                  onChange={e => setPrenom(e.target.value)}
+                  placeholder="Votre prénom"
+                  className={inputClass}
+                />
+              </div>
+            </div>
           </div>
-          <div>
-            <label className="text-xs font-bold text-gray-800 mb-1 block">Ville *</label>
-            <input
-              value={ville}
-              onChange={e => setVille(e.target.value)}
-              placeholder="Votre ville"
-              className={inputClass}
-            />
-          </div>
-          <div>
-            <label className="text-xs font-bold text-gray-800 mb-1 block">Quartier / Adresse *</label>
-            <input
-              value={quartier}
-              onChange={e => setQuartier(e.target.value)}
-              placeholder="Votre quartier ou adresse"
-              className={inputClass}
-            />
-          </div>
-          <div>
-            <label className="text-xs font-bold text-gray-800 mb-1 block">
-              Téléphone * {paysSelectionne ? `(${paysSelectionne.digits} chiffres)` : "(sélectionnez un pays)"}
-            </label>
-            <div className="flex gap-2">
-              <div className="h-12 rounded-2xl border border-slate-200 bg-slate-50 px-3 flex items-center gap-2 text-sm font-black text-slate-800 flex-shrink-0 shadow-sm">
+
+          {/* Section : Téléphone */}
+          <div className="rounded-2xl border border-slate-100 bg-slate-50/50 p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
                 <Phone className="w-4 h-4 text-blue-600" />
-                {paysSelectionne ? `${paysSelectionne.emoji} ${paysSelectionne.indicatif}` : ""}
+                <span className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-600">Téléphone WhatsApp</span>
+              </div>
+              {paysSelectionne && (
+                <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">
+                  {phoneMinLen === phoneMaxLen ? `${phoneMaxLen} chiffres` : `${phoneMinLen}–${phoneMaxLen} chiffres`}
+                </span>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <div className="h-12 rounded-xl border border-slate-200 bg-slate-50 px-3 flex items-center gap-2 text-sm font-black text-slate-800 shrink-0 shadow-sm">
+                <Phone className="w-4 h-4 text-blue-600" />
+                {paysSelectionne ? `${paysSelectionne.emoji_flag || ""} ${paysSelectionne.indicatif}` : "—"}
               </div>
               <input
                 inputMode="numeric"
                 value={telAffiche}
                 onChange={handleTelChange}
-                placeholder={paysSelectionne ? "0".repeat(paysSelectionne.digits).replace(/(.{2})/g, "$1 ").trim() : "—"}
+                placeholder={paysSelectionne
+                  ? "X".repeat(phoneMaxLen).replace(/(.{2})/g, "$1 ").trim()
+                  : "Sélectionnez un pays"}
                 disabled={!countryCode}
                 className={`${inputClass} flex-1 tracking-widest font-mono disabled:bg-slate-50 disabled:text-slate-400`}
               />
             </div>
-            {telAffiche.length > 0 && (
-              <p className={`text-xs mt-1 flex items-center gap-1 ${telValide ? "text-green-600" : "text-red-400"}`}>
+            {telAffiche.length > 0 && paysSelectionne && (
+              <p className={`text-xs flex items-center gap-1 ${telValide ? "text-green-600" : "text-red-500"}`}>
                 {telValide
-                  ? <><Check className="w-3 h-3" /> {normaliserTelephone(telDigits, countryCode)}</>
-                  : `${telDigits.length}/${paysSelectionne?.digits || "?"} chiffres`
+                  ? <><Check className="w-3 h-3" /> Numéro valide</>
+                  : telValidation.error || `${telDigits.length}/${phoneMaxLen} chiffres`
                 }
               </p>
             )}
           </div>
 
+          {/* Section : Localisation */}
+          <div className="rounded-2xl border border-slate-100 bg-slate-50/50 p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <Home className="w-4 h-4 text-blue-600" />
+              <span className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-600">Localisation</span>
+            </div>
+            <div>
+              <label className={labelClass}>Ville *</label>
+              <input
+                value={ville}
+                onChange={e => setVille(e.target.value)}
+                placeholder="Votre ville"
+                className={inputClass}
+              />
+            </div>
+            <SmartAddressInput
+              countryCode={countryCode}
+              value={quartier}
+              label="Quartier / Adresse *"
+              placeholder="Commencez par le nom du quartier..."
+              inputClassName="h-12 rounded-xl text-sm"
+              onChange={(text, location) => {
+                if (location?.ville) setVille(location.ville);
+                setQuartier(location?.quartier || location?.label || text);
+              }}
+            />
+          </div>
+
           {/* Champ code promo */}
           {!clientProfil?.code_promo_utilise && (
-            <div className="rounded-3xl border border-slate-200 bg-slate-50/70 p-4">
-              <label className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-600 mb-2 flex items-center gap-2">
-                <Gift className="w-4 h-4 text-blue-600" />
+            <div className="rounded-2xl border border-amber-100 bg-amber-50/50 p-4 space-y-2">
+              <label className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-600 flex items-center gap-2">
+                <Gift className="w-4 h-4 text-amber-600" />
                 Code promo optionnel
               </label>
               <input
@@ -322,28 +346,31 @@ function EtapeProfil({ clientProfil, onSuccess }) {
                 }`}
               />
               {codePromoStatut === "valide" && codePromoData && (
-                <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                <p className="text-xs text-green-600 flex items-center gap-1">
                   <Check className="w-3 h-3" /> Code valide ! Bénéficiez de <strong>10% de réduction</strong> (100 FCFA) sur votre première course.
                 </p>
               )}
               {codePromoStatut === "invalide" && (
-                <p className="text-xs text-red-500 mt-1"> Code promo invalide ou désactivé</p>
+                <p className="text-xs text-red-500">Code promo invalide ou désactivé</p>
               )}
               {!codePromoStatut && (
-                <p className="text-xs text-gray-600 mt-1">Bénéficiez de 10% de réduction sur votre première course !</p>
+                <p className="text-xs text-slate-500">Bénéficiez de 10% de réduction sur votre première course !</p>
               )}
             </div>
           )}
         </div>
 
-        <button
-          onClick={handleSave}
-          disabled={loading || !peutSauvegarder}
-          className="w-[calc(100%-2.5rem)] sm:w-[calc(100%-3rem)] mx-5 sm:mx-6 mb-6 h-14 rounded-2xl bg-primary text-white font-black text-base shadow-lg shadow-primary/20 active:scale-[0.98] transition-all disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-2 silgapp-relief"
-        >
-          {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />}
-          {loading ? "Sauvegarde..." : "Valider et continuer"}
-        </button>
+        {/* Bouton — sticky en bas, toujours accessible sur petit écran */}
+        <div className="sticky bottom-0 bg-white/95 backdrop-blur-md border-t border-slate-100 px-5 sm:px-6 py-4">
+          <button
+            onClick={handleSave}
+            disabled={loading || !peutSauvegarder}
+            className="w-full h-14 rounded-2xl bg-gradient-to-r from-primary to-primary-dark text-white font-black text-base shadow-lg shadow-primary/20 active:scale-[0.98] transition-all disabled:opacity-40 disabled:shadow-none flex items-center justify-center gap-2 silgapp-relief"
+          >
+            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />}
+            {loading ? "Sauvegarde..." : "Valider et continuer"}
+          </button>
+        </div>
       </div>
     </div>
   );
