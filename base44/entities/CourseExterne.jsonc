@@ -36,9 +36,17 @@
       "type": "string",
       "description": "Telephone du client normalise (format international sans + ni espace). Utilise pour les recherches CRM."
     },
+    "client_user_email": {
+      "type": "string",
+      "description": "Email du compte User li\u00e9 au client. R\u00e9solu c\u00f4t\u00e9 backend UNIQUEMENT (jamais fourni par le frontend). Permet la RLS read pour que le client voie ses courses (y compris admin/VENUS). Null si le client n'a pas de compte User."
+    },
     "contact_createur_course": {
       "type": "string",
       "description": "Numero de telephone du CREATEUR de la course \u2014 contact principal que le livreur doit contacter en priorite. OBLIGATOIRE pour toute course creee via VENUS. Peut differer du numero WhatsApp entrant (cas: une personne cree une course pour un autre client). Le numero WhatsApp entrant ne peut etre copie ici qu'apres confirmation explicite du client. Ne jamais reutiliser automatiquement un ancien numero."
+    },
+    "livreur_user_email": {
+      "type": "string",
+      "description": "Email du compte User du livreur assign\u00e9. R\u00e9solu c\u00f4t\u00e9 backend UNIQUEMENT, actualis\u00e9 \u00e0 chaque assignation/r\u00e9assignation. Permet la RLS read pour que le livreur voie ses courses. Null si non assign\u00e9 ou livreur sans compte User."
     },
     "type_course": {
       "type": "string",
@@ -213,7 +221,7 @@
         "programmee",
         "recherche_livreur",
         "livreur_en_route",
-        "client_contacte",
+        "client_contacto",
         "en_route_expediteur",
         "arrive_prise_en_charge",
         "colis_recupere",

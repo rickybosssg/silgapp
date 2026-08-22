@@ -76,6 +76,7 @@ export async function enregistrerNotification(base44, courseId, livreur, vague, 
     return await base44.asServiceRole.entities.DispatchNotification.create({
       course_id: courseId,
       livreur_id: livreur.id,
+      livreur_user_email: livreur.user_email || null,
       country_code: livreur.country_code || options.country_code || '',
       vague: vague || 1,
       statut: 'notifie',

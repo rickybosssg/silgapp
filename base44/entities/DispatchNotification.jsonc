@@ -10,6 +10,10 @@
       "type": "string",
       "description": "ID du livreur notifi\u00e9"
     },
+    "livreur_user_email": {
+      "type": "string",
+      "description": "Email du compte User du livreur notifi\u00e9. R\u00e9solu c\u00f4t\u00e9 backend UNIQUEMENT. Permet la RLS read pour que le livreur voie ses propres notifications de dispatch. Null si le livreur n'a pas de compte User."
+    },
     "country_code": {
       "type": "string",
       "description": "Code pays (pour filtrage rapide)"
@@ -66,5 +70,34 @@
     "course_id",
     "livreur_id",
     "statut"
-  ]
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "data.livreur_user_email": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
 }
