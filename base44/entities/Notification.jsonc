@@ -59,5 +59,37 @@
     "titre",
     "message",
     "type"
-  ]
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "data.destinataire_email": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "create": {},
+    "update": {
+      "$or": [
+        {
+          "data.destinataire_email": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
 }
