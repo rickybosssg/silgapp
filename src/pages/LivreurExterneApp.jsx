@@ -1040,13 +1040,6 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   }, [onboardingTermine, sessionExpired, livreurProfil?.statut, livreurProfil?.id, gpsActif]);
 
   // ─── Mutations courses ────────────────────────────────────────────────────
-  const updateCourseMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.CourseExterne.update(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
-    },
-  });
-
   const handleAccepter = (isPendingPrixManuel = false) => {
     setNotificationCourseCandidate(null);
     setNotificationCourseId(null);
@@ -1157,19 +1150,15 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   };
 
   const finaliserAnnulationLocale = async (course) => {
-    await base44.entities.CourseExterne.update(course.id, {
-      statut: "annulee",
-      manual_price_status: "refused",
-      notes: "Annulation directe livreur - proposition prix manuel en attente client",
-      date_annulation: new Date().toISOString(),
-    });
+    // L'annulation passe uniquement par annulerCourseExterne (backend).
+    // Si cette fonction est appelée, c'est que le backend a échoué — on libère juste le livreur.
     if (livreurProfil?.id) {
       await saveLivreur(livreurProfil.id, { statut: "disponible" }).catch(() => null);
     }
     stopUrgentCourseAlert("pending-price-cancelled-fallback");
     queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
     queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
-    logAcceptationLivreur("cancel-pending-price-fallback-updated", { course_id: course.id });
+    logAcceptationLivreur("cancel-pending-price-fallback-no-direct-update", { course_id: course.id });
     toast.success("Course annulee");
     return true;
   };
@@ -1289,16 +1278,9 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         if (dist && dist >= 0.1) distUpdate.distance_reelle_km = Number(dist.toFixed(2));
       }
 
-      await updateCourseMutation.mutateAsync({
-        id: course.id,
-        data: {
-          statut: "livree",
-          heure_livraison: new Date().toISOString(),
-          prix_final: montantSaisi,
-          commission_silga: split.commission_silga,
-          montant_livreur: split.montant_livreur,
-          ...distUpdate,
-        },
+      await base44.functions.invoke("finaliserLivraisonLivreur", {
+        course_id: course.id,
+        prix_final_livreur: montantSaisi,
       });
       await verifierEncoursApresCourse(course.id);
       await remettreDisponibleSiAutorise();
@@ -1334,20 +1316,14 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         return;
       }
 
-      await updateCourseMutation.mutateAsync({
-        id: course.id,
-        data: {
-          ...baseData,
-          latitude_livraison: gpsArrivee.lat,
-          longitude_livraison: gpsArrivee.lng,
-          distance_reelle_km: distanceVal,
-          prix_final: prixFinal,
-          commission_silga: split.commission_silga,
-          montant_livreur: split.montant_livreur,
-        },
+      await base44.functions.invoke("finaliserLivraisonLivreur", {
+        course_id: course.id,
+        prix_final_livreur: prixFinal,
       });
     } else {
-      await updateCourseMutation.mutateAsync({ id: course.id, data: baseData });
+      await base44.functions.invoke("finaliserLivraisonLivreur", {
+        course_id: course.id,
+      });
     }
 
     await verifierEncoursApresCourse(course.id);
@@ -1645,7 +1621,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
                     course={course}
                     onColisRecupere={handleColisRecupere}
                     onColisLivre={handleColisLivre}
-                    isPending={updateCourseMutation.isPending}
+                    isPending={false}
                     isExterne={true}
                     livreurLat={livreurProfil?.latitude}
                     livreurLng={livreurProfil?.longitude}

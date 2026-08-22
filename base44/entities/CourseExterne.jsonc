@@ -221,7 +221,7 @@
         "programmee",
         "recherche_livreur",
         "livreur_en_route",
-        "client_contacto",
+        "client_contacte",
         "en_route_expediteur",
         "arrive_prise_en_charge",
         "colis_recupere",
@@ -544,15 +544,15 @@
     },
     "commande_restaurant_id": {
       "type": "string",
-      "description": "ID de la CommandeRestaurant liee (si course issue d'une commande partenaire)"
+      "description": "ID de la CommandeRestaurant lieee (si course issue d'une commande partenaire)"
     },
     "pharmacie_id": {
       "type": "string",
-      "description": "ID de la pharmacie liee (si course issue d'une pharmacie partenaire)"
+      "description": "ID de la pharmacie lieee (si course issue d'une pharmacie partenaire)"
     },
     "conversation_id": {
       "type": "string",
-      "description": "ID de la conversation liee a la livraison pharmacie"
+      "description": "ID de la conversation lieee a la livraison pharmacie"
     },
     "crm_stats_synced": {
       "type": "boolean",

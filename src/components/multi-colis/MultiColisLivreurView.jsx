@@ -152,32 +152,28 @@ export default function MultiColisLivreurView({ course, colisRecupere, onAllLivr
       const gainLivreur = Math.round(montantTotal * ((100 - countryCommissionPct) / 100));
       const commissionSilga = Math.round(montantTotal * (countryCommissionPct / 100));
 
-      const updateData = {
-        nb_colis_livres: nbLivres,
-        prix_final: montantTotal,
-        montant_livreur: gainLivreur,
-        commission_silga: commissionSilga,
-      };
-
       if (tousTermines) {
-        updateData.statut = "livree";
-        updateData.heure_livraison = now;
-        updateData.colis_livre_at = now;
+        const res = await base44.functions.invoke("finaliserLivraisonLivreur", {
+          course_id: course.id,
+          prix_final_livreur: montantTotal,
+          is_multi_colis: true,
+        });
+        return {
+          nbLivres,
+          tousTermines,
+          montantTotal,
+          gainLivreur: res?.montant_livreur ?? gainLivreur,
+          courseData: res?.course || { ...course, statut: "livree", nb_colis_livres: nbLivres, prix_final: montantTotal },
+        };
       }
 
-      await base44.entities.CourseExterne.update(course.id, updateData);
+      // Livraison intermédiaire — pas de mise à jour de la course (compteurs mis à jour à la finalisation)
       return {
         nbLivres,
         tousTermines,
         montantTotal,
         gainLivreur,
-        courseData: {
-          ...course,
-          ...updateData,
-          id: course.id,
-          colis_livre_at: updateData.colis_livre_at || course.colis_livre_at,
-          heure_livraison: updateData.heure_livraison || course.heure_livraison,
-        },
+        courseData: { ...course, nb_colis_livres: nbLivres, prix_final: montantTotal },
       };
     },
     onSuccess: ({ tousTermines, montantTotal, gainLivreur, courseData }) => {
@@ -218,30 +214,34 @@ export default function MultiColisLivreurView({ course, colisRecupere, onAllLivr
       const gainLivreur = Math.round(montantTotal * ((100 - countryCommissionPct) / 100));
       const commissionSilga = Math.round(montantTotal * (countryCommissionPct / 100));
 
-      const updateData = {
-        nb_colis_livres: nbLivres,
-        nb_colis_annules: nbAnnules,
-        prix_final: montantTotal,
-        montant_livreur: gainLivreur,
-        commission_silga: commissionSilga,
-      };
-
       if (tousTermines) {
-        updateData.statut = nbLivres > 0 ? "livree" : "annulee";
-        updateData.heure_livraison = now;
-        updateData.colis_livre_at = now;
+        if (nbLivres > 0) {
+          const res = await base44.functions.invoke("finaliserLivraisonLivreur", {
+            course_id: course.id,
+            prix_final_livreur: montantTotal,
+            is_multi_colis: true,
+          });
+          return {
+            tousTermines,
+            courseData: res?.course || { ...course, statut: "livree", nb_colis_livres: nbLivres, nb_colis_annules: nbAnnules },
+          };
+        } else {
+          await base44.functions.invoke("annulerCourseExterne", {
+            course_id: course.id,
+            motif: "Tous les colis annulés",
+            source: "livreur",
+          });
+          return {
+            tousTermines,
+            courseData: { ...course, statut: "annulee", nb_colis_annules: nbAnnules },
+          };
+        }
       }
 
-      await base44.entities.CourseExterne.update(course.id, updateData);
+      // Annulation intermédiaire — pas de mise à jour de la course
       return {
         tousTermines,
-        courseData: {
-          ...course,
-          ...updateData,
-          id: course.id,
-          colis_livre_at: updateData.colis_livre_at || course.colis_livre_at,
-          heure_livraison: updateData.heure_livraison || course.heure_livraison,
-        },
+        courseData: { ...course, nb_colis_annules: nbAnnules },
       };
     },
     onSuccess: ({ tousTermines, courseData }) => {
