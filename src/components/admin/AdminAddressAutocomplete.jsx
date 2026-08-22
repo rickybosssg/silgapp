@@ -88,6 +88,10 @@ export default function AdminAddressAutocomplete({
   const handleCreateQuartier = async () => {
     const nomQuartier = query.trim();
     if (!nomQuartier || nomQuartier.length < 3) return;
+    if (!countryCode) {
+      toast?.error?.("Pays requis pour créer un quartier (COUNTRY_REQUIRED).");
+      return;
+    }
     setCreating(true);
     try {
       // 1. Géocoder le quartier via geocodeAddress
