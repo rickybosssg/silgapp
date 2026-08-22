@@ -96,9 +96,17 @@ export default function CourseDetailDialog({ course: courseProp, open, onClose, 
         }
         return result.data;
       }
-      // Utiliser l'entité correcte selon le réseau
+      // Utiliser la fonction backend sécurisée pour les courses externes
       if (reseau === "externe") {
-        return await base44.entities.CourseExterne.update(id, data);
+        const result = await base44.functions.invoke("transitionStatutAdmin", {
+          course_id: id,
+          statut_cible: data.statut,
+          notes: data.notes || null,
+        });
+        if (!result?.data?.success && result?.data?.error) {
+          throw new Error(result.data.error);
+        }
+        return result?.data || result;
       }
       return await base44.entities.Course.update(id, data);
     },
@@ -162,16 +170,14 @@ export default function CourseDetailDialog({ course: courseProp, open, onClose, 
         setReattributing(false);
         return;
       }
-      await base44.entities.CourseExterne.update(course.id, {
-        statut: "livreur_en_route",
-        dispatch_status: "accepte",
+      const result = await base44.functions.invoke("assignerLivreurAdmin", {
+        course_id: course.id,
         livreur_id: livreurId,
-        livreur_nom: livreurNom,
-        heure_acceptation: new Date().toISOString(),
-        notes: (course.notes || "") + "\n[Réattribué au même livreur par admin]",
+        motif: "Réattribué au même livreur par admin",
       });
-      // Remettre le livreur en course
-      await base44.entities.Livreur.update(livreurId, { statut: "en_course" });
+      if (!result?.data?.success && result?.data?.error) {
+        throw new Error(result.data.error);
+      }
       toast.success("Course réattribuée à " + (livreurNom || "ce livreur") + " — statut: En route");
       queryClient.invalidateQueries();
       onClose();
@@ -185,29 +191,14 @@ export default function CourseDetailDialog({ course: courseProp, open, onClose, 
   const handleRelancerVague0 = async () => {
     setRelaunching(true);
     try {
-      await base44.entities.CourseExterne.update(course.id, {
-        statut: "recherche_livreur",
-        dispatch_status: "en_attente",
-        dispatch_wave: 0,
-        dispatch_cycle_count: 0,
-        dispatch_notified_ids: "[]",
-        dispatch_wave_notified_ids: "[]",
-        dispatch_refused_ids: "[]",
-        dispatch_locked_until: null,
-        timeout_expires_at: null,
-        livreur_id: "",
-        livreur_nom: "",
-        livreur_telephone: "",
-        livreur_photo_url: "",
-        livreur_vehicule: "",
-        livreur_note_moyenne: 0,
-        livreur_nombre_avis: 0,
+      const result = await base44.functions.invoke("relancerDispatchAdmin", {
+        course_id: course.id,
+        mode: "vague0",
+        motif: "Relance vague 0 par admin",
       });
-      // ── Réinitialiser les notifications DispatchNotification pour permettre
-      //    au dispatch engine de re-notifier tous les livreurs ──
-      await base44.entities.DispatchNotification.deleteMany({ course_id: course.id }).catch(() => null);
-      // Déclencher le dispatch immédiatement
-      await base44.functions.invoke("dispatchExterneAuto", {}).catch(() => null);
+      if (!result?.data?.success && result?.data?.error) {
+        throw new Error(result.data.error);
+      }
       toast.success("Course relancée depuis la vague 0");
       queryClient.invalidateQueries();
       onClose();

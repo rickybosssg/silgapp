@@ -67,17 +67,15 @@ export default function CoursesRedispatch({ courses, onView }) {
 
   const relaunchMutation = useMutation({
     mutationFn: async (course) => {
-      // Remettre la course en "recherche_livreur" avec dispatch_status "en_attente"
-      // L'orchestrateur détectera le changement de statut et relancera le dispatch automatiquement
-      return base44.entities.CourseExterne.update(course.id, {
-        statut: "recherche_livreur",
-        dispatch_status: "en_attente",
-        dispatch_wave: 0,
-        timeout_expires_at: null,
-        dispatch_next_wave_at: null,
-        dispatch_v2_secours_phase: 0,
-        notes: (course.notes || "") + ` | [RELANCE ADMIN → recherche_livreur]`,
+      const result = await base44.functions.invoke("relancerDispatchAdmin", {
+        course_id: course.id,
+        mode: "redispatch",
+        motif: "Relance admin (CoursesRedispatch)",
       });
+      if (!result?.data?.success && result?.data?.error) {
+        throw new Error(result.data.error);
+      }
+      return result?.data || result;
     },
     onMutate: (course) => setRelaunchingId(course.id),
     onSuccess: (_, course) => {
@@ -92,11 +90,14 @@ export default function CoursesRedispatch({ courses, onView }) {
 
   const closeMutation = useMutation({
     mutationFn: async (course) => {
-      return base44.entities.CourseExterne.update(course.id, {
-        statut: "annulee",
-        dispatch_status: "cycle_epuise",
-        notes: (course.notes || "") + ` | [FERMÉE ADMIN — ${format(new Date(), "dd/MM HH:mm", { locale: fr })}]`,
+      const result = await base44.functions.invoke("cloturerCourseAdmin", {
+        course_id: course.id,
+        motif: `FERMÉE ADMIN — ${format(new Date(), "dd/MM HH:mm", { locale: fr })}`,
       });
+      if (!result?.data?.success && result?.data?.error) {
+        throw new Error(result.data.error);
+      }
+      return result?.data || result;
     },
     onMutate: (course) => setClosingId(course.id),
     onSuccess: (_, course) => {

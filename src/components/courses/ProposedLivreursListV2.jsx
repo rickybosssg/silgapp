@@ -144,17 +144,14 @@ export default function ProposedLivreursListV2({ course }) {
   const handleForceAssign = async (livreur) => {
     setAssigningId(livreur.id);
     try {
-      await base44.entities.CourseExterne.update(course.id, {
-        statut: "livreur_en_route",
-        dispatch_status: "accepte",
+      const result = await base44.functions.invoke("assignerLivreurAdmin", {
+        course_id: course.id,
         livreur_id: livreur.id,
-        livreur_nom: `${livreur.prenom || ""} ${livreur.nom || ""}`.trim(),
-        livreur_telephone: livreur.telephone || "",
-        livreur_vehicule: livreur.vehicule || livreur.type_vehicule || "",
-        heure_acceptation: new Date().toISOString(),
-        notes: (course.notes || "") + `\n[Assigné manuellement par admin → ${livreur.prenom || ""} ${livreur.nom || ""}]`,
+        motif: `Assigné manuellement par admin → ${livreur.prenom || ""} ${livreur.nom || ""}`,
       });
-      await base44.entities.Livreur.update(livreur.id, { statut: "en_course" });
+      if (!result?.data?.success && result?.data?.error) {
+        throw new Error(result.data.error);
+      }
       toast.success(`Course assignée à ${livreur.prenom || ""} ${livreur.nom || ""}`);
       queryClient.invalidateQueries();
     } catch (error) {
