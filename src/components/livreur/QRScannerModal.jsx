@@ -89,23 +89,16 @@ export default function QRScannerModal({ course, type, onSuccess, onClose, livre
       const gpsStartedAt = Date.now();
       const gps = await getValidationGps();
       const gpsMs = Date.now() - gpsStartedAt;
-      if (!gps?.latitude || !gps?.longitude) {
-        const message = "Position GPS indisponible. Restez à l'extérieur ou près d'une fenêtre, puis réessayez.";
-        setErrorMessage(message);
-        setResult("error");
-        toast.error(message);
-        setTimeout(() => setResult(null), 2500);
-        return;
-      }
-
+      // GPS optionnel : ne pas bloquer la livraison si le GPS est indisponible.
+      // Le backend utilise le GPS de destination de la course comme fallback.
       const networkStartedAt = Date.now();
       const res = await base44.functions.invoke("validateQRCode", {
         course_id: course.id,
         type,
         value: submittedValue,
         method,
-        latitude: gps.latitude,
-        longitude: gps.longitude,
+        latitude: gps?.latitude || null,
+        longitude: gps?.longitude || null,
       });
       console.info("[QRScanner] validation timing", {
         type,
