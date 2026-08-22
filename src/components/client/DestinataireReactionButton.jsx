@@ -38,9 +38,9 @@ export default function DestinataireReactionButton({ course, onDone }) {
     setChoix(reaction);
     setLoading(true);
     try {
-      await base44.entities.CourseExterne.update(course.id, {
+      await base44.functions.invoke("enregistrerFeedbackCourse", {
+        course_id: course.id,
         destinataire_feedback: reaction,
-        destinataire_feedback_date: new Date().toISOString(),
       });
       setDone(true);
       toast.success("Merci pour votre retour !");

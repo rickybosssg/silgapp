@@ -31,34 +31,12 @@ export default function LivreurRatingDialog({ course, onClose, onRated }) {
     }
     setLoading(true);
     try {
-      // 1. Sauvegarder la note sur la course
-      await base44.entities.CourseExterne.update(course.id, {
+      // ── Migration sécurisée : note + recalcul moyenne via backend ──
+      await base44.functions.invoke("enregistrerFeedbackCourse", {
+        course_id: course.id,
         note_livreur: note,
         commentaire_livreur: commentaire || null,
-        note_date: new Date().toISOString(),
       });
-
-      // 2. Recalculer la moyenne du livreur
-      if (course.livreur_id) {
-        const toutesLesCourses = await base44.entities.CourseExterne.filter(
-          { livreur_id: course.livreur_id, statut: "livree" },
-          "-created_date",
-          200
-        );
-        const notees = toutesLesCourses.filter(c => c.note_livreur > 0);
-        // Inclure la note actuelle si pas encore enregistrée
-        const notesValues = notees.map(c => c.id === course.id ? note : c.note_livreur);
-        if (!notees.find(c => c.id === course.id)) notesValues.push(note);
-
-        const moyenne = notesValues.length > 0
-          ? notesValues.reduce((a, b) => a + b, 0) / notesValues.length
-          : note;
-
-        await base44.entities.Livreur.update(course.livreur_id, {
-          note_moyenne: Math.round(moyenne * 10) / 10,
-          nombre_avis: notesValues.length,
-        });
-      }
 
       setDone(true);
       toast.success("Merci pour votre évaluation !");

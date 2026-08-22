@@ -85,7 +85,7 @@ export default function CourseExterneForm() {
   };
 
   const createMutation = useMutation({
-    mutationFn: (data) => base44.entities.CourseExterne.create(data),
+    mutationFn: (data) => base44.functions.invoke("creerCourseClient", { course_data: data }).then(res => res.course),
     onSuccess: () => {
       toast.success("Course créée ! Recherche d'un livreur en cours...");
       navigate("/client/suivi");

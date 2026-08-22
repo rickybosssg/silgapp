@@ -658,18 +658,22 @@ export default function ClientExterneApp() {
       const courses = [...map.values()];
 
       // Mettre à jour uniquement si GPS différent ou absent
-      for (const course of courses) {
-        const needsUpdate =
-          !course.gps_arrivee_lat ||
-          !course.gps_arrivee_lng ||
-          Math.abs(course.gps_arrivee_lat - pos.latitude) > 0.001 ||
-          Math.abs(course.gps_arrivee_lng - pos.longitude) > 0.001;
-        if (needsUpdate) {
-          await base44.entities.CourseExterne.update(course.id, {
-            gps_arrivee_lat: pos.latitude,
-            gps_arrivee_lng: pos.longitude
-          });
-        }
+      // ── Migration sécurisée : sync GPS destinataire via backend ──
+      const courseIdsToUpdate = courses
+        .filter(c =>
+          !c.gps_arrivee_lat ||
+          !c.gps_arrivee_lng ||
+          Math.abs(c.gps_arrivee_lat - pos.latitude) > 0.001 ||
+          Math.abs(c.gps_arrivee_lng - pos.longitude) > 0.001
+        )
+        .map(c => c.id);
+
+      if (courseIdsToUpdate.length > 0) {
+        await base44.functions.invoke("syncGpsDestinataire", {
+          course_ids: courseIdsToUpdate,
+          latitude: pos.latitude,
+          longitude: pos.longitude,
+        });
       }
     } catch (err) {
       console.error("Erreur sync GPS destinataire:", err);
