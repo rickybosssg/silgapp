@@ -46,7 +46,7 @@ function LivreurScoreCard({ livreur, rank, expanded, onToggle }) {
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
       <button onClick={onToggle} className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 transition-colors">
-        <span className="text-[10px] font-bold text-gray-300 w-5 text-center shrink-0">{rank}</span>
+        <span className="text-[10px] font-bold text-gray-300 w-5 text-center shrink-0">{rank || "—"}</span>
         <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center shrink-0 overflow-hidden">
           {livreur.photo_url ? (
             <img src={livreur.photo_url} alt="" className="w-full h-full object-cover" />
@@ -67,6 +67,11 @@ function LivreurScoreCard({ livreur, rank, expanded, onToggle }) {
         <span className={cn("text-[9px] font-bold px-2 py-0.5 rounded-full shrink-0", niveauConfig.bg, niveauConfig.text)}>
           {niveauConfig.label}
         </span>
+        {confiance === "faible" && (
+          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 bg-gray-100 text-gray-500 border border-gray-200">
+            Provisoire
+          </span>
+        )}
         {anomalies.length > 0 && (
           <span className={cn("text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0", "bg-red-50 text-red-600")}>
             {anomalies.length}⚠
@@ -158,9 +163,15 @@ export default function SilgaScoreCalibration({ onRecalc, isRecalculating }) {
 
   // ── Filtrer livreurs avec score calculé ──
   const withScores = livreurs.filter((l) => l.silga_score_niveau && l.silga_score_niveau !== "non_calcule");
-  const sorted = [...withScores].sort((a, b) => (b.silga_score || 0) - (a.silga_score || 0));
+
+  // ── Séparer livreurs fiables (confiance moyenne/élevée) des provisoires (confiance faible) ──
+  const fiables = withScores.filter((l) => l.silga_score_confiance && l.silga_score_confiance !== "faible");
+  const provisoires = withScores.filter((l) => !l.silga_score_confiance || l.silga_score_confiance === "faible");
+
+  const sorted = [...fiables].sort((a, b) => (b.silga_score || 0) - (a.silga_score || 0));
   const top10 = sorted.slice(0, 10);
   const bottom10 = sorted.slice(-10).reverse();
+  const sortedProvisoires = [...provisoires].sort((a, b) => (b.silga_score || 0) - (a.silga_score || 0));
 
   // ── Distribution ──
   const distribution = {
@@ -178,8 +189,8 @@ export default function SilgaScoreCalibration({ onRecalc, isRecalculating }) {
   };
 
   // ── Score moyen ──
-  const scoreMoyen = withScores.length > 0
-    ? Math.round(withScores.reduce((sum, l) => sum + (l.silga_score || 0), 0) / withScores.length)
+  const scoreMoyen = fiables.length > 0
+    ? Math.round(fiables.reduce((sum, l) => sum + (l.silga_score || 0), 0) / fiables.length)
     : 0;
 
   // ── Toutes les anomalies (depuis le cache) ──
@@ -259,7 +270,7 @@ export default function SilgaScoreCalibration({ onRecalc, isRecalculating }) {
             <span className="text-[10px] font-bold text-gray-400 uppercase">Score moyen</span>
           </div>
           <p className="text-2xl font-black text-gray-900">{scoreMoyen}<span className="text-sm text-gray-400">/100</span></p>
-          <p className="text-[10px] text-gray-400 mt-0.5">{withScores.length} livreur(s) calculé(s)</p>
+          <p className="text-[10px] text-gray-400 mt-0.5">{fiables.length} fiable(s) · {provisoires.length} provisoire(s)</p>
         </div>
         {[
           { key: "excellent", label: "Excellent", color: "text-emerald-500" },
@@ -343,7 +354,7 @@ export default function SilgaScoreCalibration({ onRecalc, isRecalculating }) {
             />
           ))}
           {top10.length === 0 && (
-            <p className="text-xs text-gray-400 text-center py-4">Aucun livreur avec score calculé. Cliquez sur "Recalculer".</p>
+            <p className="text-xs text-gray-400 text-center py-4">Pas assez de livreurs fiables. Cliquez sur "Recalculer" et attendez plus d'historique.</p>
           )}
         </div>
       </div>
@@ -365,10 +376,38 @@ export default function SilgaScoreCalibration({ onRecalc, isRecalculating }) {
             />
           ))}
           {bottom10.length === 0 && (
-            <p className="text-xs text-gray-400 text-center py-4">Aucun livreur avec score calculé. Cliquez sur "Recalculer".</p>
+            <p className="text-xs text-gray-400 text-center py-4">Pas assez de livreurs fiables. Cliquez sur "Recalculer" et attendez plus d'historique.</p>
           )}
         </div>
       </div>
+
+      {/* Provisoires — confiance faible, non classés dans le TOP/BOTTOM */}
+      {sortedProvisoires.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 px-1 mb-2">
+            <Clock className="w-4 h-4 text-gray-400" />
+            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">
+              Provisoires — Confiance faible ({sortedProvisoires.length})
+            </p>
+          </div>
+          <div className="rounded-2xl border border-gray-100 bg-gray-50/50 p-3 mb-2">
+            <p className="text-[10px] text-gray-500">
+              Ces livreurs ont moins de 5 points de données (nouveau ou peu actif). Leur score est <strong>provisoire</strong> et n'est pas inclus dans le classement principal pour éviter de les pénaliser injustement.
+            </p>
+          </div>
+          <div className="space-y-2">
+            {sortedProvisoires.map((l, i) => (
+              <LivreurScoreCard
+                key={l.id}
+                livreur={l}
+                rank={null}
+                expanded={expandedId === l.id}
+                onToggle={() => setExpandedId(expandedId === l.id ? null : l.id)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Anomalies détectées */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
