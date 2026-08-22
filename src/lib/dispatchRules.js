@@ -1,25 +1,38 @@
-// ─── Constantes de seuils ────────────────────────────────────────────────────
+// ─── Règles de dispatch — configuration dynamique ──────────────────────────
+//
+// ⚠️ Aucune valeur métier codée en dur. Toutes les constantes sont lues depuis
+//    dispatchConfigStore (source unique). Les defaults sont alignés sur les
+//    seeds backend (Country + AppConfig).
+//
+// Unification : les anciennes constantes DISPATCH_NIVEAU_* sont maintenant
+//    des alias vers les constantes unifiées (heartbeat/gps). Une même règle
+//    métier = un seul paramètre.
+//
+// Le backend reste l'autorité finale pour l'éligibilité réelle au dispatch.
 
-export const GPS_SEUIL_MIN = 5; // GPS valide si < 5 min (affichage badge)
-export const GPS_DISPATCH_SEUIL_MIN = 10; // GPS éligible dispatch si < 10 min (= moteur dispatch)
-export const GPS_EXPIRE_SEUIL_MIN = 60; // GPS expiré si > 60 min
-export const HEARTBEAT_SEUIL_MIN = 2; // App active si heartbeat < 2 min (dispatch niveau 1)
-export const HEARTBEAT_ON_SEUIL_MIN = 10; // ON si heartbeat < 10 min
-export const GPS_CLIENT_SEUIL_MIN = 30; // Client GPS valide si < 30 min
+import { getConfig } from './dispatchConfigStore';
 
-// ─── Nouveaux seuils de dispatch par niveaux ───────────────────────────────
-export const DISPATCH_NIVEAU_1_HEARTBEAT_MIN = 2; // Priorité absolue
-export const DISPATCH_NIVEAU_2_HEARTBEAT_MIN = 10; // Secours
-export const DISPATCH_NIVEAU_3_HEARTBEAT_MIN = 30; // Secours étendu
-// Niveau 4 : tous les livreurs libres (pas de limite heartbeat)
+// ── Accès aux paramètres dynamiques (résolution: backend → cache → defaults) ──
+export function getGpsSeuilMin() { return getConfig().gps_seuil_min; }
+export function getGpsDispatchSeuilMin() { return getConfig().gps_dispatch_seuil_min; }
+export function getGpsExpireSeuilMin() { return getConfig().gps_expire_seuil_min; }
+export function getGpsClientSeuilMin() { return getConfig().gps_client_seuil_min; }
+export function getHeartbeatSeuilMin() { return getConfig().heartbeat_seuil_min; }
+export function getHeartbeatOnSeuilMin() { return getConfig().heartbeat_on_seuil_min; }
 
-// ─── Helpers (règles unifiées) ───────────────────────────────────────────────
+// ── Alias unifiés (anciennes constantes DISPATCH_NIVEAU_*) ──
+// Une même règle métier = un seul paramètre.
+export const DISPATCH_NIVEAU_1_HEARTBEAT_MIN = null; // = getHeartbeatSeuilMin() — alias
+export const DISPATCH_NIVEAU_2_HEARTBEAT_MIN = null; // = getHeartbeatOnSeuilMin() — alias
+export const DISPATCH_NIVEAU_3_HEARTBEAT_MIN = null; // = getGpsExpireSeuilMin() — alias
 
-/** GPS récent = dernière position < GPS_SEUIL_MIN minutes */
+// ── Helpers (règles unifiées) ──────────────────────────────────────────────
+
+/** GPS récent = dernière position < gps_seuil_min minutes */
 export function isGPSRecent(entity) {
   const dt = entity.derniere_position_date || entity.last_seen_at;
   if (!dt) return false;
-  return (Date.now() - new Date(dt).getTime()) < GPS_SEUIL_MIN * 60 * 1000;
+  return (Date.now() - new Date(dt).getTime()) < getGpsSeuilMin() * 60 * 1000;
 }
 
 /** GPS valide = coordonnées non nulles ET récentes */
@@ -27,25 +40,24 @@ export function hasValidGPS(entity) {
   return !!(entity.latitude && entity.longitude && isGPSRecent(entity));
 }
 
-/** App active = heartbeat < HEARTBEAT_SEUIL_MIN minutes (5 min) */
+/** App active = heartbeat < heartbeat_seuil_min minutes */
 export function isAppActive(entity) {
   const dt = entity.last_seen_at;
   if (!dt) return false;
   const heartbeatAge = Date.now() - new Date(dt).getTime();
-  // Heartbeat récent < 5 min = app active
-  return heartbeatAge < HEARTBEAT_SEUIL_MIN * 60 * 1000;
+  return heartbeatAge < getHeartbeatSeuilMin() * 60 * 1000;
 }
 
-/** ON = statut actif ET heartbeat < HEARTBEAT_ON_SEUIL_MIN */
+/** ON = statut actif ET heartbeat < heartbeat_on_seuil_min */
 export function isON(livreur) {
   const actifEnDB = livreur.statut === "disponible" || livreur.statut === "en_course";
   const dt = livreur.last_seen_at || livreur.derniere_position_date;
   if (!dt) return false;
-  return actifEnDB && (Date.now() - new Date(dt).getTime()) < HEARTBEAT_ON_SEUIL_MIN * 60 * 1000;
+  return actifEnDB && (Date.now() - new Date(dt).getTime()) < getHeartbeatOnSeuilMin() * 60 * 1000;
 }
 
 /**
- * Libre = disponibilité métier + GPS ≤ 60 min (dispatchable)
+ * Libre = disponibilité métier + GPS ≤ gps_expire_seuil_min (dispatchable)
  * Critères :
  * - statut = "disponible"
  * - actif = true
@@ -66,27 +78,24 @@ export function isLibre(livreur) {
   if (!livreur.latitude || !livreur.longitude) return false;
   const dt = livreur.derniere_position_date || livreur.last_seen_at;
   if (!dt) return false;
-  return (Date.now() - new Date(dt).getTime()) < GPS_EXPIRE_SEUIL_MIN * 60 * 1000;
+  return (Date.now() - new Date(dt).getTime()) < getGpsExpireSeuilMin() * 60 * 1000;
 }
 
-/** GPS récent pour dispatch prioritaire (≤ 10 min) */
+/** GPS récent pour dispatch prioritaire (≤ gps_dispatch_seuil_min min) */
 export function isGPSRecentDispatch(livreur) {
   if (!livreur.latitude || !livreur.longitude) return false;
   const dt = livreur.derniere_position_date || livreur.last_seen_at;
   if (!dt) return false;
-  return (Date.now() - new Date(dt).getTime()) < GPS_DISPATCH_SEUIL_MIN * 60 * 1000;
+  return (Date.now() - new Date(dt).getTime()) < getGpsDispatchSeuilMin() * 60 * 1000;
 }
 
 /**
  * Catégorie d'un livreur pour l'affichage et les compteurs
  * Retourne une des 4 catégories mutuellement exclusives :
- *   - "libre"      : disponible + validé + actif + GPS ≤ 60 min (dispatchable)
- *   - "gps_expire" : disponible + validé + actif + GPS > 60 min ou absent (non dispatchable)
+ *   - "libre"      : disponible + validé + actif + GPS ≤ gps_expire_seuil_min
+ *   - "gps_expire" : disponible + validé + actif + GPS > gps_expire_seuil_min ou absent
  *   - "en_course"  : a une course active en cours
  *   - "hors_ligne" : hors_ligne, bloqué, non validé ou autre statut
- *
- * NOTE : La distinction GPS récent/ancien est supprimée.
- * Tous les GPS ≤ 60 min sont "libre" — le tri par distance se fait dans le moteur de dispatch.
  */
 export function getLivreurCategorie(livreur, livreurIdsEnCourseReelle) {
   if (livreur.actif === false) return "hors_ligne";
@@ -98,11 +107,11 @@ export function getLivreurCategorie(livreur, livreurIdsEnCourseReelle) {
   const dt = livreur.derniere_position_date || livreur.last_seen_at;
   if (!dt) return "gps_expire";
   const ageMin = (Date.now() - new Date(dt).getTime()) / 60000;
-  if (ageMin <= GPS_EXPIRE_SEUIL_MIN) return "libre";
+  if (ageMin <= getGpsExpireSeuilMin()) return "libre";
   return "gps_expire";
 }
 
-/** GPS expiré = disponible + validé + actif + GPS > 60 min */
+/** GPS expiré = disponible + validé + actif + GPS > gps_expire_seuil_min */
 export function isGPSExpire(livreur) {
   if (livreur.statut !== "disponible") return false;
   if (livreur.actif === false) return false;
@@ -110,10 +119,10 @@ export function isGPSExpire(livreur) {
   if (!livreur.latitude || !livreur.longitude) return false;
   const dt = livreur.derniere_position_date || livreur.last_seen_at;
   if (!dt) return false;
-  return (Date.now() - new Date(dt).getTime()) > GPS_EXPIRE_SEUIL_MIN * 60 * 1000;
+  return (Date.now() - new Date(dt).getTime()) > getGpsExpireSeuilMin() * 60 * 1000;
 }
 
-/** GPS ancien dispatchable = disponible + validé + actif + GPS 10-60 min */
+/** GPS ancien dispatchable = disponible + validé + actif + GPS entre dispatch_seuil et expire_seuil */
 export function isLibreSansGPSValide(livreur) {
   if (livreur.statut !== "disponible") return false;
   if (livreur.actif === false) return false;
@@ -122,23 +131,17 @@ export function isLibreSansGPSValide(livreur) {
   const dt = livreur.derniere_position_date || livreur.last_seen_at;
   if (!dt) return false;
   const ageMin = (Date.now() - new Date(dt).getTime()) / 60000;
-  return ageMin >= GPS_DISPATCH_SEUIL_MIN && ageMin <= GPS_EXPIRE_SEUIL_MIN;
+  return ageMin >= getGpsDispatchSeuilMin() && ageMin <= getGpsExpireSeuilMin();
 }
 
-/**
- * Qualité GPS — pour affichage et priorisation
- * Retourne l'âge du GPS en minutes
- */
+/** Qualité GPS — retourne l'âge du GPS en minutes */
 export function getGPSAgeMin(livreur) {
   const dt = livreur.derniere_position_date;
   if (!dt) return null;
   return (Date.now() - new Date(dt).getTime()) / 60000;
 }
 
-/**
- * Qualité Heartbeat — pour choisir le canal de notification
- * Retourne l'âge du heartbeat en minutes
- */
+/** Qualité Heartbeat — retourne l'âge du heartbeat en minutes */
 export function getHeartbeatAgeMin(livreur) {
   const dt = livreur.last_seen_at;
   if (!dt) return null;
@@ -147,12 +150,12 @@ export function getHeartbeatAgeMin(livreur) {
 
 /**
  * Canal de notification recommandé
- * Retourne "silgapp" si heartbeat récent (< 2 min), sinon "whatsapp"
+ * Retourne "silgapp" si heartbeat récent (< heartbeat_seuil_min), sinon "whatsapp"
  */
 export function getNotificationChannel(livreur) {
   const heartbeatAge = getHeartbeatAgeMin(livreur);
   if (heartbeatAge === null) return "whatsapp";
-  return heartbeatAge < DISPATCH_NIVEAU_1_HEARTBEAT_MIN ? "silgapp" : "whatsapp";
+  return heartbeatAge < getHeartbeatSeuilMin() ? "silgapp" : "whatsapp";
 }
 
 /** En course = statut en_course + ON */
@@ -160,20 +163,12 @@ export function isEnCourse(livreur) {
   return livreur.statut === "en_course" && isON(livreur);
 }
 
-/**
- * Éligible carte = visible sur la carte dispatch
- * Conditions : GPS renseigné (lat/lng) + statut actif
- * app_active n'est PAS un critère — afficher tous les livreurs ON
- */
+/** Éligible carte = visible sur la carte dispatch */
 export function isEligibleCarte(livreur) {
   return isON(livreur) && !!(livreur.latitude && livreur.longitude);
 }
 
-/**
- * Client éligible carte = app active au premier plan + GPS récent
- * N'affiche PAS les clients en arrière-plan (app_active: false)
- * pour éviter les "ghost clients" qui apparaissent toujours connectés.
- */
+/** Client éligible carte = app active au premier plan + GPS récent */
 export function isClientEligibleCarte(client) {
   if (client.actif === false) return false;
   if (client.app_active !== true) return false;
@@ -186,17 +181,26 @@ export function hasGPS(client) {
   return !!(client.latitude && client.longitude);
 }
 
-/** Client GPS récent = position < 30 min */
+/** Client GPS récent = position < gps_client_seuil_min min */
 export function isClientGPSRecent(client) {
   const dt = client.last_seen_at;
   if (!dt) return false;
-  return (Date.now() - new Date(dt).getTime()) < GPS_CLIENT_SEUIL_MIN * 60 * 1000;
+  return (Date.now() - new Date(dt).getTime()) < getGpsClientSeuilMin() * 60 * 1000;
 }
 
-/**
- * Client noir = GPS absent ou expiré > 30 min
- */
+/** Client noir = GPS absent ou expiré > gps_client_seuil_min */
 export function isClientNoir(client) {
   if (!client.latitude || !client.longitude) return true;
   return !isClientGPSRecent(client);
 }
+
+// ── Exports rétrocompatibles (anciennes constantes) ───────────────────────
+// Résolus une fois au chargement du module (depuis le cache ou les defaults).
+// Pour des valeurs toujours à jour, utiliser les fonctions get*().
+export const GPS_SEUIL_MIN = getGpsSeuilMin();
+export const GPS_DISPATCH_SEUIL_MIN = getGpsDispatchSeuilMin();
+export const GPS_EXPIRE_SEUIL_MIN = getGpsExpireSeuilMin();
+export const GPS_CLIENT_SEUIL_MIN = getGpsClientSeuilMin();
+export const GPS_MAX_STALE_MIN = getConfig().gps_max_stale_min;
+export const HEARTBEAT_SEUIL_MIN = getHeartbeatSeuilMin();
+export const HEARTBEAT_ON_SEUIL_MIN = getHeartbeatOnSeuilMin();

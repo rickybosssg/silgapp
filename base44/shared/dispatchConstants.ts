@@ -61,6 +61,42 @@ export function normalizeCommissionPct(value: any): number | null {
   return pct;
 }
 
+// ── Cache des configs tarifaires par zone (TTL 5 min) ──
+const TARIF_ZONE_CACHE = new Map<string, { data: any; expires: number }>();
+const TARIF_ZONE_TTL_MS = 5 * 60 * 1000;
+
+/**
+ * Charge la configuration tarifaire d'une zone (TarifZone) depuis la DB avec cache TTL 5 min.
+ * Retourne la zone active valide (date de validité vérifiée) pour le pays/ville donnés.
+ * Utilisé par calculPrixCourseExterne pour le calcul automatique des prix par paliers.
+ */
+export async function chargerTarifZone(base44: any, countryCode: string, ville?: string) {
+  if (!countryCode) return null;
+  const cacheKey = `${countryCode}|${ville || ''}`;
+  const cached = TARIF_ZONE_CACHE.get(cacheKey);
+  if (cached && cached.expires > Date.now()) return cached.data;
+  try {
+    const zones = await base44.asServiceRole.entities.TarifZone
+      .filter({ pays_code: countryCode, actif: true }, '-date_debut', 50);
+    if (!zones || zones.length === 0) return null;
+    const now = new Date();
+    const valid = zones.filter((z: any) => {
+      const debut = z.date_debut ? new Date(z.date_debut) : null;
+      const fin = z.date_fin ? new Date(z.date_fin) : null;
+      if (debut && now < debut) return false;
+      if (fin && now > fin) return false;
+      return true;
+    });
+    let selected = ville ? valid.find((z: any) => z.ville === ville) : null;
+    if (!selected) selected = valid[0];
+    if (!selected) return null;
+    TARIF_ZONE_CACHE.set(cacheKey, { data: selected, expires: Date.now() + TARIF_ZONE_TTL_MS });
+    return selected;
+  } catch {
+    return null;
+  }
+}
+
 // ── Cache des configs pays (TTL 5 min) ──
 const COUNTRY_CONFIG_CACHE = new Map<string, { data: any; expires: number }>();
 const COUNTRY_CONFIG_TTL_MS = 5 * 60 * 1000;

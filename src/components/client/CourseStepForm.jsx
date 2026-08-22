@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,6 +12,7 @@ import {
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
 import { calculerPrixApproximatif } from "@/lib/priceEstimate";
+import { isPaysTarificationGrandOuaga, calculerTarifGrandOuagaAsync } from "@/lib/tarifGrandOuaga";
 import CarnetAdresses from "@/components/client/CarnetAdresses";
 import ContactPickerButton from "@/components/client/ContactPickerButton";
 import { SILGAPP_COUNTRIES, phoneVariants } from "@/lib/phoneUtils";
@@ -46,7 +47,7 @@ const COLORS = {
 // ─── Helpers téléphone ────────────────────────────────────────────────────────
 function getDialCode(countryCode) {
   const c = SILGAPP_COUNTRIES.find(x => x.code === countryCode);
-  return c ? `+${c.dial}` : "+226";
+  return c ? `+${c.dial}` : "—";
 }
 function getPhonePlaceholder(countryCode) {
   const c = SILGAPP_COUNTRIES.find(x => x.code === countryCode);
@@ -216,8 +217,8 @@ export default function CourseStepForm({
   savedLat,
   savedLng,
 }) {
-  const activeCountry = countryCode || "BF";
-  const phonePlaceholder = getPhonePlaceholder(activeCountry);
+  const activeCountry = countryCode || "";
+  const phonePlaceholder = activeCountry ? getPhonePlaceholder(activeCountry) : "";
   const [expediteurFound, setExpediteurFound] = useState(null);
   const [destinataireFound, setDestinataireFound] = useState(null);
   const [verifying, setVerifying] = useState(false);
@@ -227,6 +228,76 @@ export default function CourseStepForm({
   const isExpedie = formData.type_course === "expedier";
   const isRecevoir = formData.type_course === "recevoir";
   const isDeplacement = formData.type_course === "deplacement";
+
+  // ── Source unique : calcul ORS Grand Ouaga (BF uniquement) ──────────────
+  // Un SEUL appel ORS par paire de coordonnées. Le résultat complet est
+  // stocké dans formData._tarifGrandOuaga et réutilisé par CourseExterneFormSync.
+  const prixManuelModifie = useRef(false);
+  const derniereCleCoords = useRef("");
+  const [recalculerDisponible, setRecalculerDisponible] = useState(false);
+
+  useEffect(() => {
+    if (!isPaysTarificationGrandOuaga(activeCountry)) return;
+    if (!formData.gps_depart_lat || !formData.gps_depart_lng ||
+        !formData.gps_arrivee_lat || !formData.gps_arrivee_lng) return;
+
+    const cleCoords = `${formData.gps_depart_lat},${formData.gps_depart_lng},${formData.gps_arrivee_lat},${formData.gps_arrivee_lng}`;
+
+    // Si les coordonnées ont changé après une modif manuelle → proposer recalcul
+    if (prixManuelModifie.current && derniereCleCoords.current && derniereCleCoords.current !== cleCoords) {
+      setRecalculerDisponible(true);
+      return;
+    }
+
+    let cancelled = false;
+    calculerTarifGrandOuagaAsync(
+      formData.gps_depart_lat, formData.gps_depart_lng,
+      formData.gps_arrivee_lat, formData.gps_arrivee_lng,
+      activeCountry,
+      formData.gps_depart_source,
+      formData.gps_arrivee_source
+    ).then((tarif) => {
+      if (cancelled || !tarif) return;
+      derniereCleCoords.current = cleCoords;
+      // Ne pas écraser le prix si l'utilisateur l'a modifié manuellement
+      if (!prixManuelModifie.current) {
+        setFormData(prev => ({
+          ...prev,
+          prix_propose: tarif.prix || prev.prix_propose,
+          _tarifGrandOuaga: tarif,
+        }));
+      } else {
+        // Garder le résultat pour CourseExterneFormSync, mais ne pas écraser le prix
+        setFormData(prev => ({ ...prev, _tarifGrandOuaga: tarif }));
+      }
+    }).catch(() => {});
+
+    return () => { cancelled = true; };
+  }, [formData.gps_depart_lat, formData.gps_depart_lng,
+      formData.gps_arrivee_lat, formData.gps_arrivee_lng,
+      formData.gps_depart_source, formData.gps_arrivee_source,
+      activeCountry]);
+
+  // ── Recalculer le tarif après modif manuelle + changement de coordonnées ──
+  const handleRecalculerTarif = async () => {
+    if (!formData.gps_depart_lat || !formData.gps_arrivee_lat) return;
+    const tarif = await calculerTarifGrandOuagaAsync(
+      formData.gps_depart_lat, formData.gps_depart_lng,
+      formData.gps_arrivee_lat, formData.gps_arrivee_lng,
+      activeCountry,
+      formData.gps_depart_source,
+      formData.gps_arrivee_source
+    );
+    if (tarif?.prix) {
+      prixManuelModifie.current = false;
+      setRecalculerDisponible(false);
+      setFormData(prev => ({
+        ...prev,
+        prix_propose: tarif.prix,
+        _tarifGrandOuaga: tarif,
+      }));
+    }
+  };
 
   // ─── Titre de l'étape courante ──────────────────────────────────────────────
   const stepTitles = isExpedie
@@ -1004,6 +1075,26 @@ export default function CourseStepForm({
           </div>
         )}
 
+        {/* ── Prompt recalcul tarif (coords changées après modif manuelle) ── */}
+        {recalculerDisponible && (
+          <div className="flex items-center justify-between rounded-xl border px-4 py-3" style={{ background: COLORS.primaryLight, borderColor: COLORS.primary }}>
+            <div className="flex items-center gap-2">
+              <Navigation className="w-4 h-4 flex-shrink-0" style={{ color: COLORS.primary }} />
+              <p className="text-xs font-semibold" style={{ color: COLORS.primary }}>
+                Coordonnées modifiées. Recalculer le tarif conseillé ?
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleRecalculerTarif}
+              className="px-3 py-1.5 rounded-lg text-white text-xs font-bold transition-all"
+              style={{ background: COLORS.primary }}
+            >
+              Recalculer
+            </button>
+          </div>
+        )}
+
         {/* Prix proposé — sauf multi-colis */}
         {!isMulti && (
           <>
@@ -1016,7 +1107,10 @@ export default function CourseStepForm({
                   type="number"
                   inputMode="numeric"
                   value={formData.prix_propose || ""}
-                  onChange={(e) => setFormData({ ...formData, prix_propose: parseInt(e.target.value) || 0 })}
+                  onChange={(e) => {
+                    prixManuelModifie.current = true;
+                    setFormData({ ...formData, prix_propose: parseInt(e.target.value) || 0 });
+                  }}
                   className="h-16 rounded-xl border-2 bg-white px-4 text-2xl font-black text-center pr-20 focus:outline-none"
                   style={{ borderColor: COLORS.borderInput }}
                   placeholder="1500"
@@ -1265,6 +1359,16 @@ export default function CourseStepForm({
 
   const isLastStep = step === totalSteps - 1;
   const currentStepTitle = stepTitles[step] || "";
+
+  if (!activeCountry) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+        <AlertCircle className="w-10 h-10 text-amber-500 mb-3" />
+        <p className="text-sm font-semibold text-gray-900">Pays requis</p>
+        <p className="text-xs text-gray-500 mt-1">Impossible de déterminer le pays. L'opération ne peut pas continuer sans pays explicite (COUNTRY_REQUIRED).</p>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full">

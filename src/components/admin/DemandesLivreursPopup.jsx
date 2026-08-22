@@ -82,7 +82,7 @@ export default function DemandesLivreursPopup() {
                   <Phone className="w-3 h-3" /> {latest.telephone || "N/A"}
                 </div>
                 <div className="flex items-center gap-1 text-xs text-white/50">
-                  <MapPin className="w-3 h-3" /> {latest.country_code || "BF"} · {latest.ville || "N/A"}
+                  <MapPin className="w-3 h-3" /> {latest.country_code || "—"} · {latest.ville || "N/A"}
                 </div>
               </div>
               <div className="ml-auto text-xs text-white/50 flex items-center gap-1">

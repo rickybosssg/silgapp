@@ -7,6 +7,7 @@ import { lancerDispatchMulti } from '../../shared/dispatchEngine.ts';
 import { runWatchdog } from '../../shared/dispatchWatchdog.ts';
 import { marquerRefuse, marquerAccepte, getLivreursNotifies, getLivreursRefuses, resetNotifications as resetNotifsEntity } from '../../shared/dispatchNotifications.ts';
 import { accepterCourseV2, publierCourseDansFil, isV2Enabled, secoursDispatchV2, isPilotLivreur, DISPATCH_V2_BUNDLE_VERSION } from '../../shared/dispatchV2.ts';
+import { resolveCourseParticipantUserIds } from '../../shared/conversationSecurity.ts';
 
 // 🔖 Redéploiement forcé — 2026-08-14-simplified-3 — rappel T+5min re-notifie les mêmes livreurs libres
 console.log(`[DISPATCH_EXTERNE_AUTO] 🔖 dispatchV2 bundle version: ${DISPATCH_V2_BUNDLE_VERSION}`);
@@ -318,14 +319,21 @@ Deno.serve(async (req) => {
         return Response.json({ success: false, error: 'Course expirée', expired: true });
       }
 
-      // Prix minimum dynamique selon le pays
-      let PRIX_MIN = 1000; // default FCFA
+      // Prix minimum dynamique selon le pays — BLOQUANT si non configuré (sécurité)
+      let PRIX_MIN: number | null = null;
       try {
         const countryConfig = await chargerConfigPays(base44, course.country_code);
-        if (countryConfig?.prix_minimum) {
+        if (countryConfig?.prix_minimum && countryConfig.prix_minimum > 0) {
           PRIX_MIN = countryConfig.prix_minimum;
         }
-      } catch (_) { /* fallback 1000 FCFA */ }
+      } catch (_) {}
+      if (PRIX_MIN === null) {
+        return Response.json({
+          success: false,
+          error: `Prix minimum non configuré pour le pays ${course.country_code}`,
+          blocked_reason: 'missing_country_prix_minimum',
+        }, { status: 400 });
+      }
       const deviseMin = course.devise || 'FCFA';
 
       if (pricing_mode === 'manual') {
@@ -405,7 +413,8 @@ Deno.serve(async (req) => {
         updateData.manual_price = Number(manual_price);
         updateData.manual_price_status = 'pending_client_validation';
         updateData.proposed_by_livreur_id = livreur_id;
-        updateData.timeout_expires_at = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+        const dispatchConfig = await chargerConfigDispatch(base44);
+        updateData.timeout_expires_at = new Date(Date.now() + dispatchConfig.manualPriceTimeoutSec * 1000).toISOString();
       }
 
       // 🛡️ CHECK FINAL ATOMIQUE ANTI-DOUBLON — juste avant l'updateMany, on refait
@@ -465,8 +474,11 @@ Deno.serve(async (req) => {
               client_message_id: idempotencyKey,
             });
             if (!existing || existing.length === 0) {
+              const courseMsgUserIds = await resolveCourseParticipantUserIds(base44, course.livreur_id, course.expediteur_client_id || course.destinataire_client_id);
               await base44.asServiceRole.entities.Message.create({
                 course_id: course_id,
+                participant_user_ids: courseMsgUserIds,
+                security_status: courseMsgUserIds.length > 0 ? 'secured' : 'pending',
                 sender_type: 'admin',
                 sender_id: 'silgapp_system',
                 sender_name: 'SILGAPP',
@@ -877,6 +889,69 @@ Deno.serve(async (req) => {
 
       console.log(`[DIAGNOSTIC NOTIFS] ${stats.total_notifications} notifs, ${stats.combinaisons_avec_doublons} combinaisons avec doublons, ${stats.total_doublons_en_surplus} notifs en surplus`);
       return Response.json({ success: true, stats });
+    }
+
+    // ─── 13. Marquer une course comme "vue" par le livreur ──────────────
+    // Remplace l'ancien appel frontend direct base44.entities.DispatchNotification.create()
+    // Sécurisé : résout livreur_user_email côté backend, vérifie l'identité du livreur,
+    // vérifie l'éligibilité de la course, et applique une clé d'idempotence.
+    if (action === 'marquer_vue_course') {
+      if (!course_id) return Response.json({ error: 'course_id requis' }, { status: 400 });
+
+      // 1. Récupérer l'utilisateur connecté
+      const me = await base44.auth.me();
+      if (!me || !me.email) {
+        return Response.json({ success: false, error: 'Utilisateur non authentifié' }, { status: 401 });
+      }
+
+      // 2. Résoudre le Livreur correspondant à cet utilisateur
+      const livreurs = await base44.asServiceRole.entities.Livreur.filter(
+        { user_email: me.email }, '-created_date', 1
+      );
+      const livreur = livreurs?.[0];
+      if (!livreur) {
+        return Response.json({ success: false, error: 'Aucun profil livreur lié à ce compte' }, { status: 403 });
+      }
+
+      // 3. Vérifier que la course existe et est éligible pour ce livreur
+      const course = await base44.asServiceRole.entities.CourseExterne.get(course_id);
+      if (!course) {
+        return Response.json({ success: false, error: 'Course introuvable' }, { status: 404 });
+      }
+
+      // Vérifier que le pays du livreur correspond au pays de la course
+      const courseCountry = (course.country_code || '').toUpperCase();
+      const livreurCountry = (livreur.country_code || '').toUpperCase();
+      if (!courseCountry || !livreurCountry || courseCountry !== livreurCountry) {
+        return Response.json({ success: false, error: 'country_mismatch' }, { status: 403 });
+      }
+
+      // Vérifier que la course est encore disponible (non livrée, non annulée)
+      if (course.statut === 'annulee' || course.statut === 'livree') {
+        return Response.json({ success: true, ignored: true, reason: 'course_terminal' });
+      }
+
+      // 4. Vérifier l'idempotence — ne pas créer de doublon
+      const existing = await base44.asServiceRole.entities.DispatchNotification.filter(
+        { course_id: course_id, livreur_id: livreur.id }, '-date_notification', 1
+      );
+      if (existing && existing.length > 0) {
+        return Response.json({ success: true, already_exists: true });
+      }
+
+      // 5. Créer la DispatchNotification avec livreur_user_email résolu côté backend
+      await base44.asServiceRole.entities.DispatchNotification.create({
+        course_id: course_id,
+        livreur_id: livreur.id,
+        livreur_user_email: livreur.user_email || me.email,
+        country_code: livreurCountry,
+        vague: 0,
+        statut: 'notifie',
+        priorite_dispatch: livreur.priorite_dispatch || 0,
+        date_notification: new Date().toISOString(),
+      });
+
+      return Response.json({ success: true });
     }
 
     return Response.json({ error: 'Action inconnue' }, { status: 400 });

@@ -31,9 +31,10 @@ export default function CoursesProgrammeesModal({ clientProfil, onClose }) {
   const handleCancel = async (courseId) => {
     setCancellingId(courseId);
     try {
-      await base44.entities.CourseExterne.update(courseId, {
-        statut: "annulee",
-        notes: "Annulée par le client avant l'heure programmée",
+      await base44.functions.invoke("annulerCourseExterne", {
+        course_id: courseId,
+        motif: "client_change_avis",
+        source: "client",
       });
       toast.success("Course programmée annulée");
       queryClient.invalidateQueries({ queryKey: ["courses-programmees-client"] });

@@ -1,0 +1,189 @@
+{
+  "name": "ReactivationCampaign",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Nom de la campagne"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "scheduled",
+        "sending",
+        "sent",
+        "completed",
+        "cancelled"
+      ],
+      "default": "draft",
+      "description": "Statut de la campagne"
+    },
+    "segment_type": {
+      "type": "string",
+      "enum": [
+        "push_active",
+        "push_recoverable",
+        "all_push_eligible",
+        "external_no_account"
+      ],
+      "default": "push_active",
+      "description": "Type de segment cibl\u00e9"
+    },
+    "country_code": {
+      "type": "string",
+      "description": "Code pays ISO 2 lettres (vide = tous les pays)"
+    },
+    "city": {
+      "type": "string",
+      "description": "Ville (vide = toutes les villes)"
+    },
+    "course_min": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre minimum de courses du client"
+    },
+    "course_max": {
+      "type": "number",
+      "description": "Nombre maximum de courses du client (vide = pas de limite)"
+    },
+    "max_targets": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre maximum de clients \u00e0 cibler (0 = pas de limite). Utilis\u00e9 pour les campagnes pilotes afin de limiter la taille du segment."
+    },
+    "inactive_days_min": {
+      "type": "number",
+      "description": "Inactivit\u00e9 minimum en jours depuis la derni\u00e8re course"
+    },
+    "title": {
+      "type": "string",
+      "description": "Titre de la notification push"
+    },
+    "message": {
+      "type": "string",
+      "description": "Message de la notification push"
+    },
+    "scheduled_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date/heure d'envoi programm\u00e9"
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "created_by": {
+      "type": "string",
+      "description": "Email de l'admin cr\u00e9ateur"
+    },
+    "target_count": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre total de clients cibl\u00e9s (incluant groupe contr\u00f4le)"
+    },
+    "delivered_count": {
+      "type": "number",
+      "default": 0
+    },
+    "opened_count": {
+      "type": "number",
+      "default": 0
+    },
+    "course_created_count": {
+      "type": "number",
+      "default": 0
+    },
+    "course_completed_count": {
+      "type": "number",
+      "default": 0
+    },
+    "revenue_generated": {
+      "type": "number",
+      "default": 0,
+      "description": "Chiffre d'affaires total g\u00e9n\u00e9r\u00e9 par les conversions"
+    },
+    "commission_generated": {
+      "type": "number",
+      "default": 0,
+      "description": "Commission SILGAPP g\u00e9n\u00e9r\u00e9e par les conversions"
+    },
+    "promo_cost": {
+      "type": "number",
+      "default": 0,
+      "description": "Co\u00fbt promotionnel (remises, bonus). Toujours 0 par d\u00e9faut \u2014 aucune r\u00e9duction automatique."
+    },
+    "net_result": {
+      "type": "number",
+      "default": 0,
+      "description": "R\u00e9sultat net = commission g\u00e9n\u00e9r\u00e9e - co\u00fbt promotionnel"
+    },
+    "is_ab_test": {
+      "type": "boolean",
+      "default": false,
+      "description": "True si la campagne est un test A/B"
+    },
+    "ab_variants": {
+      "type": "string",
+      "description": "JSON: [{variant, title, message}] pour les tests A/B"
+    },
+    "control_group_pct": {
+      "type": "number",
+      "default": 0,
+      "description": "Pourcentage du segment conserv\u00e9 comme groupe contr\u00f4le (0-100). Ne re\u00e7oit aucune notification."
+    },
+    "attribution_window_hours": {
+      "type": "number",
+      "default": 72,
+      "description": "Fen\u00eatre d'attribution en heures apr\u00e8s envoi du push"
+    },
+    "sent_count": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre de notifications envoy\u00e9es (hors groupe contr\u00f4le)"
+    },
+    "control_count": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre de clients dans le groupe contr\u00f4le"
+    },
+    "failed_count": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre d'\u00e9checs d'envoi FCM"
+    }
+  },
+  "required": [
+    "name",
+    "status",
+    "segment_type",
+    "title",
+    "message"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

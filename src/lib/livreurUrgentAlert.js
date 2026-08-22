@@ -3,11 +3,21 @@ import { useEffect } from "react";
 
 const SilgappPush = registerPlugin("SilgappPush");
 
-export const DEFAULT_LIVREUR_ALERT_DURATION_SECONDS = 120;
-export const DEFAULT_LIVREUR_ALERT_INTERVAL_SECONDS = 5;
+import { getConfig } from "./dispatchConfigStore";
 
 const STORAGE_DURATION_KEY = "silgapp_livreur_alert_duration_seconds";
 const STORAGE_INTERVAL_KEY = "silgapp_livreur_alert_interval_seconds";
+
+// Defaults dynamiques — lus depuis dispatchConfigStore (backend → cache → defaults alignés)
+export function getDefaultLivreurAlertDuration() {
+  return getConfig().livreur_alert_duration_sec;
+}
+export function getDefaultLivreurAlertInterval() {
+  return getConfig().livreur_alert_interval_sec;
+}
+// Rétrocompatibilité : alias vers les fonctions dynamiques
+export const DEFAULT_LIVREUR_ALERT_DURATION_SECONDS = null; // utiliser getDefaultLivreurAlertDuration()
+export const DEFAULT_LIVREUR_ALERT_INTERVAL_SECONDS = null; // utiliser getDefaultLivreurAlertInterval()
 
 let activeAlert = null;
 let sharedAudioCtx = null;
@@ -34,11 +44,11 @@ function readStoredNumber(key, fallback) {
 export function normalizeLivreurAlertConfig(config = {}) {
   const duration = toPositiveNumber(
     config.alert_duration_seconds ?? config.duree_alerte_livreur_secondes ?? config.durationSeconds ?? config.timeout_secondes,
-    readStoredNumber(STORAGE_DURATION_KEY, DEFAULT_LIVREUR_ALERT_DURATION_SECONDS)
+    readStoredNumber(STORAGE_DURATION_KEY, getDefaultLivreurAlertDuration())
   );
   const interval = toPositiveNumber(
     config.alert_interval_seconds ?? config.intervalle_vibration_secondes ?? config.intervalSeconds,
-    readStoredNumber(STORAGE_INTERVAL_KEY, DEFAULT_LIVREUR_ALERT_INTERVAL_SECONDS)
+    readStoredNumber(STORAGE_INTERVAL_KEY, getDefaultLivreurAlertInterval())
   );
 
   return {

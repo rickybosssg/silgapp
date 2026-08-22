@@ -1,0 +1,100 @@
+{
+  "name": "TarifZone",
+  "type": "object",
+  "properties": {
+    "pays_code": {
+      "type": "string",
+      "description": "Code pays ISO 2 lettres (ex: BF, CI, TG)"
+    },
+    "ville": {
+      "type": "string",
+      "description": "Ville concern\u00e9e (ex: Ouagadougou, Abidjan). Vide = toutes les villes du pays."
+    },
+    "zone_tarifaire": {
+      "type": "string",
+      "description": "Nom de la zone tarifaire (ex: GRAND_OUAGA, CENTRE_VILLE, etc.)"
+    },
+    "palier_1_km_max": {
+      "type": "number",
+      "description": "Distance maximale (km) pour le palier 1. Ex: 15 = \u2264 15 km \u2192 prix palier 1."
+    },
+    "palier_1_prix": {
+      "type": "number",
+      "description": "Prix du palier 1 (ex: 1250 FCFA pour \u2264 15 km)"
+    },
+    "palier_2_km_max": {
+      "type": "number",
+      "description": "Distance maximale (km) pour le palier 2. Ex: 25 = 15\u201325 km \u2192 prix palier 2. Au-del\u00e0, pas de tarif automatique."
+    },
+    "palier_2_prix": {
+      "type": "number",
+      "description": "Prix du palier 2 (ex: 1750 FCFA pour 15\u201325 km)"
+    },
+    "tolerance_min_km": {
+      "type": "number",
+      "description": "Borne inf\u00e9rieure de la zone de tol\u00e9rance GPS (ex: 14). Si GPS approximatif et distance dans [14, 16], appliquer le palier 1."
+    },
+    "tolerance_max_km": {
+      "type": "number",
+      "description": "Borne sup\u00e9rieure de la zone de tol\u00e9rance GPS (ex: 16)"
+    },
+    "seuil_strict_km": {
+      "type": "number",
+      "description": "Seuil strict (km) pour GPS exact. Ex: 15 = \u2264 15 km \u2192 palier 1 ; > 15 km \u2192 palier 2."
+    },
+    "devise": {
+      "type": "string",
+      "default": "FCFA"
+    },
+    "actif": {
+      "type": "boolean",
+      "default": true,
+      "description": "Zone tarifaire active"
+    },
+    "date_debut": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date d'entr\u00e9e en vigueur"
+    },
+    "date_fin": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date de fin de validit\u00e9 (vide = sans limite)"
+    },
+    "description": {
+      "type": "string",
+      "description": "Description de la zone tarifaire"
+    }
+  },
+  "required": [
+    "pays_code",
+    "zone_tarifaire",
+    "palier_1_km_max",
+    "palier_1_prix",
+    "palier_2_km_max",
+    "palier_2_prix",
+    "actif"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

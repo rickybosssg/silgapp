@@ -4,9 +4,6 @@ import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
 
-const GPS_SEUIL_MIN = 5;
-const GPS_CLIENT_SEUIL_MIN = 30;
-
 function isEnLigne(entity) {
   if (!entity?.app_active) return false;
   if (!entity?.last_seen_at) return false;
@@ -51,8 +48,8 @@ function formatTel(tel, countryCode) {
   let cleaned = tel.replace(/\s/g, "");
   const indicatifs = { BF: "+226", CI: "+225", TG: "+228", BJ: "+229", SN: "+221", ML: "+223", GN: "+224", NE: "+227" };
   if (!cleaned.startsWith("+")) {
-    const indicatif = indicatifs[countryCode] || "+226";
-    cleaned = `${indicatif}${cleaned}`;
+    const indicatif = indicatifs[countryCode] || "";
+    if (indicatif) cleaned = `${indicatif}${cleaned}`;
   }
   return cleaned.replace(/(\+\d{3})(\d{2})(\d{2})(\d{2})(\d{2})/, "$1 $2 $3 $4 $5");
 }
@@ -70,7 +67,7 @@ export default function MarkerInfoPanel({ entity, onClose }) {
   const isLiv = isLivreur(entity);
   const isPart = isPartenaire(entity);
   const isBoutique = entity._type === "boutique";
-  const countryCode = entity.country_code || entity.pays_code || "BF";
+  const countryCode = entity.country_code || entity.pays_code || "—";
   const paysEmoji = PAYS_EMOJIS[countryCode] || "";
 
   const statutLabel = isLiv

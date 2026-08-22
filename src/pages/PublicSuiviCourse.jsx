@@ -6,6 +6,8 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { getPrixAffichable } from "@/utils/getPrixAffichable";
+import { getCourseStatusLabel, getCourseStatusColor } from "@/lib/courseStatuses";
+import { haversineKm } from "@/lib/priceEstimate";
 import {
   MapPin,
   Package,
@@ -315,43 +317,10 @@ export default function PublicSuiviCourse() {
     );
   }
 
-  const statusLabels = {
-    nouvelle: "Course créée",
-    recherche_livreur: "Recherche de livreur",
-    livreur_en_route: "Livreur en route",
-    client_contacte: "Livreur en route",
-    en_route_expediteur: "Livreur en route",
-    arrive_prise_en_charge: "Arrivé prise en charge",
-    colis_recupere: "Colis récupéré",
-    passager_embarque: "Passager embarqué",
-    en_livraison: "En livraison",
-    livree: "Livré / Terminé",
-    annulee: "Annulée"
-  };
-
-  const statusColors = {
-    nouvelle: "bg-gray-100 text-gray-800",
-    recherche_livreur: "bg-yellow-100 text-yellow-800",
-    livreur_en_route: "bg-blue-100 text-blue-800",
-    client_contacte: "bg-blue-100 text-blue-800",
-    en_route_expediteur: "bg-blue-100 text-blue-800",
-    colis_recupere: "bg-purple-100 text-purple-800",
-    en_livraison: "bg-orange-100 text-orange-800",
-    livree: "bg-green-100 text-green-800",
-    annulee: "bg-red-100 text-red-800"
-  };
+  const statusLabel = getCourseStatusLabel(course.statut);
+  const statusColor = getCourseStatusColor(course.statut);
 
   const isDelivered = course.statut === "livree";
-
-  // === Cartes ETA dynamiques ===
-  function haversineKm(lat1, lon1, lat2, lon2) {
-    if (!lat1 || !lon1 || !lat2 || !lon2) return null;
-    const R = 6371;
-    const dLat = ((lat2 - lat1) * Math.PI) / 180;
-    const dLon = ((lon2 - lon1) * Math.PI) / 180;
-    const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  }
 
   const PRIX_MIN = 1000;
   const colisRecupere = ["colis_recupere", "en_livraison"].includes(course.statut);
@@ -389,8 +358,8 @@ export default function PublicSuiviCourse() {
             </div>
           </div>
 
-          <Badge className={`${statusColors[course.statut]} border-0`}>
-            {statusLabels[course.statut]}
+          <Badge className={`${statusColor} border-0`}>
+                    {statusLabel}
           </Badge>
         </Card>
 

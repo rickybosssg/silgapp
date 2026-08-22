@@ -1,10 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Loader2, Phone, Camera, Upload, MapPin } from "lucide-react";
 import { SILGAPP_COUNTRIES } from "@/lib/phoneUtils";
+import { getDefaultCountryCode } from "@/lib/countryService";
 import SmartAddressInput from "@/components/location/SmartAddressInput";
 
 export default function LivreurRegistrationForm({ user, onComplete }) {
@@ -12,10 +13,21 @@ export default function LivreurRegistrationForm({ user, onComplete }) {
     nom: user?.full_name || "",
     prenom: "",
     telephone: "",
-    country_code: "BF",
+    country_code: null,
     ville: "",
     quartier: "",
   });
+
+  // Charger le pays par défaut dynamiquement (contexte > backend)
+  useEffect(() => {
+    let mounted = true;
+    getDefaultCountryCode().then(code => {
+      if (mounted && code && !form.country_code) {
+        setForm(f => ({ ...f, country_code: code }));
+      }
+    }).catch(() => {});
+    return () => { mounted = false; };
+  }, []);
   const [photoProfil, setPhotoProfil] = useState(null);
   const [cnibRecto, setCnibRecto] = useState(null);
   const [cnibVerso, setCnibVerso] = useState(null);
@@ -84,6 +96,11 @@ export default function LivreurRegistrationForm({ user, onComplete }) {
       setError("La photo de profil est obligatoire.");
       return;
     }
+    if (!form.country_code) {
+      setError("Le pays est obligatoire. Sélectionnez votre pays avant de continuer (COUNTRY_REQUIRED).");
+      return;
+    }
+
     if (!cnibRecto || !cnibVerso) {
       setError("Les photos CNIB recto et verso sont obligatoires.");
       return;
@@ -212,7 +229,7 @@ export default function LivreurRegistrationForm({ user, onComplete }) {
           </Label>
           <div className="relative mt-1.5">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm font-mono font-bold">
-              {selectedCountry ? `+${selectedCountry.dial}` : "+226"}
+              {selectedCountry ? `+${selectedCountry.dial}` : "—"}
             </span>
             <Input
               type="tel" value={form.telephone} onChange={e => setForm({ ...form, telephone: e.target.value })}

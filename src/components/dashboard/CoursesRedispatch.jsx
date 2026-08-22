@@ -17,7 +17,7 @@ function RedispatchCourseItem({ course, onView, onRelaunch, onClose }) {
           <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
           <span className="font-semibold text-sm text-slate-200">{expediteur}</span>
           <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300">
-            En attente
+            Redispatch
           </span>
         </div>
         <div className="flex items-center gap-1.5 text-xs text-slate-400">
@@ -67,21 +67,15 @@ export default function CoursesRedispatch({ courses, onView }) {
 
   const relaunchMutation = useMutation({
     mutationFn: async (course) => {
-      // Remettre la course dans l'état d'entrée du moteur V2. L'orchestrateur
-      // publiera ensuite la course dans le fil avec disponible_push.
-      await base44.entities.CourseExterne.update(course.id, {
-        statut: "recherche_livreur",
-        dispatch_status: "nouvelle",
-        dispatch_wave: 0,
-        timeout_expires_at: null,
-        dispatch_next_wave_at: null,
-        dispatch_v2_secours_phase: 0,
-        notes: (course.notes || "") + ` | [RELANCE ADMIN → recherche_livreur]`,
-      });
-      return base44.functions.invoke("dispatchExterneAuto", {
-        action: "publier_fil_v2",
+      const result = await base44.functions.invoke("relancerDispatchAdmin", {
         course_id: course.id,
+        mode: "redispatch",
+        motif: "Relance admin (CoursesRedispatch)",
       });
+      if (!result?.data?.success && result?.data?.error) {
+        throw new Error(result.data.error);
+      }
+      return result?.data || result;
     },
     onMutate: (course) => setRelaunchingId(course.id),
     onSuccess: (_, course) => {
@@ -96,11 +90,14 @@ export default function CoursesRedispatch({ courses, onView }) {
 
   const closeMutation = useMutation({
     mutationFn: async (course) => {
-      return base44.entities.CourseExterne.update(course.id, {
-        statut: "annulee",
-        dispatch_status: "cycle_epuise",
-        notes: (course.notes || "") + ` | [FERMÉE ADMIN — ${format(new Date(), "dd/MM HH:mm", { locale: fr })}]`,
+      const result = await base44.functions.invoke("cloturerCourseAdmin", {
+        course_id: course.id,
+        motif: `FERMÉE ADMIN — ${format(new Date(), "dd/MM HH:mm", { locale: fr })}`,
       });
+      if (!result?.data?.success && result?.data?.error) {
+        throw new Error(result.data.error);
+      }
+      return result?.data || result;
     },
     onMutate: (course) => setClosingId(course.id),
     onSuccess: (_, course) => {
@@ -113,9 +110,7 @@ export default function CoursesRedispatch({ courses, onView }) {
     onSettled: () => setClosingId(null),
   });
 
-  const redispatchCourses = (courses || []).filter(
-    c => c.statut === "en_attente" && c.dispatch_status === "en_attente"
-  );
+  const redispatchCourses = (courses || []).filter(c => c.dispatch_status === "redispatch");
 
   if (redispatchCourses.length === 0) return null;
 
@@ -124,7 +119,7 @@ export default function CoursesRedispatch({ courses, onView }) {
       <div className="flex items-center gap-2 mb-3 px-1">
         <div className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse" />
         <p className="text-xs font-semibold text-amber-400 uppercase tracking-wider">
-          Courses en attente — intervention admin requise
+          Courses en redispatch — intervention admin requise
         </p>
         <span className="bg-amber-500/20 text-amber-300 text-xs font-bold px-2 py-0.5 rounded-full">
           {redispatchCourses.length}

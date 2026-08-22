@@ -69,7 +69,14 @@ export default function ManualAssignLivreurDialog({ course, open, onClose, resea
       };
 
       if (reseau === "externe") {
-        await base44.entities.CourseExterne.update(course.id, updateData);
+        const result = await base44.functions.invoke("assignerLivreurAdmin", {
+          course_id: course.id,
+          livreur_id: fresh.id,
+          motif: `Assigné manuellement par admin → ${fresh.prenom || ""} ${fresh.nom || ""}`,
+        });
+        if (!result?.data?.success && result?.data?.error) {
+          throw new Error(result.data.error);
+        }
       } else {
         await base44.entities.Course.update(course.id, {
           ...updateData,
@@ -77,19 +84,7 @@ export default function ManualAssignLivreurDialog({ course, open, onClose, resea
           dispatch_mode: "manuel",
           dispatch_status: "assigne_manuel",
         });
-      }
-
-      await base44.entities.Livreur.update(fresh.id, { statut: "en_course" });
-
-      // Notification push au livreur
-      if (fresh.user_email) {
-        await base44.entities.Notification.create({
-          titre: "🚨 Course assignée par admin",
-          message: `Course ${course.adresse_depart || ""} → ${course.adresse_arrivee || ""} vous a été assignée manuellement.`,
-          type: "course_assignee",
-          course_id: course.id,
-          destinataire_email: fresh.user_email,
-        }).catch(() => null);
+        await base44.entities.Livreur.update(fresh.id, { statut: "en_course" });
       }
     },
     onSuccess: (_data, livreur) => {

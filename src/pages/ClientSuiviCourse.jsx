@@ -8,15 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, Package, CheckCircle2, Clock, Star, XCircle, ArrowLeft, Share2, Ruler, Banknote } from "lucide-react";
 import { getPrixAffichable } from "@/utils/getPrixAffichable";
-
-function haversineKm(lat1, lon1, lat2, lon2) {
-  if (!lat1 || !lon1 || !lat2 || !lon2) return null;
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-}
+import { getCourseStatusLabel, getCourseStatusColor } from "@/lib/courseStatuses";
+import { haversineKm } from "@/lib/priceEstimate";
 import LivreurAssigneCard from "@/components/client/LivreurAssigneCard";
 
 // Ouvre WhatsApp via wa.me (fonctionne sur Android/iOS, ouvre l'app si installée)
@@ -332,32 +325,15 @@ export default function ClientSuiviCourse() {
     );
   }
 
-  const statutLabels = {
-    nouvelle: "Nouvelle course",
-    recherche_livreur: (course) =>
-      course?.pricing_mode === "manual" && course?.manual_price_status === "pending_client_validation"
-        ? (course.created_by_id === userId ? "💰 Prix proposé — votre accord requis" : "🔍 Recherche de livreur...")
-        : "Recherche de livreur...",
-    livreur_en_route: "Livreur en route vers récupération",
-    colis_recupere: "Colis récupéré",
-    en_livraison: "Livreur en route vers livraison",
-    livree: "Course livrée",
-    annulee: "Course annulée",
-  };
-
   const getStatutLabel = (course) => {
-    const v = statutLabels[course?.statut];
-    return typeof v === "function" ? v(course) : (v || course?.statut);
-  };
-
-  const statutColors = {
-    nouvelle: "bg-gray-100 text-gray-700",
-    recherche_livreur: "bg-orange-100 text-orange-700",
-    livreur_en_route: "bg-blue-100 text-blue-700",
-    colis_recupere: "bg-purple-100 text-purple-700",
-    en_livraison: "bg-blue-100 text-blue-700",
-    livree: "bg-green-100 text-green-700",
-    annulee: "bg-red-100 text-red-700",
+    if (course?.statut === "recherche_livreur" &&
+        course?.pricing_mode === "manual" &&
+        course?.manual_price_status === "pending_client_validation") {
+      return course.created_by_id === userId
+        ? "💰 Prix proposé — votre accord requis"
+        : getCourseStatusLabel(course.statut);
+    }
+    return getCourseStatusLabel(course?.statut);
   };
 
   return (
@@ -477,7 +453,7 @@ export default function ClientSuiviCourse() {
         <Card className="p-4">
           <div className="flex items-center justify-between mb-3">
             <h1 className="text-lg font-bold text-foreground">Suivi de course</h1>
-            <Badge className={statutColors[maCourse.statut]}>
+            <Badge className={getCourseStatusColor(maCourse.statut)}>
               {getStatutLabel(maCourse)}
             </Badge>
           </div>

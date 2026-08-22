@@ -14,7 +14,7 @@ import NewMessageModal from "@/components/partenaire/NewMessageModal";
 import OngletCodePromoPartenaire from "@/components/partenaire/OngletCodePromoPartenaire";
 import VenusFloatingButton from "@/components/client/VenusFloatingButton";
 import { clearPersistedToken } from "@/lib/authPersistence";
-import { registerPushToken } from "@/lib/notifications";
+import { registerPushToken, consumePendingNotificationData } from "@/lib/notifications";
 import { usePushTokenRetry } from "@/hooks/usePushTokenRetry";
 
 function returnToRoleSelection() {
@@ -27,6 +27,7 @@ function returnToRoleSelection() {
 export default function PartenaireDashboard() {
   const [user, setUser] = useState(null);
   const [tab, setTab] = useState("home");
+  const [pendingConversationId, setPendingConversationId] = useState(null);
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -41,6 +42,21 @@ export default function PartenaireDashboard() {
 
   // ── Relance automatique du token push au retour au premier plan ──
   usePushTokenRetry(null, user?.email ? { ...user, user_type: "partenaire" } : null);
+
+  // ── Deep-link : clic sur notification "nouveau_message" → ouvrir la conversation ──
+  useEffect(() => {
+    const handleMessageNotification = (event) => {
+      const data = event?.detail || {};
+      if (data.type !== "nouveau_message") return;
+      const convId = String(data.conversation_id || "").trim();
+      setPendingConversationId(convId || null);
+      setTab("messages");
+    };
+    window.addEventListener("silgapp:notification-opened", handleMessageNotification);
+    // Cold start : vérifier si l'app a été ouverte depuis une notification
+    consumePendingNotificationData();
+    return () => window.removeEventListener("silgapp:notification-opened", handleMessageNotification);
+  }, []);
 
   const { data: maBoutique, isLoading: loadingBoutique } = useQuery({
     queryKey: ["ma-boutique", user?.id],
@@ -385,7 +401,7 @@ export default function PartenaireDashboard() {
         {tab === "livraisons" && hasPharmacie && <PharmacieLivraisons pharmacieId={etablissement.id} pharmacieNom={etablissement.nom} onNavigate={setTab} />}
         {tab === "messages" && (
           <div className="bg-white rounded-2xl border border-black/5 shadow-[0_8px_24px_rgba(15,23,42,0.06)] overflow-hidden h-[calc(100dvh-180px)]">
-            <MessagesPage myType="partenaire" myId={etablissement.id} myName={etablissement.nom} />
+            <MessagesPage myType="partenaire" myId={etablissement.id} myName={etablissement.nom} initialConversationId={pendingConversationId} onBack={() => setPendingConversationId(null)} />
           </div>
         )}
         {tab === "promo" && <OngletCodePromoPartenaire partenaireId={user.id} />}

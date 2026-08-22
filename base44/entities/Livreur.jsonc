@@ -256,11 +256,88 @@
     "whatsapp_derniere_erreur_date": {
       "type": "string",
       "format": "date-time"
+    },
+    "silga_score": {
+      "type": "number",
+      "default": 0,
+      "description": "Score SILGAPP 0-100 calcul\u00e9 \u00e0 partir des donn\u00e9es op\u00e9rationnelles (acceptation, livraison, annulations, d\u00e9lai de r\u00e9ponse, note, fiabilit\u00e9 financi\u00e8re). Mode observation uniquement \u2014 NON utilis\u00e9 dans le dispatch V2."
+    },
+    "silga_score_niveau": {
+      "type": "string",
+      "enum": [
+        "excellent",
+        "bon",
+        "moyen",
+        "faible",
+        "non_calcule"
+      ],
+      "default": "non_calcule",
+      "description": "Niveau du Silga Score: excellent (80+), bon (60-79), moyen (40-59), faible (<40). non_calcule = score jamais calcul\u00e9."
+    },
+    "silga_score_breakdown": {
+      "type": "string",
+      "description": "JSON: d\u00e9tail du score par cat\u00e9gorie (taux_acceptation, taux_livraison, taux_annulation, delai_reponse, note_moyenne, fiabilite_financiere). Pour audit et transparence."
+    },
+    "silga_score_calculated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date du dernier calcul du Silga Score."
+    },
+    "silga_score_confiance": {
+      "type": "string",
+      "enum": [
+        "faible",
+        "moyenne",
+        "elevee"
+      ],
+      "default": "faible",
+      "description": "Niveau de confiance du Silga Score bas\u00e9 sur le volume de donn\u00e9es. faible = < 5 data points (livreur potentiellement nouveau, score peu fiable). moyenne = 5-19 data points. elevee = >= 20 data points (score fiable)."
+    },
+    "silga_score_data_points": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre total de points de donn\u00e9es utilis\u00e9s pour le calcul (notifications dispatch + courses livr\u00e9es + avis clients). D\u00e9termine la confiance du score."
+    },
+    "silga_score_anomalies": {
+      "type": "string",
+      "description": "JSON: tableau des anomalies d\u00e9tect\u00e9es lors du calcul (ex: score \u00e9lev\u00e9 mais taux d'annulation \u00e9lev\u00e9, score faible par manque de donn\u00e9es). Pour audit et calibration."
     }
   },
   "required": [
     "nom",
     "telephone",
     "type_livreur"
-  ]
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "data.user_email": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "create": {},
+    "update": {
+      "$or": [
+        {
+          "data.user_email": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
 }

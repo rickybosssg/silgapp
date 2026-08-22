@@ -8,9 +8,12 @@ import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import CourseStepForm from "@/components/client/CourseStepForm";
 import { sauvegarderContactDB } from "@/components/client/CarnetAdresses";
+import { haversineKm } from "@/lib/priceEstimate";
 import LivreurRechercheAnimation from "@/components/client/LivreurRechercheAnimation";
 import InvitationWhatsAppModal from "@/components/client/InvitationWhatsAppModal";
 import { normalizePhone, phoneVariants } from "@/lib/phoneUtils";
+import { resolveGpsForCourse, GPS_BLOCK_MESSAGE } from "@/lib/gpsResolution";
+import { isPaysTarificationGrandOuaga } from "@/lib/tarifGrandOuaga";
 
 // Génère les IDs de colis : A, B, C...
 const COLIS_LETTERS = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"];
@@ -37,15 +40,7 @@ function createColisDefaults(nb) {
   }));
 }
 
-// Haversine
-function calculerDistance(lat1, lng1, lat2, lng2) {
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lng2 - lng1) * Math.PI) / 180;
-  const a = Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
+// haversineKm importé depuis priceEstimate (source canonique)
 
 const STORAGE_KEY = "silgapp_course_draft";
 const STEP_KEY = "silgapp_course_step";
@@ -374,7 +369,8 @@ export default function CourseExterneFormSync() {
         finalData.delivery_confirmed_at = null;
       }
 
-      const course = await base44.entities.CourseExterne.create(finalData);
+      const createResult = await base44.functions.invoke("creerCourseClient", { course_data: finalData });
+      const course = createResult.course;
 
       // ── Créer les sous-colis si mode multi-colis ──────────────────────────
       if (finalData.is_multi_colis && finalData._colisData?.length > 1) {
@@ -586,18 +582,40 @@ export default function CourseExterneFormSync() {
       expediteurTel,
     });
 
-    // Calcul prix — sécurisé : uniquement si les 4 coordonnées GPS sont valides
+    // ── Calcul prix — SOURCE UNIQUE : formData._tarifGrandOuaga (déjà calculé par CourseStepForm) ──
+    // AUCUN re-appel ORS ici : le résultat est réutilisé depuis CourseStepForm.
     let prixEstime = 0;
+    let distanceTarifaireKm = null;
+    let distanceTarifaireSource = null;
     if (
       formData.gps_depart_lat && formData.gps_depart_lng &&
       formData.gps_arrivee_lat && formData.gps_arrivee_lng
     ) {
-      const distance = calculerDistance(
-        formData.gps_depart_lat, formData.gps_depart_lng,
-        formData.gps_arrivee_lat, formData.gps_arrivee_lng
-      );
-      // Règle : prix minimum SILGAPP = 1 000 F CFA
-      prixEstime = Math.max(Math.round(distance * 100), 1000);
+      if (isPaysTarificationGrandOuaga(courseCountryCode)) {
+        // Grand Ouaga : utiliser le résultat déjà calculé par CourseStepForm (ORS + cache)
+        const tarif = formData._tarifGrandOuaga;
+        if (tarif) {
+          prixEstime = tarif.prix || 0;
+          distanceTarifaireKm = tarif.distanceKm;
+          distanceTarifaireSource = tarif.distanceSource;
+        }
+        // Si pas de résultat pré-calculé (reload, deep link), fallback Haversine local
+        if (!tarif || prixEstime === 0) {
+          const distance = haversineKm(
+            formData.gps_depart_lat, formData.gps_depart_lng,
+            formData.gps_arrivee_lat, formData.gps_arrivee_lng
+          );
+          prixEstime = Math.max(Math.round(distance * 100), 1000);
+          distanceTarifaireSource = "haversine_fallback";
+        }
+      } else {
+        const distance = haversineKm(
+          formData.gps_depart_lat, formData.gps_depart_lng,
+          formData.gps_arrivee_lat, formData.gps_arrivee_lng
+        );
+        // Règle : prix minimum SILGAPP = 1 000 F CFA
+        prixEstime = Math.max(Math.round(distance * 100), 1000);
+      }
     }
 
     // Pour "recevoir" : la destination = position du client destinataire (jamais inconnue)
@@ -632,6 +650,66 @@ export default function CourseExterneFormSync() {
         }
       } catch (err) {
         console.warn("[CourseForm] validateCourseRoles indisponible, on continue :", err.message);
+      }
+    }
+
+    // ── Résolution GPS : exact → quartier → blocage ──
+    // Pour "recevoir" : l'arrivée est la position du client (GPS exact)
+    // Pour "expedier"/"deplacement" : le départ est la position du client (GPS exact)
+    let quartiersList = [];
+    try {
+      quartiersList = await base44.entities.Quartier.filter({ country_code: courseCountryCode, actif: true }, "nom", 500);
+    } catch (_) {}
+
+    const departGps = resolveGpsForCourse({
+      exactLat: formData.gps_depart_lat,
+      exactLng: formData.gps_depart_lng,
+      quartierName: formData.quartier_depart,
+      quartiers: quartiersList,
+    });
+    const arriveeGps = isMulti ? null : resolveGpsForCourse({
+      exactLat: gpsArriveLat,
+      exactLng: gpsArriveLng,
+      quartierName: formData.quartier_arrivee,
+      quartiers: quartiersList,
+    });
+
+    // ── Gestion des ambiguïtés : ne jamais choisir silencieusement ──
+    if (departGps?.ambiguous) {
+      const names = departGps.suggestions.map(s => s.nom).join(", ");
+      toast.error(`Point de départ ambigu : plusieurs quartiers correspondent (${names}). Sélectionnez-en un dans la liste.`);
+      setIsSubmitting(false);
+      return;
+    }
+    if (!isMulti && arriveeGps?.ambiguous) {
+      const names = arriveeGps.suggestions.map(s => s.nom).join(", ");
+      toast.error(`Point d'arrivée ambigu : plusieurs quartiers correspondent (${names}). Sélectionnez-en un dans la liste.`);
+      setIsSubmitting(false);
+      return;
+    }
+    // Blocage si aucun GPS disponible (sauf multi-colis où chaque colis a son propre GPS)
+    if (!departGps || !departGps.lat) {
+      toast.error(`Point de départ : ${GPS_BLOCK_MESSAGE}`);
+      setIsSubmitting(false);
+      return;
+    }
+    if (!isMulti && (!arriveeGps || !arriveeGps.lat)) {
+      toast.error(`Point d'arrivée : ${GPS_BLOCK_MESSAGE}`);
+      setIsSubmitting(false);
+      return;
+    }
+
+    // ── Garde-fou >25 km : aucune course ne doit partir avec prix nul ou ambigu ──
+    // Pour le BF (Grand Ouaga), si la distance tarifaire dépasse 25 km, le tarif
+    // automatique est null. Le client DOIT saisir un prix personnalisé avant dispatch.
+    if (!isMulti && isPaysTarificationGrandOuaga(courseCountryCode)) {
+      const tarif = formData._tarifGrandOuaga;
+      const isHorsTarif = tarif && tarif.prix === null;
+      const prixClientSaisi = Number(formData.prix_propose) || 0;
+      if (isHorsTarif && prixClientSaisi <= 0) {
+        toast.error("Distance supérieure à 25 km — vous devez saisir un prix personnalisé avant de créer la course.");
+        setIsSubmitting(false);
+        return;
       }
     }
 
@@ -673,15 +751,21 @@ export default function CourseExterneFormSync() {
       quartier_arrivee: formData.quartier_arrivee || null,
       type_colis: isDeplacement ? "autre" : (isMulti ? (colis[0]?.type_colis || "petit_colis") : formData.type_colis),
       notes: formData.notes,
-      gps_depart_lat: formData.gps_depart_lat,
-      gps_depart_lng: formData.gps_depart_lng,
-      gps_arrivee_lat: isMulti ? null : gpsArriveLat,
-      gps_arrivee_lng: isMulti ? null : gpsArriveLng,
+      gps_depart_lat: departGps?.lat || null,
+      gps_depart_lng: departGps?.lng || null,
+      gps_depart_source: departGps?.source || null,
+      gps_arrivee_lat: isMulti ? null : (arriveeGps?.lat || null),
+      gps_arrivee_lng: isMulti ? null : (arriveeGps?.lng || null),
+      gps_arrivee_source: isMulti ? null : (arriveeGps?.source || null),
       destination_inconnue: destInconnue,
+      // prix_estimate = prix automatique conseillé par SILGAPP (jamais modifié par l'utilisateur)
+      // prix_propose_client = prix réellement choisi par le client (formData.prix_propose)
       prix_estimate: isMulti ? 0 : prixEstime,
-      prix_propose_admin: isMulti ? 0 : (formData.prix_propose || prixEstime),
-      prix_propose_client: isMulti ? 0 : (formData.prix_propose || 0),
-      pricing_mode: isMulti ? "automatic" : "admin_manuel",
+      prix_propose_admin: 0, // Jamais défini par le client — réservé à l'admin
+      prix_propose_client: isMulti ? 0 : (formData.prix_propose || prixEstime),
+      distance_tarifaire_km: isMulti ? null : distanceTarifaireKm,
+      distance_tarifaire_source: isMulti ? null : distanceTarifaireSource,
+      pricing_mode: isMulti ? "automatic" : (formData.prix_propose && formData.prix_propose !== prixEstime ? "manual" : "automatic"),
       statut: formData.date_souhaitee ? "programmee" : "recherche_livreur",
       dispatch_status: "en_attente",
       date_souhaitee: formData.date_souhaitee || null,

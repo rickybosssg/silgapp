@@ -3,7 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { clearPersistedToken } from "@/lib/authPersistence";
 import { 
   LayoutDashboard, MapPin, Plus, Truck, BarChart3, Bell, 
-  Package, TrendingUp, ChevronLeft, ChevronRight, LogOut, Wallet, Shield, Globe, Settings, MessageCircle, Users, Megaphone, ChevronDown, Check, UserCheck, ShieldAlert, Store, UtensilsCrossed, Pill, PieChart, Sparkles, Brain, FlaskConical, Cpu, Crown, Zap
+  Package, TrendingUp, ChevronLeft, ChevronRight, LogOut, Wallet, Shield, Globe, Settings, MessageCircle, Users, Megaphone, ChevronDown, Check, UserCheck, ShieldAlert, Store, UtensilsCrossed, Pill, PieChart, Sparkles, Brain, FlaskConical, Cpu, Crown, Zap, Coins, Radio, Trophy
 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { cn } from "@/lib/utils";
@@ -35,8 +35,10 @@ export const navItems = [
   { path: "/admin/statistiques", label: "Statistiques", icon: PieChart },
   { path: "/admin/comptabilite", label: "Comptabilité", icon: Wallet },
   { path: "/admin/global", label: "Admin Global", icon: Globe },
+  { path: "/admin/tarification", label: "Tarification", icon: Coins },
   { path: "/admin/gestion-pays", label: "Gestion des pays", icon: Settings },
   { path: "/admin/crm-clients", label: "CRM Clients", icon: Users },
+  { path: "/admin/reactivation-clients", label: "Réactivation Clients", icon: Bell },
   { path: "/admin/externe/clients", label: "Clients externes", icon: Users },
   { path: "/admin/publicites", label: "Publicités", icon: Megaphone },
   { path: "/admin/venus-brain", label: "Cerveau de VENUS", icon: Brain },
@@ -59,6 +61,9 @@ export const navItems = [
   { path: "/admin/pharmacies", label: "Pharmacies", icon: Pill },
   { path: "/admin/commandes-partenaires", label: "Commandes Partenaires", icon: Package },
   { path: "/admin/neo", label: "NEO – Moteur d'amélioration", icon: Sparkles },
+  { path: "/admin/courses-a-sauver", label: "Courses à sauver", icon: ShieldAlert },
+  { path: "/admin/fiabilite-push", label: "Fiabilité Push", icon: Radio },
+  { path: "/admin/silga-score", label: "Silga Score", icon: Trophy },
   { path: "/admin/bugs", label: "Suivi des bugs", icon: ShieldAlert },
   { path: "/notifications", label: "Notifications", icon: Bell },
   { path: "/maintenance", label: "Maintenance", icon: Shield },

@@ -1,15 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
-
-const R = 6371; // Rayon terrestre en km
-
-function haversine(lat1, lng1, lat2, lng2) {
-  if (!lat1 || !lng1 || !lat2 || !lng2) return null;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLng = ((lng2 - lng1) * Math.PI) / 180;
-  const a = Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
+import { haversineKm } from '../../shared/geoUtils.ts';
 
 function dureeMinutes(debutIso, finIso) {
   if (!debutIso || !finIso) return null;
@@ -216,7 +206,7 @@ Deno.serve(async (req) => {
         const deltaMin = dureeMinutes(prev.heure_livraison, curr.heure_livraison);
         if (!deltaMin || deltaMin > 180) continue;
 
-        const distLivraisons = haversine(
+        const distLivraisons = haversineKm(
           prev.latitude_livraison || prev.latitude_arrivee_livraison,
           prev.longitude_livraison || prev.longitude_arrivee_livraison,
           curr.gps_depart_lat || curr.latitude_recuperation,

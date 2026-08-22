@@ -46,8 +46,8 @@ export default function CreateLivreurDialog({ reseau = "interne", countryCode = 
     country_code: effectiveCountryCode || "",
   });
 
-  const activeCountry = effectiveCountryCode || form.country_code || "BF";
-  const paysInfo = PAYS_INFO[activeCountry] || PAYS_INFO["BF"];
+  const activeCountry = effectiveCountryCode || form.country_code || "";
+  const paysInfo = activeCountry ? (PAYS_INFO[activeCountry] || PAYS_INFO["BF"]) : { tel: "+XXX...", quartier: "..." };
 
   const createMutation = useMutation({
     mutationFn: async () => {

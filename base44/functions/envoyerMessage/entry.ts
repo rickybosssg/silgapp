@@ -1,6 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 import { envoyerWhatsAppRaw } from '../../shared/twilioWhatsApp.ts';
 import { createAdminInboxItem } from '../../shared/adminInbox.ts';
+import { resolveParticipantUserIds } from '../../shared/conversationSecurity.ts';
 
 /**
  * Envoi sécurisé d'un message de messagerie SILGAPP.
@@ -128,7 +129,43 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ── 3. Créer le message avec les VRAIES informations ──
+    // ── 3. Résoudre les User.id des participants pour la RLS Message ──
+    let messageParticipantUserIds: string[] = [];
+    try {
+      if (conversation_id) {
+        const convs = await base44.asServiceRole.entities.Conversation.filter({ id: conversation_id });
+        const conv = convs?.[0];
+        if (conv?.participant_user_ids && Array.isArray(conv.participant_user_ids) && conv.participant_user_ids.length > 0) {
+          messageParticipantUserIds = conv.participant_user_ids;
+        } else if (conv) {
+          let parts: any[] = [];
+          try { parts = JSON.parse(conv.participants || '[]'); } catch {}
+          const { userIds } = await resolveParticipantUserIds(base44, parts);
+          messageParticipantUserIds = userIds;
+        }
+      } else if (course_id) {
+        const courses = await base44.asServiceRole.entities.CourseExterne.filter({ id: course_id });
+        const c = courses?.[0];
+        const courseParticipants: any[] = [];
+        if (c?.livreur_id) {
+          const livreur = await base44.asServiceRole.entities.Livreur.get(c.livreur_id).catch(() => null);
+          if (livreur) courseParticipants.push({ type: 'livreur', id: livreur.id });
+        }
+        const clientId = c?.expediteur_client_id || c?.destinataire_client_id;
+        if (clientId) {
+          const client = await base44.asServiceRole.entities.ClientExterne.get(clientId).catch(() => null);
+          if (client) courseParticipants.push({ type: 'client', id: client.id });
+        }
+        const admins = await base44.asServiceRole.entities.User.filter({ role: 'admin' });
+        for (const a of admins || []) courseParticipants.push({ type: 'admin', id: a.email });
+        const { userIds } = await resolveParticipantUserIds(base44, courseParticipants);
+        messageParticipantUserIds = userIds;
+      }
+    } catch (e: any) {
+      console.warn('[envoyerMessage] participant_user_ids resolution failed:', e?.message);
+    }
+
+    // ── 4. Créer le message avec les VRAIES informations ──
     const message = await base44.asServiceRole.entities.Message.create({
       course_id: course_id || null,
       conversation_id: conversation_id || null,
@@ -140,6 +177,8 @@ Deno.serve(async (req) => {
       content: content || '',
       audio_url: audio_url || null,
       photo_url: photo_url || null,
+      participant_user_ids: messageParticipantUserIds,
+      security_status: messageParticipantUserIds.length > 0 ? 'secured' : 'pending',
     });
 
     // ── 4. Mettre à jour la conversation (last_message) ──

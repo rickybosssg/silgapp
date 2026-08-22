@@ -9,6 +9,7 @@ import { useHeartbeat } from "@/hooks/useHeartbeat";
 import { useGPSNatif } from "@/hooks/useGPSNatif";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
+import { haversineKm } from "@/lib/priceEstimate";
 
 import { registerPushToken, subscribeToNotifications, consumePendingNotificationData } from "@/lib/notifications";
 import { usePushTokenRetry } from "@/hooks/usePushTokenRetry";
@@ -48,16 +49,7 @@ import {
 import CoursesDisponibles from "@/components/livreur/CoursesDisponibles";
 import { useCoursesDisponibles } from "@/hooks/useCoursesDisponibles";
 
-// Haversine — utilisée aussi pour le calcul de prix
-function calculerDistance(lat1, lng1, lat2, lng2) {
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lng2 - lng1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
+// haversineKm importé depuis priceEstimate (source canonique)
 
 const saveLivreur = (id, data) => base44.functions.invoke('updateLivreur', { id, data });
 
@@ -115,6 +107,7 @@ function logAcceptationLivreur(event, details = {}) {
 export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("courses");
+  const [pendingConversationId, setPendingConversationId] = useState(null);
   const [gpsActif, setGpsActif] = useState(false);
   const [onboardingTermine, setOnboardingTermine] = useState(false);
   const [showMesInfos, setShowMesInfos] = useState(false);
@@ -435,6 +428,13 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   useEffect(() => {
     const handleNotificationOpened = (event) => {
       const data = event?.detail || {};
+      // ── Deep-link messages : ouvrir la conversation concernée ──
+      if (data.type === "nouveau_message") {
+        const convId = String(data.conversation_id || "").trim();
+        setPendingConversationId(convId || null);
+        setActiveTab("messages");
+        return;
+      }
       if (data.type !== "nouvelle_course" && data.type !== "course_assignee") return;
       stopUrgentCourseAlert("app-opened");
       if (data.course_id) setNotificationCourseId(data.course_id);
@@ -1029,13 +1029,6 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   }, [onboardingTermine, sessionExpired, livreurProfil?.statut, livreurProfil?.id, gpsActif]);
 
   // ─── Mutations courses ────────────────────────────────────────────────────
-  const updateCourseMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.CourseExterne.update(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
-    },
-  });
-
   const handleAccepter = (isPendingPrixManuel = false) => {
     setNotificationCourseCandidate(null);
     setNotificationCourseId(null);
@@ -1146,19 +1139,15 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   };
 
   const finaliserAnnulationLocale = async (course) => {
-    await base44.entities.CourseExterne.update(course.id, {
-      statut: "annulee",
-      manual_price_status: "refused",
-      notes: "Annulation directe livreur - proposition prix manuel en attente client",
-      date_annulation: new Date().toISOString(),
-    });
+    // L'annulation passe uniquement par annulerCourseExterne (backend).
+    // Si cette fonction est appelée, c'est que le backend a échoué — on libère juste le livreur.
     if (livreurProfil?.id) {
       await saveLivreur(livreurProfil.id, { statut: "disponible" }).catch(() => null);
     }
     stopUrgentCourseAlert("pending-price-cancelled-fallback");
     queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
     queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
-    logAcceptationLivreur("cancel-pending-price-fallback-updated", { course_id: course.id });
+    logAcceptationLivreur("cancel-pending-price-fallback-no-direct-update", { course_id: course.id });
     toast.success("Course annulee");
     return true;
   };
@@ -1264,7 +1253,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       if (!course.distance_reelle_km || course.distance_reelle_km === 0) {
         let dist = null;
         if (course.gps_depart_lat && course.gps_depart_lng && course.gps_arrivee_lat && course.gps_arrivee_lng) {
-          dist = calculerDistance(course.gps_depart_lat, course.gps_depart_lng, course.gps_arrivee_lat, course.gps_arrivee_lng);
+          dist = haversineKm(course.gps_depart_lat, course.gps_depart_lng, course.gps_arrivee_lat, course.gps_arrivee_lng);
         }
         if (!dist || dist < 0.1) {
           const lat1 = course.latitude_recuperation ?? course.gps_depart_lat;
@@ -1272,22 +1261,15 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
           const lat2 = course.latitude_livraison ?? course.latitude_arrivee_livraison ?? course.gps_arrivee_lat;
           const lng2 = course.longitude_livraison ?? course.longitude_arrivee_livraison ?? course.gps_arrivee_lng;
           if (lat1 && lng1 && lat2 && lng2) {
-            dist = calculerDistance(lat1, lng1, lat2, lng2);
+            dist = haversineKm(lat1, lng1, lat2, lng2);
           }
         }
         if (dist && dist >= 0.1) distUpdate.distance_reelle_km = Number(dist.toFixed(2));
       }
 
-      await updateCourseMutation.mutateAsync({
-        id: course.id,
-        data: {
-          statut: "livree",
-          heure_livraison: new Date().toISOString(),
-          prix_final: montantSaisi,
-          commission_silga: split.commission_silga,
-          montant_livreur: split.montant_livreur,
-          ...distUpdate,
-        },
+      await base44.functions.invoke("finaliserLivraisonLivreur", {
+        course_id: course.id,
+        prix_final_livreur: montantSaisi,
       });
       await verifierEncoursApresCourse(course.id);
       await remettreDisponibleSiAutorise();
@@ -1311,7 +1293,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     const baseData = { statut: "livree", heure_livraison: new Date().toISOString() };
 
     if (gpsArrivee && course.latitude_recuperation && course.longitude_recuperation) {
-      const distance = calculerDistance(
+      const distance = haversineKm(
         course.latitude_recuperation, course.longitude_recuperation,
         gpsArrivee.lat, gpsArrivee.lng
       );
@@ -1323,20 +1305,14 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         return;
       }
 
-      await updateCourseMutation.mutateAsync({
-        id: course.id,
-        data: {
-          ...baseData,
-          latitude_livraison: gpsArrivee.lat,
-          longitude_livraison: gpsArrivee.lng,
-          distance_reelle_km: distanceVal,
-          prix_final: prixFinal,
-          commission_silga: split.commission_silga,
-          montant_livreur: split.montant_livreur,
-        },
+      await base44.functions.invoke("finaliserLivraisonLivreur", {
+        course_id: course.id,
+        prix_final_livreur: prixFinal,
       });
     } else {
-      await updateCourseMutation.mutateAsync({ id: course.id, data: baseData });
+      await base44.functions.invoke("finaliserLivraisonLivreur", {
+        course_id: course.id,
+      });
     }
 
     await verifierEncoursApresCourse(course.id);
@@ -1646,7 +1622,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
                     course={course}
                     onColisRecupere={handleColisRecupere}
                     onColisLivre={handleColisLivre}
-                    isPending={updateCourseMutation.isPending}
+                    isPending={false}
                     isExterne={true}
                     livreurLat={livreurProfil?.latitude}
                     livreurLng={livreurProfil?.longitude}
@@ -1723,7 +1699,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
             myType="livreur"
             myId={livreurProfil?.id}
             myName={`${livreurProfil?.prenom || ""} ${livreurProfil?.nom || ""}`.trim() || livreurProfil?.telephone}
-            onBack={() => setActiveTab("courses")}
+            initialConversationId={pendingConversationId}
+            onBack={() => { setPendingConversationId(null); setActiveTab("courses"); }}
           />
         )}
 

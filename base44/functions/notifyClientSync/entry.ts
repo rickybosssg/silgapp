@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { resolveDialCode } from '../../shared/countryResolver.ts';
 
 /**
  * Déclenché par automation quand une CourseExterne est créée/mise à jour.
@@ -80,19 +81,16 @@ Deno.serve(async (req) => {
       return Response.json({ error: "Course non trouvée" }, { status: 404 });
     }
 
-    // Indicatifs SILGAPP multi-pays
-    const COUNTRY_DIALCODES = [
-      { code: "226", len: 8 }, // BF
-      { code: "225", len: 10 }, // CI
-      { code: "228", len: 8 }, // TG
-      { code: "229", len: 8 }, // BJ
-      { code: "221", len: 9 }, // SN
-      { code: "223", len: 8 }, // ML
-      { code: "224", len: 9 }, // GN
-      { code: "227", len: 8 }, // NE
-    ];
+    // Charger dynamiquement les indicatifs depuis Country (source centralisée)
+    const countryList = await base44.asServiceRole.entities.Country.filter({ actif: true }).catch(() => []);
+    const COUNTRY_DIALCODES = (countryList || [])
+      .map(c => ({
+        code: String(c.indicatif || "").replace(/^\+/, "").replace(/\s/g, ""),
+        len: c.format_numero ? parseInt(c.format_numero.replace(/\D/g, "").length) || 8 : 8,
+      }))
+      .filter(c => c.code);
 
-    // Génère toutes les variantes d'un numéro (tous pays)
+    // Génère toutes les variantes d'un numéro (tous pays actifs)
     function phoneVariants(num) {
       const n = (num || "").replace(/\D/g, "");
       if (!n) return [n];

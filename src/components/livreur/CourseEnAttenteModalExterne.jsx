@@ -3,16 +3,9 @@ import { MapPin, Navigation, Check, X, Package, Clock, Ruler, AlertCircle } from
 import { base44 } from "@/api/base44Client";
 import { cn } from "@/lib/utils";
 import ManualPriceModal from "./ManualPriceModal";
+import { isPaysTarificationParPaliers } from "@/lib/tarifGrandOuaga";
 import { stopUrgentCourseAlert, useUrgentCourseAlert } from "@/lib/livreurUrgentAlert";
-
-function haversine(lat1, lon1, lat2, lon2) {
-  if (!lat1 || !lon1 || !lat2 || !lon2) return null;
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
+import { haversineKm as haversine } from "@/lib/priceEstimate";
 
 const typeColisLabel = {
   petit_colis: "Petit colis",
@@ -45,6 +38,17 @@ export default function CourseEnAttenteModalExterne({
   const [courseExpiree, setCourseExpiree] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showManualPriceModal, setShowManualPriceModal] = useState(false);
+  const [_paysAvecPaliers, _setPaysAvecPaliers] = useState(false);
+
+  // Vérifier dynamiquement si le pays utilise la tarification par paliers
+  useEffect(() => {
+    let mounted = true;
+    if (!course?.country_code) { _setPaysAvecPaliers(false); return; }
+    isPaysTarificationParPaliers(course.country_code).then(has => {
+      if (mounted) _setPaysAvecPaliers(has);
+    }).catch(() => { if (mounted) _setPaysAvecPaliers(false); });
+    return () => { mounted = false; };
+  }, [course?.country_code]);
 
   // Course admin : Accepter / Refuser uniquement, quel que soit le mode du livreur
   const isAdminCourse = course?.source === "admin" || course?.pricing_mode === "admin_manuel";
@@ -133,6 +137,17 @@ export default function CourseEnAttenteModalExterne({
 
   const handleAccepterClick = () => {
     if (isSubmitting) return;
+    // ── Garde-fou tarification par paliers : tarif fixe, pas de prix manuel livreur ──
+    // Les pays avec une TarifZone configurée ont un prix fixe par paliers
+    // ou un prix personnalisé admin (> palier_2_km_max). Le livreur ne peut pas
+    // proposer son propre prix.
+    // ⚠️ isPaysTarificationParPaliers est async — on utilise une vérification
+    //    non-bloquante : si le pays n'est pas encore résolu, on laisse le comportement
+    //    par défaut (mode manuel autorisé). Le backend reste l'autorité finale.
+    if (course?.country_code && _paysAvecPaliers) {
+      handleAccepterAuto();
+      return;
+    }
     // Si mode manuel → afficher le modal de saisie du prix d'abord
     if (pricingMode === "manual") {
       setShowManualPriceModal(true);

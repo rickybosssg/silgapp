@@ -26,7 +26,6 @@ export default async function handler(req) {
       { status: 403 }
     );
   }
-
   // ── 1. Calcul des périodes ──
   const now = new Date();
   const today = new Date(now.getTime());

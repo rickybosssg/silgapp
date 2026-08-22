@@ -31,11 +31,14 @@ Deno.serve(async (req) => {
     // ── SIMULATE_START : Démarrer une simulation ──
     if (action === 'simulate_start') {
       const { workflow_code, telephone, profileName, countryCode } = body;
+      if (!countryCode) {
+        return Response.json({ error: 'COUNTRY_REQUIRED', message: "country_code est requis pour démarrer une simulation." }, { status: 400 });
+      }
       const tarifs = { nom: 'Burkina Faso', prix_km: 300, minimum: 1000, devise: 'FCFA' };
       const result = await lancerWorkflow(base44, workflow_code, {
         telephone: telephone || '+22670000099',
         profileName: profileName || 'Admin Test',
-        countryCode: countryCode || 'BF',
+        countryCode,
         tarifs,
         conversation_id: `sim_${Date.now()}`,
         is_simulation: true,

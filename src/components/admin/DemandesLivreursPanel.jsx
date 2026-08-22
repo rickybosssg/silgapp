@@ -117,7 +117,7 @@ export default function DemandesLivreursAdmin() {
                       </div>
                     </div>
                     <Badge variant="outline" className="bg-secondary/10 text-secondary border-secondary/20">
-                      {livreur.country_code || "BF"}
+                      {livreur.country_code || "—"}
                     </Badge>
                   </div>
 

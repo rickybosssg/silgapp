@@ -1,5 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
 import { emitDriverDebtThreshold } from '../../shared/venusAdminEventBus.ts';
+import { chargerConfigPays } from '../../shared/dispatchConstants.ts';
+import { recalculerSoldeLivreur } from '../../shared/recalculerSoldeLivreur.ts';
 
 /**
  * Vérifie l'encours d'un livreur après chaque course terminée.
@@ -65,27 +67,18 @@ Deno.serve(async (req) => {
       return Response.json({ success: false, error: 'Livreur introuvable' }, { status: 404 });
     }
 
-    // Si déjà bloqué, ne rien faire
-    if (livreur.bloque_encours) {
-      return Response.json({ success: true, skipped: true, reason: 'deja_bloque' });
-    }
-
-    // Récupérer le seuil du pays
     const countryCode = course.country_code || livreur.country_code;
     if (!countryCode) {
       return Response.json({ success: false, error: 'Code pays manquant' }, { status: 400 });
     }
 
-    const countries = await base44.asServiceRole.entities.Country.filter({ code: countryCode, actif: true });
-    const seuil = countries?.[0]?.seuil_encours_max || 5000;
-    const devise = countries?.[0]?.devise || 'FCFA';
-
-    // Calculer la commission de cette course
+    // Récupérer la commission de cette course (pour audit)
     let commission = 0;
     if (course.commission_silga && course.commission_silga > 0) {
       commission = course.commission_silga;
     } else if (course.prix_final && course.prix_final > 0) {
-      const pct = Number(countries?.[0]?.commission_pct);
+      const countryConfig = await chargerConfigPays(base44, countryCode);
+      const pct = Number(countryConfig?.commission_pct);
       if (!Number.isFinite(pct) || pct < 0 || pct > 100) {
         return Response.json({
           success: false,
@@ -100,35 +93,35 @@ Deno.serve(async (req) => {
       return Response.json({ success: true, skipped: true, reason: 'commission_nulle' });
     }
 
-    // ── Recalculer l'encours RÉEL depuis les courses livrées non payées ──
-    //    Au lieu d'accumuler dans un snapshot qui peut se désynchroniser,
-    //    on recalcule à chaque fois la somme des commissions impayées.
-    const livrees = await base44.asServiceRole.entities.CourseExterne.filter({
-      livreur_id: livreurId, statut: 'livree',
-    });
-    const encoursAvant = livrees
-      .filter(c => c.statut_paiement_livreur !== 'paye')
-      .reduce((s, c) => s + (c.commission_silga || 0), 0);
-    const nouvelEncours = encoursAvant; // déjà inclut la commission de cette course
-
-    // Pourcentage du seuil atteint
-    const pourcentage = seuil > 0 ? Math.round((nouvelEncours / seuil) * 100) : 0;
-
-    console.log(`[ENCOURS] Livreur ${livreurId} (${livreur.nom}): ${nouvelEncours} (${pourcentage}% du seuil ${seuil} ${devise})`);
-
     const now = new Date().toISOString();
 
-    // ── BLOCAGE : ≥ 100% du seuil ──
-    if (nouvelEncours >= seuil) {
-      await base44.asServiceRole.entities.Livreur.update(livreurId, {
-        bloque_encours: true,
-        encours_bloque_at: now,
-        statut: 'hors_ligne',
-        admin_hors_ligne: true,
-        admin_statut_log: 'Blocage automatique — plafond d\'encours atteint',
-      });
+    // ── Marquer la course comme comptabilisée (garde d'idempotence) ──
+    await base44.asServiceRole.entities.CourseExterne.update(courseId, {
+      encours_comptabilise_at: now,
+      encours_comptabilise_montant: commission,
+    });
 
-      // Historique
+    // ── Recalculer le solde depuis les sources financières ──
+    // montant_du_silga = projection = somme des commissions non payées
+    // encours = alias legacy synchronisé (conservé pour anciens APK)
+    const resultat = await recalculerSoldeLivreur(base44, livreurId);
+    const { solde, seuil, bloque, statut_paiement, devise } = resultat;
+
+    if (seuil === null || seuil <= 0) {
+      return Response.json({
+        success: false,
+        error: `Seuil d'encours non configuré pour le pays ${countryCode}`,
+        blocked_reason: 'missing_country_seuil_encours_max',
+      }, { status: 400 });
+    }
+
+    const seuilAlertePct = (await chargerConfigPays(base44, countryCode))?.seuil_alerte_encours_pct ?? 80;
+    const pourcentage = seuil > 0 ? Math.round((solde / seuil) * 100) : 0;
+
+    console.log(`[ENCOURS] Livreur ${livreurId} (${livreur.nom}): solde recalculé = ${solde} (${pourcentage}% du seuil ${seuil} ${devise})`);
+
+    // ── BLOCAGE : ≥ 100% du seuil ──
+    if (bloque) {
       await base44.asServiceRole.entities.HistoriqueEncours.create({
         type_action: 'blocage_auto',
         livreur_id: livreurId,
@@ -136,23 +129,18 @@ Deno.serve(async (req) => {
         livreur_telephone: livreur.telephone || '',
         pays_code: countryCode,
         course_id: courseId,
-        encours_avant: encoursAvant,
-        encours_apres: nouvelEncours,
+        encours_avant: livreur.montant_du_silga ?? 0,
+        encours_apres: solde,
         seuil_applicable: seuil,
         pourcentage_atteint: pourcentage,
         action_par: 'systeme',
         date_action: now,
       });
-      await base44.asServiceRole.entities.CourseExterne.update(courseId, {
-        encours_comptabilise_at: now,
-        encours_comptabilise_montant: commission,
-      });
 
-      // Notification push au livreur
       if (livreur.user_email) {
         await base44.asServiceRole.entities.Notification.create({
           titre: ' Compte bloqué — Plafond d\'encours atteint',
-          message: `Votre plafond d'encours SILGAPP a été atteint (${nouvelEncours.toLocaleString()} ${devise}). Veuillez effectuer votre dépôt auprès de SILGAPP afin de réactiver votre compte.`,
+          message: `Votre plafond d'encours SILGAPP a été atteint (${solde.toLocaleString()} ${devise}). Veuillez effectuer votre dépôt auprès de SILGAPP afin de réactiver votre compte.`,
           type: 'generic',
           destinataire_email: livreur.user_email,
           lue: false,
@@ -162,36 +150,31 @@ Deno.serve(async (req) => {
             destinataire_email: livreur.user_email,
             livreur_id: livreurId,
             titre: ' Compte bloqué',
-            message: `Plafond d'encours atteint (${nouvelEncours.toLocaleString()} ${devise}). Contactez SILGAPP pour régulariser.`,
+            message: `Plafond d'encours atteint (${solde.toLocaleString()} ${devise}). Contactez SILGAPP pour régulariser.`,
             type: 'generic',
           });
         } catch (_) {}
       }
 
-      // Notification aux admins
       await notifierAdmins(base44, countryCode,
         ` Blocage encours — ${livreur.nom}`,
-        `${livreur.nom} (${livreur.telephone}) bloqué automatiquement. Encours: ${nouvelEncours.toLocaleString()} ${devise} (${pourcentage}% du seuil).`
+        `${livreur.nom} (${livreur.telephone}) bloqué automatiquement. Encours: ${solde.toLocaleString()} ${devise} (${pourcentage}% du seuil).`
       );
 
-      console.log(`[ENCOURS] BLOCAGE : Livreur ${livreurId} — ${nouvelEncours} ${devise}`);
-
-      // VENUS Admin Event (non-bloquant)
-      await emitDriverDebtThreshold(base44, livreur, seuil, nouvelEncours).catch(() => {});
+      await emitDriverDebtThreshold(base44, livreur, seuil, solde).catch(() => {});
 
       return Response.json({
         success: true,
         bloque: true,
-        encours: nouvelEncours,
+        encours: solde,
         pourcentage,
         seuil,
         devise,
       });
     }
 
-    // ── ALERTE 80% ──
-    if (pourcentage >= 80 && pourcentage < 100) {
-      // Ne pas spammer : envoyer l'alerte max 1x par heure
+    // ── ALERTE — seuil dynamique (défaut 80%) ──
+    if (pourcentage >= seuilAlertePct && pourcentage < 100) {
       const derniereAlerte = livreur.encours_alerte_at ? new Date(livreur.encours_alerte_at) : null;
       const maintenant = new Date();
       const uneHeure = 60 * 60 * 1000;
@@ -200,7 +183,7 @@ Deno.serve(async (req) => {
         if (livreur.user_email) {
           await base44.asServiceRole.entities.Notification.create({
             titre: ' Alerte encours — Approche du plafond',
-            message: `Attention, vous approchez du plafond d'encours autorisé (${pourcentage}% — ${nouvelEncours.toLocaleString()} / ${seuil.toLocaleString()} ${devise}). Veuillez effectuer votre dépôt auprès de SILGAPP afin d'éviter le blocage automatique de votre compte.`,
+            message: `Attention, vous approchez du plafond d'encours autorisé (${pourcentage}% — ${solde.toLocaleString()} / ${seuil.toLocaleString()} ${devise}). Veuillez effectuer votre dépôt auprès de SILGAPP afin d'éviter le blocage automatique de votre compte.`,
             type: 'generic',
             destinataire_email: livreur.user_email,
             lue: false,
@@ -210,7 +193,7 @@ Deno.serve(async (req) => {
               destinataire_email: livreur.user_email,
               livreur_id: livreurId,
               titre: ' Alerte encours',
-              message: `Vous êtes à ${pourcentage}% du plafond (${nouvelEncours.toLocaleString()} ${devise}). Pensez à régulariser.`,
+              message: `Vous êtes à ${pourcentage}% du plafond (${solde.toLocaleString()} ${devise}). Pensez à régulariser.`,
               type: 'generic',
             });
           } catch (_) {}
@@ -218,25 +201,15 @@ Deno.serve(async (req) => {
         await base44.asServiceRole.entities.Livreur.update(livreurId, {
           encours_alerte_at: now,
         });
-        console.log(`[ENCOURS] ALERTE 80% : Livreur ${livreurId} — ${pourcentage}%`);
+        console.log(`[ENCOURS] ALERTE ${seuilAlertePct}% : Livreur ${livreurId} — ${pourcentage}%`);
       }
     }
-
-    // Mettre à jour l'encours ET montant_du_silga (source de vérité unique)
-    await base44.asServiceRole.entities.Livreur.update(livreurId, {
-      encours: nouvelEncours,
-      montant_du_silga: nouvelEncours,
-    });
-    await base44.asServiceRole.entities.CourseExterne.update(courseId, {
-      encours_comptabilise_at: now,
-      encours_comptabilise_montant: commission,
-    });
 
     return Response.json({
       success: true,
       bloque: false,
-      alerte: pourcentage >= 80,
-      encours: nouvelEncours,
+      alerte: pourcentage >= seuilAlertePct,
+      encours: solde,
       pourcentage,
       seuil,
       devise,
@@ -274,8 +247,15 @@ async function handleDeblocage(base44, body) {
   }
 
   const countryCode = livreur.country_code;
-  const countries = await base44.asServiceRole.entities.Country.filter({ code: countryCode, actif: true });
-  const seuil = countries?.[0]?.seuil_encours_max || 5000;
+  const countryConfig = await chargerConfigPays(base44, countryCode);
+  const seuil = countryConfig?.seuil_encours_max ?? null;
+  if (seuil === null || seuil <= 0) {
+    return Response.json({
+      success: false,
+      error: `Seuil d'encours non configuré pour le pays ${countryCode}`,
+      blocked_reason: 'missing_country_seuil_encours_max',
+    }, { status: 400 });
+  }
   const pourcentageApres = seuil > 0 ? Math.round((nouvelEncours / seuil) * 100) : 0;
   const encoreBloque = seuil > 0 && nouvelEncours >= seuil;
 
@@ -308,7 +288,7 @@ async function handleDeblocage(base44, body) {
 
   // Notifier le livreur
   if (livreur.user_email) {
-    const devise = countries?.[0]?.devise || 'FCFA';
+    const devise = countryConfig?.devise || 'FCFA';
     await base44.asServiceRole.entities.Notification.create({
       titre: encoreBloque ? ' Encours réduit' : ' Compte réactivé',
       message: encoreBloque
@@ -343,8 +323,15 @@ async function handleAjustement(base44, body) {
 
   const encoursAvant = livreur.montant_du_silga ?? livreur.encours ?? 0;
   const countryCode = livreur.country_code;
-  const countries = await base44.asServiceRole.entities.Country.filter({ code: countryCode, actif: true });
-  const seuil = countries?.[0]?.seuil_encours_max || 5000;
+  const countryConfig = await chargerConfigPays(base44, countryCode);
+  const seuil = countryConfig?.seuil_encours_max ?? null;
+  if (seuil === null || seuil <= 0) {
+    return Response.json({
+      success: false,
+      error: `Seuil d'encours non configuré pour le pays ${countryCode}`,
+      blocked_reason: 'missing_country_seuil_encours_max',
+    }, { status: 400 });
+  }
   const now = new Date().toISOString();
 
   const seraBloque = seuil > 0 && nouvel_encours >= seuil;
@@ -401,14 +388,22 @@ async function handleGetBloques(base44, body) {
   const filter = { bloque_encours: true, type_livreur: 'externe', country_code: effectiveCountry };
   const bloques = await base44.asServiceRole.entities.Livreur.filter(filter);
 
-  // Enrichir avec les seuils pays
+  // Enrichir avec les seuils pays — bloquant si non configuré
   const paysCodes = [...new Set(bloques.map(l => l.country_code).filter(Boolean))];
   const seuilsParPays = {};
   for (const code of paysCodes) {
-    const countries = await base44.asServiceRole.entities.Country.filter({ code, actif: true });
+    const countryConfig = await chargerConfigPays(base44, code);
+    const seuil = countryConfig?.seuil_encours_max ?? null;
+    if (seuil === null || seuil <= 0) {
+      return Response.json({
+        success: false,
+        error: `Seuil d'encours non configuré pour le pays ${code}`,
+        blocked_reason: 'missing_country_seuil_encours_max',
+      }, { status: 400 });
+    }
     seuilsParPays[code] = {
-      seuil: countries?.[0]?.seuil_encours_max || 5000,
-      devise: countries?.[0]?.devise || 'FCFA',
+      seuil,
+      devise: countryConfig?.devise || 'FCFA',
     };
   }
 
@@ -417,16 +412,13 @@ async function handleGetBloques(base44, body) {
   const enriched = [];
   const now = new Date().toISOString();
   for (const l of bloques) {
-    const seuil = seuilsParPays[l.country_code]?.seuil || 5000;
+    const seuil = seuilsParPays[l.country_code]?.seuil;
     const devise = seuilsParPays[l.country_code]?.devise || 'FCFA';
 
-    // Recalculer depuis les courses livrées non payées
-    const livrees = await base44.asServiceRole.entities.CourseExterne.filter({
-      livreur_id: l.id, statut: 'livree',
-    });
-    const encoursReel = livrees
-      .filter(c => c.statut_paiement_livreur !== 'paye')
-      .reduce((s, c) => s + (c.commission_silga || 0), 0);
+    // Utiliser le solde persisté (montant_du_silga) — source de vérité unique.
+    // Ne pas recalculer depuis les courses : un paiement partiel ne marque pas
+    // les courses comme payées, donc un recalcul recréerait une dette déjà réglée.
+    const encoursReel = l.montant_du_silga ?? l.encours ?? 0;
 
     // Auto-déblocage si la dette réelle est sous le seuil
     if (encoursReel < seuil) {

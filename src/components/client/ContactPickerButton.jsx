@@ -9,16 +9,16 @@ const INDICATIFS = {
   SN: "221", ML: "223", GN: "224", NE: "227",
 };
 
-function normaliserNumero(numero, countryCode = "BF") {
+function normaliserNumero(numero, countryCode = "") {
   if (!numero) return "";
   let n = String(numero).replace(/[\s\-().]/g, "").replace(/^\+/, "");
-  const indicatif = INDICATIFS[countryCode] || "226";
+  const indicatif = INDICATIFS[countryCode] || "";
   if (n.startsWith("00" + indicatif)) n = n.slice(2);
   if (/^\d{8}$/.test(n)) n = indicatif + n;
   return n.startsWith("+") ? n : "+" + n;
 }
 
-export default function ContactPickerButton({ onSelect, countryCode = "BF", label }) {
+export default function ContactPickerButton({ onSelect, countryCode = "", label }) {
   const [loading, setLoading] = useState(false);
 
   const handlePick = async () => {

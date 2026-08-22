@@ -1,6 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.38';
 import { genererReferenceCourse } from '../../shared/venusCourseReference.ts';
 import { normalizePhone } from '../../shared/phoneUtils.ts';
+import { resolveDialCode } from '../../shared/countryResolver.ts';
 
 /**
  * Envoie une notification WhatsApp de suivi de course au client.
@@ -183,7 +184,7 @@ Deno.serve(async (req) => {
     // Pas de course_id requis : on envoie directement les infos + lien téléchargement
     if (evenement === 'inviter_destinataire') {
       const tel = body.telephone || '';
-      const countryCode = body.country_code || 'BF';
+      const countryCode = body.country_code;
       const clientNom = body.client_nom || 'un client';
       const typeCourse = body.type_course || 'expedier';
 
@@ -191,8 +192,15 @@ Deno.serve(async (req) => {
         return Response.json({ success: false, skipped: 'no_phone' });
       }
 
-      const INDICATIFS2 = { BF: '+226', CI: '+225', TG: '+228', BJ: '+229', SN: '+221', ML: '+223', GN: '+224', NE: '+227', GH: '+233' };
-      const ind2 = INDICATIFS2[countryCode] || '+226';
+      if (!countryCode) {
+        return Response.json({ success: false, error: 'COUNTRY_REQUIRED', message: "country_code est requis pour envoyer un suivi WhatsApp." }, { status: 400 });
+      }
+
+      // ⚠️ Phase A — Indicatif résolu depuis le backend Country, plus de map hardcodée.
+      const ind2 = await resolveDialCode(base44, countryCode);
+      if (!ind2) {
+        return Response.json({ success: false, error: 'DIAL_CODE_NOT_FOUND', message: `Indicatif introuvable pour le pays ${countryCode}.` }, { status: 400 });
+      }
       let num2 = tel.replace(/\D/g, '');
       if (!num2.startsWith(ind2.replace('+', ''))) {
         num2 = ind2.replace('+', '') + num2;
@@ -286,9 +294,11 @@ Deno.serve(async (req) => {
       return Response.json({ success: false, skipped: 'no_phone' });
     }
 
-    // Normaliser le numéro au format canonique DB (226XXXXXXXX sans +)
-    const INDICATIFS = { BF: '+226', CI: '+225', TG: '+228', BJ: '+229', SN: '+221', ML: '+223', GN: '+224', NE: '+227', GH: '+233' };
-    const indicatif = INDICATIFS[course.country_code] || '+226';
+    // ⚠️ Phase A — Indicatif résolu depuis le backend Country, plus de map hardcodée.
+    const indicatif = await resolveDialCode(base44, course.country_code);
+    if (!indicatif) {
+      return Response.json({ success: false, error: 'DIAL_CODE_NOT_FOUND', message: `Indicatif introuvable pour le pays ${course.country_code}.` }, { status: 400 });
+    }
     let numero = normalizePhone(telephone, course.country_code) || telephone.replace(/\D/g, '');
     // Garde anti-régression : si normalizePhone n'a pas pu normaliser, appliquer l'ancienne logique
     if (!numero || numero.length < 8) {
@@ -450,6 +460,8 @@ Deno.serve(async (req) => {
         if (conversationForSend) {
           await base44.asServiceRole.entities.Message.create({
             conversation_id: conversationForSend.id,
+            participant_user_ids: conversationForSend.participant_user_ids || [],
+            security_status: (conversationForSend.participant_user_ids && conversationForSend.participant_user_ids.length > 0) ? 'secured' : 'pending',
             sender_type: 'admin',
             sender_id: 'venus',
             sender_name: 'VENUS',

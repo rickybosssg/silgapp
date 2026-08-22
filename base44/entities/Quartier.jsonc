@@ -12,15 +12,23 @@
     },
     "nom": {
       "type": "string",
-      "description": "Nom officiel du quartier"
+      "description": "Nom technique interne du quartier (peut inclure un num\u00e9ro de zone: Karpala, Karpala 2)"
+    },
+    "nom_affiche": {
+      "type": "string",
+      "description": "Nom visible par le client (regroupement d'affichage). Si deux zones ont le m\u00eame nom_affiche, une seule ligne appara\u00eet dans l'autocompl\u00e9tion. Ex: Karpala et Karpala 2 ont tous deux nom_affiche='Karpala'. Si vide, utilise 'nom'."
+    },
+    "quartier_parent": {
+      "type": "string",
+      "description": "Nom du quartier parent pour le regroupement interne. Si d\u00e9fini, ce quartier fait partie d'un groupe de zones GPS. Le GPS du quartier n'est qu'un point de secours \u2014 la position exacte doit venir du GPS client ou de la carte. Ex: 'Karpala' pour la zone 'Karpala 2'."
     },
     "latitude": {
       "type": "number",
-      "description": "Latitude approximative du centre du quartier"
+      "description": "Latitude approximative du centre de la zone"
     },
     "longitude": {
       "type": "number",
-      "description": "Longitude approximative du centre du quartier"
+      "description": "Longitude approximative du centre de la zone"
     },
     "variantes": {
       "type": "string",

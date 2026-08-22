@@ -9,6 +9,7 @@ import { Preferences } from "@capacitor/preferences";
 import { Capacitor } from "@capacitor/core";
 import { Contacts } from "@capacitor-community/contacts";
 import { pickNativeContact } from "@/lib/nativeAndroid";
+import { getDialCodeSync } from "@/lib/countryService";
 
 const FREQUENT_CONTACTS_KEY = "silgapp_frequent_contacts";
 
@@ -86,16 +87,20 @@ export default function ContactPicker({ type = "destinataire", onSelect }) {
 
   const normalizePhone = (phone) => {
     if (!phone) return "";
-    return phone.replace(/\D/g, "").slice(-8);
+    return phone.replace(/\D/g, "");
   };
 
   const formatPhone = (phone) => {
     if (!phone) return "";
     const digits = phone.replace(/\D/g, "");
-    if (digits.length === 8) return digits.replace(/(\d{2})(\d{2})(\d{2})(\d{2})/, "+226 $1 $2 $3 $4");
-    if (digits.length === 11 && digits.startsWith("226")) {
-      const d = digits.slice(3);
-      return "+226 " + d.replace(/(\d{2})(\d{2})(\d{2})(\d{2})/, "$1 $2 $3 $4");
+    const dial = getDialCodeSync() || "";
+    const dialDigits = dial.replace(/^\+/, "");
+    if (dialDigits && digits.startsWith(dialDigits) && digits.length === dialDigits.length + 8) {
+      const d = digits.slice(dialDigits.length);
+      return `${dial} ${d.replace(/(\d{2})(\d{2})(\d{2})(\d{2})/, "$1 $2 $3 $4")}`;
+    }
+    if (digits.length === 8 && dialDigits) {
+      return `${dial} ${digits.replace(/(\d{2})(\d{2})(\d{2})(\d{2})/, "$1 $2 $3 $4")}`;
     }
     return phone;
   };

@@ -160,8 +160,8 @@ function parseJsonObj(str?: string): any {
   try { return JSON.parse(str); } catch { return {}; }
 }
 
-export async function chargerConfigPays(base44: any, countryCode: string): Promise<CountryConfig> {
-  const fallback = FALLBACK_PAYS[countryCode] || FALLBACK_PAYS['BF'];
+export async function chargerConfigPays(base44: any, countryCode: string): Promise<CountryConfig | null> {
+  const fallback = FALLBACK_PAYS[countryCode] || null;
   try {
     const pays = await base44.asServiceRole.entities.Country.filter({ code: countryCode });
     if (pays && pays.length > 0) {
@@ -199,7 +199,7 @@ export async function chargerConfigPays(base44: any, countryCode: string): Promi
   } catch (e) {
     console.error(`[venusI18n] Erreur chargement pays ${countryCode}:`, e.message);
   }
-  return fallback;
+  return fallback; // null si pays inconnu — ne JAMAIS fallback vers BF
 }
 
 // ═════════════════════════════════════════════════════════════

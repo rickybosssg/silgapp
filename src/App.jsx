@@ -1,6 +1,7 @@
 import React, { Suspense, lazy, useState, useEffect } from 'react';
 import SplashScreen from './components/SplashScreen';
 import { Toaster } from '@/components/ui/toaster';
+import { Toaster as SonnerToaster } from '@/components/ui/sonner';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -109,6 +110,11 @@ const DispatchLogs = lazy(() => import('./pages/DispatchLogs.jsx'));
 const LivreursPrioritaires = lazy(() => import('./pages/LivreursPrioritaires.jsx'));
 const AdminCourseStandalone = lazy(() => import('./pages/AdminCourseStandalone.jsx'));
 const CentreNotifications = lazy(() => import('./pages/CentreNotifications.jsx'));
+const TarificationAdmin = lazy(() => import('./pages/TarificationAdmin.jsx'));
+const ReactivationClients = lazy(() => import('./pages/ReactivationClients.jsx'));
+const CoursesARisque = lazy(() => import('./pages/CoursesARisque.jsx'));
+const FiabilitePush = lazy(() => import('./pages/FiabilitePush.jsx'));
+const SilgaScore = lazy(() => import('./pages/SilgaScore.jsx'));
 
 function AnimatedRoutes({ children }) {
   // Variables définies DANS la fonction pour éviter init issues
@@ -447,6 +453,7 @@ function AppContent() {
           <Route path="/admin/test-notifications" element={<AnimatedRoutes><TestNotifications /></AnimatedRoutes>} />
           <Route path="/admin/test-dispatch-livreur" element={<AnimatedRoutes><TestDispatchLivreur /></AnimatedRoutes>} />
           <Route path="/admin/centre-notifications" element={<AnimatedRoutes><CentreNotifications /></AnimatedRoutes>} />
+          <Route path="/admin/tarification" element={<AnimatedRoutes><TarificationAdmin /></AnimatedRoutes>} />
           <Route path="/admin/demandes-livreurs" element={<AnimatedRoutes><DemandesLivreursAdmin /></AnimatedRoutes>} />
           <Route path="/admin/livreurs-bloques" element={<AnimatedRoutes><LivreursBloquesEncours /></AnimatedRoutes>} />
           <Route path="/admin/comptabilite" element={<AnimatedRoutes><Comptabilite /></AnimatedRoutes>} />
@@ -460,6 +467,10 @@ function AppContent() {
           <Route path="/admin/dispatch-logs" element={<AnimatedRoutes><DispatchLogs /></AnimatedRoutes>} />
           <Route path="/admin/livreurs-prioritaires" element={<AnimatedRoutes><LivreursPrioritaires /></AnimatedRoutes>} />
           <Route path="/admin/crm-clients" element={<AnimatedRoutes><ClientsCRM /></AnimatedRoutes>} />
+          <Route path="/admin/reactivation-clients" element={<AnimatedRoutes><ReactivationClients /></AnimatedRoutes>} />
+          <Route path="/admin/courses-a-sauver" element={<AnimatedRoutes><CoursesARisque /></AnimatedRoutes>} />
+          <Route path="/admin/fiabilite-push" element={<AnimatedRoutes><FiabilitePush /></AnimatedRoutes>} />
+          <Route path="/admin/silga-score" element={<AnimatedRoutes><SilgaScore /></AnimatedRoutes>} />
           <Route path="/admin/messages" element={<AnimatedRoutes><AdminMessages /></AnimatedRoutes>} />
           <Route path="/admin/whatsapp" element={<AnimatedRoutes><WhatsAppAdmin /></AnimatedRoutes>} />
           <Route path="/admin/venus" element={<AnimatedRoutes><VenusAdminCenter /></AnimatedRoutes>} />
@@ -514,6 +525,7 @@ function AppWithProviders() {
     <QueryClientProvider client={queryClientInstance}>
       <App />
       <IOSAppStoreBanner />
+      <SonnerToaster position="top-center" richColors closeButton />
     </QueryClientProvider>
   );
 }

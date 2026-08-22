@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { resolveDialCode } from '../../shared/countryResolver.ts';
 
 /**
  * Vérifie si un livreur est opt-in dans le Sandbox WhatsApp Twilio.
@@ -40,9 +41,16 @@ Deno.serve(async (req) => {
 
     if (!telephone) return Response.json({ error: 'telephone requis' }, { status: 400 });
 
-    // Normaliser le numéro
+    // Normaliser le numéro — résoudre l'indicatif dynamiquement depuis Country
     let tel = telephone.replace(/\s+/g, '').replace(/[^\d+]/g, '');
-    if (!tel.startsWith('+')) tel = '+226' + tel;
+    if (!tel.startsWith('+')) {
+      // Résoudre l'indicatif pays depuis le livreur ou la course
+      const livreurCountry = livreur?.country_code;
+      const dial = livreurCountry
+        ? await resolveDialCode(base44, livreurCountry)
+        : '';
+      tel = (dial || '') + tel;
+    }
 
     // ── 1. Vérifier les messages entrants (opt-in = "join rise-bit") ──────────
     const entrantsResp = await fetch(

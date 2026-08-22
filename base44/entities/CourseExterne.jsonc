@@ -36,9 +36,17 @@
       "type": "string",
       "description": "Telephone du client normalise (format international sans + ni espace). Utilise pour les recherches CRM."
     },
+    "client_user_email": {
+      "type": "string",
+      "description": "Email du compte User li\u00e9 au client. R\u00e9solu c\u00f4t\u00e9 backend UNIQUEMENT (jamais fourni par le frontend). Permet la RLS read pour que le client voie ses courses (y compris admin/VENUS). Null si le client n'a pas de compte User."
+    },
     "contact_createur_course": {
       "type": "string",
       "description": "Numero de telephone du CREATEUR de la course \u2014 contact principal que le livreur doit contacter en priorite. OBLIGATOIRE pour toute course creee via VENUS. Peut differer du numero WhatsApp entrant (cas: une personne cree une course pour un autre client). Le numero WhatsApp entrant ne peut etre copie ici qu'apres confirmation explicite du client. Ne jamais reutiliser automatiquement un ancien numero."
+    },
+    "livreur_user_email": {
+      "type": "string",
+      "description": "Email du compte User du livreur assign\u00e9. R\u00e9solu c\u00f4t\u00e9 backend UNIQUEMENT, actualis\u00e9 \u00e0 chaque assignation/r\u00e9assignation. Permet la RLS read pour que le livreur voie ses courses. Null si non assign\u00e9 ou livreur sans compte User."
     },
     "type_course": {
       "type": "string",
@@ -132,6 +140,24 @@
     "gps_arrivee_lng": {
       "type": "number"
     },
+    "gps_depart_source": {
+      "type": "string",
+      "enum": [
+        "exact",
+        "quartier",
+        "geocodage"
+      ],
+      "description": "Source du GPS de depart: exact (GPS telephone ou carte), quartier (centre approximatif du quartier), geocodage (adresse geocodee). Null si GPS non disponible."
+    },
+    "gps_arrivee_source": {
+      "type": "string",
+      "enum": [
+        "exact",
+        "quartier",
+        "geocodage"
+      ],
+      "description": "Source du GPS d'arrivee: exact (GPS telephone ou carte), quartier (centre approximatif du quartier), geocodage (adresse geocodee). Null si GPS non disponible."
+    },
     "passager_nom": {
       "type": "string"
     },
@@ -163,13 +189,25 @@
     },
     "prix_propose_client": {
       "type": "number",
-      "description": "Prix propose par le CLIENT lors de la creation de sa course (etape Prix propos\u00e9 dans le formulaire). Distinct de prix_propose_admin qui est reserve a l'admin. Visible par le livreur et l'admin."
+      "description": "Prix propose par le CLIENT lors de la creation de sa course (etape Prix propose dans le formulaire). Distinct de prix_propose_admin qui est reserve a l'admin. Visible par le livreur et l'admin."
     },
     "prix_final": {
       "type": "number"
     },
     "distance_reelle_km": {
       "type": "number"
+    },
+    "distance_tarifaire_km": {
+      "type": "number",
+      "description": "Distance routiere ORS (ou fallback Haversine) utilisee pour determiner le tarif Grand Ouaga. Calculee une seule fois a la creation. Distincte de distance_reelle_km qui sert a d'autres usages."
+    },
+    "distance_tarifaire_source": {
+      "type": "string",
+      "enum": [
+        "ors",
+        "haversine_fallback"
+      ],
+      "description": "Source de la distance tarifaire : ors (route reelle OpenRouteService) ou haversine_fallback (ORS indisponible). Permet de savoir si le tarif a ete calcule avec une route reelle ou un fallback."
     },
     "devise": {
       "type": "string",
@@ -222,12 +260,12 @@
     "dispatch_wave_started_at": {
       "type": "string",
       "format": "date-time",
-      "description": "Date de d\u00e9marrage de la vague actuelle"
+      "description": "Date de demarrage de la vague actuelle"
     },
     "dispatch_next_wave_at": {
       "type": "string",
       "format": "date-time",
-      "description": "Date pr\u00e9vue de d\u00e9marrage de la prochaine vague"
+      "description": "Date prevue de demarrage de la prochaine vague"
     },
     "timeout_expires_at": {
       "type": "string",
@@ -273,7 +311,7 @@
     "heure_contact_client": {
       "type": "string",
       "format": "date-time",
-      "description": "Date/heure \u00e0 laquelle le livreur a confirm\u00e9 avoir contact\u00e9 le client (\u00e9tape \u00ab Client contact\u00e9 \u00bb du workflow administratif). Renseign\u00e9 uniquement pour les courses administratives."
+      "description": "Date/heure a laquelle le livreur a confirme avoir contacte le client (etape Client contacte du workflow administratif). Renseigne uniquement pour les courses administratives."
     },
     "heure_prise_en_charge": {
       "type": "string",
@@ -506,20 +544,29 @@
     },
     "commande_restaurant_id": {
       "type": "string",
-      "description": "ID de la CommandeRestaurant li\u00e9e (si course issue d'une commande partenaire)"
+      "description": "ID de la CommandeRestaurant lieee (si course issue d'une commande partenaire)"
     },
     "pharmacie_id": {
       "type": "string",
-      "description": "ID de la pharmacie liee (si course issue d'une pharmacie partenaire)"
+      "description": "ID de la pharmacie lieee (si course issue d'une pharmacie partenaire)"
     },
     "conversation_id": {
       "type": "string",
-      "description": "ID de la conversation liee a la livraison pharmacie"
+      "description": "ID de la conversation lieee a la livraison pharmacie"
     },
     "crm_stats_synced": {
       "type": "boolean",
       "default": false,
       "description": "True si les stats CRM ont deja ete incrementees pour cette course (anti double-comptage)"
+    },
+    "encours_comptabilise_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date a laquelle la commission de cette course a ete comptabilisee dans le montant_du_silga du livreur (anti double-comptage). Si null, la commission n'a pas encore ete ajoutee au solde."
+    },
+    "encours_comptabilise_montant": {
+      "type": "number",
+      "description": "Montant de la commission comptabilisee dans l'encours du livreur (pour audit)"
     }
   },
   "required": [

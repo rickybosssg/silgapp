@@ -31,9 +31,11 @@
 // VERSION: 2026-08-11 — Version stable figée. Ne pas modifier sans validation.
 
 import { waitUntil } from 'base44:runtime';
-import { STATUTS_ACTIFS_COURSE, STATUTS_TERMINAUX_COURSE, calculerDistance } from './dispatchConstants.ts';
+import { STATUTS_ACTIFS_COURSE, STATUTS_TERMINAUX_COURSE, calculerDistance, chargerConfigPays } from './dispatchConstants.ts';
 import { dispatchLog, reponseDejaPrise, generateToken, generatePIN, journaliserDispatch } from './dispatchUtils.ts';
 import { enregistrerNotification, getLivreursNotifies, getLivreursRefuses, marquerAccepte } from './dispatchNotifications.ts';
+import { chargerConfigDispatch } from './dispatchConfig.ts';
+import { resolveCourseParticipantUserIds } from './conversationSecurity.ts';
 
 // ── Version du bundle (pour vérifier que la production charge la dernière version) ──
 export const DISPATCH_V2_BUNDLE_VERSION = '2026-08-17-fix-en-attente-accept';
@@ -103,6 +105,31 @@ async function notifierLivreursEligiblesV2(base44: any, course: any, options: an
   // Enregistrer les DispatchNotifications (bulk) pour le suivi dispatch
   await Promise.allSettled(
     candidats.map((livreur: any) => enregistrerNotification(base44, course.id, livreur, 0, { country_code: course.country_code }))
+  );
+
+  // ── Créer les notifications utilisateur (inbox) ──
+  // Idempotence via deduplication_key = COURSE_DISPATCH_<courseId>_<livreurId>
+  // Deux événements différents (dispatch vs rappel vs attribution) utilisent des
+  // clés différentes. Un retry du même événement est bloqué.
+  await Promise.allSettled(
+    candidats.map((livreur: any) => {
+      if (!livreur.user_email) return Promise.resolve();
+      const dedupKey = `COURSE_DISPATCH_${course.id}_${livreur.id}`;
+      return base44.asServiceRole.entities.Notification.filter({
+        deduplication_key: dedupKey,
+      }).then((existing: any) => {
+        if (existing && existing.length > 0) return; // déjà notifié — pas de doublon
+        return base44.asServiceRole.entities.Notification.create({
+          titre: 'Nouvelle course SILGAPP',
+          message: `${course.quartier_depart || course.adresse_depart || 'Départ'} → ${course.quartier_arrivee || course.adresse_arrivee || 'destination'}`,
+          type: 'nouvelle_course',
+          course_id: course.id,
+          destinataire_email: livreur.user_email,
+          deduplication_key: dedupKey,
+          lue: false,
+        });
+      }).catch(() => {});
+    })
   );
 
   // 📤 Envoi push batch : 1 seule invocation backend pour tous les livreurs prioritaires
@@ -335,8 +362,13 @@ export async function accepterCourseV2(base44: any, courseId: string, livreurId:
     return { success: false, error: 'Course expirée', expired: true };
   }
 
-  // 7. Prix minimum
-  const isManual = pricing_mode === 'manual' && manual_price && Number(manual_price) >= 1000;
+  // 7. Prix minimum — dynamique selon le pays (bloquant si non configuré)
+  const countryConfig = await chargerConfigPays(base44, course.country_code);
+  const PRIX_MIN = countryConfig?.prix_minimum ?? null;
+  if (PRIX_MIN === null) {
+    return { success: false, error: `Prix minimum non configuré pour le pays ${course.country_code}`, blocked_reason: 'missing_country_prix_minimum' };
+  }
+  const isManual = pricing_mode === 'manual' && manual_price && Number(manual_price) >= PRIX_MIN;
 
   // 8. Tokens/PINs (préserver existants)
   const pickupToken = course.pickup_qr_token || generateToken();
@@ -370,7 +402,8 @@ export async function accepterCourseV2(base44: any, courseId: string, livreurId:
     updateData.manual_price = Number(manual_price);
     updateData.manual_price_status = 'pending_client_validation';
     updateData.proposed_by_livreur_id = livreurId;
-    updateData.timeout_expires_at = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+    const dispatchConfig = await chargerConfigDispatch(base44);
+    updateData.timeout_expires_at = new Date(Date.now() + dispatchConfig.manualPriceTimeoutSec * 1000).toISOString();
   }
 
   // Le statut constitue le verrou atomique. Ne pas filtrer livreur_id avec une
@@ -421,6 +454,22 @@ export async function accepterCourseV2(base44: any, courseId: string, livreurId:
             : (course.prix_estimate ? `Prix estimé : ${Number(course.prix_estimate).toLocaleString()} ${course.devise || 'FCFA'}` : '');
           const messageContent = `🔑 Code de récupération : ${pickupPIN}\n📦 Code de livraison : ${deliveryPIN}${prixLabel ? `\n💰 ${prixLabel}` : ''}`;
 
+          // 🔒 Résolution des participants côté backend (jamais du frontend)
+          // Le message contient les codes PIN — il doit être sécurisé immédiatement.
+          let participantUserIds: string[] = [];
+          let messageSecurityStatus: 'secured' | 'pending' = 'pending';
+          try {
+            const clientId = courseVerifie.expediteur_client_id || courseVerifie.destinataire_client_id;
+            participantUserIds = await resolveCourseParticipantUserIds(base44, livreurId, clientId);
+            if (participantUserIds.length > 0) {
+              messageSecurityStatus = 'secured';
+            } else {
+              dispatchLog(`[V2] ⚠️ [SECURITÉ] Message PIN course ${courseId}: resolveCourseParticipantUserIds a retourné 0 User.id — message créé en pending (backfill nécessaire)`);
+            }
+          } catch (err: any) {
+            dispatchLog(`[V2] ❌ [SECURITÉ] Message PIN course ${courseId}: échec résolution participants — ${err?.message} — message créé en pending (backfill nécessaire)`);
+          }
+
           await base44.asServiceRole.entities.Message.create({
             course_id: courseId,
             sender_type: 'admin',
@@ -430,6 +479,8 @@ export async function accepterCourseV2(base44: any, courseId: string, livreurId:
             content: messageContent,
             source: 'app',
             client_message_id: idempotencyKey,
+            participant_user_ids: participantUserIds,
+            security_status: messageSecurityStatus,
           });
 
           // 📤 Push notification au livreur avec PIN + prix

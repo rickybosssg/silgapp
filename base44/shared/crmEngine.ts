@@ -1,18 +1,49 @@
 // ── Moteur CRM partagé — utilisé par les fonctions backend ──
 // Toute la logique de normalisation, upsert (sans stats), recalcul stats, merge
 
+import { chargerConfigPays } from './dispatchConstants.ts';
+
+// ⚠️ LEGACY CACHE — Source de vérité = Country.indicatif (via chargerConfigPays).
+//    Cette map statique est un CACHE uniquement, populé dynamiquement par
+//    preloadDialCodes(). NE JAMAIS ajouter de pays manuellement ici.
+//    Fallback hardcodé uniquement si la BDD est indisponible.
 const COUNTRY_DIAL_CODE: Record<string, string> = {
   BF: "226", CI: "225", TG: "228", BJ: "229", SN: "221",
   ML: "223", GN: "224", NE: "227", GH: "233",
 };
 
-export function normalizePhone(phone: string, countryCode: string = "BF"): string {
+/**
+ * Précharge les indicatifs téléphoniques depuis Country.indicatif.
+ * À appeler au début des fonctions qui utilisent normalizePhone.
+ * Source de vérité = Country.indicatif. Le cache n'est jamais la source.
+ */
+export async function preloadDialCodes(base44: any, countryCode?: string) {
+  try {
+    if (countryCode) {
+      const country = await chargerConfigPays(base44, countryCode);
+      if (country?.indicatif) {
+        COUNTRY_DIAL_CODE[countryCode] = String(country.indicatif).replace(/^\+/, '');
+      }
+    } else {
+      const countries = await base44.asServiceRole.entities.Country.filter({ actif: true });
+      for (const c of (countries || [])) {
+        if (c.code && c.indicatif) {
+          COUNTRY_DIAL_CODE[c.code] = String(c.indicatif).replace(/^\+/, '');
+        }
+      }
+    }
+  } catch {
+    // BDD indisponible — fallback sur le cache statique
+  }
+}
+
+export function normalizePhone(phone: string, countryCode: string = ""): string {
   let digits = (phone || "").replace(/\D/g, "");
   if (!digits) return "";
-  const dial = COUNTRY_DIAL_CODE[countryCode] || "226";
-  if (digits.startsWith(dial) && digits.length >= dial.length + 6) return digits;
+  const dial = COUNTRY_DIAL_CODE[countryCode] || "";
+  if (dial && digits.startsWith(dial) && digits.length >= dial.length + 6) return digits;
   if (digits.startsWith("0")) digits = digits.slice(1);
-  if (digits.length <= 9) return dial + digits;
+  if (dial && digits.length <= 9) return dial + digits;
   return digits;
 }
 

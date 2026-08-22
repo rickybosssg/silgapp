@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,14 +8,7 @@ import { Loader2, Upload, Save, X, AlertTriangle, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import PartenaireLocalisation from "@/components/partenaire/PartenaireLocalisation";
 import SmartAddressInput from "@/components/location/SmartAddressInput";
-
-const PAYS = [
-  { code: "BF", nom: "Burkina Faso", emoji: "🇧🇫", digits: 8 }, { code: "CI", nom: "Côte d'Ivoire", emoji: "🇨🇮", digits: 10 },
-  { code: "TG", nom: "Togo", emoji: "🇹🇬", digits: 8 }, { code: "BJ", nom: "Bénin", emoji: "🇧🇯", digits: 8 },
-  { code: "SN", nom: "Sénégal", emoji: "🇸🇳", digits: 9 }, { code: "ML", nom: "Mali", emoji: "🇲🇱", digits: 8 },
-  { code: "GN", nom: "Guinée", emoji: "🇬🇳", digits: 9 }, { code: "NE", nom: "Niger", emoji: "🇳🇪", digits: 8 },
-  { code: "GH", nom: "Ghana", emoji: "🇬🇭", digits: 9 },
-];
+import { useActiveCountries } from "@/lib/countryService";
 
 // Compression image avant upload (max 800px, JPEG 0.7) — Correction 1
 function compressImage(file) {
@@ -43,14 +36,27 @@ function compressImage(file) {
 export default function EtablissementForm({ type, existing, partenaireId, userEmail, onSaved, onCancel, isAdmin }) {
   const isRestaurant = type === "restaurant";
   const isPharmacie = type === "pharmacie";
+  const { countries } = useActiveCountries();
   const [form, setForm] = useState(existing || {
     nom: "", logo_url: "", description: "",
     categorie: "", specialite: "",
-    pays_code: "BF", ville: "", quartier: "",
+    pays_code: null, ville: "", quartier: "",
     telephone: "", telephone_depot: "",
     horaires: "", temps_preparation_min: 30,
     ouvert: true, actif: true, commission_pct: null,
   });
+
+  // Charger le pays par défaut dynamiquement si pas déjà défini
+  useEffect(() => {
+    if (existing?.pays_code || form.pays_code) return;
+    let mounted = true;
+    import("@/lib/countryService").then(({ getDefaultCountryCode }) => {
+      getDefaultCountryCode().then(code => {
+        if (mounted && code) set(f => ({ ...f, pays_code: code }));
+      }).catch(() => {});
+    });
+    return () => { mounted = false; };
+  }, [existing?.pays_code]);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -70,11 +76,14 @@ export default function EtablissementForm({ type, existing, partenaireId, userEm
     setUploading(false);
   };
 
-  // Validation téléphone selon le pays — Correction 5
-  const paysConfig = PAYS.find(p => p.code === form.pays_code) || PAYS[0];
+  // Validation téléphone selon le pays — dynamique depuis Country
+  const paysConfig = countries.find(p => p.code === form.pays_code) || null;
+  const paysDigits = paysConfig?.format_numero
+    ? parseInt(paysConfig.format_numero.replace(/\D/g, "").length) || 8
+    : 8;
   const telDigits = (form.telephone || "").replace(/\D/g, "");
-  const telValide = !form.telephone || telDigits.length === paysConfig.digits;
-  const telDepotValide = !form.telephone_depot || (form.telephone_depot.replace(/\D/g, "").length === paysConfig.digits);
+  const telValide = !form.telephone || telDigits.length === paysDigits;
+  const telDepotValide = !form.telephone_depot || (form.telephone_depot.replace(/\D/g, "").length === paysDigits);
 
   const handleSave = async () => {
     if (!form.nom || !form.pays_code) return;
@@ -214,7 +223,7 @@ export default function EtablissementForm({ type, existing, partenaireId, userEm
               <Label className="text-xs font-semibold text-gray-600">Pays *</Label>
               <div className="relative mt-1.5">
                 <select value={form.pays_code} onChange={e => set("pays_code", e.target.value)} className="w-full h-12 rounded-xl border border-gray-200 bg-white px-3 pr-8 text-sm font-medium appearance-none cursor-pointer focus:ring-2 focus:ring-purple-200 focus:border-purple-400 outline-none">
-                  {PAYS.map(p => <option key={p.code} value={p.code}>{p.emoji} {p.nom}</option>)}
+                  {countries.map(p => <option key={p.code} value={p.code}>{p.emoji_flag || ""} {p.nom}</option>)}
                 </select>
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none text-xs">▼</span>
               </div>

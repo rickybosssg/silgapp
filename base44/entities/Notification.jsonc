@@ -45,6 +45,10 @@
       "type": "string",
       "description": "Email du destinataire"
     },
+    "deduplication_key": {
+      "type": "string",
+      "description": "Cl\u00e9 anti-doublon (ex: COURSE_DISPATCH_<courseId>_<livreurId>). Emp\u00eache les notifications dupliqu\u00e9es pour le m\u00eame \u00e9v\u00e9nement. Deux \u00e9v\u00e9nements diff\u00e9rents (ex: dispatch vs rappel) utilisent des cl\u00e9s diff\u00e9rentes. Un retry du m\u00eame \u00e9v\u00e9nement est bloqu\u00e9."
+    },
     "lue": {
       "type": "boolean",
       "default": false,
@@ -55,5 +59,37 @@
     "titre",
     "message",
     "type"
-  ]
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "data.destinataire_email": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "create": {},
+    "update": {
+      "$or": [
+        {
+          "data.destinataire_email": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
 }

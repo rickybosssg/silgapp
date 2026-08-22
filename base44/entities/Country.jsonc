@@ -48,7 +48,19 @@
     },
     "format_numero": {
       "type": "string",
-      "description": "Format des num\u00e9ros locaux (ex: XX XX XX XX)"
+      "description": "Format des num\u00e9ros locaux (ex: XX XX XX XX). Informatif uniquement \u2014 la validation utilise phone_min_length / phone_max_length."
+    },
+    "phone_min_length": {
+      "type": "number",
+      "description": "Longueur minimale du num\u00e9ro national (sans l'indicatif international). Ex: 8 pour BF, 10 pour CI et BJ. Source unique pour la validation frontend et backend."
+    },
+    "phone_max_length": {
+      "type": "number",
+      "description": "Longueur maximale du num\u00e9ro national (sans l'indicatif international). Ex: 8 pour BF, 10 pour CI et BJ, 11 pour NG (avec leading 0). Source unique pour la validation frontend et backend."
+    },
+    "phone_pattern": {
+      "type": "string",
+      "description": "Pattern regex optionnel pour valider le format du num\u00e9ro national (ex: ^[0-9]{8}$). Si vide, la validation utilise phone_min_length / phone_max_length uniquement."
     },
     "format_adresse": {
       "type": "string",
@@ -87,6 +99,46 @@
       "type": "number",
       "default": 5000,
       "description": "Seuil d'encours maximum avant blocage automatique du livreur (en devise locale)"
+    },
+    "seuil_alerte_encours_pct": {
+      "type": "number",
+      "default": 80,
+      "description": "Pourcentage du seuil d'encours \u00e0 partir duquel une alerte est envoy\u00e9e au livreur (d\u00e9faut 80%)"
+    },
+    "gps_seuil_min": {
+      "type": "number",
+      "default": 5,
+      "description": "D\u00e9lai (en minutes) en-dessous duquel le GPS est consid\u00e9r\u00e9 comme r\u00e9cent (badge vert). Source unique frontend+backend."
+    },
+    "gps_dispatch_seuil_min": {
+      "type": "number",
+      "default": 10,
+      "description": "D\u00e9lai (en minutes) en-dessous duquel le GPS est \u00e9ligible au dispatch prioritaire (niveau 1). Au-del\u00e0, le livreur reste \u00e9ligible mais sans priorit\u00e9 GPS."
+    },
+    "gps_expire_seuil_min": {
+      "type": "number",
+      "default": 30,
+      "description": "D\u00e9lai maximum (en minutes) avant qu'un GPS livreur soit consid\u00e9r\u00e9 comme expir\u00e9 c\u00f4t\u00e9 backend. Un livreur avec GPS > cette valeur est exclu du dispatch (sauf prioritaires). D\u00e9faut 30 min."
+    },
+    "gps_max_stale_min": {
+      "type": "number",
+      "default": 120,
+      "description": "D\u00e9lai maximum (en minutes) avant exclusion d\u00e9finitive du dispatch pour GPS trop ancien. Au-del\u00e0, m\u00eame les livreurs non-prioritaires avec GPS sont exclus. D\u00e9faut 120 min (2h)."
+    },
+    "gps_client_seuil_min": {
+      "type": "number",
+      "default": 30,
+      "description": "D\u00e9lai (en minutes) en-dessous duquel le GPS client est consid\u00e9r\u00e9 comme valide pour l'affichage sur la carte. Au-del\u00e0, le client appara\u00eet comme 'noir' (GPS expir\u00e9). D\u00e9faut 30 min."
+    },
+    "heartbeat_seuil_min": {
+      "type": "number",
+      "default": 2,
+      "description": "D\u00e9lai (en minutes) en-dessous duquel l'app est consid\u00e9r\u00e9e comme active (badge vert). D\u00e9termine aussi le niveau 1 de dispatch (prioritaire) et le canal de notification (SILGAPP vs WhatsApp)."
+    },
+    "heartbeat_on_seuil_min": {
+      "type": "number",
+      "default": 10,
+      "description": "D\u00e9lai (en minutes) en-dessous duquel un livreur est consid\u00e9r\u00e9 comme 'ON' (connect\u00e9). D\u00e9termine aussi le niveau 2 de dispatch (secours)."
     },
     "ville_principale": {
       "type": "string",

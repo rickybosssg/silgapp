@@ -91,6 +91,8 @@ Deno.serve(async (req) => {
           // Stocker le message de relance
           await base44.asServiceRole.entities.Message.create({
             conversation_id: conv.id,
+            participant_user_ids: conv.participant_user_ids || [],
+            security_status: (conv.participant_user_ids && conv.participant_user_ids.length > 0) ? 'secured' : 'pending',
             sender_type: 'admin',
             sender_id: 'venus',
             sender_name: 'VENUS',

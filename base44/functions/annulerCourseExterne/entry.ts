@@ -150,6 +150,7 @@ Deno.serve(async (req) => {
         livreur_vehicule: null,
         livreur_note_moyenne: 0,
         livreur_nombre_avis: 0,
+        livreur_user_email: null, // ⚠️ Retrait livreur → null pour RLS future
         dispatch_notified_ids: "[]",
         dispatch_refused_ids: JSON.stringify(refusedIds), // ⚠️ livreur annulant EXCLU définitivement
         heure_acceptation: null,
@@ -292,6 +293,7 @@ Deno.serve(async (req) => {
         livreur_vehicule: "",
         livreur_note_moyenne: 0,
         livreur_nombre_avis: 0,
+        livreur_user_email: null, // ⚠️ Retrait livreur → null pour RLS future
         notes: (course.notes || "") + ` | [ANNULÉ ${sourceLabel}] ${motif || ""}`,
       };
 

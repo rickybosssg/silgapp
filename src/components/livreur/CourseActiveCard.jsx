@@ -17,19 +17,19 @@ import AnnulationExplicationChat from "./AnnulationExplicationChat";
 import { getPrixAffichable, getDeviseAffichable } from "@/utils/getPrixAffichable";
 
 import { getCountryConfig } from "@/lib/phoneUtils";
+import { haversineKm as haversine } from "@/lib/priceEstimate";
 
 function isInternalDispatchNote(value) {
   return /^Accept(?:e|ee|é|ée)e? par \S+ (?:a|à) \d{4}-\d{2}-\d{2}T/i.test(String(value || "").trim());
 }
 
-// Haversine
-function haversine(lat1, lon1, lat2, lon2) {
-  if (!lat1 || !lon1 || !lat2 || !lon2) return null;
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+async function invokeCourseBackend(functionName, payload) {
+  const response = await base44.functions.invoke(functionName, payload);
+  const data = response?.data ?? response;
+  if (data?.success === false || data?.error) {
+    throw new Error(data?.error || `Erreur ${functionName}`);
+  }
+  return data;
 }
 
 // Badge ETA affiché en haut de la carte, calculé depuis la position GPS réelle du livreur
@@ -209,13 +209,10 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
     if (!course.prix_propose_admin) return;
 
     const autoSetPrice = async () => {
-      const split = getRequiredSplit(Number(course.prix_propose_admin));
-      if (!split) return;
       try {
-        await base44.entities.CourseExterne.update(course.id, {
-          prix_final: Number(course.prix_propose_admin),
-          commission_silga: split.commission_silga,
-          montant_livreur: split.montant_livreur,
+        await invokeCourseBackend("finaliserLivraisonLivreur", {
+          course_id: course.id,
+          prix_final_livreur: Number(course.prix_propose_admin),
         });
         queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
       } catch (err) {
@@ -291,14 +288,8 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
         commission_pct: split.commission_pct,
         heure_livraison: new Date().toISOString(),
       };
-      // On sauvegarde le prix mais on garde statut="arrivee" — le livreur reste en_course
-      base44.entities.CourseExterne.update(course.id, {
-        prix_final: montant,
-        commission_silga: split.commission_silga,
-        montant_livreur: split.montant_livreur,
-        heure_livraison: mergedData.heure_livraison,
-      }).catch(() => null);
-      queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+      // Le montant reste local jusqu'au bouton final afin d'éviter toute écriture
+      // sensible avant la confirmation explicite du livreur.
       setDeplacementRecap(mergedData);
       setShowPrixModal(false);
       setPrixReel("");
@@ -411,10 +402,10 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
     }
     const now = new Date().toISOString();
     updateOptimisticStatut("client_contacte", { heure_contact_client: now });
-    await base44.entities.CourseExterne.update(course.id, {
-      statut: "client_contacte",
-      heure_contact_client: now,
-    }).catch(() => null);
+    await invokeCourseBackend("transitionStatutLivreur", {
+      course_id: course.id,
+      statut_cible: "client_contacte",
+    });
     queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
     toast.success("Client contacté. Vous pouvez maintenant démarrer votre trajet.");
   };
@@ -425,9 +416,10 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
       return;
     }
     updateOptimisticStatut("en_route_expediteur", {});
-    await base44.entities.CourseExterne.update(course.id, {
-      statut: "en_route_expediteur",
-    }).catch(() => null);
+    await invokeCourseBackend("transitionStatutLivreur", {
+      course_id: course.id,
+      statut_cible: "en_route_expediteur",
+    });
     queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
     toast.success("Bon trajet ! En route vers l'expéditeur.");
   };
@@ -489,6 +481,11 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
     });
 
     try {
+      await invokeCourseBackend("transitionStatutLivreur", {
+        course_id: course.id,
+        statut_cible: "colis_recupere",
+      });
+
       const colis = await base44.entities.ColisExterne.filter({ course_id: course.id }, "numero_ordre", 50);
       await Promise.all((colis || [])
         .filter((item) => !["livre", "annule"].includes(item.statut))
@@ -496,13 +493,6 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
           statut: "recupere",
           heure_recuperation: now,
         })));
-
-      await base44.entities.CourseExterne.update(course.id, {
-        statut: "colis_recupere",
-        heure_recuperation: now,
-        pickup_confirmed_by: "livreur",
-        pickup_confirmed_at: now,
-      });
 
       queryClient.invalidateQueries({ queryKey: ["colis-externes", course.id] });
       queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
@@ -866,9 +856,9 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
               // Étape 1 : Client contacté (avec timestamp) — fire-and-forget pour ne pas
               // être interrompu par l'ouverture du dialer/WhatsApp
               updateOptimisticStatut("client_contacte", { heure_contact_client: now });
-              base44.entities.CourseExterne.update(course.id, {
-                statut: "client_contacte",
-                heure_contact_client: now,
+              invokeCourseBackend("transitionStatutLivreur", {
+                course_id: course.id,
+                statut_cible: "client_contacte",
               }).catch(() => null);
               queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
               toast.success("Client contacté. N'oubliez pas de démarrer votre trajet.");
@@ -1131,7 +1121,12 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                     longitude_prise_en_charge: pos.coords.longitude,
                   };
                   updateOptimisticStatut("pris_en_charge", data);
-                  await base44.entities.CourseExterne.update(course.id, data).catch(() => null);
+                  await invokeCourseBackend("transitionStatutLivreur", {
+                    course_id: course.id,
+                    statut_cible: "pris_en_charge",
+                    latitude: pos.coords.latitude,
+                    longitude: pos.coords.longitude,
+                  }).catch(() => null);
                   queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
                   toast.success("Passager pris en charge ! ");
                 },
@@ -1140,7 +1135,10 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                   const now = new Date().toISOString();
                   const data = { statut: "pris_en_charge", heure_prise_en_charge: now };
                   updateOptimisticStatut("pris_en_charge", data);
-                  base44.entities.CourseExterne.update(course.id, data).catch(() => null);
+                  invokeCourseBackend("transitionStatutLivreur", {
+                    course_id: course.id,
+                    statut_cible: "pris_en_charge",
+                  }).catch(() => null);
                   queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
                   toast.success("Passager pris en charge ! ");
                 },
@@ -1159,7 +1157,12 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                     longitude_arrivee_dest: pos.coords.longitude,
                   };
                   updateOptimisticStatut("arrivee", data);
-                  await base44.entities.CourseExterne.update(course.id, data).catch(() => null);
+                  await invokeCourseBackend("transitionStatutLivreur", {
+                    course_id: course.id,
+                    statut_cible: "arrivee",
+                    latitude: pos.coords.latitude,
+                    longitude: pos.coords.longitude,
+                  }).catch(() => null);
                   queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
                   // Ouvrir automatiquement la modale de prix
                   setShowPrixModal(true);
@@ -1169,7 +1172,10 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                   const now = new Date().toISOString();
                   const data = { statut: "arrivee", heure_arrivee: now };
                   updateOptimisticStatut("arrivee", data);
-                  base44.entities.CourseExterne.update(course.id, data).catch(() => null);
+                  invokeCourseBackend("transitionStatutLivreur", {
+                    course_id: course.id,
+                    statut_cible: "arrivee",
+                  }).catch(() => null);
                   queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
                   setShowPrixModal(true);
                 },
@@ -1478,13 +1484,10 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                     statut: "livree",
                   };
                   updateOptimisticStatut("livree", finalData);
-                  await base44.entities.CourseExterne.update(course.id, {
-                    statut: "livree",
-                    prix_final: deplacementRecap.prix_final,
-                    commission_silga: deplacementRecap.commission_silga,
-                    montant_livreur: deplacementRecap.montant_livreur,
-                    heure_livraison: deplacementRecap.heure_livraison,
-                  }).catch(() => null);
+                  await invokeCourseBackend("finaliserLivraisonLivreur", {
+                    course_id: course.id,
+                    prix_final_livreur: deplacementRecap.prix_final,
+                  });
                   queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
                   // Appeler onColisLivre pour libérer le livreur UNIQUEMENT maintenant
                   onColisLivre(finalData, deplacementRecap.prix_final);

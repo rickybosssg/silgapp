@@ -88,6 +88,10 @@ const courseActiveCardSource = readFileSync(
   new URL("../src/components/livreur/CourseActiveCard.jsx", import.meta.url),
   "utf8",
 );
+const finaliserLivraisonSource = readFileSync(
+  new URL("../base44/functions/finaliserLivraisonLivreur/entry.ts", import.meta.url),
+  "utf8",
+);
 const mainActivitySource = readFileSync(
   new URL("../android/app/src/main/java/com/silgapp2/app/MainActivity.java", import.meta.url),
   "utf8",
@@ -104,6 +108,9 @@ assert.doesNotMatch(dispatchV2Source, /dispatch_status:[^\n]+livreur_id:\s*''/, 
 assert.match(dispatchV2Source, /STATUTS_TERMINAUX_COURSE\.includes\(course\.statut\)/, "V2 doit refuser une course terminee ou annulee");
 assert.doesNotMatch(dispatchV2Source, /notes:\s*`Accept/, "V2 ne doit pas exposer son journal technique dans les notes utilisateur");
 assert.match(courseActiveCardSource, /!isInternalDispatchNote\(course\.notes\)/, "les anciennes notes techniques doivent rester masquees");
+assert.doesNotMatch(courseActiveCardSource, /CourseExterne\.(?:create|update|delete)\(/, "le workflow Livreur ne doit jamais ecrire directement dans CourseExterne");
+assert.match(finaliserLivraisonSource, /course\.statut === 'livree' && \(!isAdminCourse \|\| hasFinancialData\)/, "une course livree avec sa repartition doit rester idempotente");
+assert.match(finaliserLivraisonSource, /const hasFinancialData[\s\S]*commission_silga[\s\S]*montant_livreur/, "la reprise financiere Admin doit verifier les deux montants calcules");
 assert.match(dispatchWatchdogSource, /deadlineMs === 0 && course\.dispatch_status === 'disponible_push'/, "le watchdog ne doit pas retirer prematurement une course V2");
 assert.match(nativePushSource, /DISPATCH_V2_ALERT_DURATION_MS\s*=\s*10000L/, "l'alerte native V2 doit durer dix secondes");
 assert.match(nativePushSource, /playNotificationSound\(context, false\)/, "la sonnerie native V2 ne doit pas boucler");

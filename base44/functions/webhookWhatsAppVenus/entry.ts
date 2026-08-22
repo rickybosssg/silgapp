@@ -18,6 +18,7 @@ import {
   repondreWorkflow,
 } from '../../shared/venusWorkflowEngine.ts';
 import { getMaintenanceMode } from '../../shared/venusSupervisionEngine.ts';
+import { resolveParticipantUserIds } from '../../shared/conversationSecurity.ts';
 import {
   peutAgirSurAudio,
   genererMessageRepetitionAudio,
@@ -167,7 +168,25 @@ Deno.serve(async (req) => {
     const telephone = from.replace('whatsapp:', '');
     const detectedCountry = detecterPaysDepuisTelephone(telephone);
     const paysInconnu = !detectedCountry;
-    const countryCode = detectedCountry || 'BF';
+    // ⚠️ Phase A — Plus de fallback "BF". Si le pays ne peut être détecté depuis
+    // le téléphone, on demande à l'utilisateur de préciser son pays.
+    const countryCode = detectedCountry;
+    if (!countryCode) {
+      // Tenter de résoudre depuis le backend (premier pays actif)
+      try {
+        const countries = await base44.asServiceRole.entities.Country.filter({ actif: true }, "ordre", 1);
+        if (countries?.[0]?.code) {
+          return Response.json({
+            reponse: "Bonjour ! Je n'ai pas pu déterminer votre pays depuis votre numéro de téléphone. Pourriez-vous m'indiquer votre pays (ex: Burkina Faso, Côte d'Ivoire, Togo) ?",
+            country_required: true,
+          });
+        }
+      } catch (_) {}
+      return Response.json({
+        reponse: "Bonjour ! Je n'ai pas pu déterminer votre pays. Pourriez-vous m'indiquer votre pays (ex: Burkina Faso, Côte d'Ivoire, Togo) ?",
+        country_required: true,
+      });
+    }
     const countryConfig = await chargerConfigPays(base44, countryCode);
     const tarifs = {
       nom: countryConfig.nom,
@@ -269,12 +288,17 @@ Deno.serve(async (req) => {
       }
       venusLog(`[WebhookVenus] ✅ ÉTAPE 2 — Conversation existante trouvée: ${conversation.id} | venus_active: ${conversation.venus_active} | from_number: ${fromNumber}`);
     } else {
-      const participants = JSON.stringify([
+      const participantsArray = [
         { type: 'client', id: normalizedTel, name: profileName || telephone },
         { type: 'admin', id: 'all', name: 'Admin SILGAPP' },
-      ]);
+      ];
+      const participants = JSON.stringify(participantsArray);
+      // ── Sécurité : résoudre participant_user_ids côté backend ──
+      const { userIds: convUserIds } = await resolveParticipantUserIds(base44, participantsArray);
       conversation = await base44.asServiceRole.entities.Conversation.create({
         participants,
+        participant_user_ids: convUserIds,
+        security_status: convUserIds.length > 0 ? 'secured' : 'pending',
         title: profileName || telephone,
         whatsapp_phone: normalizedTel,
         silgapp_from_number: fromNumber,
@@ -349,6 +373,8 @@ Deno.serve(async (req) => {
 
     await base44.asServiceRole.entities.Message.create({
       conversation_id: conversation.id,
+      participant_user_ids: conversation.participant_user_ids || [],
+      security_status: (conversation.participant_user_ids && conversation.participant_user_ids.length > 0) ? 'secured' : 'pending',
       sender_type: 'client',
       sender_id: normalizedTel,
       sender_name: profileName || telephone,
@@ -1019,6 +1045,8 @@ Deno.serve(async (req) => {
     // ── 5. Créer le Message de réponse Venus ──
     await base44.asServiceRole.entities.Message.create({
       conversation_id: conversation.id,
+      participant_user_ids: conversation.participant_user_ids || [],
+      security_status: (conversation.participant_user_ids && conversation.participant_user_ids.length > 0) ? 'secured' : 'pending',
       sender_type: 'admin',
       sender_id: 'venus',
       sender_name: 'VENUS',

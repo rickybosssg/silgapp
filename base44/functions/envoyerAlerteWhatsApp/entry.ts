@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { resolveDialCode } from '../../shared/countryResolver.ts';
 
 /**
  * Envoi d'alerte WhatsApp via Twilio.
@@ -54,22 +55,13 @@ function getMessageWhatsApp(type, destinataire) {
   return ` *SILGAPP – Notification*\nOuvrez l'application pour consulter les détails de votre livraison.`;
 }
 
-const INDICATIFS_PAYS = {
-  BF: '+226',
-  CI: '+225',
-  TG: '+228',
-  BJ: '+229',
-  SN: '+221',
-  ML: '+223',
-  GN: '+224',
-  NE: '+227',
-};
-
-function normaliserTelephone(tel, countryCode = 'BF') {
+async function normaliserTelephone(base44, tel, countryCode) {
   if (!tel) return null;
   let t = tel.replace(/\s+/g, '').replace(/[^\d+]/g, '');
   if (t.startsWith('+')) return t;
-  const indicatif = INDICATIFS_PAYS[normalizeCountryCode(countryCode)] || '+226';
+  if (!countryCode) return null;
+  const indicatif = await resolveDialCode(base44, countryCode);
+  if (!indicatif) return null;
   const indicatifSansPlus = indicatif.replace('+', '');
   if (t.startsWith(indicatifSansPlus)) return '+' + t;
   if (t.startsWith('0') && t.length <= 9) return indicatif + t.slice(1);
@@ -253,7 +245,7 @@ Deno.serve(async (req) => {
       // CAS 2: Heartbeat >= 2 min → WhatsApp
       console.log(`[STRATÉGIE] ⏳ Heartbeat ancien (${heartbeatAgeMin?.toFixed(1) || 'N/A'} min) → Tentative WhatsApp`);
 
-      const telephone = normaliserTelephone(livreur.telephone, livreur.country_code);
+      const telephone = await normaliserTelephone(base44, livreur.telephone, livreur.country_code);
       if (!telephone) {
         console.log(`[WhatsApp] Course ${courseId} Livreur ${livreur.id}: téléphone invalide "${livreur.telephone}" → SKIP\n`);
         return Response.json({ skipped: true, reason: 'telephone_invalide' });
@@ -425,8 +417,9 @@ Deno.serve(async (req) => {
       console.log(`[STRATÉGIE CLIENT] ⏳ Heartbeat ancien (${heartbeatAgeMinClient?.toFixed(1) || 'N/A'} min) → Tentative WhatsApp`);
 
       // Vérifier si WhatsApp déjà envoyé pour cette course
+      const clientTel = await normaliserTelephone(base44, client.telephone, client.country_code);
       const alertesCourse = await base44.asServiceRole.entities.WhatsAppAlerte.filter({
-        livreur_telephone: normaliserTelephone(client.telephone, client.country_code),
+        livreur_telephone: clientTel,
         notification_id: notification.id || '',
         statut: 'sent'
       });
@@ -438,7 +431,7 @@ Deno.serve(async (req) => {
 
       // Anti-doublon global
       const [alertesExistantes, notifsNonLues] = await Promise.all([
-        base44.asServiceRole.entities.WhatsAppAlerte.filter({ livreur_telephone: normaliserTelephone(client.telephone, client.country_code), statut: 'sent' }),
+        base44.asServiceRole.entities.WhatsAppAlerte.filter({ livreur_telephone: clientTel, statut: 'sent' }),
         base44.asServiceRole.entities.Notification.filter({ destinataire_email: destinataireEmail, lue: false })
       ]);
 
@@ -447,7 +440,7 @@ Deno.serve(async (req) => {
         return Response.json({ skipped: true, reason: 'alerte_deja_envoyee_client' });
       }
 
-      const telephone = normaliserTelephone(client.telephone, client.country_code);
+      const telephone = clientTel;
       if (!telephone) {
         console.log(`[WhatsApp] Course ${courseId} Client ${client.id}: téléphone invalide "${client.telephone}" → SKIP\n`);
         return Response.json({ skipped: true, reason: 'telephone_invalide_client' });

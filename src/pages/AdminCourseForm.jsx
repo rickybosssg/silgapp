@@ -14,6 +14,30 @@ import SmartAddressPicker from "@/components/crm/SmartAddressPicker";
 import { upsertCourseAddresses } from "@/lib/addressBook";
 import { upsertClientsFromCourseContacts, normalizePhone } from "@/lib/crmUtils";
 import { calculerPrixApproximatif } from "@/lib/priceEstimate";
+import { isPaysTarificationGrandOuaga, calculerTarifGrandOuagaAsync } from "@/lib/tarifGrandOuaga";
+import { resolveGpsForCourse, GPS_BLOCK_MESSAGE } from "@/lib/gpsResolution";
+
+const DRAFT_KEY = "silgapp_admin_course_draft";
+
+// ── Helper: formate un nombre sans crasher si null/undefined ──
+const safeFmt = (val) => (val != null && !isNaN(Number(val)) ? Number(val).toLocaleString("fr-FR") : "—");
+
+function saveDraft(state) {
+  try {
+    sessionStorage.setItem(DRAFT_KEY, JSON.stringify(state));
+  } catch (_) {}
+}
+
+function loadDraft() {
+  try {
+    const raw = sessionStorage.getItem(DRAFT_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (_) { return null; }
+}
+
+function clearDraft() {
+  try { sessionStorage.removeItem(DRAFT_KEY); } catch (_) {}
+}
 
 function generarQRData() {
   const pickupQrToken = crypto.randomUUID().replace(/-/g, "");
@@ -21,29 +45,6 @@ function generarQRData() {
   const pickupCode4 = String(Math.floor(1000 + Math.random() * 9000));
   const deliveryCode4 = String(Math.floor(1000 + Math.random() * 9000));
   return { pickupQrToken, deliveryQrToken, pickupCode4, deliveryCode4 };
-}
-
-const COUNTRY_DIAL_CODE = {
-  BF: "226", CI: "225", TG: "228", BJ: "229", SN: "221",
-  ML: "223", GN: "224", NE: "227", GH: "233",
-};
-
-function cleanPhone(phone, countryCode) {
-  let digits = (phone || "").replace(/\D/g, "");
-  if (!digits) return "";
-
-  const dial = COUNTRY_DIAL_CODE[countryCode] || "226";
-
-  // Déjà au format international (commence par l'indicatif)
-  if (digits.startsWith(dial) && digits.length >= dial.length + 6) return digits;
-
-  // Format local avec 0 initial → retirer le 0
-  if (digits.startsWith("0")) digits = digits.slice(1);
-
-  // Ajouter l'indicatif pays si le numéro est court (format local)
-  if (digits.length <= 9) return dial + digits;
-
-  return digits;
 }
 
 const PAYS = [
@@ -66,7 +67,7 @@ const TYPE_OPTIONS = [
 
 // ── Main form component ──
 export default function AdminCourseForm() {
-  const { countryCode: adminCountryCode } = useAdminContext();
+  const { selectedCountry: adminCountryCode } = useAdminContext();
   const { addWindow } = useAdminCourseWindows();
 
   const [submitting, setSubmitting] = useState(false);
@@ -74,7 +75,7 @@ export default function AdminCourseForm() {
   const [typeCourse, setTypeCourse] = useState("expedier");
   const [adresseDepart, setAdresseDepart] = useState("");
   const [adresseArrivee, setAdresseArrivee] = useState("");
-  const [countryCode, setCountryCode] = useState(adminCountryCode || "BF");
+  const [countryCode, setCountryCode] = useState(adminCountryCode || "");
 
   const [clientNom, setClientNom] = useState("");
   const [clientTelephone, setClientTelephone] = useState("");
@@ -88,32 +89,159 @@ export default function AdminCourseForm() {
   const [quartierArrivee, setQuartierArrivee] = useState("");
   const [gpsDepart, setGpsDepart] = useState(null);
   const [gpsArrivee, setGpsArrivee] = useState(null);
+  const [gpsDepartSource, setGpsDepartSource] = useState(null); // "exact" | "quartier" | "geocodage"
+  const [gpsArriveeSource, setGpsArriveeSource] = useState(null);
+  const [quartiers, setQuartiers] = useState([]);
   const [mapModal, setMapModal] = useState(null); // null | 'depart' | 'arrivee'
   const [detectedClient, setDetectedClient] = useState(null);
   const [quickMode, setQuickMode] = useState(false);
   const [prixApproximatif, setPrixApproximatif] = useState(null);
   const [prixProposeAdmin, setPrixProposeAdmin] = useState("");
   const prixProposeManuelModifie = useRef(false);
+  const derniereCleCoordsAdmin = useRef("");
+  const [recalculerDisponibleAdmin, setRecalculerDisponibleAdmin] = useState(false);
+  const skipNextSave = useRef(true);
+
+  // ── Persistance du brouillon : restauration après remount/rechargement ──
+  useEffect(() => {
+    const draft = loadDraft();
+    if (draft) {
+      if (draft.typeCourse) setTypeCourse(draft.typeCourse);
+      if (draft.adresseDepart) setAdresseDepart(draft.adresseDepart);
+      if (draft.adresseArrivee) setAdresseArrivee(draft.adresseArrivee);
+      if (draft.countryCode) setCountryCode(draft.countryCode);
+      if (draft.clientNom) setClientNom(draft.clientNom);
+      if (draft.clientTelephone) setClientTelephone(draft.clientTelephone);
+      if (draft.expediteurNom) setExpediteurNom(draft.expediteurNom);
+      if (draft.expediteurTelephone) setExpediteurTelephone(draft.expediteurTelephone);
+      if (draft.destinataireNom) setDestinataireNom(draft.destinataireNom);
+      if (draft.destinataireTelephone) setDestinataireTelephone(draft.destinataireTelephone);
+      if (draft.typeColis) setTypeColis(draft.typeColis);
+      if (draft.notes) setNotes(draft.notes);
+      if (draft.quartierDepart) setQuartierDepart(draft.quartierDepart);
+      if (draft.quartierArrivee) setQuartierArrivee(draft.quartierArrivee);
+      if (draft.gpsDepart) setGpsDepart(draft.gpsDepart);
+      if (draft.gpsArrivee) setGpsArrivee(draft.gpsArrivee);
+      if (draft.gpsDepartSource) setGpsDepartSource(draft.gpsDepartSource);
+      if (draft.gpsArriveeSource) setGpsArriveeSource(draft.gpsArriveeSource);
+      if (draft.prixProposeAdmin) setPrixProposeAdmin(draft.prixProposeAdmin);
+    }
+  }, []);
+
+  // ── Sauvegarde automatique du brouillon (après restauration) ──
+  useEffect(() => {
+    if (skipNextSave.current) {
+      skipNextSave.current = false;
+      return;
+    }
+    saveDraft({
+      typeCourse, adresseDepart, adresseArrivee, countryCode,
+      clientNom, clientTelephone, expediteurNom, expediteurTelephone,
+      destinataireNom, destinataireTelephone, typeColis, notes,
+      quartierDepart, quartierArrivee, gpsDepart, gpsArrivee,
+      gpsDepartSource, gpsArriveeSource, prixProposeAdmin,
+    });
+  }, [typeCourse, adresseDepart, adresseArrivee, countryCode,
+      clientNom, clientTelephone, expediteurNom, expediteurTelephone,
+      destinataireNom, destinataireTelephone, typeColis, notes,
+      quartierDepart, quartierArrivee, gpsDepart, gpsArrivee,
+      gpsDepartSource, gpsArriveeSource, prixProposeAdmin]);
+
+  // ── Synchroniser countryCode avec adminCountryCode dès que le contexte admin est chargé ──
+  // Ne remplace pas un pays déjà explicitement choisi par l'admin.
+  useEffect(() => {
+    if (adminCountryCode && !countryCode) {
+      setCountryCode(adminCountryCode);
+    }
+  }, [adminCountryCode]);
+
+  // ── Charger les quartiers du pays pour la résolution GPS de fallback ──
+  useEffect(() => {
+    if (!countryCode) { setQuartiers([]); return; }
+    let cancelled = false;
+    base44.entities.Quartier
+      .filter({ country_code: countryCode, actif: true }, "nom", 500)
+      .then((data) => { if (!cancelled) setQuartiers(data || []); })
+      .catch(() => { if (!cancelled) setQuartiers([]); });
+    return () => { cancelled = true; };
+  }, [countryCode]);
 
   const selectedPays = PAYS.find(p => p.code === countryCode);
 
   // ── Calcul automatique du prix approximatif dès que le GPS est connu ──
+  // Tarification Grand Ouaga : utilise ORS (distance routière) pour le BF,
+  // fallback Haversine pour les autres pays.
   useEffect(() => {
-    if (gpsDepart?.lat && gpsDepart?.lng && gpsArrivee?.lat && gpsArrivee?.lng && countryCode) {
-      const result = calculerPrixApproximatif(
-        gpsDepart.lat, gpsDepart.lng,
-        gpsArrivee.lat, gpsArrivee.lng,
-        countryCode
-      );
-      setPrixApproximatif(result);
-      if (!prixProposeManuelModifie.current) {
-        setPrixProposeAdmin(result ? String(result.prix) : "");
-      }
-    } else {
+    if (!gpsDepart?.lat || !gpsDepart?.lng || !gpsArrivee?.lat || !gpsArrivee?.lng || !countryCode) {
       setPrixApproximatif(null);
       if (!prixProposeManuelModifie.current) setPrixProposeAdmin("");
+      return;
     }
-  }, [gpsDepart, gpsArrivee, countryCode]);
+
+    // Si les coordonnées ont changé après une modif manuelle → proposer recalcul
+    const cleCoords = `${gpsDepart.lat},${gpsDepart.lng},${gpsArrivee.lat},${gpsArrivee.lng}`;
+    if (prixProposeManuelModifie.current && derniereCleCoordsAdmin.current && derniereCleCoordsAdmin.current !== cleCoords) {
+      setRecalculerDisponibleAdmin(true);
+      return;
+    }
+
+    let cancelled = false;
+
+    const compute = async () => {
+      let result = null;
+
+      if (isPaysTarificationGrandOuaga(countryCode)) {
+        result = await calculerTarifGrandOuagaAsync(
+          gpsDepart.lat, gpsDepart.lng,
+          gpsArrivee.lat, gpsArrivee.lng,
+          countryCode,
+          gpsDepartSource,
+          gpsArriveeSource
+        );
+      } else {
+        result = calculerPrixApproximatif(
+          gpsDepart.lat, gpsDepart.lng,
+          gpsArrivee.lat, gpsArrivee.lng,
+          countryCode
+        );
+      }
+
+      if (cancelled) return;
+
+      setPrixApproximatif(result);
+      derniereCleCoordsAdmin.current = cleCoords;
+      if (!prixProposeManuelModifie.current) {
+        setPrixProposeAdmin(result?.prix ? String(result.prix) : "");
+      }
+    };
+
+    compute();
+    return () => { cancelled = true; };
+  }, [gpsDepart, gpsArrivee, countryCode, gpsDepartSource, gpsArriveeSource]);
+
+  // ── Recalculer le tarif après modif manuelle + changement de coordonnées ──
+  const handleRecalculerTarifAdmin = async () => {
+    if (!gpsDepart?.lat || !gpsArrivee?.lat || !countryCode) return;
+    let result = null;
+    if (isPaysTarificationGrandOuaga(countryCode)) {
+      result = await calculerTarifGrandOuagaAsync(
+        gpsDepart.lat, gpsDepart.lng,
+        gpsArrivee.lat, gpsArrivee.lng,
+        countryCode, gpsDepartSource, gpsArriveeSource
+      );
+    } else {
+      result = calculerPrixApproximatif(
+        gpsDepart.lat, gpsDepart.lng,
+        gpsArrivee.lat, gpsArrivee.lng, countryCode
+      );
+    }
+    if (result?.prix) {
+      prixProposeManuelModifie.current = false;
+      setRecalculerDisponibleAdmin(false);
+      setPrixApproximatif(result);
+      setPrixProposeAdmin(String(result.prix));
+    }
+  };
 
   const fillFromTemplate = (template) => {
     setTypeCourse(template.type_course);
@@ -129,6 +257,8 @@ export default function AdminCourseForm() {
     setQuartierArrivee("");
     setGpsDepart(null);
     setGpsArrivee(null);
+    setGpsDepartSource(null);
+    setGpsArriveeSource(null);
     setClientNom("");
     setClientTelephone("");
     setExpediteurNom("");
@@ -143,6 +273,14 @@ export default function AdminCourseForm() {
   };
 
   const handleSubmit = async () => {
+    if (!countryCode) {
+      toast.error("Le pays est obligatoire. Sélectionnez un pays avant de créer la course (COUNTRY_REQUIRED).");
+      return;
+    }
+    if (!clientTelephone.trim()) {
+      toast.error("Le numéro du client est obligatoire");
+      return;
+    }
     setSubmitting(true);
     try {
       const { pickupQrToken, deliveryQrToken, pickupCode4, deliveryCode4 } = generarQRData();
@@ -184,6 +322,54 @@ export default function AdminCourseForm() {
       // Fallback : si le client n'a pas de téléphone, utiliser l'expéditeur ou le destinataire
       const contactCreateurCourse = clientTel || finalExpediteurTel || finalDestinataireTel || "";
 
+      // ── Résolution GPS : exact → quartier → blocage ──
+      const departGps = resolveGpsForCourse({
+        exactLat: gpsDepart?.lat,
+        exactLng: gpsDepart?.lng,
+        quartierName: quartierDepart,
+        quartiers,
+      });
+      const arriveeGps = resolveGpsForCourse({
+        exactLat: gpsArrivee?.lat,
+        exactLng: gpsArrivee?.lng,
+        quartierName: quartierArrivee,
+        quartiers,
+      });
+
+      // ── Gestion des ambiguïtés : ne jamais choisir silencieusement ──
+      if (departGps?.ambiguous) {
+        const names = departGps.suggestions.map(s => s.nom).join(", ");
+        toast.error(`Point de départ ambigu : plusieurs quartiers correspondent (${names}). Sélectionnez-en un dans la liste.`);
+        setSubmitting(false);
+        return;
+      }
+      if (arriveeGps?.ambiguous) {
+        const names = arriveeGps.suggestions.map(s => s.nom).join(", ");
+        toast.error(`Point d'arrivée ambigu : plusieurs quartiers correspondent (${names}). Sélectionnez-en un dans la liste.`);
+        setSubmitting(false);
+        return;
+      }
+      if (!departGps || !departGps.lat) {
+        toast.error(`Point de départ : ${GPS_BLOCK_MESSAGE}`);
+        setSubmitting(false);
+        return;
+      }
+      if (!arriveeGps || !arriveeGps.lat) {
+        toast.error(`Point d'arrivée : ${GPS_BLOCK_MESSAGE}`);
+        setSubmitting(false);
+        return;
+      }
+
+      // ── Garde-fou >25 km : aucune course admin ne doit partir avec prix nul ──
+      if (isPaysTarificationGrandOuaga(countryCode) && prixApproximatif?.prix === null) {
+        const prixAdminSaisi = prixProposeAdmin ? Number(prixProposeAdmin) : 0;
+        if (prixAdminSaisi <= 0) {
+          toast.error("Distance supérieure à 25 km — vous devez saisir un prix personnalisé avant de créer la course.");
+          setSubmitting(false);
+          return;
+        }
+      }
+
       const courseData = {
         country_code: countryCode,
         source: "admin",
@@ -192,10 +378,12 @@ export default function AdminCourseForm() {
         adresse_arrivee: adresseArrivee.trim() || "—",
         quartier_depart: quartierDepart || null,
         quartier_arrivee: quartierArrivee || null,
-        gps_depart_lat: gpsDepart?.lat || null,
-        gps_depart_lng: gpsDepart?.lng || null,
-        gps_arrivee_lat: gpsArrivee?.lat || null,
-        gps_arrivee_lng: gpsArrivee?.lng || null,
+        gps_depart_lat: departGps?.lat || null,
+        gps_depart_lng: departGps?.lng || null,
+        gps_depart_source: departGps?.source || null,
+        gps_arrivee_lat: arriveeGps?.lat || null,
+        gps_arrivee_lng: arriveeGps?.lng || null,
+        gps_arrivee_source: arriveeGps?.source || null,
         client_nom: clientNom.trim() || "Client",
         client_telephone: clientTel,
         contact_createur_course: contactCreateurCourse,
@@ -210,6 +398,8 @@ export default function AdminCourseForm() {
         pricing_mode: "admin_manuel",
         prix_estimate: prixApproximatif?.prix || 0,
         prix_propose_admin: prixProposeAdmin ? Number(prixProposeAdmin) : (prixApproximatif?.prix || 0),
+        distance_tarifaire_km: prixApproximatif?.distanceKm || null,
+        distance_tarifaire_source: prixApproximatif?.distanceSource || null,
         tracking_token: trackingToken,
         tracking_link: trackingLink,
         pickup_qr_token: pickupQrToken,
@@ -224,7 +414,22 @@ export default function AdminCourseForm() {
         destinataire_phone_normalized: finalDestinataireTel ? normalizePhone(finalDestinataireTel, countryCode) : null,
       };
 
-      const course = await base44.entities.CourseExterne.create(courseData);
+      let result;
+      try {
+        result = await base44.functions.invoke('creerCourseAdmin', courseData);
+      } catch (invokeErr) {
+        console.error("[CREER_COURSE_ADMIN] Invoke threw:", invokeErr);
+        const errMsg = invokeErr?.message || invokeErr?.error || invokeErr?.data?.error || (typeof invokeErr === 'string' ? invokeErr : 'Erreur réseau');
+        throw new Error(errMsg);
+      }
+      // Le SDK peut envelopper la réponse dans une propriété data
+      if (result?.data && (result.data.success !== undefined || result.data.error !== undefined)) {
+        result = result.data;
+      }
+      if (!result?.success || result?.error) {
+        throw new Error(result?.error || 'Erreur inconnue');
+      }
+      const course = result.course;
 
       // CRM - Créer ou mettre à jour les fiches pour les 3 contacts (sans stats)
       try {
@@ -246,8 +451,11 @@ export default function AdminCourseForm() {
 
       // Réinitialiser le formulaire pour permettre la création d'une autre course
       resetForm();
+      clearDraft();
     } catch (err) {
-      toast.error("Erreur création: " + (err?.message || "inconnue"));
+      console.error("[CREER_COURSE_ADMIN] Error:", err);
+      const errMsg = err?.message || err?.error || (typeof err === 'string' ? err : 'Erreur inconnue');
+      toast.error("Erreur création: " + errMsg);
     } finally {
       setSubmitting(false);
     }
@@ -359,7 +567,7 @@ export default function AdminCourseForm() {
           <div className="flex items-center gap-2">
             <div className="w-1 h-4 bg-gradient-to-b from-sky-500 to-blue-500 rounded-full" />
             <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Contacts</p>
-            <span className="text-[10px] bg-sky-50 text-sky-600 px-2 py-0.5 rounded-full font-semibold border border-sky-100">Optionnel</span>
+            <span className="text-[10px] bg-rose-50 text-rose-600 px-2 py-0.5 rounded-full font-semibold border border-rose-100">Téléphone obligatoire</span>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -506,6 +714,7 @@ export default function AdminCourseForm() {
                 onSelect={(r) => {
                   if (r?.latitude && r?.longitude) {
                     setGpsDepart({ lat: r.latitude, lng: r.longitude });
+                    setGpsDepartSource("geocodage");
                     if (r.quartier) setQuartierDepart(r.quartier);
                   }
                 }}
@@ -546,6 +755,7 @@ export default function AdminCourseForm() {
                 onSelect={(r) => {
                   if (r?.latitude && r?.longitude) {
                     setGpsArrivee({ lat: r.latitude, lng: r.longitude });
+                    setGpsArriveeSource("geocodage");
                     if (r.quartier) setQuartierArrivee(r.quartier);
                   }
                 }}
@@ -579,6 +789,25 @@ export default function AdminCourseForm() {
           )}
         </div>
 
+        {/* ── Prompt recalcul tarif (coords changées après modif manuelle) ── */}
+        {recalculerDisponibleAdmin && (
+          <div className="flex items-center justify-between rounded-xl bg-blue-50 border border-blue-200 px-4 py-3">
+            <div className="flex items-center gap-2">
+              <Navigation className="w-4 h-4 text-blue-500 flex-shrink-0" />
+              <p className="text-[11px] font-semibold text-blue-700">
+                Coordonnées modifiées. Recalculer le tarif conseillé ?
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleRecalculerTarifAdmin}
+              className="px-3 py-1.5 rounded-lg bg-blue-500 text-white text-[11px] font-bold hover:bg-blue-600 transition-all"
+            >
+              Recalculer
+            </button>
+          </div>
+        )}
+
         {/* ── Prix de la course ── */}
         <div className="bg-white rounded-[1.5rem] border border-gray-100 shadow-lg shadow-gray-100/50 p-5 space-y-4">
           <div className="flex items-center gap-2">
@@ -595,9 +824,13 @@ export default function AdminCourseForm() {
             {prixApproximatif ? (
               <div className="text-right">
                 <p className="text-xl font-black text-amber-700">
-                  {prixApproximatif.prix.toLocaleString()} <span className="text-xs font-bold">{prixApproximatif.devise}</span>
+                  {safeFmt(prixApproximatif.prix)} <span className="text-xs font-bold">{prixApproximatif.devise}</span>
                 </p>
-                <p className="text-[10px] text-amber-400 mt-0.5">{prixApproximatif.distance} km</p>
+                <p className="text-[10px] text-amber-400 mt-0.5">
+                  {prixApproximatif.distanceKm || prixApproximatif.distance} km
+                  {prixApproximatif.distanceSource === "ors" && " (route)"}
+                  {prixApproximatif.distanceSource === "haversine_fallback" && " (vol d'oiseau)"}
+                </p>
               </div>
             ) : (
               <p className="text-[10px] text-gray-400 italic max-w-[140px] text-right">
@@ -613,13 +846,13 @@ export default function AdminCourseForm() {
               <Input
                 type="text"
                 inputMode="numeric"
-                value={prixProposeAdmin ? Number(prixProposeAdmin.replace(/\D/g, "")).toLocaleString("fr-FR") : ""}
+                value={prixProposeAdmin ? safeFmt(prixProposeAdmin.replace(/\D/g, "")) : ""}
                 onChange={e => {
                   prixProposeManuelModifie.current = true;
                   const digits = e.target.value.replace(/\D/g, "");
                   setPrixProposeAdmin(digits);
                 }}
-                placeholder={prixApproximatif ? prixApproximatif.prix.toLocaleString("fr-FR") : "—"}
+                placeholder={prixApproximatif?.prix ? safeFmt(prixApproximatif.prix) : "—"}
                 className="rounded-xl h-12 pr-20 bg-amber-50/30 border-amber-100/50 text-lg font-bold text-gray-900 focus:ring-amber-300/50 focus:border-amber-400"
               />
               <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-bold text-gray-400">
@@ -639,7 +872,7 @@ export default function AdminCourseForm() {
           <div className="absolute inset-0 bg-gradient-to-r from-rose-600 to-orange-500 rounded-2xl blur-md opacity-30" />
           <Button
             onClick={handleSubmit}
-            disabled={submitting}
+            disabled={submitting || !clientTelephone.trim()}
             className="relative w-full h-14 rounded-2xl gap-2.5 font-bold text-base bg-gradient-to-r from-rose-600 via-red-600 to-orange-500 hover:from-rose-700 hover:via-red-700 hover:to-orange-600 shadow-xl shadow-red-200/50 transition-all active:scale-[0.98] border border-white/10"
           >
             {submitting ? (
@@ -670,7 +903,10 @@ export default function AdminCourseForm() {
         initialLat={gpsDepart?.lat}
         initialLng={gpsDepart?.lng}
         label="Localiser le point de départ"
-        onSelect={(lat, lng) => setGpsDepart({ lat, lng })}
+        onSelect={(lat, lng) => {
+          setGpsDepart({ lat, lng });
+          setGpsDepartSource("exact");
+        }}
       />
       <MapPickerModal
         open={mapModal === 'arrivee'}
@@ -679,7 +915,10 @@ export default function AdminCourseForm() {
         initialLat={gpsArrivee?.lat}
         initialLng={gpsArrivee?.lng}
         label="Localiser le point d'arrivée"
-        onSelect={(lat, lng) => setGpsArrivee({ lat, lng })}
+        onSelect={(lat, lng) => {
+          setGpsArrivee({ lat, lng });
+          setGpsArriveeSource("exact");
+        }}
       />
     </div>
   );

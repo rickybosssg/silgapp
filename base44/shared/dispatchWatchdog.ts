@@ -16,12 +16,8 @@ import { STATUTS_ACTIFS_COURSE, STATUTS_ACTIFS_VERIF } from './dispatchConstants
 import { journaliserDispatch } from './dispatchUtils.ts';
 import { getLivreursNotifies } from './dispatchNotifications.ts';
 import { lancerDispatchMulti } from './dispatchEngine.ts';
-import { chargerConfigDispatch, chargerConfigVaguesGPS, CYCLE_EPUISE_TIMEOUT_MS } from './dispatchConfig.ts';
+import { chargerConfigDispatch, chargerConfigVaguesGPS } from './dispatchConfig.ts';
 import { isV2Enabled, secoursDispatchV2 } from './dispatchV2.ts';
-
-const WATCHDOG_GRACE_MS = 2 * 60 * 1000;        // 2 min de grâce pour les automations événementielles
-const PROPOSE_TIMEOUT_GRACE_MS = 5 * 60 * 1000; // 5 min de grâce après expiration du timeout
-const ALERT_DEDUP_MS = 30 * 60 * 1000;           // 30 min de dédup pour les alertes admin
 
 /** Crée une alerte admin si aucune alerte récente n'existe pour la même course. */
 async function createAdminAlert(base44, titre, message, courseId) {
@@ -72,6 +68,13 @@ export async function runWatchdog(base44, body = {}) {
     dispatch: await chargerConfigDispatch(base44),
     gps: await chargerConfigVaguesGPS(base44),
   };
+
+  // ── Paramètres dynamiques (chargés depuis AppConfig avec fallbacks sûrs) ──
+  const WATCHDOG_GRACE_MS = cachedConfig.dispatch.watchdogGraceMin * 60 * 1000;
+  const PROPOSE_TIMEOUT_GRACE_MS = cachedConfig.dispatch.proposeTimeoutGraceMin * 60 * 1000;
+  const ALERT_DEDUP_MS = cachedConfig.dispatch.alertDedupMin * 60 * 1000;
+  const DISPONIBLE_PUSH_TIMEOUT_MS = cachedConfig.dispatch.disponiblePushTimeoutMin * 60 * 1000;
+  const CYCLE_EPUISE_TIMEOUT_MS = cachedConfig.dispatch.cycleEpuiseTimeoutMs;
 
   // ═══ ANOMALIE 1: Course nouvelle jamais traitée par l'automation create ═══
   // Une course nouvelle > 2 min sans aucune notification = l'entity automation create a échoué
@@ -235,8 +238,6 @@ export async function runWatchdog(base44, body = {}) {
   // Phase 1: cycle_epuise avec timeout expiré → transition vers disponible_push
   //          (la course devient visible par tous les livreurs éligibles)
   // Phase 2: disponible_push avec timeout expiré → transition vers en_attente
-  const DISPONIBLE_PUSH_TIMEOUT_MS = 30 * 60 * 1000; // 30 min en disponible_push
-
   for (const course of courses) {
     if (course.dispatch_status !== 'cycle_epuise' && course.dispatch_status !== 'disponible_push') continue;
     const deadlineMs = course.timeout_expires_at ? new Date(course.timeout_expires_at).getTime() : 0;
@@ -300,10 +301,10 @@ export async function runWatchdog(base44, body = {}) {
         : new Date(course.created_date).getTime();
       const ageMin = (now.getTime() - sollicitationMs) / 60000;
 
-      if (ageMin >= 5) {
-        // T+5 min : envoyer un push batch de rappel aux meilleurs livreurs encore éligibles
+      if (ageMin >= cachedConfig.dispatch.secoursV2DelayMin) {
+        // T+5min (configurable) : push batch de rappel aux meilleurs livreurs encore éligibles
         // secoursDispatchV2 exclut déjà les livreurs en course, refusés et déjà notifiés.
-        const result = await secoursDispatchV2(base44, course, 10, { excludeAlreadyNotified: false });
+        const result = await secoursDispatchV2(base44, course, cachedConfig.dispatch.secoursV2NbLivreurs, { excludeAlreadyNotified: false });
         await base44.asServiceRole.entities.CourseExterne.update(course.id, {
           dispatch_v2_secours_phase: 1,
         });

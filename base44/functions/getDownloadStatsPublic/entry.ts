@@ -31,7 +31,7 @@ Deno.serve(async (req) => {
       stats.total_downloads += (s.downloads || 0);
 
       // Par pays
-      const cc = s.country_code || 'BF';
+      const cc = s.country_code || 'Inconnu';
       if (!stats.by_country[cc]) {
         stats.by_country[cc] = { visits: 0, clicks: 0, downloads: 0 };
       }

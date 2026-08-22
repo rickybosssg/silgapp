@@ -19,7 +19,7 @@ Deno.serve(async (req) => {
     // Récupérer les stats existantes (service role for public access)
     const existingStats = await base44.asServiceRole.entities.DownloadStats.filter({
       month: monthKey,
-      country_code: country_code || 'BF'
+      country_code: country_code || 'INCONNU'
     });
 
     if (existingStats.length > 0) {
@@ -41,7 +41,7 @@ Deno.serve(async (req) => {
       // Créer de nouvelles stats
       const newStats = {
         month: monthKey,
-        country_code: country_code || 'BF',
+        country_code: country_code || 'INCONNU',
         platform: platform || 'web',
         referrer: referrer || 'direct',
         page_visits: event_type === 'page_visit' ? 1 : 0,

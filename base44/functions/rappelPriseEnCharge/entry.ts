@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
+import { resolveCourseParticipantUserIds } from '../../shared/conversationSecurity.ts';
 
 /**
  * Rappel de prise en charge — Envoie une notification push aux livreurs
@@ -91,8 +92,11 @@ Deno.serve(async (req) => {
           // 💬 Envoyer aussi le message dans la messagerie interne de la course
           const idempotencyKey = `rappel-prise-en-charge-${course.id}`;
           try {
+            const rappelMsgUserIds = await resolveCourseParticipantUserIds(base44, course.livreur_id, course.expediteur_client_id || course.destinataire_client_id);
             await base44.asServiceRole.entities.Message.create({
               course_id: course.id,
+              participant_user_ids: rappelMsgUserIds,
+              security_status: rappelMsgUserIds.length > 0 ? 'secured' : 'pending',
               sender_type: 'admin',
               sender_id: 'silgapp_system',
               sender_name: 'SILGAPP',

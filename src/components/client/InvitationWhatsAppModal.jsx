@@ -1,4 +1,5 @@
 import React from "react";
+import { getDialCodeSync } from "@/lib/countryService";
 
 /**
  * InvitationWhatsAppModal
@@ -9,15 +10,18 @@ import React from "react";
  * telephone — numéro de la personne à inviter
  * nomContact — nom de la personne à inviter (si connu)
  * nomExpediteur — nom du client qui envoie l'invitation
+ * countryCode — code pays ISO 2 lettres (pour résoudre l'indicatif)
  * onClose — fermer sans envoyer
  * onSend — appelé juste avant d'ouvrir WhatsApp (pour future API)
  */
-export default function InvitationWhatsAppModal({ telephone, nomContact, nomExpediteur, onClose, onSend }) {
+export default function InvitationWhatsAppModal({ telephone, nomContact, nomExpediteur, countryCode, onClose, onSend }) {
   const normaliserTel = (tel) => {
     if (!tel) return "";
     const digits = tel.replace(/\D/g, "");
-    if (digits.startsWith("226") && digits.length >= 11) return digits;
-    if (digits.length === 8) return "226" + digits;
+    const dial = (getDialCodeSync(countryCode) || "").replace(/^\+/, "");
+    if (!dial) return digits; // pas d'indicatif résolu — retourne les chiffres bruts
+    if (digits.startsWith(dial) && digits.length >= dial.length + 6) return digits;
+    if (digits.length === 8) return dial + digits;
     if (digits.length > 8) return digits;
     return digits;
   };

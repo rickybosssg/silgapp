@@ -179,12 +179,17 @@ export default function NewConversationDialog({ open, onClose, myType, myId, myN
     if (found) {
       onStart(found.id);
     } else {
-      const conv = await base44.entities.Conversation.create({
-        participants: JSON.stringify(participants),
-        group_type: "direct",
+      // ── Sécurité : création via backend pour résoudre participant_user_ids côté serveur ──
+      const res = await base44.functions.invoke('creerConversationSecurisee', {
+        participants,
         title: `${myName} ↔ ${user.name}`,
+        group_type: "direct",
       });
-      onStart(conv.id);
+      if (res?.data?.success && res.data.conversation) {
+        onStart(res.data.conversation.id);
+      } else {
+        alert(res?.data?.error || 'Erreur lors de la création de la conversation');
+      }
     }
     onClose();
   };

@@ -55,7 +55,7 @@ export default function StatsTelechargementsAdmin() {
       const clicks = record.clicks || 0;
       const downloads = record.downloads || 0;
       const recordDate = new Date(record.created_date);
-      const country = record.country_code || "BF";
+      const country = record.country_code || "Inconnu";
 
       // Totaux
       totalVisits += visits;

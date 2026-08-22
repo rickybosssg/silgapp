@@ -195,13 +195,20 @@ function DusLivreursTab() {
     mutationFn: async ({ entry, montant }) => {
       const info = entry.livreurInfo;
       if (!info) throw new Error("Livreur introuvable");
-      const nouveauSolde = Math.max(0, (info.montant_du_silga || 0) - montant);
-      if (nouveauSolde === 0) {
-        const impayees = entry.courses.filter(c => c.statut_paiement_livreur !== "paye");
-        await Promise.all(impayees.map(c => base44.entities.CourseExterne.update(c.id, { statut_paiement_livreur: "paye" })));
+      // ── Migration sécurisée : paiement via paiementLivreur (crée PaiementSilgapp) ──
+      //    Plus d'écriture directe de statut_paiement_livreur — le journal
+      //    financier PaiementSilgapp est la source de vérité.
+      const result = await base44.functions.invoke("paiementLivreur", {
+        livreur_id: entry.id,
+        montant: montant,
+        request_id: `compta-${entry.id}-${Date.now()}`,
+        commentaire: "Paiement enregistré via ComptabilitePanel",
+      });
+      const data = result?.data || result;
+      if (!data?.success && data?.error) {
+        throw new Error(data.error);
       }
-      await base44.functions.invoke("updateLivreur", { id: entry.id, data: { montant_du_silga: nouveauSolde } });
-      return { nouveauSolde, montant };
+      return { nouveauSolde: data?.nouveau_solde ?? 0, montant };
     },
     onSuccess: ({ montant, nouveauSolde }) => {
       queryClient.invalidateQueries({ queryKey: ["courses-externes-livrees"] });

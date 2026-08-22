@@ -86,6 +86,8 @@ export async function notifierRedispatchClient({ base44, course, messageVenus, m
         // Stocker le message VENUS dans l'entité Message
         await base44.asServiceRole.entities.Message.create({
           conversation_id: convs[0].id,
+          participant_user_ids: convs[0].participant_user_ids || [],
+          security_status: (convs[0].participant_user_ids && convs[0].participant_user_ids.length > 0) ? 'secured' : 'pending',
           sender_type: 'admin',
           sender_id: 'venus',
           sender_name: 'VENUS',

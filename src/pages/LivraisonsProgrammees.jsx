@@ -113,7 +113,10 @@ export default function LivraisonsProgrammees() {
     }
     setActionId(course.id);
     try {
-      await base44.entities.CourseExterne.update(course.id, { date_souhaitee: next.toISOString() });
+      await base44.functions.invoke("reprogrammerCourseClient", {
+        course_id: course.id,
+        nouvelle_date: next.toISOString(),
+      });
       setMessage("Livraison programmee modifiee.");
       refresh();
     } catch (err) {
@@ -127,9 +130,10 @@ export default function LivraisonsProgrammees() {
     if (!window.confirm("Annuler cette livraison programmee ?")) return;
     setActionId(course.id);
     try {
-      await base44.entities.CourseExterne.update(course.id, {
-        statut: "annulee",
-        motif_annulation: "Annulee par le client avant activation",
+      await base44.functions.invoke("annulerCourseExterne", {
+        course_id: course.id,
+        motif: "client_change_avis",
+        source: "client",
       });
       setMessage("Livraison programmee annulee.");
       refresh();
@@ -143,7 +147,10 @@ export default function LivraisonsProgrammees() {
   const duplicateCourse = async (course) => {
     setActionId(course.id);
     try {
-      await base44.entities.CourseExterne.create(copyCoursePayload(course));
+      await base44.functions.invoke("creerCourseClient", {
+        course_data: copyCoursePayload(course),
+        is_duplicate: true,
+      });
       setMessage("Livraison programmee dupliquee au lendemain.");
       refresh();
     } catch (err) {

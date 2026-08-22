@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { useHeartbeat } from "@/hooks/useHeartbeat";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { useClientNotifications } from "@/hooks/useClientNotifications";
-import { registerPushToken } from "@/lib/notifications";
+import { registerPushToken, consumePendingNotificationData } from "@/lib/notifications";
 import { usePushTokenRetry } from "@/hooks/usePushTokenRetry";
 import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
@@ -38,16 +38,6 @@ import RechercheLivreurScreen from "@/components/client/RechercheLivreurScreen";
 import SuiviCourseFullscreen from "@/components/client/SuiviCourseFullscreen";
 import EcranFinCourse from "@/components/client/EcranFinCourse";
 import { isLibre } from "@/lib/dispatchRules";
-
-
-function haversineDistance(lat1, lon1, lat2, lon2) {
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a = Math.sin(dLat/2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon/2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
 
 function GPSBadge({ profil, onForceSync }) {
   const hasCoords = !!(profil?.latitude && profil?.longitude);
@@ -92,6 +82,7 @@ export default function ClientExterneApp() {
   const [notationShownFor, setNotationShownFor] = useState(null);
   const [courseAnnuleeRelance, setCourseAnnuleeRelance] = useState(null); // course annulée auto → proposer relance
   const [showMessages, setShowMessages] = useState(false);
+  const [pendingConversationId, setPendingConversationId] = useState(null);
   const [showNotificationsPanel, setShowNotificationsPanel] = useState(false);
   const [notificationPanelItems, setNotificationPanelItems] = useState([]);
   const [sessionId, setSessionId] = useState(() => {
@@ -368,6 +359,37 @@ export default function ClientExterneApp() {
     client_id: clientProfil.id,
   } : null);
 
+  // ── Deep-link : clic sur notification → routage selon le type ──
+  useEffect(() => {
+    const handleNotificationOpened = (event) => {
+      const data = event?.detail || {};
+
+      // ── Réactivation : ouvrir directement l'écran de création de course ──
+      if (data.destination === "create_course" || data.type === "reactivation_campaign") {
+        // Tracer l'ouverture côté backend (attribution reactivation)
+        if (data.campaign_id && data.recipient_id) {
+          base44.functions.invoke("trackReactivationOpened", {
+            campaign_id: data.campaign_id,
+            recipient_id: data.recipient_id,
+          }).catch(() => null);
+        }
+        navigate("/client/course/expedier");
+        return;
+      }
+
+      // ── Message : ouvrir la conversation ──
+      if (data.type === "nouveau_message") {
+        const convId = String(data.conversation_id || "").trim();
+        setPendingConversationId(convId || null);
+        setShowMessages(true);
+      }
+    };
+    window.addEventListener("silgapp:notification-opened", handleNotificationOpened);
+    // Cold start : vérifier si l'app a été ouverte depuis une notification
+    consumePendingNotificationData();
+    return () => window.removeEventListener("silgapp:notification-opened", handleNotificationOpened);
+  }, [navigate]);
+
   useEffect(() => {
     loadProfil();
     base44.auth.me().then(u => setUserId(u?.id)).catch(() => null);
@@ -635,18 +657,22 @@ export default function ClientExterneApp() {
       const courses = [...map.values()];
 
       // Mettre à jour uniquement si GPS différent ou absent
-      for (const course of courses) {
-        const needsUpdate =
-          !course.gps_arrivee_lat ||
-          !course.gps_arrivee_lng ||
-          Math.abs(course.gps_arrivee_lat - pos.latitude) > 0.001 ||
-          Math.abs(course.gps_arrivee_lng - pos.longitude) > 0.001;
-        if (needsUpdate) {
-          await base44.entities.CourseExterne.update(course.id, {
-            gps_arrivee_lat: pos.latitude,
-            gps_arrivee_lng: pos.longitude
-          });
-        }
+      // ── Migration sécurisée : sync GPS destinataire via backend ──
+      const courseIdsToUpdate = courses
+        .filter(c =>
+          !c.gps_arrivee_lat ||
+          !c.gps_arrivee_lng ||
+          Math.abs(c.gps_arrivee_lat - pos.latitude) > 0.001 ||
+          Math.abs(c.gps_arrivee_lng - pos.longitude) > 0.001
+        )
+        .map(c => c.id);
+
+      if (courseIdsToUpdate.length > 0) {
+        await base44.functions.invoke("syncGpsDestinataire", {
+          course_ids: courseIdsToUpdate,
+          latitude: pos.latitude,
+          longitude: pos.longitude,
+        });
       }
     } catch (err) {
       console.error("Erreur sync GPS destinataire:", err);
@@ -1505,7 +1531,8 @@ export default function ClientExterneApp() {
             myType="client"
             myId={clientProfil?.id}
             myName={prenom}
-            onBack={() => setShowMessages(false)}
+            initialConversationId={pendingConversationId}
+            onBack={() => { setPendingConversationId(null); setShowMessages(false); }}
           />
         </div>
       )}

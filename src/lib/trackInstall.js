@@ -24,8 +24,8 @@ export function trackAppInstall() {
   try {
     const deviceId = getOrCreateDeviceId();
     const platform = detectPlatform();
-    let countryCode = 'BF';
-    try { countryCode = localStorage.getItem('silgapp_selected_country') || 'BF'; } catch {}
+    let countryCode = '';
+    try { countryCode = localStorage.getItem('silgapp_selected_country') || ''; } catch {}
     base44.functions.invoke('trackAppInstall', {
       device_id: deviceId,
       platform,

@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { haversineKm } from '../../shared/geoUtils.ts';
 
 /**
  * MOTEUR DE DISPATCH AUTOMATIQUE — SILGA INTERNE UNIQUEMENT
@@ -17,19 +18,7 @@ const TIMEOUT_SECONDES = 90;
 const MAX_CYCLES = 10;
 const VERIFICATION_INTERVAL_MS = 10000;
 
-/** Haversine distance */
-function calculerDistance(lat1, lon1, lat2, lon2) {
-  if (!lat1 || !lon1 || !lat2 || !lon2) return 999999;
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) *
-    Math.cos((lat2 * Math.PI) / 180) *
-    Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
+// haversineKm importé depuis geoUtils (source canonique)
 
 /**
  * Trouve les livreurs internes éligibles

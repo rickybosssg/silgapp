@@ -1,0 +1,124 @@
+{
+  "name": "ReactivationCampaignRecipient",
+  "type": "object",
+  "properties": {
+    "campaign_id": {
+      "type": "string",
+      "description": "ID de la campagne ReactivationCampaign"
+    },
+    "client_id": {
+      "type": "string",
+      "description": "ID du ClientExterne cibl\u00e9"
+    },
+    "client_telephone": {
+      "type": "string",
+      "description": "T\u00e9l\u00e9phone du client (pour recherche rapide)"
+    },
+    "user_email": {
+      "type": "string",
+      "description": "Email du compte User li\u00e9 au client"
+    },
+    "push_token": {
+      "type": "string",
+      "description": "Token FCM utilis\u00e9 pour l'envoi"
+    },
+    "push_token_id": {
+      "type": "string",
+      "description": "ID du NotificationToken utilis\u00e9"
+    },
+    "is_control_group": {
+      "type": "boolean",
+      "default": false,
+      "description": "True si le client est dans le groupe contr\u00f4le (pas de notification envoy\u00e9e)"
+    },
+    "ab_variant": {
+      "type": "string",
+      "description": "Variante A/B assign\u00e9e (A, B, C, etc.)"
+    },
+    "sent_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "delivered_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "opened_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date d'ouverture de la notification par le client"
+    },
+    "course_created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date de cr\u00e9ation de la course attribu\u00e9e \u00e0 cette campagne"
+    },
+    "course_completed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date de livraison de la course attribu\u00e9e"
+    },
+    "course_id": {
+      "type": "string",
+      "description": "ID de la CourseExterne attribu\u00e9e"
+    },
+    "revenue": {
+      "type": "number",
+      "default": 0,
+      "description": "CA g\u00e9n\u00e9r\u00e9 par la course attribu\u00e9e"
+    },
+    "commission": {
+      "type": "number",
+      "default": 0,
+      "description": "Commission SILGAPP g\u00e9n\u00e9r\u00e9e par la course attribu\u00e9e"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "sent",
+        "delivered",
+        "opened",
+        "converted",
+        "control",
+        "failed"
+      ],
+      "default": "pending",
+      "description": "Statut du recipient: pending=en attente, sent=push envoy\u00e9, delivered=FCM d\u00e9livr\u00e9, opened=client a ouvert, converted=course cr\u00e9\u00e9e, control=groupe contr\u00f4le, failed=\u00e9chec FCM"
+    },
+    "fcm_error": {
+      "type": "string",
+      "description": "Erreur FCM si \u00e9chec d'envoi"
+    },
+    "country_code": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "campaign_id",
+    "client_id",
+    "status"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

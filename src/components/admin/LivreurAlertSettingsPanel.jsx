@@ -6,15 +6,15 @@ import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  DEFAULT_LIVREUR_ALERT_DURATION_SECONDS,
-  DEFAULT_LIVREUR_ALERT_INTERVAL_SECONDS,
+  getDefaultLivreurAlertDuration,
+  getDefaultLivreurAlertInterval,
   normalizeLivreurAlertConfig,
 } from "@/lib/livreurUrgentAlert";
 
 export default function LivreurAlertSettingsPanel() {
   const queryClient = useQueryClient();
-  const [durationSeconds, setDurationSeconds] = useState(DEFAULT_LIVREUR_ALERT_DURATION_SECONDS);
-  const [intervalSeconds, setIntervalSeconds] = useState(DEFAULT_LIVREUR_ALERT_INTERVAL_SECONDS);
+  const [durationSeconds, setDurationSeconds] = useState(getDefaultLivreurAlertDuration());
+  const [intervalSeconds, setIntervalSeconds] = useState(getDefaultLivreurAlertInterval());
 
   const { data: configs = [], isLoading } = useQuery({
     queryKey: ["dispatch-config"],

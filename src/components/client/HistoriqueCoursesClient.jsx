@@ -7,26 +7,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-
-const STATUT_LABELS = {
-  nouvelle: "Nouvelle",
-  recherche_livreur: "Recherche livreur",
-  livreur_en_route: "Livreur en route",
-  colis_recupere: "Colis récupéré",
-  en_livraison: "En livraison",
-  livree: "Livrée ",
-  annulee: "Annulée",
-};
-
-const STATUT_COLORS = {
-  nouvelle: "bg-gray-100 text-gray-700",
-  recherche_livreur: "bg-orange-100 text-orange-700",
-  livreur_en_route: "bg-blue-100 text-blue-700",
-  colis_recupere: "bg-purple-100 text-purple-700",
-  en_livraison: "bg-blue-100 text-blue-700",
-  livree: "bg-green-100 text-green-700",
-  annulee: "bg-red-100 text-red-700",
-};
+import { getCourseStatusLabel, getCourseStatusColor } from "@/lib/courseStatuses";
 
 const TYPE_COLIS_ICONS = {
   petit_colis: "",
@@ -64,8 +45,8 @@ function CourseHistoriqueCard({ course, fraisAnnulation, onSelect }) {
               </p>
             </div>
           </div>
-          <Badge className={`text-xs flex-shrink-0 ${STATUT_COLORS[course.statut]}`}>
-            {STATUT_LABELS[course.statut]}
+          <Badge className={`text-xs flex-shrink-0 ${getCourseStatusColor(course.statut)}`}>
+            {getCourseStatusLabel(course.statut)}
           </Badge>
         </div>
 

@@ -10,6 +10,23 @@
       "type": "string",
       "description": "ID de la conversation"
     },
+    "participant_user_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Tableau des User.id autoris\u00e9s \u00e0 lire ce message. R\u00e9solu c\u00f4t\u00e9 backend depuis la conversation parente. Sert de base \u00e0 la RLS read/update quand security_status=secured."
+    },
+    "security_status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "secured"
+      ],
+      "default": "pending",
+      "description": "Statut de s\u00e9curit\u00e9. pending = cr\u00e9ation non s\u00e9curis\u00e9e (seul le cr\u00e9ateur peut lire via created_by_id). secured = participant_user_ids r\u00e9solu c\u00f4t\u00e9 backend (seuls les participants peuvent lire). Toute cr\u00e9ation directe via SDK d\u00e9marre en pending \u2014 l'automation backfillMessageParticipants passe en secured apr\u00e8s validation."
+    },
     "sender_type": {
       "type": "string",
       "enum": [
@@ -149,5 +166,61 @@
     "sender_type",
     "sender_id",
     "sender_name"
-  ]
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "$and": [
+            {
+              "data.security_status": "secured"
+            },
+            {
+              "data.participant_user_ids": "{{user.id}}"
+            }
+          ]
+        },
+        {
+          "$and": [
+            {
+              "data.security_status": "pending"
+            },
+            {
+              "created_by_id": "{{user.id}}"
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "create": {},
+    "update": {
+      "$or": [
+        {
+          "$and": [
+            {
+              "data.security_status": "secured"
+            },
+            {
+              "data.participant_user_ids": "{{user.id}}"
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
 }

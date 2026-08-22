@@ -109,12 +109,12 @@ export default function AdminGlobal() {
 
     return allCodes.map(code => {
       const paysInfo = pays.find(p => p.code === code) || paysActifsListe.find(p => p.code === code);
-      const c = courses.filter(x => (x.country_code || "BF") === code);
+      const c = courses.filter(x => x.country_code === code);
       const livrees = c.filter(x => x.statut === "livree");
       const enCours = c.filter(x => !["livree", "annulee"].includes(x.statut));
       const ca = livrees.reduce((s, x) => s + (x.prix_final || 0), 0);
-      const lvrs = livreurs.filter(x => (x.country_code || "BF") === code);
-      const cls = clients.filter(x => (x.country_code || "BF") === code);
+      const lvrs = livreurs.filter(x => x.country_code === code);
+      const cls = clients.filter(x => x.country_code === code);
       const adminsPaysList = admins.filter(a => a.country_code === code && a.admin_type === "pays");
 
       return {

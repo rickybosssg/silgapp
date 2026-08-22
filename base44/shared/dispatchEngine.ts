@@ -4,8 +4,10 @@
 
 import { calculerDistance, INDICATIFS, STATUTS_ACTIFS_COURSE, STATUTS_TERMINAUX_COURSE } from './dispatchConstants.ts';
 import { dispatchLog, normalizeNom, supprimerNotificationsCourse, journaliserDispatch } from './dispatchUtils.ts';
-import { chargerConfigDispatch, chargerLivreursEnCourse, chargerConfigVaguesGPS, CYCLE_EPUISE_TIMEOUT_MS } from './dispatchConfig.ts';
+import { chargerConfigDispatch, chargerLivreursEnCourse, chargerConfigVaguesGPS } from './dispatchConfig.ts';
+import { chargerConfigPays } from './dispatchConstants.ts';
 import { envoyerWhatsAppRaw } from './twilioWhatsApp.ts';
+import { resolveDialCode } from './countryResolver.ts';
 import { notifierRedispatchClient } from './venusRedispatchNotifier.ts';
 import {
   getLivreursNotifies,
@@ -93,7 +95,10 @@ export async function trouverLivreursCandidats(base44, course, exclusions = [], 
   });
 
   const candidats = [];
-  const GPS_EXPIRE_SEUIL_MIN = 30;
+  // ── Seuils GPS dynamiques (chargés depuis Country avec fallbacks sûrs) ──
+  const countryConfig = await chargerConfigPays(base44, course.country_code);
+  const GPS_EXPIRE_SEUIL_MIN = countryConfig?.gps_expire_seuil_min ?? 30;
+  const GPS_MAX_STALE_MIN = countryConfig?.gps_max_stale_min ?? 120;
   const TIEBREAKER_DISTANCE_M = 100;
 
   function gpsFreshnessTier(gpsAgeMin) {
@@ -162,7 +167,6 @@ export async function trouverLivreursCandidats(base44, course, exclusions = [], 
     //    pour cause de GPS absent ou expiré. La priorité prime sur le GPS. ──
     // 🛡️ MAIS: un seuil maximum de 2h empêche de notifier des livreurs clairement
     //    hors ligne (GPS de 14-45h), ce qui gaspille des crédits d'intégration.
-    const GPS_MAX_STALE_MIN = 120; // 2h — au-delà, les non-prioritaires sont exclus
     const isPriority = (l.priorite_dispatch || 0) > 0;
     // 🛡️ En vague 1 (skipGpsFilterForPriority), les livreurs prioritaires ne sont
     //    JAMAIS exclus pour GPS absent ou ancien. La priorité prime sur le GPS.
@@ -268,7 +272,12 @@ export async function notifierLivreur(base44, courseId, course, livreur, timeout
     const waPromise = (async () => {
       try {
         if (waOptIn === false && !waOptInDate) return;
-        const indicatif = INDICATIFS[livreurCountry] || '+226';
+        // ⚠️ Phase A — Indicatif résolu depuis le backend Country, plus de map hardcodée.
+        const indicatif = await resolveDialCode(base44, livreurCountry);
+        if (!indicatif) {
+          console.warn('[DISPATCH] ⚠️ Indicatif introuvable pour', livreurCountry, '— WhatsApp ignoré');
+          return;
+        }
         let tel = livreurTel.replace(/\s+/g, '').replace(/[^\d+]/g, '');
         if (!tel.startsWith('+')) tel = indicatif + tel;
 
@@ -345,7 +354,9 @@ export async function lancerDispatchMulti(base44, courseId, exclusions = [], cac
   }
 
   const config = cachedConfig?.dispatch || await chargerConfigDispatch(base44);
-  dispatchLog(`[DISPATCH] ⚙️ Config: ${config.nb} livreurs, ${config.timeout}s`);
+  const CYCLE_EPUISE_TIMEOUT_MS = config.cycleEpuiseTimeoutMs;
+  const MAX_CYCLES = config.maxCycles;
+  dispatchLog(`[DISPATCH] ⚙️ Config: ${config.nb} livreurs, ${config.timeout}s, max_cycles=${MAX_CYCLES}`);
 
   const gpsConfig = cachedConfig?.gps || await chargerConfigVaguesGPS(base44);
 
@@ -405,7 +416,7 @@ export async function lancerDispatchMulti(base44, courseId, exclusions = [], cac
     }
     if (dejaNotifies.length > 0) {
       const cycleCount = (course.dispatch_cycle_count || 0) + 1;
-      if (cycleCount > 3) {
+      if (cycleCount > MAX_CYCLES) {
         dispatchLog(`[DISPATCH] 🛑 Course ${courseId} — ${cycleCount - 1} cycles épuisés sans livreur — auto-annulation`);
         await base44.asServiceRole.entities.CourseExterne.update(courseId, {
           statut: 'annulee',
@@ -418,14 +429,14 @@ export async function lancerDispatchMulti(base44, courseId, exclusions = [], cac
           livreur_vehicule: '',
           livreur_note_moyenne: 0,
           livreur_nombre_avis: 0,
-          notes: (course.notes || '') + ' | [AUTO-ANNULÉ] Cycle dispatch épuisé après 3 cycles sans livreur acceptant',
+          notes: (course.notes || '') + ` | [AUTO-ANNULÉ] Cycle dispatch épuisé après ${MAX_CYCLES} cycles sans livreur acceptant`,
         });
         journaliserDispatch(base44, { course_id: courseId, country_code: course.country_code, vague: wave, evenement: 'cycle_epuise' });
         const messageVenus = `📍 Malgré plusieurs tentatives, aucun livreur n'est disponible pour votre course. Votre course a été annulée. Veuillez réessayer plus tard.`;
         notifierRedispatchClient({ base44, course, messageVenus, motif: 'auto_annulation' }).catch(err => console.error('[DISPATCH] ❌ VENUS notif auto-annulation:', err.message));
         return { cycleEpuise: true };
       }
-      dispatchLog(`[DISPATCH] 🔄 Nouveau cycle ${cycleCount}/3 — réinitialisation des notifiés pour course ${courseId}`);
+      dispatchLog(`[DISPATCH] 🔄 Nouveau cycle ${cycleCount}/${MAX_CYCLES} — réinitialisation des notifiés pour course ${courseId}`);
       await base44.asServiceRole.entities.CourseExterne.update(courseId, {
         dispatch_status: 'en_attente',
         dispatch_wave: 0,

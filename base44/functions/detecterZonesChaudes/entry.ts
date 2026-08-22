@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { haversineKm as haversineKmShared } from '../../shared/geoUtils.ts';
 
 // ─── Quartiers de référence (Ouagadougou) ────────────────────────────────────
 const QUARTIERS_REF = [
@@ -100,13 +101,7 @@ async function sendFcm(projectId, accessToken, fcmToken, titre, message) {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-function haversineKm(lat1, lon1, lat2, lon2) {
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
+// haversineKm importé depuis geoUtils (source canonique)
 
 function isRecentMin(dateStr, minutes) {
   if (!dateStr) return false;
@@ -431,7 +426,14 @@ Deno.serve(async (req) => {
       pushesEnvoyes.push({ zone: zone.nom, envoyees: notifsEnvoyees, echouees: notifsEchouees });
 
       // 3. Sauvegarder historique
-      const paysCode = countryCode || "BF";
+      // ⚠️ Phase A — Plus de fallback "BF". Le pays doit venir du contexte d'appel.
+      // countryCode est déjà résolu plus haut dans la fonction depuis les courses analysées.
+      // Si null, on ne crée pas d'historique avec un pays approximatif.
+      const paysCode = countryCode;
+      if (!paysCode) {
+        console.warn('[ZonesChaudes] ⚠️ country_code non résolu — historique zone chaude ignoré');
+        continue;
+      }
       const villeNom = pays?.ville_principale || pays?.nom || "Ouagadougou";
       try {
         await base44.asServiceRole.entities.ZoneChaudeHistorique.create({
