@@ -15,6 +15,8 @@ export const PUSH_DEGRADATION_TYPES = {
   LIVREURS_INJOIGNABLES: 'PUSH_D4_LIVREURS_INJOIGNABLES',
   TOKENS_STALE: 'PUSH_D5_TOKENS_STALE',
   AUCUN_TOKEN_LIVREUR: 'PUSH_D6_AUCUN_TOKEN_LIVREUR',
+  LIVREUR_ACTIF_SANS_TOKEN: 'PUSH_D7_LIVREUR_ACTIF_SANS_TOKEN',
+  LIVREUR_INACTIF_SANS_TOKEN: 'PUSH_D8_LIVREUR_INACTIF_SANS_TOKEN',
 };
 
 const DEGRADATION_SCORES: Record<string, number> = {
@@ -24,6 +26,8 @@ const DEGRADATION_SCORES: Record<string, number> = {
   [PUSH_DEGRADATION_TYPES.LIVREURS_INJOIGNABLES]: 35,
   [PUSH_DEGRADATION_TYPES.TOKENS_STALE]: 10,
   [PUSH_DEGRADATION_TYPES.AUCUN_TOKEN_LIVREUR]: 25,
+  [PUSH_DEGRADATION_TYPES.LIVREUR_ACTIF_SANS_TOKEN]: 45,
+  [PUSH_DEGRADATION_TYPES.LIVREUR_INACTIF_SANS_TOKEN]: 10,
 };
 
 const DEGRADATION_LABELS: Record<string, string> = {
@@ -33,6 +37,8 @@ const DEGRADATION_LABELS: Record<string, string> = {
   [PUSH_DEGRADATION_TYPES.LIVREURS_INJOIGNABLES]: 'Livreurs actifs injoignables par push',
   [PUSH_DEGRADATION_TYPES.TOKENS_STALE]: 'Tokens actifs non utilisés depuis >30 jours',
   [PUSH_DEGRADATION_TYPES.AUCUN_TOKEN_LIVREUR]: 'Livreurs sans aucun token push enregistré',
+  [PUSH_DEGRADATION_TYPES.LIVREUR_ACTIF_SANS_TOKEN]: 'Livreurs actifs aujourd\'hui sans token push (critique pour le dispatch)',
+  [PUSH_DEGRADATION_TYPES.LIVREUR_INACTIF_SANS_TOKEN]: 'Livreurs inactifs depuis longtemps sans token push',
 };
 
 export interface PushDegradationItem {
@@ -81,6 +87,8 @@ export interface PushHealthMetrics {
   livreurs_actifs_total: number;
   livreurs_avec_token_valide: number;
   livreurs_sans_token: number;
+  livreurs_actifs_recents_sans_token: number;
+  livreurs_inactifs_sans_token: number;
   taux_livreurs_joignables_pct: number;
 
   // Dégradations détectées
@@ -193,6 +201,9 @@ export async function computePushHealth(base44: any): Promise<PushHealthMetrics>
   const erreursFatales = ['UNREGISTERED', 'INVALID_ARGUMENT', 'SENDER_ID_MISMATCH', 'QUOTA_EXCEEDED'];
   let livreursAvecTokenValide = 0;
   let livreursSansToken = 0;
+  let livreursActifsRecentsSansToken = 0; // actifs aujourd'hui sans token (critique)
+  let livreursInactifsSansToken = 0; // inactifs depuis >7 jours sans token (moins critique)
+  const ONE_DAY_MS_CHECK = 24 * 3600 * 1000;
   for (const livreur of livreursActifs) {
     const tokens = livreurTokenMap.get(livreur.id) || [];
     const validTokens = tokens.filter((t: any) =>
@@ -202,6 +213,15 @@ export async function computePushHealth(base44: any): Promise<PushHealthMetrics>
       livreursAvecTokenValide++;
     } else {
       livreursSansToken++;
+      // Distinguer : livreur actif aujourd'hui (critique) vs inactif longtemps (moins critique)
+      const lastSeen = livreur.last_seen_at ? new Date(livreur.last_seen_at).getTime() : 0;
+      const isActifAujourdhui = livreur.app_active === true || (now - lastSeen) < ONE_DAY_MS_CHECK;
+      const isInactiveLongtemps = lastSeen > 0 && (now - lastSeen) > 7 * ONE_DAY_MS_CHECK;
+      if (isActifAujourdhui) {
+        livreursActifsRecentsSansToken++;
+      } else if (isInactiveLongtemps) {
+        livreursInactifsSansToken++;
+      }
     }
   }
   const livreursActifsTotal = livreursActifs.length;
@@ -270,13 +290,35 @@ export async function computePushHealth(base44: any): Promise<PushHealthMetrics>
     });
   }
 
-  // D6: Livreurs sans aucun token
+  // D6: Livreurs sans aucun token (vue agrégée — gardée pour compatibilité)
   if (livreursSansToken >= 3) {
     degradations.push({
       type: PUSH_DEGRADATION_TYPES.AUCUN_TOKEN_LIVREUR,
       label: DEGRADATION_LABELS[PUSH_DEGRADATION_TYPES.AUCUN_TOKEN_LIVREUR],
       description: `${livreursSansToken} livreurs actifs n'ont aucun token push enregistré`,
       metric_value: livreursSansToken,
+      metric_unit: 'livreurs',
+    });
+  }
+
+  // D7: Livreurs actifs aujourd'hui sans token (CRITIQUE pour le dispatch)
+  if (livreursActifsRecentsSansToken >= 1) {
+    degradations.push({
+      type: PUSH_DEGRADATION_TYPES.LIVREUR_ACTIF_SANS_TOKEN,
+      label: DEGRADATION_LABELS[PUSH_DEGRADATION_TYPES.LIVREUR_ACTIF_SANS_TOKEN],
+      description: `${livreursActifsRecentsSansToken} livreur(s) actif(s) aujourd'hui n'ont pas de token push valide — perte de courses immédiate`,
+      metric_value: livreursActifsRecentsSansToken,
+      metric_unit: 'livreurs',
+    });
+  }
+
+  // D8: Livreurs inactifs depuis longtemps sans token (moins critique)
+  if (livreursInactifsSansToken >= 3) {
+    degradations.push({
+      type: PUSH_DEGRADATION_TYPES.LIVREUR_INACTIF_SANS_TOKEN,
+      label: DEGRADATION_LABELS[PUSH_DEGRADATION_TYPES.LIVREUR_INACTIF_SANS_TOKEN],
+      description: `${livreursInactifsSansToken} livreurs inactifs depuis >7 jours n'ont pas de token push`,
+      metric_value: livreursInactifsSansToken,
       metric_unit: 'livreurs',
     });
   }
@@ -289,6 +331,8 @@ export async function computePushHealth(base44: any): Promise<PushHealthMetrics>
   let actionRecommandee = 'Aucune action requise';
   if (degradations.some(d => d.type === PUSH_DEGRADATION_TYPES.TAUX_ECHEC_CRITIQUE)) {
     actionRecommandee = 'Vérifier la configuration Firebase immédiatement';
+  } else if (degradations.some(d => d.type === PUSH_DEGRADATION_TYPES.LIVREUR_ACTIF_SANS_TOKEN)) {
+    actionRecommandee = 'Contacter immédiatement les livreurs actifs sans token';
   } else if (degradations.some(d => d.type === PUSH_DEGRADATION_TYPES.LIVREURS_INJOIGNABLES)) {
     actionRecommandee = 'Contacter les livreurs injoignables';
   } else if (degradations.some(d => d.type === PUSH_DEGRADATION_TYPES.TOKENS_INVALIDES_ACCUMULATION)) {
@@ -324,6 +368,8 @@ export async function computePushHealth(base44: any): Promise<PushHealthMetrics>
     livreurs_actifs_total: livreursActifsTotal,
     livreurs_avec_token_valide: livreursAvecTokenValide,
     livreurs_sans_token: livreursSansToken,
+    livreurs_actifs_recents_sans_token: livreursActifsRecentsSansToken,
+    livreurs_inactifs_sans_token: livreursInactifsSansToken,
     taux_livreurs_joignables_pct: tauxLivreursJoignablesPct,
     degradations,
     degradation_score: degradationScore,
@@ -362,9 +408,16 @@ export async function syncPushHealthAlerts(base44: any, metrics: PushHealthMetri
   // ── Crée des alertes pour les nouvelles dégradations ──
   // Déduplication temporelle : ne pas recréer une alerte si une existe déjà (même non archivée)
   for (const deg of metrics.degradations) {
-    if (deg.type === PUSH_DEGRADATION_TYPES.TOKENS_STALE || deg.type === PUSH_DEGRADATION_TYPES.AUCUN_TOKEN_LIVREUR) {
+    if (deg.type === PUSH_DEGRADATION_TYPES.TOKENS_STALE
+        || deg.type === PUSH_DEGRADATION_TYPES.AUCUN_TOKEN_LIVREUR
+        || deg.type === PUSH_DEGRADATION_TYPES.LIVREUR_INACTIF_SANS_TOKEN) {
       // Ces dégradations sont structurelles, pas urgentes — alerter seulement si niveau critique
       if (metrics.niveau !== 'critique') continue;
+    }
+
+    // D7: Livreurs actifs sans token — toujours alerter (critique pour le dispatch)
+    if (deg.type === PUSH_DEGRADATION_TYPES.LIVREUR_ACTIF_SANS_TOKEN) {
+      // Toujours alerter, même si le niveau n'est pas critique
     }
 
     const dedupKey = `PUSH_DEGRADATION_${deg.type}`;

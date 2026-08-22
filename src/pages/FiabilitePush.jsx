@@ -3,12 +3,13 @@ import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import {
   Radio, AlertTriangle, CheckCircle2, XCircle, Smartphone,
-  Truck, Users, RefreshCw, Zap, TrendingDown, Activity,
+  Truck, Users, RefreshCw, Zap, TrendingDown, Activity, Clock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import LivreursInjoignablesList from "@/components/admin/LivreursInjoignablesList";
 
 const NIVEAU_COLORS = {
   sain: { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200", icon: CheckCircle2, label: "Sain" },
@@ -161,7 +162,33 @@ export default function FiabilitePush() {
             <MetricCard icon={CheckCircle2} label="Joignables" value={metrics.livreurs_avec_token_valide} sub={`${metrics.taux_livreurs_joignables_pct}%`} color="text-emerald-500" />
             <MetricCard icon={XCircle} label="Injoignables" value={metrics.livreurs_sans_token} color={metrics.livreurs_sans_token > 3 ? "text-red-500" : "text-gray-500"} />
           </div>
+          {(metrics.livreurs_actifs_recents_sans_token > 0 || metrics.livreurs_inactifs_sans_token > 0) && (
+            <div className="mt-2 grid grid-cols-2 gap-3">
+              <div className={cn(
+                "rounded-xl border p-3 flex items-center gap-2",
+                metrics.livreurs_actifs_recents_sans_token > 0
+                  ? "bg-red-50 border-red-200"
+                  : "bg-gray-50 border-gray-100"
+              )}>
+                <AlertTriangle className={cn("w-4 h-4", metrics.livreurs_actifs_recents_sans_token > 0 ? "text-red-500" : "text-gray-300")} />
+                <div>
+                  <p className="text-sm font-black text-gray-900">{metrics.livreurs_actifs_recents_sans_token}</p>
+                  <p className="text-[9px] text-gray-400 font-semibold uppercase">Actifs sans token (critique)</p>
+                </div>
+              </div>
+              <div className="rounded-xl border border-gray-100 bg-gray-50 p-3 flex items-center gap-2">
+                <Clock className="w-4 h-4 text-gray-400" />
+                <div>
+                  <p className="text-sm font-black text-gray-900">{metrics.livreurs_inactifs_sans_token}</p>
+                  <p className="text-[9px] text-gray-400 font-semibold uppercase">Inactifs sans token</p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
+
+        {/* Liste détaillée des livreurs non joignables */}
+        <LivreursInjoignablesList />
 
         {/* Répartition par plateforme */}
         <div>
