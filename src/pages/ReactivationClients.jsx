@@ -265,6 +265,7 @@ function CampaignForm({ onClose, onCreated }) {
   const [city, setCity] = useState("");
   const [courseMin, setCourseMin] = useState(0);
   const [courseMax, setCourseMax] = useState("");
+  const [maxTargets, setMaxTargets] = useState(0);
   const [inactiveDays, setInactiveDays] = useState("");
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
@@ -297,6 +298,7 @@ function CampaignForm({ onClose, onCreated }) {
         city: city.trim(),
         course_min: Number(courseMin) || 0,
         course_max: courseMax ? Number(courseMax) : null,
+        max_targets: Number(maxTargets) || 0,
         inactive_days_min: inactiveDays ? Number(inactiveDays) : null,
         title: title.trim(),
         message: message.trim(),
@@ -358,7 +360,7 @@ function CampaignForm({ onClose, onCreated }) {
                 className="w-full h-10 rounded-xl border border-slate-200 px-3 text-sm font-semibold" />
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="text-[11px] font-black uppercase tracking-wider text-slate-600 block mb-1">Courses min</label>
               <input type="number" value={courseMin} onChange={(e) => setCourseMin(e.target.value)}
@@ -369,9 +371,16 @@ function CampaignForm({ onClose, onCreated }) {
               <input type="number" value={courseMax} onChange={(e) => setCourseMax(e.target.value)} placeholder="∞"
                 className="w-full h-10 rounded-xl border border-slate-200 px-2 text-sm font-semibold" />
             </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="text-[11px] font-black uppercase tracking-wider text-slate-600 block mb-1">Inactif ≥ (j)</label>
               <input type="number" value={inactiveDays} onChange={(e) => setInactiveDays(e.target.value)} placeholder="ex: 30"
+                className="w-full h-10 rounded-xl border border-slate-200 px-2 text-sm font-semibold" />
+            </div>
+            <div>
+              <label className="text-[11px] font-black uppercase tracking-wider text-slate-600 block mb-1">Max cibles (pilote)</label>
+              <input type="number" value={maxTargets} onChange={(e) => setMaxTargets(e.target.value)} placeholder="0 = illimité"
                 className="w-full h-10 rounded-xl border border-slate-200 px-2 text-sm font-semibold" />
             </div>
           </div>

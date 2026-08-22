@@ -121,7 +121,7 @@ export async function sendReactivationPush(targets: { token: string; recipient_i
       if (!r.ok) {
         const errorCode = r.result?.error?.details?.[0]?.errorCode || r.result?.error?.status;
         if (["UNREGISTERED", "INVALID_ARGUMENT"].includes(errorCode)) {
-          invalid.push(token);
+          invalid.push(target.token);
         }
         return false;
       }
@@ -129,7 +129,7 @@ export async function sendReactivationPush(targets: { token: string; recipient_i
     }));
     success += results.filter(Boolean).length;
     failed += results.filter((r) => !r).length;
-    if (i + BATCH_SIZE < tokens.length) await new Promise((r) => setTimeout(r, 200));
+    if (i + BATCH_SIZE < targets.length) await new Promise((r) => setTimeout(r, 200));
   }
 
   return { success, failed, invalid };
@@ -242,6 +242,7 @@ export interface TargetSelectionParams {
   city?: string;
   course_min?: number;
   course_max?: number;
+  max_targets?: number;
   inactive_days_min?: number;
   control_group_pct?: number;
   ab_variants?: any[];
@@ -308,6 +309,14 @@ export async function selectTargets(base44: any, params: TargetSelectionParams):
     }
   }
   eligible = eligible.filter((t) => !recentSet.has(t.client.id));
+
+  // ── Limite max_targets (campagnes pilotes) ──
+  const maxTargets = params.max_targets || 0;
+  if (maxTargets > 0 && eligible.length > maxTargets) {
+    // Tri déterministe pour que la sélection soit reproductible
+    eligible.sort((a, b) => a.client.id < b.client.id ? -1 : 1);
+    eligible = eligible.slice(0, maxTargets);
+  }
 
   // ── Groupe contrôle ──
   const controlPct = params.control_group_pct || 0;

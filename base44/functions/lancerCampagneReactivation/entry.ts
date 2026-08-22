@@ -29,6 +29,7 @@ export default async function(req: Request): Promise<Response> {
       city: campaign.city || undefined,
       course_min: campaign.course_min,
       course_max: campaign.course_max,
+      max_targets: campaign.max_targets || 0,
       inactive_days_min: campaign.inactive_days_min,
       control_group_pct: campaign.control_group_pct || 0,
       ab_variants: abVariants,
