@@ -360,20 +360,36 @@ export default function ClientExterneApp() {
     client_id: clientProfil.id,
   } : null);
 
-  // ── Deep-link : clic sur notification "nouveau_message" → ouvrir la conversation ──
+  // ── Deep-link : clic sur notification → routage selon le type ──
   useEffect(() => {
-    const handleMessageNotification = (event) => {
+    const handleNotificationOpened = (event) => {
       const data = event?.detail || {};
-      if (data.type !== "nouveau_message") return;
-      const convId = String(data.conversation_id || "").trim();
-      setPendingConversationId(convId || null);
-      setShowMessages(true);
+
+      // ── Réactivation : ouvrir directement l'écran de création de course ──
+      if (data.destination === "create_course" || data.type === "reactivation_campaign") {
+        // Tracer l'ouverture côté backend (attribution reactivation)
+        if (data.campaign_id && data.recipient_id) {
+          base44.functions.invoke("trackReactivationOpened", {
+            campaign_id: data.campaign_id,
+            recipient_id: data.recipient_id,
+          }).catch(() => null);
+        }
+        navigate("/client/course/expedier");
+        return;
+      }
+
+      // ── Message : ouvrir la conversation ──
+      if (data.type === "nouveau_message") {
+        const convId = String(data.conversation_id || "").trim();
+        setPendingConversationId(convId || null);
+        setShowMessages(true);
+      }
     };
-    window.addEventListener("silgapp:notification-opened", handleMessageNotification);
+    window.addEventListener("silgapp:notification-opened", handleNotificationOpened);
     // Cold start : vérifier si l'app a été ouverte depuis une notification
     consumePendingNotificationData();
-    return () => window.removeEventListener("silgapp:notification-opened", handleMessageNotification);
-  }, []);
+    return () => window.removeEventListener("silgapp:notification-opened", handleNotificationOpened);
+  }, [navigate]);
 
   useEffect(() => {
     loadProfil();

@@ -71,26 +71,32 @@ export default async function(req: Request): Promise<Response> {
         started_at: new Date().toISOString(),
       });
 
-      // Récupérer les tokens à envoyer (hors contrôle)
+      // Récupérer les tokens à envoyer (hors contrôle) + associer recipient_id
       const toSend = targets.filter((t) => !t.is_control && t.token?.token && !String(t.token.token).startsWith('web_'));
-      const tokenList = toSend.map((t) => t.token.token);
+      // Construire les paires {token, recipient_id} pour le tracking d'ouverture
+      const sendTargets = toSend.map((t) => ({
+        token: t.token.token,
+        recipient_id: t.recipient_id || created.find((r: any) => r.client_id === t.client.id)?.id || '',
+      })).filter((t: any) => t.recipient_id);
 
       let successCount = 0;
       let failedCount = 0;
 
-      if (tokenList.length > 0) {
+      if (sendTargets.length > 0) {
         // Pour les tests A/B, envoyer le message de la variante
         if (campaign.is_ab_test && abVariants) {
           for (const variant of abVariants) {
-            const variantTargets = toSend.filter((t) => t.ab_variant === variant.variant);
-            const variantTokens = variantTargets.map((t) => t.token.token);
-            if (variantTokens.length === 0) continue;
-            const result = await sendReactivationPush(variantTokens, variant.title || campaign.title, variant.message || campaign.message, campaign_id);
+            const variantTargets = sendTargets.filter((t: any) => {
+              const target = toSend.find((s) => s.token.token === t.token);
+              return target?.ab_variant === variant.variant;
+            });
+            if (variantTargets.length === 0) continue;
+            const result = await sendReactivationPush(variantTargets, variant.title || campaign.title, variant.message || campaign.message, campaign_id);
             successCount += result.success;
             failedCount += result.failed;
           }
         } else {
-          const result = await sendReactivationPush(tokenList, campaign.title, campaign.message, campaign_id);
+          const result = await sendReactivationPush(sendTargets, campaign.title, campaign.message, campaign_id);
           successCount = result.success;
           failedCount = result.failed;
 
@@ -115,11 +121,14 @@ export default async function(req: Request): Promise<Response> {
         });
       }
 
+      // ⚠️ delivered_count = 0 par défaut. FCM Android ne fournit PAS d'accusé de
+      // livraison fiable. "success" = FCM a accepté le message, pas qu'il est affiché.
+      // opened_count sera incrémenté quand le client cliquera (trackReactivationOpened).
       await base44.asServiceRole.entities.ReactivationCampaign.update(campaign_id, {
         status: 'sent',
         sent_count: successCount,
         failed_count: failedCount,
-        delivered_count: successCount,
+        delivered_count: 0,
       });
 
       return Response.json({

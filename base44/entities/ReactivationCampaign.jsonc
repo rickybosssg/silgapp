@@ -47,6 +47,11 @@
       "type": "number",
       "description": "Nombre maximum de courses du client (vide = pas de limite)"
     },
+    "max_targets": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre maximum de clients \u00e0 cibler (0 = pas de limite). Utilis\u00e9 pour les campagnes pilotes afin de limiter la taille du segment."
+    },
     "inactive_days_min": {
       "type": "number",
       "description": "Inactivit\u00e9 minimum en jours depuis la derni\u00e8re course"

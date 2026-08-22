@@ -77,46 +77,47 @@ export async function sendOneFcm(projectId: string, accessToken: string, token: 
   return { ok: response.ok, status: response.status, result };
 }
 
-export async function sendReactivationPush(tokens: string[], title: string, message: string, campaignId: string): Promise<{ success: number; failed: number; invalid: string[] }> {
+export async function sendReactivationPush(targets: { token: string; recipient_id: string }[], title: string, message: string, campaignId: string): Promise<{ success: number; failed: number; invalid: string[] }> {
   const { projectId, clientEmail, privateKey } = getFirebaseConfig();
   if (!projectId || !clientEmail || !privateKey) {
     throw new Error("Firebase non configuré — FIREBASE_SERVICE_ACCOUNT_JSON manquant");
   }
 
   const accessToken = await getAccessToken(clientEmail, privateKey);
-  const fcmPayload = {
-    notification: { title, body: message },
-    data: {
-      type: "reactivation_campaign",
-      campaign_id: String(campaignId),
-      destination: "create_course",
-      click_action: APP_URL,
-    },
-    android: {
-      priority: "HIGH",
-      ttl: "86400s",
-      notification: {
-        channel_id: ANDROID_CHANNEL_ID,
-        sound: "default",
-        vibrate_timings: ["0s", "0.2s", "0.1s", "0.2s", "0.1s", "0.4s"],
-        default_sound: true,
-        notification_priority: "PRIORITY_HIGH",
-        visibility: "PUBLIC",
-        click_action: APP_URL,
-      },
-    },
-    webpush: { fcm_options: { link: APP_URL } },
-  };
+  const BATCH_SIZE = 100;
 
   let success = 0;
   let failed = 0;
   const invalid: string[] = [];
-  const BATCH_SIZE = 100;
 
-  for (let i = 0; i < tokens.length; i += BATCH_SIZE) {
-    const batch = tokens.slice(i, i + BATCH_SIZE);
-    const results = await Promise.all(batch.map(async (token) => {
-      const r = await sendOneFcm(projectId, accessToken, token, fcmPayload);
+  for (let i = 0; i < targets.length; i += BATCH_SIZE) {
+    const batch = targets.slice(i, i + BATCH_SIZE);
+    const results = await Promise.all(batch.map(async (target) => {
+      const fcmPayload = {
+        notification: { title, body: message },
+        data: {
+          type: "reactivation_campaign",
+          campaign_id: String(campaignId),
+          recipient_id: String(target.recipient_id),
+          destination: "create_course",
+          click_action: APP_URL,
+        },
+        android: {
+          priority: "HIGH",
+          ttl: "86400s",
+          notification: {
+            channel_id: ANDROID_CHANNEL_ID,
+            sound: "default",
+            vibrate_timings: ["0s", "0.2s", "0.1s", "0.2s", "0.1s", "0.4s"],
+            default_sound: true,
+            notification_priority: "PRIORITY_HIGH",
+            visibility: "PUBLIC",
+            click_action: APP_URL,
+          },
+        },
+        webpush: { fcm_options: { link: APP_URL } },
+      };
+      const r = await sendOneFcm(projectId, accessToken, target.token, fcmPayload);
       if (!r.ok) {
         const errorCode = r.result?.error?.details?.[0]?.errorCode || r.result?.error?.status;
         if (["UNREGISTERED", "INVALID_ARGUMENT"].includes(errorCode)) {
