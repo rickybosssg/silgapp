@@ -114,6 +114,7 @@ const TarificationAdmin = lazy(() => import('./pages/TarificationAdmin.jsx'));
 const ReactivationClients = lazy(() => import('./pages/ReactivationClients.jsx'));
 const CoursesARisque = lazy(() => import('./pages/CoursesARisque.jsx'));
 const FiabilitePush = lazy(() => import('./pages/FiabilitePush.jsx'));
+const SilgaScore = lazy(() => import('./pages/SilgaScore.jsx'));
 
 function AnimatedRoutes({ children }) {
   // Variables définies DANS la fonction pour éviter init issues
@@ -434,6 +435,7 @@ function AppContent() {
           <Route path="/admin/reactivation-clients" element={<AnimatedRoutes><ReactivationClients /></AnimatedRoutes>} />
           <Route path="/admin/courses-a-sauver" element={<AnimatedRoutes><CoursesARisque /></AnimatedRoutes>} />
           <Route path="/admin/fiabilite-push" element={<AnimatedRoutes><FiabilitePush /></AnimatedRoutes>} />
+          <Route path="/admin/silga-score" element={<AnimatedRoutes><SilgaScore /></AnimatedRoutes>} />
           <Route path="/admin/messages" element={<AnimatedRoutes><AdminMessages /></AnimatedRoutes>} />
           <Route path="/admin/whatsapp" element={<AnimatedRoutes><WhatsAppAdmin /></AnimatedRoutes>} />
           <Route path="/admin/venus" element={<AnimatedRoutes><VenusAdminCenter /></AnimatedRoutes>} />

@@ -256,6 +256,32 @@
     "whatsapp_derniere_erreur_date": {
       "type": "string",
       "format": "date-time"
+    },
+    "silga_score": {
+      "type": "number",
+      "default": 0,
+      "description": "Score SILGAPP 0-100 calcul\u00e9 \u00e0 partir des donn\u00e9es op\u00e9rationnelles (acceptation, livraison, annulations, d\u00e9lai de r\u00e9ponse, note, fiabilit\u00e9 financi\u00e8re). Mode observation uniquement \u2014 NON utilis\u00e9 dans le dispatch V2."
+    },
+    "silga_score_niveau": {
+      "type": "string",
+      "enum": [
+        "excellent",
+        "bon",
+        "moyen",
+        "faible",
+        "non_calcule"
+      ],
+      "default": "non_calcule",
+      "description": "Niveau du Silga Score: excellent (80+), bon (60-79), moyen (40-59), faible (<40). non_calcule = score jamais calcul\u00e9."
+    },
+    "silga_score_breakdown": {
+      "type": "string",
+      "description": "JSON: d\u00e9tail du score par cat\u00e9gorie (taux_acceptation, taux_livraison, taux_annulation, delai_reponse, note_moyenne, fiabilite_financiere). Pour audit et transparence."
+    },
+    "silga_score_calculated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date du dernier calcul du Silga Score."
     }
   },
   "required": [

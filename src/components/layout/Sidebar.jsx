@@ -3,7 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { clearPersistedToken } from "@/lib/authPersistence";
 import { 
   LayoutDashboard, MapPin, Plus, Truck, BarChart3, Bell,
-  Package, TrendingUp, ChevronLeft, ChevronRight, LogOut, Wallet, Shield, Globe, Settings, MessageCircle, Users, Megaphone, ChevronDown, Check, UserCheck, ShieldAlert, Store, UtensilsCrossed, Pill, PieChart, Sparkles, Brain, FlaskConical, Cpu, Crown, Zap, Coins, Radio
+  Package, TrendingUp, ChevronLeft, ChevronRight, LogOut, Wallet, Shield, Globe, Settings, MessageCircle, Users, Megaphone, ChevronDown, Check, UserCheck, ShieldAlert, Store, UtensilsCrossed, Pill, PieChart, Sparkles, Brain, FlaskConical, Cpu, Crown, Zap, Coins, Radio, Trophy
 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { cn } from "@/lib/utils";
@@ -64,6 +64,7 @@ export const navItems = [
   { path: "/admin/bugs", label: "Suivi des bugs", icon: ShieldAlert },
   { path: "/admin/courses-a-sauver", label: "Courses à sauver", icon: ShieldAlert },
   { path: "/admin/fiabilite-push", label: "Fiabilité Push", icon: Radio },
+  { path: "/admin/silga-score", label: "Silga Score", icon: Trophy },
   { path: "/notifications", label: "Notifications", icon: Bell },
   { path: "/maintenance", label: "Maintenance", icon: Shield },
 ];
