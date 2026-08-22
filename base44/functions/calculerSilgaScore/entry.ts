@@ -79,7 +79,7 @@ export default async function(req: Request): Promise<Response> {
         200
       );
 
-      // Fetch CourseExterne assignées à ce livreur
+      // Fetch CourseExterne assignées à ce livreur (avec champs de timing)
       const courses = await base44.entities.CourseExterne.filter(
         { livreur_id: livreurId },
         '-created_date',
@@ -101,6 +101,9 @@ export default async function(req: Request): Promise<Response> {
         silga_score_niveau: scoreResult.niveau,
         silga_score_breakdown: JSON.stringify(scoreResult.breakdown),
         silga_score_calculated_at: new Date().toISOString(),
+        silga_score_confiance: scoreResult.confiance,
+        silga_score_data_points: scoreResult.data_points,
+        silga_score_anomalies: JSON.stringify(scoreResult.anomalies),
       });
 
       results.push({
@@ -110,8 +113,13 @@ export default async function(req: Request): Promise<Response> {
         country_code: countryCode,
         score: scoreResult.score,
         niveau: scoreResult.niveau,
+        confiance: scoreResult.confiance,
+        confiance_reason: scoreResult.confiance_reason,
+        data_points: scoreResult.data_points,
+        anomalies: scoreResult.anomalies,
         breakdown: scoreResult.breakdown,
         metrics: scoreResult.metrics,
+        comparison: scoreResult.comparison,
       });
     }
 
@@ -125,10 +133,20 @@ export default async function(req: Request): Promise<Response> {
         moyen: results.filter(r => r.niveau === 'moyen').length,
         faible: results.filter(r => r.niveau === 'faible').length,
       };
+      const byConfiance = {
+        faible: results.filter(r => r.confiance === 'faible').length,
+        moyenne: results.filter(r => r.confiance === 'moyenne').length,
+        elevee: results.filter(r => r.confiance === 'elevee').length,
+      };
+      const allAnomalies = results.flatMap(r => r.anomalies.map(a => ({ ...a, livreur_id: r.livreur_id, livreur_nom: r.livreur_nom, score: r.score })));
+
       summary = {
         total_calcules: results.length,
         score_moyen: avgScore,
-        repartition: byNiveau,
+        repartition_niveaux: byNiveau,
+        repartition_confiance: byConfiance,
+        total_anomalies: allAnomalies.length,
+        anomalies_detail: allAnomalies,
       };
     }
 

@@ -4,10 +4,12 @@ import { base44 } from "@/api/base44Client";
 import {
   Trophy, RefreshCw, ChevronDown, ChevronUp, Truck, Star,
   TrendingUp, TrendingDown, Wallet, Clock, Award, AlertCircle,
+  BarChart3, List,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import SilgaScoreCalibration from "@/components/admin/SilgaScoreCalibration";
 
 const NIVEAU_CONFIG = {
   excellent: { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200", bar: "bg-emerald-500", label: "Excellent", icon: Award },
@@ -58,6 +60,7 @@ function BreakdownRow({ category }) {
 export default function SilgaScore() {
   const queryClient = useQueryClient();
   const [expandedId, setExpandedId] = useState(null);
+  const [activeTab, setActiveTab] = useState("classement");
 
   // ── Charger les livreurs avec leur score ──
   const { data: livreurs = [], isLoading } = useQuery({
@@ -145,19 +148,55 @@ export default function SilgaScore() {
               <p className="text-[10px] text-gray-400">Score de fiabilité des livreurs — mode observation</p>
             </div>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => recalcMutation.mutate()}
-            disabled={recalcMutation.isPending}
-            className="rounded-xl gap-2"
-          >
-            <RefreshCw className={cn("w-3.5 h-3.5", recalcMutation.isPending && "animate-spin")} />
-            <span className="hidden sm:inline">Recalculer</span>
-          </Button>
+          <div className="flex items-center gap-2">
+            {/* Tabs */}
+            <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-0.5">
+              <button
+                onClick={() => setActiveTab("classement")}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all",
+                  activeTab === "classement" ? "bg-white text-gray-900 shadow-sm" : "text-gray-400"
+                )}
+              >
+                <List className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Classement</span>
+              </button>
+              <button
+                onClick={() => setActiveTab("calibration")}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all",
+                  activeTab === "calibration" ? "bg-white text-gray-900 shadow-sm" : "text-gray-400"
+                )}
+              >
+                <BarChart3 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Calibration</span>
+              </button>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => recalcMutation.mutate()}
+              disabled={recalcMutation.isPending}
+              className="rounded-xl gap-2"
+            >
+              <RefreshCw className={cn("w-3.5 h-3.5", recalcMutation.isPending && "animate-spin")} />
+              <span className="hidden sm:inline">Recalculer</span>
+            </Button>
+          </div>
         </div>
       </div>
 
+      {/* Tab content */}
+      {activeTab === "calibration" && (
+        <div className="max-w-4xl mx-auto px-4 py-5">
+          <SilgaScoreCalibration
+            onRecalc={() => recalcMutation.mutate()}
+            isRecalculating={recalcMutation.isPending}
+          />
+        </div>
+      )}
+
+      {activeTab === "classement" && (
       <div className="max-w-4xl mx-auto px-4 py-5 space-y-5">
         {/* Banner mode observation */}
         <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 flex items-start gap-3">
@@ -310,6 +349,7 @@ export default function SilgaScore() {
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }
