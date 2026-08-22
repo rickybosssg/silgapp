@@ -425,21 +425,12 @@ export default function AdminCourseForm() {
         result = await base44.functions.invoke('creerCourseAdmin', courseData);
       } catch (invokeErr) {
         console.error("[CREER_COURSE_ADMIN] Invoke threw:", invokeErr);
-        // Le SDK peut throw pour les réponses 4xx/5xx
         const errMsg = invokeErr?.message || invokeErr?.error || invokeErr?.data?.error || (typeof invokeErr === 'string' ? invokeErr : 'Erreur réseau');
         throw new Error(errMsg);
       }
-      console.log("[CREER_COURSE_ADMIN] Response type:", typeof result, "value:", result);
-      // Si le SDK retourne un objet Response (fetch API), le parser
-      if (result && typeof result === 'object' && typeof result.json === 'function') {
-        try {
-          result = await result.json();
-        } catch (parseErr) {
-          throw new Error("Réponse non-JSON du serveur");
-        }
-      }
-      if (!result || (!result.success && !result.error)) {
-        throw new Error("Réponse invalide du serveur: " + JSON.stringify(result).substring(0, 200));
+      // Le SDK peut envelopper la réponse dans une propriété data
+      if (result?.data && (result.data.success !== undefined || result.data.error !== undefined)) {
+        result = result.data;
       }
       if (!result?.success || result?.error) {
         throw new Error(result?.error || 'Erreur inconnue');
