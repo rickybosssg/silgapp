@@ -100,12 +100,16 @@ export default function AdminAddressAutocomplete({
         country_code: countryCode,
       });
 
+      console.log("[GEOCODE_RESULT]", JSON.stringify(res)?.substring(0, 500));
+
       let lat = null;
       let lng = null;
       let ville = null;
 
-      if (res?.results && res.results.length > 0) {
-        const first = res.results[0];
+      // Gérer les deux formats de réponse : direct ou wrapper data
+      const results = res?.results || res?.data?.results || [];
+      if (results.length > 0) {
+        const first = results[0];
         lat = first.latitude;
         lng = first.longitude;
         ville = first.quartier || first.ville || first.label || null;
@@ -120,7 +124,8 @@ export default function AdminAddressAutocomplete({
         // Pas de résultat de géocodage — utiliser le nom saisi sans GPS
         onChange?.(nomQuartier);
         setShowSuggestions(false);
-        toast?.error?.(`Quartier « ${nomQuartier} » non trouvé par le géocodeur`);
+        const errMsg = res?.error || res?.data?.error || "aucun résultat";
+        toast?.error?.(`Quartier « ${nomQuartier} » non trouvé (${errMsg})`);
         return;
       }
 
