@@ -20,6 +20,9 @@ import { resolveGpsForCourse, isGpsValid, GPS_BLOCK_MESSAGE } from "@/lib/gpsRes
 
 const DRAFT_KEY = "silgapp_admin_course_draft";
 
+// ── Helper: formate un nombre sans crasher si null/undefined ──
+const safeFmt = (val) => (val != null && !isNaN(Number(val)) ? Number(val).toLocaleString("fr-FR") : "—");
+
 function saveDraft(state) {
   try {
     sessionStorage.setItem(DRAFT_KEY, JSON.stringify(state));
@@ -817,7 +820,7 @@ export default function AdminCourseForm() {
             {prixApproximatif ? (
               <div className="text-right">
                 <p className="text-xl font-black text-amber-700">
-                  {prixApproximatif.prix ? prixApproximatif.prix.toLocaleString() : "—"} <span className="text-xs font-bold">{prixApproximatif.devise}</span>
+                  {safeFmt(prixApproximatif.prix)} <span className="text-xs font-bold">{prixApproximatif.devise}</span>
                 </p>
                 <p className="text-[10px] text-amber-400 mt-0.5">
                   {prixApproximatif.distanceKm || prixApproximatif.distance} km
@@ -839,13 +842,13 @@ export default function AdminCourseForm() {
               <Input
                 type="text"
                 inputMode="numeric"
-                value={prixProposeAdmin ? Number(prixProposeAdmin.replace(/\D/g, "")).toLocaleString("fr-FR") : ""}
+                value={prixProposeAdmin ? safeFmt(prixProposeAdmin.replace(/\D/g, "")) : ""}
                 onChange={e => {
                   prixProposeManuelModifie.current = true;
                   const digits = e.target.value.replace(/\D/g, "");
                   setPrixProposeAdmin(digits);
                 }}
-                placeholder={prixApproximatif?.prix ? prixApproximatif.prix.toLocaleString("fr-FR") : "—"}
+                placeholder={prixApproximatif?.prix ? safeFmt(prixApproximatif.prix) : "—"}
                 className="rounded-xl h-12 pr-20 bg-amber-50/30 border-amber-100/50 text-lg font-bold text-gray-900 focus:ring-amber-300/50 focus:border-amber-400"
               />
               <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-bold text-gray-400">

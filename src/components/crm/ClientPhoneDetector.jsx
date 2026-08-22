@@ -106,7 +106,7 @@ export default function ClientPhoneDetector({ phone, countryCode, onClientFound,
           <div className="flex items-center gap-2">
             {client.nb_courses_total > 0 && (
               <span className="text-[10px] text-gray-500 font-medium">
-                {client.nb_courses_total} course{client.nb_courses_total > 1 ? "s" : ""} • {(client.montant_total_depense || 0).toLocaleString()} FCFA
+                {client.nb_courses_total} course{client.nb_courses_total > 1 ? "s" : ""} • {Number(client.montant_total_depense || 0).toLocaleString("fr-FR")} FCFA
               </span>
             )}
             <button
