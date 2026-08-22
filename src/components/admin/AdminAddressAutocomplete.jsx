@@ -61,13 +61,28 @@ export default function AdminAddressAutocomplete({
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // Suggestions filtrées
+  // Suggestions filtrées — recherche sur nom, nom_affiche, variantes
+  // Déduplication par nom_affiche (ou nom si nom_affiche vide) pour ne pas
+  // afficher Karpala + Karpala 2 comme deux suggestions distinctes.
   const suggestions = React.useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return [];
-    return quartiers
-      .filter((qu) => qu.nom.toLowerCase().includes(q))
-      .slice(0, 8);
+    const matches = quartiers.filter((qu) => {
+      const nom = (qu.nom || "").toLowerCase();
+      const nomAffiche = (qu.nom_affiche || "").toLowerCase();
+      const variantes = (qu.variantes || "").toLowerCase();
+      return nom.includes(q) || nomAffiche.includes(q) || variantes.includes(q);
+    });
+    // Dédupliquer par nom_affiche (fallback nom) — garde le premier match
+    const seen = new Set();
+    const deduped = [];
+    for (const qu of matches) {
+      const key = (qu.nom_affiche || qu.nom || "").toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      deduped.push(qu);
+    }
+    return deduped.slice(0, 8);
   }, [query, quartiers]);
 
   const handleCreateQuartier = async () => {

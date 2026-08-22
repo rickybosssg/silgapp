@@ -150,6 +150,14 @@ export default function AdminCourseForm() {
       quartierDepart, quartierArrivee, gpsDepart, gpsArrivee,
       gpsDepartSource, gpsArriveeSource, prixProposeAdmin]);
 
+  // ── Synchroniser countryCode avec adminCountryCode dès que le contexte admin est chargé ──
+  // Ne remplace pas un pays déjà explicitement choisi par l'admin.
+  useEffect(() => {
+    if (adminCountryCode && !countryCode) {
+      setCountryCode(adminCountryCode);
+    }
+  }, [adminCountryCode]);
+
   // ── Charger les quartiers du pays pour la résolution GPS de fallback ──
   useEffect(() => {
     if (!countryCode) { setQuartiers([]); return; }
