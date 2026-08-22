@@ -421,6 +421,11 @@ export default function AdminCourseForm() {
       };
 
       const result = await base44.functions.invoke('creerCourseAdmin', courseData);
+      console.log("[CREER_COURSE_ADMIN] Response:", result);
+      if (!result || (!result.success && !result.error)) {
+        // Réponse inattendue (non-JSON, ou objet vide)
+        throw new Error("Réponse invalide du serveur (voir console pour détails)");
+      }
       if (!result?.success || result?.error) {
         throw new Error(result?.error || 'Erreur inconnue');
       }
@@ -448,7 +453,9 @@ export default function AdminCourseForm() {
       resetForm();
       clearDraft();
     } catch (err) {
-      toast.error("Erreur création: " + (err?.message || "inconnue"));
+      console.error("[CREER_COURSE_ADMIN] Error:", err);
+      const errMsg = err?.message || err?.error || (typeof err === 'string' ? err : 'Erreur inconnue');
+      toast.error("Erreur création: " + errMsg);
     } finally {
       setSubmitting(false);
     }
