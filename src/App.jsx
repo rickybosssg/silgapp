@@ -1,6 +1,7 @@
 import React, { Suspense, lazy, useState, useEffect } from 'react';
 import SplashScreen from './components/SplashScreen';
 import { Toaster } from '@/components/ui/toaster';
+import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -484,6 +485,7 @@ function AppWithProviders() {
     <QueryClientProvider client={queryClientInstance}>
       <App />
       <IOSAppStoreBanner />
+      <SonnerToaster position="top-center" richColors closeButton />
     </QueryClientProvider>
   );
 }
