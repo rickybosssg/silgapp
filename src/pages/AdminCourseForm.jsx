@@ -65,7 +65,7 @@ const TYPE_OPTIONS = [
 
 // ── Main form component ──
 export default function AdminCourseForm() {
-  const { countryCode: adminCountryCode } = useAdminContext();
+  const { selectedCountry: adminCountryCode } = useAdminContext();
   const { addWindow } = useAdminCourseWindows();
 
   const [submitting, setSubmitting] = useState(false);
