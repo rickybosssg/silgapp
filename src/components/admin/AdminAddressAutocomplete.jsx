@@ -1,19 +1,20 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { base44 } from "@/api/base44Client";
-import { MapPin, Search, Loader2, Plus } from "lucide-react";
+import { MapPin, Search, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 /**
- * Champ de saisie d'adresse admin avec suggestions de quartiers en temps réel.
+ * Champ de saisie d'adresse admin avec suggestions live du géocodeur ORS.
  *
- * Quand l'admin tape du texte, une liste de quartiers correspondants apparaît.
- * Sélectionner un quartier remplit l'adresse + le GPS automatiquement.
+ * Au lieu de proposer des quartiers depuis la base locale (qui est souvent
+ * incomplète), ce composant interroge le géocodeur en temps réel et affiche
+ * les résultats. Sélectionner un résultat remplit l'adresse + le GPS.
  *
  * Props:
  * - value, onChange
- * - onSelect(result): appelé avec { latitude, longitude, quartier, label } quand un quartier est sélectionné
- * - countryCode: code pays pour filtrer les quartiers
+ * - onSelect(result): appelé avec { latitude, longitude, quartier, ville, label } quand une adresse est sélectionnée
+ * - countryCode: code pays pour filtrer les résultats
  * - placeholder, iconColor, inputClassName
  * - children: bouton « Localiser » positionné à droite par le parent
  */
@@ -27,23 +28,14 @@ export default function AdminAddressAutocomplete({
   inputClassName = "",
   children,
 }) {
-  const [quartiers, setQuartiers] = useState([]);
   const [query, setQuery] = useState(value || "");
+  const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [highlightIndex, setHighlightIndex] = useState(-1);
-  const [creating, setCreating] = useState(false);
   const containerRef = useRef(null);
-
-  // Charger les quartiers filtrés par pays
-  useEffect(() => {
-    if (!countryCode) { setQuartiers([]); return; }
-    let cancelled = false;
-    base44.entities.Quartier
-      .filter({ country_code: countryCode, actif: true }, "nom", 500)
-      .then((data) => { if (!cancelled) setQuartiers(data || []); })
-      .catch(() => { if (!cancelled) setQuartiers([]); });
-    return () => { cancelled = true; };
-  }, [countryCode]);
+  const debounceRef = useRef(null);
+  const abortRef = useRef(null);
 
   // Sync externe → interne
   useEffect(() => {
@@ -61,124 +53,77 @@ export default function AdminAddressAutocomplete({
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // Suggestions filtrées — recherche sur nom, nom_affiche, variantes
-  // Déduplication par nom_affiche (ou nom si nom_affiche vide) pour ne pas
-  // afficher Karpala + Karpala 2 comme deux suggestions distinctes.
-  const suggestions = React.useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return [];
-    const matches = quartiers.filter((qu) => {
-      const nom = (qu.nom || "").toLowerCase();
-      const nomAffiche = (qu.nom_affiche || "").toLowerCase();
-      const variantes = (qu.variantes || "").toLowerCase();
-      return nom.includes(q) || nomAffiche.includes(q) || variantes.includes(q);
-    });
-    // Dédupliquer par nom_affiche (fallback nom) — garde le premier match
-    const seen = new Set();
-    const deduped = [];
-    for (const qu of matches) {
-      const key = (qu.nom_affiche || qu.nom || "").toLowerCase();
-      if (seen.has(key)) continue;
-      seen.add(key);
-      deduped.push(qu);
-    }
-    return deduped.slice(0, 8);
-  }, [query, quartiers]);
+  // ── Recherche live via geocodeAddress (debounce 350ms) ──
+  const searchAddresses = useCallback(
+    async (q) => {
+      if (!q || q.trim().length < 3) {
+        setSuggestions([]);
+        setLoading(false);
+        return;
+      }
 
-  const handleCreateQuartier = async () => {
-    const nomQuartier = query.trim();
-    if (!nomQuartier || nomQuartier.length < 3) return;
-    if (!countryCode) {
-      toast?.error?.("Pays requis pour créer un quartier (COUNTRY_REQUIRED).");
+      // Annuler la requête précédente
+      if (abortRef.current) {
+        abortRef.current.abort = true;
+      }
+      const myAbort = { abort: false };
+      abortRef.current = myAbort;
+
+      setLoading(true);
+      try {
+        const res = await base44.functions.invoke("geocodeAddress", {
+          query: q.trim(),
+          country_code: countryCode,
+        });
+
+        if (myAbort.abort) return;
+
+        const results = res?.results || res?.data?.results || [];
+        setSuggestions(results.slice(0, 8));
+        setShowSuggestions(true);
+        setHighlightIndex(-1);
+      } catch (err) {
+        if (!myAbort.abort) {
+          console.error("[AdminAddressAutocomplete] Erreur géocode:", err);
+          setSuggestions([]);
+        }
+      } finally {
+        if (!myAbort.abort) setLoading(false);
+      }
+    },
+    [countryCode]
+  );
+
+  // Debounce la recherche
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    const q = query.trim();
+    if (q.length < 3) {
+      setSuggestions([]);
+      setLoading(false);
       return;
     }
-    setCreating(true);
-    try {
-      // 1. Géocoder le quartier via geocodeAddress
-      const res = await base44.functions.invoke("geocodeAddress", {
-        query: nomQuartier,
-        country_code: countryCode,
-      });
+    debounceRef.current = setTimeout(() => {
+      searchAddresses(q);
+    }, 350);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [query, searchAddresses]);
 
-      console.log("[GEOCODE_RESULT]", JSON.stringify(res)?.substring(0, 500));
-
-      let lat = null;
-      let lng = null;
-      let ville = null;
-
-      // Gérer les deux formats de réponse : direct ou wrapper data
-      const results = res?.results || res?.data?.results || [];
-      if (results.length > 0) {
-        const first = results[0];
-        lat = first.latitude;
-        lng = first.longitude;
-        ville = first.quartier || first.ville || first.label || null;
-        // Extraire le nom de la ville du label si pas explicite
-        if (!ville && first.label) {
-          const parts = first.label.split(",");
-          ville = parts.length > 1 ? parts[parts.length - 1].trim() : parts[0].trim();
-        }
-      }
-
-      if (!lat || !lng) {
-        // Pas de résultat de géocodage — utiliser le nom saisi sans GPS
-        onChange?.(nomQuartier);
-        setShowSuggestions(false);
-        const errMsg = res?.error || res?.data?.error || "aucun résultat";
-        toast?.error?.(`Quartier « ${nomQuartier} » non trouvé (${errMsg})`);
-        return;
-      }
-
-      // 2. Enregistrer le nouveau quartier en base
-      if (!countryCode) {
-        toast?.error?.("Pays requis pour créer un quartier (COUNTRY_REQUIRED).");
-        return;
-      }
-      const nouveauQuartier = await base44.entities.Quartier.create({
-        country_code: countryCode,
-        nom: nomQuartier,
-        ville: ville || "—",
-        latitude: lat,
-        longitude: lng,
-        actif: true,
-      });
-
-      // 3. L'ajouter à la liste locale pour qu'il apparaisse immédiatement
-      setQuartiers((prev) => [...prev, nouveauQuartier]);
-
-      // 4. Sélectionner le quartier créé (remplit l'adresse + GPS)
-      setQuery(nomQuartier);
-      setShowSuggestions(false);
-      setHighlightIndex(-1);
-      onChange?.(nomQuartier);
-      if (onSelect) {
-        onSelect({
-          latitude: lat,
-          longitude: lng,
-          quartier: nomQuartier,
-          label: nomQuartier,
-        });
-      }
-
-      toast?.success?.(`Quartier « ${nomQuartier} » enregistré avec coordonnées GPS`);
-    } catch (err) {
-      toast?.error?.(`Erreur création quartier: ${err?.message || "inconnue"}`);
-    } finally {
-      setCreating(false);
-    }
-  };
-
-  const handleSelect = (qu) => {
-    setQuery(qu.nom);
+  const handleSelect = (result) => {
+    const label = result.label || result.name || result.quartier || "";
+    setQuery(label);
     setShowSuggestions(false);
     setHighlightIndex(-1);
-    onChange?.(qu.nom);
-    if (onSelect && qu.latitude && qu.longitude) {
+    onChange?.(label);
+    if (onSelect && result.latitude && result.longitude) {
       onSelect({
-        latitude: qu.latitude,
-        longitude: qu.longitude,
-        quartier: qu.nom,
-        label: qu.nom,
+        latitude: result.latitude,
+        longitude: result.longitude,
+        quartier: result.quartier || result.name || "",
+        ville: result.ville || "",
+        label,
       });
     }
   };
@@ -214,20 +159,27 @@ export default function AdminAddressAutocomplete({
         value={query}
         onChange={handleInputChange}
         onKeyDown={handleKeyDown}
-        onFocus={() => { if (query.trim()) setShowSuggestions(true); }}
+        onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }}
         placeholder={placeholder}
         autoComplete="off"
         className={inputClassName}
       />
       {children}
 
+      {/* Loading indicator */}
+      {loading && (
+        <div className="force-light absolute right-24 top-1/2 -translate-y-1/2 z-20">
+          <Loader2 className="w-4 h-4 text-gray-400 animate-spin" />
+        </div>
+      )}
+
       {showSuggestions && suggestions.length > 0 && (
         <div className="force-light absolute z-50 mt-1 w-full max-h-56 overflow-y-auto rounded-xl bg-white border border-gray-200 shadow-lg">
-          {suggestions.map((q, idx) => (
+          {suggestions.map((r, idx) => (
             <button
-              key={q.id || idx}
+              key={idx}
               type="button"
-              onClick={() => handleSelect(q)}
+              onClick={() => handleSelect(r)}
               onMouseEnter={() => setHighlightIndex(idx)}
               className={`flex items-center gap-2 w-full text-left px-4 py-2.5 text-sm transition-colors ${
                 idx === highlightIndex
@@ -236,34 +188,27 @@ export default function AdminAddressAutocomplete({
               } ${idx > 0 ? "border-t border-gray-50" : ""}`}
             >
               <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-              <span>{q.nom}</span>
-              {q.ville && (
-                <span className="text-[10px] text-gray-400 ml-auto">{q.ville}</span>
+              <div className="flex-1 min-w-0">
+                <p className="truncate">{r.label || r.name}</p>
+              </div>
+              {r.ville && (
+                <span className="text-[10px] text-gray-400 ml-auto shrink-0">{r.ville}</span>
               )}
             </button>
           ))}
         </div>
       )}
 
-      {/* Création d'un nouveau quartier s'il n'existe pas en base */}
-      {showSuggestions && suggestions.length === 0 && query.trim().length >= 3 && !creating && (
-        <button
-          type="button"
-          onClick={handleCreateQuartier}
-          className="force-light absolute z-50 mt-1 w-full flex items-center gap-2 px-4 py-2.5 text-sm text-left rounded-xl bg-white border border-primary/30 shadow-lg hover:bg-primary/5 transition-colors"
-        >
-          <Plus className="w-4 h-4 text-primary shrink-0" />
-          <span className="text-gray-700">
-            Créer « <span className="font-medium text-primary">{query.trim()}</span> » et rechercher ses coordonnées
-          </span>
-        </button>
-      )}
-
-      {/* Loading pendant la création */}
-      {creating && (
-        <div className="force-light absolute z-50 mt-1 w-full flex items-center gap-2 px-4 py-2.5 text-sm rounded-xl bg-white border border-primary/30 shadow-lg">
-          <Loader2 className="w-4 h-4 text-primary animate-spin shrink-0" />
-          <span className="text-gray-600">Recherche des coordonnées…</span>
+      {/* Aucun résultat trouvé — proposer d'utiliser la carte */}
+      {showSuggestions && !loading && suggestions.length === 0 && query.trim().length >= 3 && (
+        <div className="force-light absolute z-50 mt-1 w-full rounded-xl bg-white border border-gray-200 shadow-lg p-3 space-y-2">
+          <p className="text-xs text-gray-500 text-center">
+            Aucune adresse trouvée pour « {query.trim()} »
+          </p>
+          <p className="text-[11px] text-gray-400 text-center">
+            Utilisez le bouton <span className="font-semibold text-gray-600">Localiser</span> pour
+            placer le point sur la carte et récupérer le GPS.
+          </p>
         </div>
       )}
     </div>
