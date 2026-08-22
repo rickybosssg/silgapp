@@ -105,10 +105,8 @@ export default function AdminCourseForm() {
 
   // ── Persistance du brouillon : restauration après remount/rechargement ──
   useEffect(() => {
-    console.log("[ADMIN_COURSE_FORM_MOUNT]");
     const draft = loadDraft();
     if (draft) {
-      console.log("[ADMIN_COURSE_DRAFT_RESTORED]", { clientTelephone: draft.clientTelephone });
       if (draft.typeCourse) setTypeCourse(draft.typeCourse);
       if (draft.adresseDepart) setAdresseDepart(draft.adresseDepart);
       if (draft.adresseArrivee) setAdresseArrivee(draft.adresseArrivee);
@@ -129,9 +127,6 @@ export default function AdminCourseForm() {
       if (draft.gpsArriveeSource) setGpsArriveeSource(draft.gpsArriveeSource);
       if (draft.prixProposeAdmin) setPrixProposeAdmin(draft.prixProposeAdmin);
     }
-    return () => {
-      console.log("[ADMIN_COURSE_FORM_UNMOUNT]");
-    };
   }, []);
 
   // ── Sauvegarde automatique du brouillon (après restauration) ──
@@ -590,10 +585,7 @@ export default function AdminCourseForm() {
               <p className="text-[10px] text-gray-400 mb-1 font-semibold uppercase tracking-wide">Téléphone</p>
               <Input
                 value={clientTelephone}
-                onChange={e => {
-                  console.log("[CLIENT_PHONE_CHANGE]", `"${clientTelephone}" → "${e.target.value}"`);
-                  setClientTelephone(e.target.value);
-                }}
+                onChange={e => setClientTelephone(e.target.value)}
                 placeholder="+226 XX XX XX XX"
                 className="rounded-xl h-11 bg-blue-50 border-blue-200/60 text-sm focus:ring-blue-300/50 focus:border-blue-400"
               />
