@@ -845,7 +845,7 @@ export default function AdminCourseForm() {
                   const digits = e.target.value.replace(/\D/g, "");
                   setPrixProposeAdmin(digits);
                 }}
-                placeholder={prixApproximatif ? prixApproximatif.prix.toLocaleString("fr-FR") : "—"}
+                placeholder={prixApproximatif?.prix ? prixApproximatif.prix.toLocaleString("fr-FR") : "—"}
                 className="rounded-xl h-12 pr-20 bg-amber-50/30 border-amber-100/50 text-lg font-bold text-gray-900 focus:ring-amber-300/50 focus:border-amber-400"
               />
               <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-bold text-gray-400">
