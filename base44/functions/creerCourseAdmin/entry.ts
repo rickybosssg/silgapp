@@ -19,8 +19,16 @@ export default async function(req) {
     if (!user) {
       return Response.json({ error: 'Non autorisé' }, { status: 401 });
     }
-    if (user.role !== 'admin') {
-      return Response.json({ error: 'Réservé aux administrateurs' }, { status: 403 });
+
+    // ── Autorisation : admin complet OU permission dédiée can_create_admin_course ──
+    // Un agent de saisie a role='user' mais can_create_admin_course=true.
+    // Il peut créer des courses admin mais n'a PAS accès au dashboard admin complet.
+    const isAuthorized = user.role === 'admin' || user.can_create_admin_course === true;
+    if (!isAuthorized) {
+      return Response.json({
+        error: 'Réservé aux administrateurs ou agents de saisie autorisés',
+        code: 'FORBIDDEN_NO_ADMIN_COURSE_PERMISSION'
+      }, { status: 403 });
     }
 
     const courseData = await req.json();

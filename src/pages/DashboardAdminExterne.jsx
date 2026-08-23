@@ -28,8 +28,8 @@ import DispatchConfigPanel from "@/components/admin/DispatchConfigPanel";
 import LivreursBloquesEncours from "@/components/admin/LivreursBloquesEncours";
 
 export default function DashboardAdminExterne() {
-  const { isPays, countryCode: adminCountryCode } = useAdminContext();
-  const effectiveCountry = isPays ? adminCountryCode : "BF"; // Fallback BF si global
+  const { isPays, countryCode: adminCountryCode, selectedCountry } = useAdminContext();
+  const effectiveCountry = isPays ? adminCountryCode : (selectedCountry || "BF");
 
   const { data: courses = [] } = useQuery({
     queryKey: ["courses-externes", effectiveCountry],

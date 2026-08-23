@@ -370,12 +370,17 @@ export default function CourseExterneFormSync() {
       }
 
       const createResult = await base44.functions.invoke("creerCourseClient", { course_data: finalData });
-      const course = createResult.course;
+      // Safety: SDK peut wrapper la réponse dans { data: { ... } }
+      const course = createResult?.data?.course || createResult?.course;
 
-      // ── Créer les sous-colis si mode multi-colis ──────────────────────────
+      if (!course?.id) {
+        throw new Error("Réponse invalide du serveur — course non créée");
+      }
+
+      // ── Créer les sous-colis si mode multi-colis (fire-and-forget) ──
       if (finalData.is_multi_colis && finalData._colisData?.length > 1) {
-        const colisPromises = finalData._colisData.map((c) => {
-          return base44.entities.ColisExterne.create({
+        Promise.all(finalData._colisData.map((c) =>
+          base44.entities.ColisExterne.create({
             course_id: course.id,
             colis_uid: c.colis_uid,
             numero_ordre: c.numero_ordre,
@@ -394,27 +399,19 @@ export default function CourseExterneFormSync() {
             montant_a_encaisser: 0,
             mode_paiement: "especes",
             ordre_livraison: c.ordre_livraison || c.numero_ordre,
-          });
-        });
-        await Promise.all(colisPromises);
+          }).catch(() => null)
+        )).catch(() => null);
       }
 
-      // Notifier toujours (la fonction vérifie en interne)
-      try {
-        await base44.functions.invoke("notifyClientSync", { course_id: course.id });
-      } catch (err) {
-        console.error("Erreur notification:", err);
-      }
-      // Ne pas lancer le dispatch pour les courses programmées
+      // ── Fire-and-forget : notifications et dispatch en arrière-plan ──
+      // Le client ne doit PAS attendre la fin du dispatch pour voir sa confirmation.
+      // La création de la course et la recherche du livreur sont deux étapes distinctes.
+      base44.functions.invoke("notifyClientSync", { course_id: course.id }).catch(() => null);
       if (!formData.date_souhaitee) {
-        try {
-          await base44.functions.invoke("dispatchExterneAuto", {
-            action: "lancer_recherche_auto",
-            course_id: course.id
-          });
-        } catch (err) {
-          console.error("Erreur dispatch:", err);
-        }
+        base44.functions.invoke("dispatchExterneAuto", {
+          action: "lancer_recherche_auto",
+          course_id: course.id
+        }).catch(() => null);
       }
       return course;
     },
@@ -429,12 +426,12 @@ export default function CourseExterneFormSync() {
       queryClient.invalidateQueries({ queryKey: ['courses-externes-client'] });
 
       if (formData.date_souhaitee || response?.statut === "programmee") {
-        toast.success("Course programmee creee");
+        toast.success("Course programmée créée");
         navigate("/client", { replace: true });
         return;
       }
 
-      toast.success("Course creee ! Recherche d'un livreur en cours...");
+      toast.success("Course créée — En attente d’un livreur");
       setCreatedCourse(response);
       // Sauvegarde contacts en base de données (sauf déplacement)
       const cid = clientProfil?.id;

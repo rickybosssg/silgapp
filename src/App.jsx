@@ -71,6 +71,7 @@ const PolitiqueConfidentialite = lazy(() => import('./pages/PolitiqueConfidentia
 const TestNotifications = lazy(() => import('./pages/TestNotifications.jsx'));
 const DiagnosticPushComplet = lazy(() => import('./pages/DiagnosticPushComplet.jsx'));
 const TestDispatchLivreur = lazy(() => import('./pages/TestDispatchLivreur.jsx'));
+const CentreNotificationsPush = lazy(() => import('./pages/CentreNotificationsPush.jsx'));
 const DemoDashboard = lazy(() => import('./pages/DemoDashboard.jsx'));
 const Statistiques = lazy(() => import('./pages/Statistiques.jsx'));
 // ── Module Boutiques / Restaurants / Partenaires ──
@@ -453,6 +454,7 @@ function AppContent() {
           <Route path="/admin/test-notifications" element={<AnimatedRoutes><TestNotifications /></AnimatedRoutes>} />
           <Route path="/admin/test-dispatch-livreur" element={<AnimatedRoutes><TestDispatchLivreur /></AnimatedRoutes>} />
           <Route path="/admin/centre-notifications" element={<AnimatedRoutes><CentreNotifications /></AnimatedRoutes>} />
+          <Route path="/admin/centre-notifications-push" element={<AnimatedRoutes><CentreNotificationsPush /></AnimatedRoutes>} />
           <Route path="/admin/tarification" element={<AnimatedRoutes><TarificationAdmin /></AnimatedRoutes>} />
           <Route path="/admin/demandes-livreurs" element={<AnimatedRoutes><DemandesLivreursAdmin /></AnimatedRoutes>} />
           <Route path="/admin/livreurs-bloques" element={<AnimatedRoutes><LivreursBloquesEncours /></AnimatedRoutes>} />

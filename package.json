@@ -12,6 +12,7 @@
     "test:livreur-course": "node tests/livreur-course-regression.mjs",
     "test:courses-disponibles": "node tests/courses-disponibles-regression.mjs",
     "test:source-integrity": "node tests/source-integrity.mjs",
+    "test:base44-sync": "node tests/base44-sync-regression.mjs",
     "test:venus-admin": "node --experimental-strip-types tests/venus-admin-regression.mjs",
     "test:venus-whatsapp": "node --experimental-strip-types tests/venus-whatsapp-regression.mjs",
     "preview": "vite preview"

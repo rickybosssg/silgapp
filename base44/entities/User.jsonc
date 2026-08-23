@@ -28,6 +28,8 @@
         "TG",
         "BJ",
         "SN",
+        "GH",
+        "NG",
         "ML",
         "GN",
         "NE"
@@ -39,9 +41,15 @@
       "enum": [
         "client",
         "livreur",
-        "partenaire"
+        "partenaire",
+        "agent_saisie"
       ],
-      "description": "R\u00f4le m\u00e9tier SILGAPP persistant en base de donn\u00e9es. D\u00e9finit le dashboard affich\u00e9 : client, livreur ou partenaire. Ind\u00e9pendant du cache/localStorage \u2014 survit \u00e0 la d\u00e9sinstallation et au changement d'appareil."
+      "description": "R\u00f4le m\u00e9tier SILGAPP persistant en base de donn\u00e9es. D\u00e9finit le dashboard affich\u00e9 : client, livreur, partenaire ou agent_saisie (acc\u00e8s limit\u00e9 au formulaire de cr\u00e9ation de course admin). Ind\u00e9pendant du cache/localStorage \u2014 survit \u00e0 la d\u00e9sinstallation et au changement d'appareil."
+    },
+    "can_create_admin_course": {
+      "type": "boolean",
+      "default": false,
+      "description": "Permission d\u00e9di\u00e9e : autorise cet utilisateur \u00e0 cr\u00e9er des courses administratives via /admin/creer-course, SANS lui donner le r\u00f4le admin complet. V\u00e9rifi\u00e9e c\u00f4t\u00e9 backend dans creerCourseAdmin. Doit \u00eatre d\u00e9finie par un admin (pas auto-modifiable par l'utilisateur)."
     }
   }
 }

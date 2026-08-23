@@ -52,7 +52,7 @@ export default function ClientPhoneDetector({ phone, countryCode, onClientFound,
   useEffect(() => {
     if (!normalizedPhone || normalizedPhone.length < 8) {
       setClient(null);
-      onClientFoundRef.current?.(null);
+      // Le champ est encore incomplet : ne pas réinitialiser le parent pendant la saisie.
       return;
     }
     const timer = setTimeout(() => searchClient.current(), 400);

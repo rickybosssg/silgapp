@@ -144,20 +144,23 @@ Deno.serve(async (req) => {
         });
       }
 
-      // ── GPS OBLIGATOIRE — bloquer si coordonnées absentes ou invalides ──
-      const latOk = latitude != null && !isNaN(Number(latitude)) && Number(latitude) !== 0;
-      const lngOk = longitude != null && !isNaN(Number(longitude)) && Number(longitude) !== 0;
-      if (!latOk || !lngOk) {
-        return Response.json({ success: false, error: 'GPS requis pour valider cette étape — coordonnées manquantes' });
-      }
+      // ── GPS optionnel : utiliser les coordonnées fournies ou fallback sur le GPS de destination ──
+      // Le PIN code est la preuve de livraison. Le GPS est utilisé pour les stats uniquement.
+      let gpsLat = (latitude != null && !isNaN(Number(latitude)) && Number(latitude) !== 0) ? Number(latitude) : null;
+      let gpsLng = (longitude != null && !isNaN(Number(longitude)) && Number(longitude) !== 0) ? Number(longitude) : null;
+      // Fallback : GPS de destination de la course (le livreur est censé être à l'adresse d'arrivée)
+      if (gpsLat === null && course.gps_arrivee_lat) gpsLat = Number(course.gps_arrivee_lat);
+      if (gpsLng === null && course.gps_arrivee_lng) gpsLng = Number(course.gps_arrivee_lng);
+      if (gpsLat === null && course.latitude_recuperation) gpsLat = Number(course.latitude_recuperation);
+      if (gpsLng === null && course.longitude_recuperation) gpsLng = Number(course.longitude_recuperation);
 
       // ── PICKUP validé ──
       if (isPickup) {
         await base44.asServiceRole.entities.CourseExterne.update(course_id, {
           statut: 'colis_recupere',
           heure_recuperation: new Date().toISOString(),
-          latitude_recuperation: latitude || null,
-          longitude_recuperation: longitude || null,
+          latitude_recuperation: gpsLat || null,
+          longitude_recuperation: gpsLng || null,
           pickup_confirmed_by: method,
           pickup_confirmed_at: new Date().toISOString(),
         });
@@ -186,19 +189,19 @@ Deno.serve(async (req) => {
         let distAdmin = null;
         if (course.gps_depart_lat && course.gps_depart_lng && course.gps_arrivee_lat && course.gps_arrivee_lng) {
           distAdmin = haversineKm(course.gps_depart_lat, course.gps_depart_lng, course.gps_arrivee_lat, course.gps_arrivee_lng);
-        } else if (latRecupAdmin && lngRecupAdmin && latitude && longitude) {
-          distAdmin = haversineKm(latRecupAdmin, lngRecupAdmin, latitude, longitude);
+        } else if (latRecupAdmin && lngRecupAdmin && gpsLat && gpsLng) {
+          distAdmin = haversineKm(latRecupAdmin, lngRecupAdmin, gpsLat, gpsLng);
         }
 
         const adminUpdateData = {
           statut: 'livree',
           heure_livraison: now,
-          latitude_livraison: latitude || null,
-          longitude_livraison: longitude || null,
+          latitude_livraison: gpsLat || null,
+          longitude_livraison: gpsLng || null,
           delivery_confirmed_by: isBackupPin ? 'pin_secours' : method,
           delivery_confirmed_at: now,
-          latitude_arrivee_livraison: latitude || null,
-          longitude_arrivee_livraison: longitude || null,
+          latitude_arrivee_livraison: gpsLat || null,
+          longitude_arrivee_livraison: gpsLng || null,
           colis_livre_at: now,
           // PRIX NON CALCULÉ — saisi par le livreur côté app
         };
@@ -214,8 +217,8 @@ Deno.serve(async (req) => {
           course: {
             statut: 'livree',
             heure_livraison: now,
-            latitude_livraison: latitude || null,
-            longitude_livraison: longitude || null,
+            latitude_livraison: gpsLat || null,
+            longitude_livraison: gpsLng || null,
             distance_reelle_km: adminUpdateData.distance_reelle_km || null,
           },
         });
@@ -224,12 +227,12 @@ Deno.serve(async (req) => {
       const updateData = {
         statut: 'livree',
         heure_livraison: now,
-        latitude_livraison: latitude || null,
-        longitude_livraison: longitude || null,
+        latitude_livraison: gpsLat || null,
+        longitude_livraison: gpsLng || null,
         delivery_confirmed_by: isBackupPin ? 'pin_secours' : method,
         delivery_confirmed_at: now,
-        latitude_arrivee_livraison: latitude || null,
-        longitude_arrivee_livraison: longitude || null,
+        latitude_arrivee_livraison: gpsLat || null,
+        longitude_arrivee_livraison: gpsLng || null,
         colis_livre_at: now,
       };
 
@@ -244,8 +247,8 @@ Deno.serve(async (req) => {
 
       const latRecup = course.latitude_recuperation;
       const lngRecup = course.longitude_recuperation;
-      const latLivr = latitude;
-      const lngLivr = longitude;
+      const latLivr = gpsLat;
+      const lngLivr = gpsLng;
 
       // Distance réelle livreur (pour stats uniquement)
       // Si le trajet livreur est < 0.1 km (GPS n'a pas bougé, ex: PIN secours),
@@ -318,8 +321,8 @@ Deno.serve(async (req) => {
           updateData.distance_reelle_km = Math.max(Number(distReelle) || 0, 0.01);
         }
 
-        updateData.latitude_arrivee_livraison = latitude;
-        updateData.longitude_arrivee_livraison = longitude;
+        updateData.latitude_arrivee_livraison = gpsLat || null;
+        updateData.longitude_arrivee_livraison = gpsLng || null;
       } else if (latDepart && lngDepart && latArrivee && lngArrivee) {
         // ── MODE PRIX AUTOMATIQUE : calcul basé sur la distance ──
         const dist = haversineKm(latDepart, lngDepart, latArrivee, lngArrivee);
@@ -342,8 +345,8 @@ Deno.serve(async (req) => {
         updateData.prix_final = prixFinal;
         updateData.commission_silga = commission;
         updateData.montant_livreur = montantLivreur;
-        updateData.latitude_arrivee_livraison = latitude;
-        updateData.longitude_arrivee_livraison = longitude;
+        updateData.latitude_arrivee_livraison = gpsLat || null;
+        updateData.longitude_arrivee_livraison = gpsLng || null;
       } else {
         // GPS course (départ/arrivée) manquants → appliquer le minimum SILGAPP
         updateData.prix_final = PRIX_MINIMUM_GLOBAL;
