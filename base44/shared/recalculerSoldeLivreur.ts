@@ -129,13 +129,12 @@ export async function recalculerSoldeLivreur(base44: any, livreurId: string): Pr
 
   await base44.asServiceRole.entities.Livreur.update(livreurId, updateData);
 
-  // 10. Si solde = 0, marquer toutes les courses comme payées (cohérence UX)
-  if (solde === 0 && totalCommissions > 0) {
-    await base44.asServiceRole.entities.CourseExterne.updateMany(
-      { livreur_id: livreurId, statut: 'livree', statut_paiement_livreur: 'non_paye' },
-      { $set: { statut_paiement_livreur: 'paye' } }
-    ).catch(() => {});
-  }
+  // ⚠️ NE JAMAIS marquer automatiquement les courses comme "paye" ici.
+  // statut_paiement_livreur = indication UX qui doit refléter un paiement
+  // EXPLICITE sur cette course précise (via paiementLivreur / traiterPaiementSilgapp).
+  // Marquer au solde global provoque des faux "paye" quand un livreur a un
+  // ancien paiement couvrant d'anciennes commissions mais n'a pas encore réglé
+  // la commission d'une nouvelle course livrée aujourd'hui.
 
   console.log(`[SOLDE] Livreur ${livreurId}: solde=${solde} ${devise} (commissions=${totalCommissions}, payé=${totalPaye}, seuil=${seuil}, bloque=${bloque})`);
 
