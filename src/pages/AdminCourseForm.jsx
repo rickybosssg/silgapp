@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
@@ -79,7 +79,32 @@ export default function AdminCourseForm() {
   const [countryCode, setCountryCode] = useState(adminCountryCode || "");
 
   const [clientNom, setClientNom] = useState("");
-  const [clientTelephone, setClientTelephone] = useState("");
+
+  // ── TRACEUR TEMPORAIRE : identifie précisément qui écrit dans clientTelephone ──
+  // Seul onChange du champ téléphone, la restauration de brouillon et resetForm
+  // doivent appeler ce setter. Si la console affiche "CLEARED TO EMPTY" avec un
+  // source inattendu, on a trouvé le coupable.
+  const [clientTelephone, setClientTelephoneRaw] = useState("");
+  const clientTelephonePrevRef = useRef("");
+  const setClientTelephone = useCallback((value, source = "unknown") => {
+    const stack = new Error().stack;
+    const from = clientTelephonePrevRef.current;
+    if (value !== from) {
+      if (value === "" && from !== "") {
+        console.warn("[TRACE clientTelephone] ⚠️ CLEARED TO EMPTY", {
+          from,
+          to: value,
+          source,
+          stack: stack?.split("\n").slice(2, 10).join("\n"),
+        });
+      } else {
+        console.log("[TRACE clientTelephone]", { from, to: value, source });
+      }
+    }
+    clientTelephonePrevRef.current = value;
+    setClientTelephoneRaw(value);
+  }, []);
+
   const [expediteurNom, setExpediteurNom] = useState("");
   const [expediteurTelephone, setExpediteurTelephone] = useState("");
   const [destinataireNom, setDestinataireNom] = useState("");
@@ -112,7 +137,7 @@ export default function AdminCourseForm() {
       if (draft.adresseArrivee) setAdresseArrivee(draft.adresseArrivee);
       if (draft.countryCode) setCountryCode(draft.countryCode);
       if (draft.clientNom) setClientNom(draft.clientNom);
-      if (draft.clientTelephone) setClientTelephone(draft.clientTelephone);
+      if (draft.clientTelephone) setClientTelephone(draft.clientTelephone, "draft_restore");
       if (draft.expediteurNom) setExpediteurNom(draft.expediteurNom);
       if (draft.expediteurTelephone) setExpediteurTelephone(draft.expediteurTelephone);
       if (draft.destinataireNom) setDestinataireNom(draft.destinataireNom);
@@ -261,7 +286,7 @@ export default function AdminCourseForm() {
     setGpsDepartSource(null);
     setGpsArriveeSource(null);
     setClientNom("");
-    setClientTelephone("");
+    setClientTelephone("", "resetForm");
     setExpediteurNom("");
     setExpediteurTelephone("");
     setDestinataireNom("");
@@ -595,7 +620,7 @@ export default function AdminCourseForm() {
                 autoCapitalize="off"
                 spellCheck={false}
                 value={clientTelephone}
-                onChange={e => setClientTelephone(e.target.value)}
+                onChange={e => setClientTelephone(e.target.value, "input_onChange")}
                 placeholder="+226 XX XX XX XX"
                 className="rounded-xl h-11 bg-blue-50 border-blue-200/60 text-sm focus:ring-blue-300/50 focus:border-blue-400"
               />

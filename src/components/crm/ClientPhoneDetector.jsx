@@ -52,10 +52,9 @@ export default function ClientPhoneDetector({ phone, countryCode, onClientFound,
   useEffect(() => {
     if (!normalizedPhone || normalizedPhone.length < 8) {
       setClient(null);
-      // ⚠️ NE PAS appeler onClientFoundRef.current?.(null) ici — cela provoque
-      // un setDetectedClient(null) dans le parent, ce qui déclenche un re-render
-      // qui peut écraser le téléphone/nom saisi manuellement sur mobile.
-      // Le badge "Nouveau client" s'affiche déjà via le rendu (client === null).
+      // setDetectedClient(null) dans le parent — ne touche PAS à clientTelephone.
+      // Le traceur dans AdminCourseForm surveille toute écriture dans clientTelephone.
+      onClientFoundRef.current?.(null);
       return;
     }
     const timer = setTimeout(() => searchClient.current(), 400);
