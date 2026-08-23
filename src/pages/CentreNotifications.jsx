@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from "react";
+import { Link } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bell, MessageSquare, Sparkles, Package, CreditCard, XCircle, Settings, Check, Archive, Inbox } from "lucide-react";
+import { Bell, MessageSquare, Sparkles, Package, CreditCard, XCircle, Settings, Check, Archive, Inbox, Megaphone } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -136,6 +137,13 @@ export default function CentreNotifications() {
               Tout marquer lu
             </button>
           )}
+          <Link
+            to="/admin/centre-notifications-push"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-semibold hover:bg-primary/90 transition-colors"
+          >
+            <Megaphone className="w-3.5 h-3.5" />
+            Envoyer push
+          </Link>
         </div>
       </div>
 
