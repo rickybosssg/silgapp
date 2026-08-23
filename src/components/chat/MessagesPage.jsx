@@ -351,6 +351,11 @@ export default function MessagesPage({ myType, myId, myName, onBack, initialConv
       const mine = all.filter(c => {
         try {
           const parts = JSON.parse(c.participants || "[]");
+          // Admin : voir toutes les conversations où un participant admin est présent
+          // (y compris celles avec id="support" créées avant la résolution de l'email)
+          if (myType === "admin") {
+            return parts.some(p => normalizeParticipantType(p?.type) === "admin");
+          }
           return parts.some(p => participantBelongsToMe(p, myType, myId));
         } catch { return false; }
       });
