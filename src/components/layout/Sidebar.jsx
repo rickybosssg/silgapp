@@ -46,7 +46,7 @@ export const navItems = [
   { path: "/admin/venus-test-lab", label: "Laboratoire de Test VENUS", icon: FlaskConical },
   { path: "/admin/openai-dashboard", label: "Suivi OpenAI", icon: Cpu },
   { path: "/admin/credits-integration", label: "Crédits d'intégration", icon: Zap },
-  { path: "/admin/centre-notifications", label: "Notifications Push", icon: Megaphone },
+  { path: "/admin/centre-notifications", label: "Centre de notifications", icon: Bell },
   { path: "/admin/externe", label: "Config Dispatch", icon: Settings },
   { path: "/admin/livreurs-prioritaires", label: "Livreurs prioritaires", icon: Crown },
   { path: "/admin/demandes-livreurs", label: "Livreurs à valider", icon: UserCheck },
