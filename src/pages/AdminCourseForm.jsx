@@ -575,6 +575,10 @@ export default function AdminCourseForm() {
             <div>
               <p className="text-[10px] text-gray-400 mb-1 font-semibold uppercase tracking-wide">Nom du client</p>
               <Input
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="words"
+                spellCheck={false}
                 value={clientNom}
                 onChange={e => setClientNom(e.target.value)}
                 placeholder="Nom"
@@ -584,6 +588,12 @@ export default function AdminCourseForm() {
             <div>
               <p className="text-[10px] text-gray-400 mb-1 font-semibold uppercase tracking-wide">Téléphone</p>
               <Input
+                type="tel"
+                inputMode="tel"
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck={false}
                 value={clientTelephone}
                 onChange={e => setClientTelephone(e.target.value)}
                 placeholder="+226 XX XX XX XX"
@@ -597,7 +607,12 @@ export default function AdminCourseForm() {
             countryCode={countryCode}
             onClientFound={setDetectedClient}
             onClientName={(nom, prenom) => {
-              if (!clientNom) setClientNom(prenom ? `${prenom} ${nom}`.trim() : nom);
+              // ⚠️ NE JAMAIS écraser un nom déjà saisi par l'admin.
+              // On ne pré-remplit que si le champ est complètement vide.
+              if (!clientNom || clientNom.trim() === "") {
+                const nomComplet = prenom ? `${prenom} ${nom}`.trim() : nom;
+                if (nomComplet) setClientNom(nomComplet);
+              }
             }}
           />
 
@@ -607,6 +622,10 @@ export default function AdminCourseForm() {
               <div>
                 <p className="text-[10px] text-gray-400 mb-1 font-semibold uppercase tracking-wide">Expéditeur</p>
                 <Input
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
                   value={expediteurNom}
                   onChange={e => setExpediteurNom(e.target.value)}
                   placeholder="Nom expéditeur"
@@ -616,6 +635,12 @@ export default function AdminCourseForm() {
               <div>
                 <p className="text-[10px] text-gray-400 mb-1 font-semibold uppercase tracking-wide">Tél. expéditeur</p>
                 <Input
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
                   value={expediteurTelephone}
                   onChange={e => setExpediteurTelephone(e.target.value)}
                   placeholder="+226 XX XX XX XX"
@@ -631,6 +656,10 @@ export default function AdminCourseForm() {
               <div>
                 <p className="text-[10px] text-gray-400 mb-1 font-semibold uppercase tracking-wide">Destinataire</p>
                 <Input
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
                   value={destinataireNom}
                   onChange={e => setDestinataireNom(e.target.value)}
                   placeholder="Nom destinataire"
@@ -640,6 +669,12 @@ export default function AdminCourseForm() {
               <div>
                 <p className="text-[10px] text-gray-400 mb-1 font-semibold uppercase tracking-wide">Tél. destinataire</p>
                 <Input
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
                   value={destinataireTelephone}
                   onChange={e => setDestinataireTelephone(e.target.value)}
                   placeholder="+226 XX XX XX XX"
