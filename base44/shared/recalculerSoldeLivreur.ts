@@ -33,6 +33,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { chargerConfigPays } from './dispatchConstants.ts';
+import { calculerSoldeLivreur } from './soldeCalculator.ts';
 
 /**
  * Recalcule le solde dû d'un livreur depuis les sources financières.
@@ -59,35 +60,10 @@ export async function recalculerSoldeLivreur(base44: any, livreurId: string): Pr
     return { solde: 0, creditDisponible: 0, seuil: null, bloque: false, statut_paiement: 'paye', devise: 'FCFA', totalCommissions: 0, totalPaye: 0 };
   }
 
-  // 2. Récupérer TOUTES les courses livrées du livreur (dette brute)
-  //    Pas de filtre sur statut_paiement_livreur : la vérité est dans PaiementSilgapp.
-  const coursesLivrees = await base44.asServiceRole.entities.CourseExterne.filter(
-    { livreur_id: livreurId, statut: 'livree' },
-    'heure_livraison', 500
-  ).catch(() => []);
-
-  // 3. Somme de TOUTES les commissions = dette brute
-  const totalCommissions = (coursesLivrees || []).reduce(
-    (sum: number, c: any) => sum + (Number(c.commission_silga) || 0), 0
-  );
-
-  // 4. Récupérer tous les paiements traités depuis le journal immuable
-  //    PaiementSilgapp = source de vérité pour les montants réglés.
-  //    statut=traite (pas en_attente ni refuse), type_dette=commission_livreur.
-  const paiements = await base44.asServiceRole.entities.PaiementSilgapp.filter(
-    { user_id: livreurId, statut: 'traite', type_dette: 'commission_livreur' },
-    '-date_envoi', 500
-  ).catch(() => []);
-
-  // 5. Somme des montants effectivement payés
-  const totalPaye = (paiements || []).reduce(
-    (sum: number, p: any) => sum + (Number(p.montant_paye) || 0), 0
-  );
-
-  // 6. Solde = dette brute - montant réglé (jamais négatif)
-  //    Crédit = surplus payé au-delà des commissions (jamais négatif)
-  const solde = Math.max(0, totalCommissions - totalPaye);
-  const creditDisponible = Math.max(0, totalPaye - totalCommissions);
+  // 2-6. Calcul via le module shared (SOURCE DE VÉRITÉ unique)
+  //    soldeCalculator.ts contient la formule canonique utilisée partout
+  //    (recalculerSoldeLivreur + getSoldeLivreur + UI).
+  const { solde, creditDisponible, totalCommissions, totalPaye } = await calculerSoldeLivreur(base44, livreurId);
 
   // 7. Récupérer le seuil du pays
   const countryConfig = await chargerConfigPays(base44, livreur.country_code);

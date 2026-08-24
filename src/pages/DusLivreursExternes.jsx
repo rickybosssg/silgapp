@@ -273,13 +273,19 @@ export default function DusLivreursExternes() {
     refetchInterval: 30000,
   });
 
-  // ── Paiements traités des livreurs (pour calculer le crédit disponible) ──
-  const paiementsFilter = effectiveCountry
-    ? { user_type: 'livreur', statut: 'traite', type_dette: 'commission_livreur', country_code: effectiveCountry }
-    : { user_type: 'livreur', statut: 'traite', type_dette: 'commission_livreur' };
-  const { data: paiementsLivreurs = [] } = useQuery({
-    queryKey: ["paiements-silgapp-livreurs", effectiveCountry],
-    queryFn: () => base44.entities.PaiementSilgapp.filter(paiementsFilter, '-date_envoi', 500),
+  // ── Soldes livreurs (source de vérité unique : getSoldeLivreur) ──
+  //    Utilise la même formule que recalculerSoldeLivreur — aucun calcul local.
+  const { data: soldesLivreurs = {} } = useQuery({
+    queryKey: ["soldes-livreurs", effectiveCountry],
+    queryFn: async () => {
+      const res = await base44.functions.invoke('getSoldeLivreur', { country_code: effectiveCountry || undefined });
+      const data = res?.data || res;
+      const map = {};
+      (data?.livreurs || []).forEach(l => {
+        map[l.livreur_id] = l;
+      });
+      return map;
+    },
     refetchInterval: 30000,
   });
 
@@ -303,13 +309,6 @@ export default function DusLivreursExternes() {
 
   // ── Agréger par livreur ──
   const recapLivreurs = useMemo(() => {
-    // ── Total payé par livreur (depuis le journal PaiementSilgapp) ──
-    const payeParLivreur = {};
-    (paiementsLivreurs || []).forEach(p => {
-      if (!p.user_id) return;
-      payeParLivreur[p.user_id] = (payeParLivreur[p.user_id] || 0) + (Number(p.montant_paye) || 0);
-    });
-
     const map = {};
     coursesList.forEach(c => {
       if (!c.livreur_id) return;
@@ -348,9 +347,15 @@ export default function DusLivreursExternes() {
       // Détecter la divergence entre solde stocké et solde théorique
       entry.soldeTheorique = entry.commissionTotal - entry.montantPaye;
       entry.divergence = entry.montantDu !== entry.soldeTheorique ? Math.abs(entry.montantDu - entry.soldeTheorique) : 0;
-      // ── Crédit disponible = surplus payé au-delà des commissions ──
-      const totalPayeReel = payeParLivreur[entry.id] || 0;
-      entry.creditDisponible = Math.max(0, totalPayeReel - entry.commissionTotal);
+      // ── Crédit disponible depuis getSoldeLivreur (source de vérité unique) ──
+      const soldeBackend = soldesLivreurs[entry.id];
+      entry.creditDisponible = soldeBackend?.creditDisponible ?? 0;
+      // Synchroniser montantDu avec le backend si disponible (plus précis que le champ stocké)
+      if (soldeBackend && soldeBackend.montantDu !== undefined) {
+        entry.montantDu = soldeBackend.montantDu;
+        entry.soldeTheorique = soldeBackend.totalCommissions - soldeBackend.totalPaye;
+        entry.divergence = 0; // backend = source de vérité, pas de divergence
+      }
     });
     let result = Object.values(map);
     const totalCommissionJour = result.reduce((s, r) => s + (r.commissionJour || 0), 0);
@@ -360,7 +365,7 @@ export default function DusLivreursExternes() {
     // On ne somme que les dettes positives (les crédits négatifs ne réduisent pas le total dû)
     const totalDuGlobal = result.reduce((s, r) => s + Math.max(0, r.montantDu), 0);
     return { list: result.sort((a, b) => b.montantDu - a.montantDu), totalDuGlobal, totalCommissionJour };
-  }, [coursesList, livreursList, paiementsLivreurs, filtre, startOfToday]);
+  }, [coursesList, livreursList, soldesLivreurs, filtre, startOfToday]);
 
   // ── Recap Boutiques ──
   const recapBoutiques = useMemo(() => {

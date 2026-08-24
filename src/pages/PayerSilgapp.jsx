@@ -47,16 +47,15 @@ export default function PayerSilgapp({ userType: forcedType }) {
             telephone: livreurs[0].telephone,
             country_code: livreurs[0].country_code,
           });
-          // ── Source de vérité unique : montant_du_silga (champ stocké, mis à jour à chaque paiement)
-          setMontantDu(livreurs[0].montant_du_silga ?? livreurs[0].encours ?? 0);
-          // ── Calculer le crédit disponible (surplus) pour ce livreur ──
+          // ── Source de vérité unique : getSoldeLivreur (même formule que recalculerSoldeLivreur) ──
           try {
-            const paiements = await base44.entities.PaiementSilgapp.filter({ user_id: livreurs[0].id, statut: 'traite', type_dette: 'commission_livreur' }, '-date_envoi', 500);
-            const coursesLivrees = await base44.entities.CourseExterne.filter({ livreur_id: livreurs[0].id, statut: 'livree' }, 'heure_livraison', 500);
-            const totalPaye = (paiements || []).reduce((s, p) => s + (Number(p.montant_paye) || 0), 0);
-            const totalCommissions = (coursesLivrees || []).reduce((s, c) => s + (Number(c.commission_silga) || 0), 0);
-            setCreditDisponible(Math.max(0, totalPaye - totalCommissions));
-          } catch (_) {}
+            const res = await base44.functions.invoke('getSoldeLivreur', { livreur_id: livreurs[0].id });
+            const data = res?.data || res;
+            setMontantDu(data?.montantDu ?? 0);
+            setCreditDisponible(data?.creditDisponible ?? 0);
+          } catch (_) {
+            setMontantDu(livreurs[0].montant_du_silga ?? livreurs[0].encours ?? 0);
+          }
           return;
         }
 
@@ -109,16 +108,16 @@ export default function PayerSilgapp({ userType: forcedType }) {
     const interval = setInterval(async () => {
       try {
         if (userType === "livreur") {
-          const l = await base44.entities.Livreur.filter({ id: userInfo.id });
-          if (l?.[0]) setMontantDu(l[0].montant_du_silga ?? l[0].encours ?? 0);
-          // ── Recalculer le crédit disponible ──
+          // ── Source de vérité unique : getSoldeLivreur ──
           try {
-            const paiements = await base44.entities.PaiementSilgapp.filter({ user_id: userInfo.id, statut: 'traite', type_dette: 'commission_livreur' }, '-date_envoi', 500);
-            const coursesLivrees = await base44.entities.CourseExterne.filter({ livreur_id: userInfo.id, statut: 'livree' }, 'heure_livraison', 500);
-            const totalPaye = (paiements || []).reduce((s, p) => s + (Number(p.montant_paye) || 0), 0);
-            const totalCommissions = (coursesLivrees || []).reduce((s, c) => s + (Number(c.commission_silga) || 0), 0);
-            setCreditDisponible(Math.max(0, totalPaye - totalCommissions));
-          } catch (_) {}
+            const res = await base44.functions.invoke('getSoldeLivreur', { livreur_id: userInfo.id });
+            const data = res?.data || res;
+            setMontantDu(data?.montantDu ?? 0);
+            setCreditDisponible(data?.creditDisponible ?? 0);
+          } catch (_) {
+            const l = await base44.entities.Livreur.filter({ id: userInfo.id });
+            if (l?.[0]) setMontantDu(l[0].montant_du_silga ?? l[0].encours ?? 0);
+          }
         } else if (userType === "client") {
           const frais = await base44.entities.FraisAnnulation.filter({ client_id: userInfo.id });
           const impaye = (frais || []).filter((f) => f.statut_paiement !== "paye").reduce((s, f) => s + (f.montant || 0), 0);
