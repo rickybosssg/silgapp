@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -61,8 +61,13 @@ export default function CourseExterneFormSync() {
   const [courseCreated, setCourseCreated] = useState(false);
   const [createdCourse, setCreatedCourse] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false); // verrou anti-double-clic
+  const submissionSafetyTimerRef = useRef(null);
   const [invitationModal, setInvitationModal] = useState(null); // { telephone, nom } ou null
   const [gpsLoading, setGpsLoading] = useState({ depart: false, arrivee: false });
+
+  useEffect(() => () => {
+    if (submissionSafetyTimerRef.current) clearTimeout(submissionSafetyTimerRef.current);
+  }, []);
 
   // Lire brouillon (données pures, sans fonctions)
   const getDraftFromStorage = () => {
@@ -286,6 +291,14 @@ export default function CourseExterneFormSync() {
     },
   };
   const queryClient = useQueryClient();
+  const resetSubmission = () => {
+    if (submissionSafetyTimerRef.current) {
+      clearTimeout(submissionSafetyTimerRef.current);
+      submissionSafetyTimerRef.current = null;
+    }
+    setIsSubmitting(false);
+  };
+
   const createMutation = useMutation({
     mutationFn: async (data) => {
       let finalData = { ...data };
@@ -425,9 +438,9 @@ export default function CourseExterneFormSync() {
       });
       // OPTIMISTIC UI: Remplacer le brouillon temporaire par la vraie course
       queryClient.setQueryData(['courses-externes-client'], (old) =>
-        (old || []).filter(c => c.id !== `temp_${Date.now()}`).concat(response)
+        (old || []).filter(c => !c.id?.startsWith('temp_')).concat(response)
       );
-      setIsSubmitting(false);
+      resetSubmission();
       localStorage.removeItem(STORAGE_KEY);
       localStorage.removeItem(STEP_KEY);
       queryClient.invalidateQueries({ queryKey: ['courses-externes-client'] });
@@ -466,7 +479,7 @@ export default function CourseExterneFormSync() {
       // OPTIMISTIC UI: Retirer le brouillon en cas d'erreur
       queryClient.setQueryData(['courses-externes-client'], (old) => (old || []).filter(c => !c.id?.startsWith('temp_')));
       toast.error("Erreur : " + err.message);
-      setIsSubmitting(false);
+      resetSubmission();
     },
   });
 
@@ -484,7 +497,9 @@ export default function CourseExterneFormSync() {
     // ── Filelet de sécurité absolu : le bouton ne doit JAMAIS rester bloqué ──
     // Si isSubmitting est encore true après 30s, on force le reset.
     // Couvre TOUS les cas : ReferenceError, TypeError, crash réseau, etc.
-    const _safetyTimer = setTimeout(() => {
+    if (submissionSafetyTimerRef.current) clearTimeout(submissionSafetyTimerRef.current);
+    submissionSafetyTimerRef.current = setTimeout(() => {
+      submissionSafetyTimerRef.current = null;
       setIsSubmitting(prev => {
         if (prev) {
           console.error("[CREATE_CLIENT_TIMEOUT] isSubmitting encore true après 30s — force reset", {
@@ -518,7 +533,7 @@ export default function CourseExterneFormSync() {
     if (missingFields.length > 0) {
       console.warn("[CourseForm] Champs manquants :", missingFields);
       toast.error(`Champs manquants : ${missingFields.join(", ")}`);
-      setIsSubmitting(false);
+      resetSubmission();
       return;
     }
 
@@ -529,7 +544,7 @@ export default function CourseExterneFormSync() {
     } catch (err) {
       console.error("[CourseForm] Erreur auth:", err);
       toast.error("Session expirée ou problème de connexion. Rafraîchissez la page.");
-      setIsSubmitting(false);
+      resetSubmission();
       return;
     }
 
@@ -550,7 +565,7 @@ export default function CourseExterneFormSync() {
     if (clientFromDB?.bloque_frais_annulation) {
       toast.error("Votre compte est bloqué : frais d'annulation impayés supérieurs à 2 000 FCFA. Veuillez régulariser votre situation.");
       navigate("/payer-silgapp");
-      setIsSubmitting(false);
+      resetSubmission();
       return;
     }
 
@@ -558,7 +573,7 @@ export default function CourseExterneFormSync() {
     if (!courseCountryCode) {
       console.error("[CourseForm] country_code manquant sur clientFromDB:", clientFromDB);
       toast.error("Erreur : votre profil client n'a pas de pays. Veuillez contacter le support.");
-      setIsSubmitting(false);
+      resetSubmission();
       return;
     }
 
@@ -673,7 +688,7 @@ export default function CourseExterneFormSync() {
           const errMsg = validationRes.data.errors?.[0] || "Incohérence détectée dans les rôles";
           console.warn("[CourseForm] Validation rôles échouée :", errMsg);
           toast.error(errMsg);
-          setIsSubmitting(false);
+          resetSubmission();
           return;
         }
       } catch (err) {
@@ -710,24 +725,24 @@ export default function CourseExterneFormSync() {
     if (departGps?.ambiguous) {
       const names = departGps.suggestions.map(s => s.nom).join(", ");
       toast.error(`Point de départ ambigu : plusieurs quartiers correspondent (${names}). Sélectionnez-en un dans la liste.`);
-      setIsSubmitting(false);
+      resetSubmission();
       return;
     }
     if (!isMulti && arriveeGps?.ambiguous) {
       const names = arriveeGps.suggestions.map(s => s.nom).join(", ");
       toast.error(`Point d'arrivée ambigu : plusieurs quartiers correspondent (${names}). Sélectionnez-en un dans la liste.`);
-      setIsSubmitting(false);
+      resetSubmission();
       return;
     }
     // Blocage si aucun GPS disponible (sauf multi-colis où chaque colis a son propre GPS)
     if (!departGps || !departGps.lat) {
       toast.error(`Point de départ : ${GPS_BLOCK_MESSAGE}`);
-      setIsSubmitting(false);
+      resetSubmission();
       return;
     }
     if (!isMulti && (!arriveeGps || !arriveeGps.lat)) {
       toast.error(`Point d'arrivée : ${GPS_BLOCK_MESSAGE}`);
-      setIsSubmitting(false);
+      resetSubmission();
       return;
     }
 
@@ -740,7 +755,7 @@ export default function CourseExterneFormSync() {
       const prixClientSaisi = Number(formData.prix_propose) || 0;
       if (isHorsTarif && prixClientSaisi <= 0) {
         toast.error("Distance supérieure à 25 km — vous devez saisir un prix personnalisé avant de créer la course.");
-        setIsSubmitting(false);
+        resetSubmission();
         return;
       }
     }
@@ -946,7 +961,7 @@ export default function CourseExterneFormSync() {
                 country_code: clientProfil?.country_code || "UNKNOWN"
               });
               toast.error("Erreur lors de la création : " + (err?.message || "erreur inconnue"));
-              setIsSubmitting(false);
+              resetSubmission();
             });
           }}>
             <CourseStepForm

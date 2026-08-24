@@ -49,6 +49,16 @@ export default async function(req: Request): Promise<Response> {
     // ── Résoudre client_user_email côté backend ──
     cleanData.client_user_email = user.email;
 
+    // ── Normaliser le pays et dériver les statuts côté backend ──
+    // Le frontend ne peut pas imposer ces champs sensibles, mais la course doit
+    // être exploitable immédiatement, même si le dispatch asynchrone tarde.
+    cleanData.country_code = String(cleanData.country_code || '').trim().toUpperCase();
+    if (!cleanData.country_code) {
+      return Response.json({ error: 'country_code requis' }, { status: 400 });
+    }
+    cleanData.statut = cleanData.date_souhaitee ? 'programmee' : 'recherche_livreur';
+    cleanData.dispatch_status = 'en_attente';
+
     // ── Pour les duplications, ne pas copier les QR codes ──
     if (is_duplicate) {
       delete cleanData.id;
