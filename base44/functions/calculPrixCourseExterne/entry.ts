@@ -88,6 +88,9 @@ Deno.serve(async (req) => {
         montant_livreur: montantLivreur,
         statut: 'livree',
         heure_livraison: new Date().toISOString(),
+        // ── Identité financière immuable ──
+        // Renseigné côté backend au moment de la livraison, JAMAIS modifié ensuite.
+        ...(course.livreur_financier_id ? {} : { livreur_financier_id: course.livreur_id }),
       });
       return Response.json({
         success: true,
@@ -190,6 +193,9 @@ Deno.serve(async (req) => {
       montant_livreur: montantLivreur,
       statut: 'livree',
       heure_livraison: new Date().toISOString(),
+      // ── Identité financière immuable ──
+      // Renseigné côté backend au moment de la livraison, JAMAIS modifié ensuite.
+      ...(course.livreur_financier_id ? {} : { livreur_financier_id: course.livreur_id }),
     });
 
     // ── Comptabiliser la commission dans le solde du livreur ──

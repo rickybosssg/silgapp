@@ -147,6 +147,7 @@ Deno.serve(async (req) => {
         livreur_note_moyenne: 0,
         livreur_nombre_avis: 0,
         livreur_user_email: null, // ⚠️ Retrait livreur → null pour RLS future
+        // ⚠️ livreur_financier_id N'EST JAMAIS effacé (immuable) — sécurité financière
         dispatch_notified_ids: "[]",
         dispatch_refused_ids: JSON.stringify(refusedIds), // ⚠️ livreur annulant EXCLU définitivement
         heure_acceptation: null,
@@ -287,6 +288,7 @@ Deno.serve(async (req) => {
         livreur_note_moyenne: 0,
         livreur_nombre_avis: 0,
         livreur_user_email: null, // ⚠️ Retrait livreur → null pour RLS future
+        // ⚠️ livreur_financier_id N'EST JAMAIS effacé (immuable) — sécurité financière
         notes: (course.notes || "") + ` | [ANNULÉ ${sourceLabel}] ${motif || ""}`,
       };
 

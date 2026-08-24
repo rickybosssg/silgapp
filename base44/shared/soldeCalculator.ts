@@ -5,7 +5,10 @@
 // FORMULE EXPLICITE :
 //
 //   totalCommissions = SUM(commission_silga WHERE statut=livree)
+//                      clé de rattachement = livreur_financier_id (immuable)
+//                      fallback : livreur_id (pour courses non encore backfillées)
 //   totalPaye        = SUM(montant_paye FROM PaiementSilgapp WHERE statut=traite)
+//                      clé de rattachement = user_id (= livreur_id)
 //
 //   solde            = max(0, totalCommissions - totalPaye)
 //   creditDisponible = max(0, totalPaye - totalCommissions)
@@ -14,8 +17,19 @@
 // - recalculerSoldeLivreur.ts l'utilise puis écrit le résultat sur le livreur.
 // - getSoldeLivreur (backend) l'utilise pour exposer la valeur au frontend.
 //
-// Aucun calcul de solde ne doit être dupliqué ailleurs (frontend ou backend).
+// RÈGLE D'IMMUTABILITÉ :
+//   livreur_financier_id est renseigné à la livraison et JAMAIS modifié ensuite.
+//   livreur_id peut évoluer (redispatch, annulation, nettoyage) — il n'est utilisé
+//   que comme fallback pour les courses non encore backfillées.
 // ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Clé financière d'une course : livreur_financier_id en priorité, fallback livreur_id.
+ * Utilisée pour agréger les commissions par livreur financier.
+ */
+function getLivreurFinancierId(course: any): string {
+  return course.livreur_financier_id || course.livreur_id || '';
+}
 
 /**
  * Calcule le solde dû et le crédit disponible d'un livreur SANS écrire en DB.
@@ -34,12 +48,29 @@ export async function calculerSoldeLivreur(base44: any, livreurId: string): Prom
   }
 
   // 1. Toutes les courses livrées du livreur (dette brute)
-  const coursesLivrees = await base44.asServiceRole.entities.CourseExterne.filter(
+  //    On récupère par livreur_financier_id ET par livreur_id (fallback)
+  //    puis on déduplique en mémoire.
+  const coursesByFinancier = await base44.asServiceRole.entities.CourseExterne.filter(
+    { livreur_financier_id: livreurId, statut: 'livree' },
+    'heure_livraison', 500
+  ).catch(() => []);
+
+  const coursesByLivreurId = await base44.asServiceRole.entities.CourseExterne.filter(
     { livreur_id: livreurId, statut: 'livree' },
     'heure_livraison', 500
   ).catch(() => []);
 
-  const totalCommissions = (coursesLivrees || []).reduce(
+  // Dédupliquer : une course peut avoir les deux champs renseignés
+  const seenIds = new Set<string>();
+  const allCourses = [];
+  for (const c of (coursesByFinancier || [])) {
+    if (!seenIds.has(c.id)) { seenIds.add(c.id); allCourses.push(c); }
+  }
+  for (const c of (coursesByLivreurId || [])) {
+    if (!seenIds.has(c.id)) { seenIds.add(c.id); allCourses.push(c); }
+  }
+
+  const totalCommissions = allCourses.reduce(
     (sum: number, c: any) => sum + (Number(c.commission_silga) || 0), 0
   );
 
@@ -86,11 +117,12 @@ export async function calculerSoldesLivreursBatch(
     paiementsFilter, '-date_envoi', 2000
   ).catch(() => []);
 
-  // 3. Agréger par livreur_id
+  // 3. Agréger par livreur_financier_id (fallback livreur_id)
   const commissionsByLivreur: Record<string, number> = {};
   (allCourses || []).forEach((c: any) => {
-    if (!c.livreur_id) return;
-    commissionsByLivreur[c.livreur_id] = (commissionsByLivreur[c.livreur_id] || 0) + (Number(c.commission_silga) || 0);
+    const fid = getLivreurFinancierId(c);
+    if (!fid) return;
+    commissionsByLivreur[fid] = (commissionsByLivreur[fid] || 0) + (Number(c.commission_silga) || 0);
   });
 
   const payeByLivreur: Record<string, number> = {};
