@@ -29,6 +29,7 @@ function formatMontantCredit(montant) {
 const FILTRES = [
   { id: "arecouvrer", label: "À recouvrer" },
   { id: "ajour", label: "À jour" },
+  { id: "en_credit", label: "En crédit" },
   { id: "tous", label: "Tous" },
 ];
 
@@ -360,7 +361,8 @@ export default function DusLivreursExternes() {
     let result = Object.values(map);
     const totalCommissionJour = result.reduce((s, r) => s + (r.commissionJour || 0), 0);
     if (filtre === "arecouvrer") result = result.filter(r => r.montantDu > 0);
-    if (filtre === "ajour") result = result.filter(r => r.montantDu <= 0);
+    if (filtre === "ajour") result = result.filter(r => r.montantDu <= 0 && !(r.creditDisponible > 0));
+    if (filtre === "en_credit") result = result.filter(r => r.creditDisponible > 0);
     // Total calculé APRÈS le filtre → correspond à la liste affichée
     // On ne somme que les dettes positives (les crédits négatifs ne réduisent pas le total dû)
     const totalDuGlobal = result.reduce((s, r) => s + Math.max(0, r.montantDu), 0);
@@ -693,6 +695,15 @@ export default function DusLivreursExternes() {
                         <span className="text-gray-300 ml-auto">Aujourd'hui : {(entry.commissionJour || 0).toLocaleString()} F</span>
                       )}
                     </div>
+                    {entry.creditDisponible > 0 && (
+                      <div className="mt-2 bg-blue-50 border border-blue-200 rounded-xl px-3 py-2 flex items-center gap-2">
+                        <Wallet className="w-4 h-4 text-blue-600 shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-blue-700">Crédit disponible : {entry.creditDisponible.toLocaleString()} F</p>
+                          <p className="text-[10px] text-blue-500">Les prochaines commissions seront déduites de ce crédit.</p>
+                        </div>
+                      </div>
+                    )}
                     <div className="flex gap-2 mt-3">
                       <Button variant="outline" size="sm" className="flex-1 h-9 text-xs rounded-xl font-semibold text-gray-700" onClick={() => setDetailEntry(entry)}>
                         Détails
