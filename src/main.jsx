@@ -5,6 +5,10 @@ import { installNativeGeolocationShim } from '@/lib/nativeAndroid'
 import { syncTokenFromPreferences, restoreTokenFromCookie } from '@/lib/authPersistence'
 import '@/index.css'
 
+// DIAGNOSTIC TEMPORAIRE — intercepteur d'erreurs 500
+import { init500Diagnostic } from '@/lib/diag500';
+init500Diagnostic();
+
 installNativeGeolocationShim()
 
 // Note: la capture du access_token depuis l'URL est faite dans index.html

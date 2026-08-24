@@ -416,6 +416,13 @@ export default function CourseExterneFormSync() {
       return course;
     },
     onSuccess: (response) => {
+      console.log("[CREATE_CLIENT_RESPONSE]", {
+        ts: Date.now(),
+        success: true,
+        course_id: response?.id,
+        country_code: response?.country_code,
+        statut: response?.statut
+      });
       // OPTIMISTIC UI: Remplacer le brouillon temporaire par la vraie course
       queryClient.setQueryData(['courses-externes-client'], (old) =>
         (old || []).filter(c => c.id !== `temp_${Date.now()}`).concat(response)
@@ -451,6 +458,11 @@ export default function CourseExterneFormSync() {
       }
     },
     onError: (err) => {
+      console.error("[CREATE_CLIENT_ERROR]", {
+        ts: Date.now(),
+        error: err?.message,
+        stack: err?.stack
+      });
       // OPTIMISTIC UI: Retirer le brouillon en cas d'erreur
       queryClient.setQueryData(['courses-externes-client'], (old) => (old || []).filter(c => !c.id?.startsWith('temp_')));
       toast.error("Erreur : " + err.message);
@@ -464,6 +476,25 @@ export default function CourseExterneFormSync() {
     // ─── Verrou anti-double-soumission (double-clic, re-render) ─────────────
     if (isSubmitting || createMutation.isPending) return;
     setIsSubmitting(true);
+
+    const _diagStart = Date.now();
+    const _diagCountry = clientProfil?.country_code || "UNKNOWN";
+    console.log("[CREATE_CLIENT_START]", { ts: _diagStart, country_code: _diagCountry, type_course: formData.type_course });
+
+    // ── Filelet de sécurité absolu : le bouton ne doit JAMAIS rester bloqué ──
+    // Si isSubmitting est encore true après 30s, on force le reset.
+    // Couvre TOUS les cas : ReferenceError, TypeError, crash réseau, etc.
+    const _safetyTimer = setTimeout(() => {
+      setIsSubmitting(prev => {
+        if (prev) {
+          console.error("[CREATE_CLIENT_TIMEOUT] isSubmitting encore true après 30s — force reset", {
+            country_code: _diagCountry,
+            elapsed_ms: Date.now() - _diagStart
+          });
+        }
+        return false;
+      });
+    }, 30000);
 
     //  country_code DOIT être déclaré AVANT toute utilisation dans normalizePhone()
     // ─── Validation des champs obligatoires ───────────────────────────────────
@@ -658,6 +689,10 @@ export default function CourseExterneFormSync() {
       quartiersList = await base44.entities.Quartier.filter({ country_code: courseCountryCode, actif: true }, "nom", 500);
     } catch (_) {}
 
+    // isMulti DOIT être déclaré ici (avant son premier usage ci-dessous)
+    const nbColis = isDeplacement ? 1 : (formData.nb_colis || 1);
+    const isMulti = isExpedie && nbColis > 1;
+
     const departGps = resolveGpsForCourse({
       exactLat: formData.gps_depart_lat,
       exactLng: formData.gps_depart_lng,
@@ -710,9 +745,6 @@ export default function CourseExterneFormSync() {
       }
     }
 
-    const nbColis = isDeplacement ? 1 : (formData.nb_colis || 1);
-    const isMulti = isExpedie && nbColis > 1;
-
     // Pour multi-colis : résumé des destinataires
     const adresseArriveeFinale = isMulti
       ? "Tournée multi-colis"
@@ -725,6 +757,15 @@ export default function CourseExterneFormSync() {
       ? (colis[0]?.destinataire_telephone || "")
       : isDeplacement ? (formData.passager_telephone || "")
       : destinataireTel;
+
+    console.log("[CREATE_CLIENT_PRE_MUTATE]", {
+      ts: Date.now(),
+      elapsed_ms: Date.now() - _diagStart,
+      country_code: courseCountryCode,
+      isMulti,
+      nbColis,
+      prix_propose_client: formData.prix_propose
+    });
 
     createMutation.mutate({
       country_code: courseCountryCode,
@@ -896,7 +937,18 @@ export default function CourseExterneFormSync() {
         )}
 
         <Card className="p-5 sm:p-6" style={{ background: "#FFFFFF", borderRadius: "1rem", borderColor: "#E2E8F0" }}>
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            handleSubmit(e).catch((err) => {
+              console.error("[CREATE_CLIENT_UNCAUGHT_ERROR]", {
+                error: err?.message,
+                stack: err?.stack,
+                country_code: clientProfil?.country_code || "UNKNOWN"
+              });
+              toast.error("Erreur lors de la création : " + (err?.message || "erreur inconnue"));
+              setIsSubmitting(false);
+            });
+          }}>
             <CourseStepForm
               step={currentStep}
               totalSteps={totalSteps}
