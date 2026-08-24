@@ -937,7 +937,18 @@ export default function CourseExterneFormSync() {
         )}
 
         <Card className="p-5 sm:p-6" style={{ background: "#FFFFFF", borderRadius: "1rem", borderColor: "#E2E8F0" }}>
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            handleSubmit(e).catch((err) => {
+              console.error("[CREATE_CLIENT_UNCAUGHT_ERROR]", {
+                error: err?.message,
+                stack: err?.stack,
+                country_code: clientProfil?.country_code || "UNKNOWN"
+              });
+              toast.error("Erreur lors de la création : " + (err?.message || "erreur inconnue"));
+              setIsSubmitting(false);
+            });
+          }}>
             <CourseStepForm
               step={currentStep}
               totalSteps={totalSteps}
