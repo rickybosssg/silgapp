@@ -115,6 +115,7 @@ const ReactivationClients = lazy(() => import('./pages/ReactivationClients.jsx')
 const CoursesARisque = lazy(() => import('./pages/CoursesARisque.jsx'));
 const FiabilitePush = lazy(() => import('./pages/FiabilitePush.jsx'));
 const SilgaScore = lazy(() => import('./pages/SilgaScore.jsx'));
+import Diag500Panel from './components/admin/Diag500Panel.jsx';
 
 function AnimatedRoutes({ children }) {
   // Variables définies DANS la fonction pour éviter init issues
@@ -492,6 +493,7 @@ function AppWithProviders() {
     <QueryClientProvider client={queryClientInstance}>
       <App />
       <IOSAppStoreBanner />
+      <Diag500Panel />
       <SonnerToaster position="top-center" richColors closeButton />
     </QueryClientProvider>
   );
