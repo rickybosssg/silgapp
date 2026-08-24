@@ -145,29 +145,66 @@ export async function calculerSoldesLivreursBatch(
     paiementsFilter, '-date_envoi', 2000
   ).catch(() => []);
 
-  // 3. Agréger par livreur_financier_id (fallback livreur_id)
+  // 3. Récupérer les livreurs avec base comptable pour filtrage
+  const livreurIds = new Set<string>();
+  (allCourses || []).forEach((c: any) => {
+    const fid = getLivreurFinancierId(c);
+    if (fid) livreurIds.add(fid);
+    if (c.livreur_id) livreurIds.add(c.livreur_id);
+  });
+  (allPaiements || []).forEach((p: any) => {
+    if (p.user_id) livreurIds.add(p.user_id);
+  });
+
+  const livreursAvecBase: Record<string, { date: string; soldeInitial: number }> = {};
+  for (const id of livreurIds) {
+    const l = await base44.asServiceRole.entities.Livreur.get(id).catch(() => null);
+    if (l?.base_comptable_date) {
+      livreursAvecBase[id] = {
+        date: l.base_comptable_date,
+        soldeInitial: Number(l.base_comptable_solde_initial) || 0,
+      };
+    }
+  }
+
+  // 4. Agréger par livreur_financier_id (fallback livreur_id)
+  //    En filtrant par base comptable si définie
   const commissionsByLivreur: Record<string, number> = {};
   (allCourses || []).forEach((c: any) => {
     const fid = getLivreurFinancierId(c);
     if (!fid) return;
+    const base = livreursAvecBase[fid];
+    if (base) {
+      const d = c.heure_livraison || c.colis_livre_at || c.created_date;
+      if (!d || new Date(d) < new Date(base.date)) return; // course avant base → ignorée
+    }
     commissionsByLivreur[fid] = (commissionsByLivreur[fid] || 0) + (Number(c.commission_silga) || 0);
   });
 
   const payeByLivreur: Record<string, number> = {};
   (allPaiements || []).forEach((p: any) => {
     if (!p.user_id) return;
+    const base = livreursAvecBase[p.user_id];
+    if (base) {
+      const d = p.traite_at || p.date_envoi;
+      if (!d || new Date(d) < new Date(base.date)) return; // paiement avant base → ignoré
+    }
     payeByLivreur[p.user_id] = (payeByLivreur[p.user_id] || 0) + (Number(p.montant_paye) || 0);
   });
 
-  // 4. Calculer pour chaque livreur présent dans les commissions OU les paiements
+  // 5. Calculer pour chaque livreur présent dans les commissions OU les paiements
   const allIds = new Set([...Object.keys(commissionsByLivreur), ...Object.keys(payeByLivreur)]);
   const result: Record<string, any> = {};
   allIds.forEach(id => {
     const totalCommissions = commissionsByLivreur[id] || 0;
     const totalPaye = payeByLivreur[id] || 0;
+    const base = livreursAvecBase[id];
+    const soldeBrut = base
+      ? base.soldeInitial + totalCommissions - totalPaye
+      : totalCommissions - totalPaye;
     result[id] = {
-      solde: Math.max(0, totalCommissions - totalPaye),
-      creditDisponible: Math.max(0, totalPaye - totalCommissions),
+      solde: Math.max(0, soldeBrut),
+      creditDisponible: Math.max(0, -soldeBrut),
       totalCommissions,
       totalPaye,
     };
