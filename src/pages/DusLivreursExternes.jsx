@@ -98,10 +98,11 @@ function DetailModal({ entry, livreurInfo, onClose, onPaiement, onBloquer, onDeb
                 <p className="text-xs text-gray-500">Déjà payé</p>
                 <p className="font-bold text-green-600">{entry.montantPaye.toLocaleString()} F</p>
               </div>
-              {entry.montantDu < 0 && (
+              {entry.creditDisponible > 0 && (
                 <div className="bg-blue-50 rounded-xl p-3 col-span-2">
-                  <p className="text-xs text-blue-600">Surplus (à rembourser)</p>
-                  <p className="font-bold text-blue-700">{Math.abs(entry.montantDu).toLocaleString()} F</p>
+                  <p className="text-xs text-blue-600 font-medium">Crédit disponible (avance)</p>
+                  <p className="text-xl font-black text-blue-700">{entry.creditDisponible.toLocaleString()} F</p>
+                  <p className="text-[10px] text-blue-500 mt-1">Les prochaines commissions seront automatiquement déduites de ce crédit.</p>
                 </div>
               )}
             </div>
@@ -272,6 +273,16 @@ export default function DusLivreursExternes() {
     refetchInterval: 30000,
   });
 
+  // ── Paiements traités des livreurs (pour calculer le crédit disponible) ──
+  const paiementsFilter = effectiveCountry
+    ? { user_type: 'livreur', statut: 'traite', type_dette: 'commission_livreur', country_code: effectiveCountry }
+    : { user_type: 'livreur', statut: 'traite', type_dette: 'commission_livreur' };
+  const { data: paiementsLivreurs = [] } = useQuery({
+    queryKey: ["paiements-silgapp-livreurs", effectiveCountry],
+    queryFn: () => base44.entities.PaiementSilgapp.filter(paiementsFilter, '-date_envoi', 500),
+    refetchInterval: 30000,
+  });
+
   // ── Définition du "jour" (aujourd'hui, minuit local) ──
   const startOfToday = useMemo(() => {
     const d = new Date();
@@ -292,6 +303,13 @@ export default function DusLivreursExternes() {
 
   // ── Agréger par livreur ──
   const recapLivreurs = useMemo(() => {
+    // ── Total payé par livreur (depuis le journal PaiementSilgapp) ──
+    const payeParLivreur = {};
+    (paiementsLivreurs || []).forEach(p => {
+      if (!p.user_id) return;
+      payeParLivreur[p.user_id] = (payeParLivreur[p.user_id] || 0) + (Number(p.montant_paye) || 0);
+    });
+
     const map = {};
     coursesList.forEach(c => {
       if (!c.livreur_id) return;
@@ -330,6 +348,9 @@ export default function DusLivreursExternes() {
       // Détecter la divergence entre solde stocké et solde théorique
       entry.soldeTheorique = entry.commissionTotal - entry.montantPaye;
       entry.divergence = entry.montantDu !== entry.soldeTheorique ? Math.abs(entry.montantDu - entry.soldeTheorique) : 0;
+      // ── Crédit disponible = surplus payé au-delà des commissions ──
+      const totalPayeReel = payeParLivreur[entry.id] || 0;
+      entry.creditDisponible = Math.max(0, totalPayeReel - entry.commissionTotal);
     });
     let result = Object.values(map);
     const totalCommissionJour = result.reduce((s, r) => s + (r.commissionJour || 0), 0);
@@ -339,7 +360,7 @@ export default function DusLivreursExternes() {
     // On ne somme que les dettes positives (les crédits négatifs ne réduisent pas le total dû)
     const totalDuGlobal = result.reduce((s, r) => s + Math.max(0, r.montantDu), 0);
     return { list: result.sort((a, b) => b.montantDu - a.montantDu), totalDuGlobal, totalCommissionJour };
-  }, [coursesList, livreursList, filtre, startOfToday]);
+  }, [coursesList, livreursList, paiementsLivreurs, filtre, startOfToday]);
 
   // ── Recap Boutiques ──
   const recapBoutiques = useMemo(() => {
@@ -660,10 +681,10 @@ export default function DusLivreursExternes() {
                       <span className="text-gray-400">Commission générée :</span>
                       <span className="font-bold text-green-600">{(entry.commissionTotal || 0).toLocaleString()} F</span>
                       {entry.courses.length > 0 && <span className="text-gray-400">· {entry.courses.length} course(s)</span>}
-                      {entry.montantDu < 0 && (
-                        <span className="text-blue-600 font-bold ml-auto">Surplus : {Math.abs(entry.montantDu).toLocaleString()} F</span>
+                      {entry.creditDisponible > 0 && (
+                        <span className="text-blue-600 font-bold ml-auto">Crédit : {entry.creditDisponible.toLocaleString()} F</span>
                       )}
-                      {entry.nbCoursesJour > 0 && entry.montantDu >= 0 && (
+                      {entry.nbCoursesJour > 0 && entry.creditDisponible === 0 && (
                         <span className="text-gray-300 ml-auto">Aujourd'hui : {(entry.commissionJour || 0).toLocaleString()} F</span>
                       )}
                     </div>

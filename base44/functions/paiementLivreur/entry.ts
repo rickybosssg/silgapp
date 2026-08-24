@@ -95,17 +95,12 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ── Refuser un paiement supérieur au solde dû ──
-    //    Pas de crédit/avance implicite — si le montant dépasse la dette,
-    //    le paiement est refusé. L'admin doit d'abord corriger le solde.
-    if (montant > ancienSolde) {
-      return Response.json({
-        error: `Montant (${montant} FCFA) supérieur au solde dû (${ancienSolde} FCFA). Paiement refusé — aucun système de crédit/avance livreur n'est activé.`,
-        solde_du: ancienSolde,
-        montant_demande: montant,
-      }, { status: 400 });
-    }
-    const nouveauSolde = ancienSolde - montant;
+    // ── Surplus autorisé ──
+    //    Si le montant dépasse le solde dû, le surplus devient un crédit
+    //    implicite (conservé dans le journal PaiementSilgapp.montant_paye).
+    //    Les futures commissions sont automatiquement absorbées par recalculerSoldeLivreur
+    //    via la formule : solde = max(0, totalCommissions - totalPaye).
+    const nouveauSolde = Math.max(0, ancienSolde - montant);
 
     // ── Créer l'enregistrement PaiementSilgapp (TRAÇABILITÉ OBLIGATOIRE) ──
     const paiementRecord = await base44.asServiceRole.entities.PaiementSilgapp.create({

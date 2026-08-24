@@ -41,6 +41,7 @@ import { chargerConfigPays } from './dispatchConstants.ts';
  */
 export async function recalculerSoldeLivreur(base44: any, livreurId: string): Promise<{
   solde: number;
+  creditDisponible: number;
   seuil: number | null;
   bloque: boolean;
   statut_paiement: string;
@@ -49,13 +50,13 @@ export async function recalculerSoldeLivreur(base44: any, livreurId: string): Pr
   totalPaye: number;
 }> {
   if (!livreurId) {
-    return { solde: 0, seuil: null, bloque: false, statut_paiement: 'paye', devise: 'FCFA', totalCommissions: 0, totalPaye: 0 };
+    return { solde: 0, creditDisponible: 0, seuil: null, bloque: false, statut_paiement: 'paye', devise: 'FCFA', totalCommissions: 0, totalPaye: 0 };
   }
 
   // 1. Récupérer le livreur
   const livreur = await base44.asServiceRole.entities.Livreur.get(livreurId).catch(() => null);
   if (!livreur) {
-    return { solde: 0, seuil: null, bloque: false, statut_paiement: 'paye', devise: 'FCFA', totalCommissions: 0, totalPaye: 0 };
+    return { solde: 0, creditDisponible: 0, seuil: null, bloque: false, statut_paiement: 'paye', devise: 'FCFA', totalCommissions: 0, totalPaye: 0 };
   }
 
   // 2. Récupérer TOUTES les courses livrées du livreur (dette brute)
@@ -84,7 +85,9 @@ export async function recalculerSoldeLivreur(base44: any, livreurId: string): Pr
   );
 
   // 6. Solde = dette brute - montant réglé (jamais négatif)
+  //    Crédit = surplus payé au-delà des commissions (jamais négatif)
   const solde = Math.max(0, totalCommissions - totalPaye);
+  const creditDisponible = Math.max(0, totalPaye - totalCommissions);
 
   // 7. Récupérer le seuil du pays
   const countryConfig = await chargerConfigPays(base44, livreur.country_code);
@@ -98,7 +101,7 @@ export async function recalculerSoldeLivreur(base44: any, livreurId: string): Pr
       encours: solde,
       statut_paiement: solde > 0 ? 'non_paye' : 'paye',
     });
-    return { solde, seuil: null, bloque: false, statut_paiement: solde > 0 ? 'non_paye' : 'paye', devise, totalCommissions, totalPaye };
+    return { solde, creditDisponible, seuil: null, bloque: false, statut_paiement: solde > 0 ? 'non_paye' : 'paye', devise, totalCommissions, totalPaye };
   }
 
   // 8. Déterminer le statut dérivé (solde > 0 → dette, solde = 0 → réglé)
@@ -138,5 +141,5 @@ export async function recalculerSoldeLivreur(base44: any, livreurId: string): Pr
 
   console.log(`[SOLDE] Livreur ${livreurId}: solde=${solde} ${devise} (commissions=${totalCommissions}, payé=${totalPaye}, seuil=${seuil}, bloque=${bloque})`);
 
-  return { solde, seuil, bloque, statut_paiement: statutPaiement, devise, totalCommissions, totalPaye };
+  return { solde, creditDisponible, seuil, bloque, statut_paiement: statutPaiement, devise, totalCommissions, totalPaye };
 }
