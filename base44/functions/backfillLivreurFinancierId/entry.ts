@@ -43,6 +43,7 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const dryRun = body.dry_run !== false; // défaut true
+    const groupFilter = body.group_filter || null; // "A", "B", "C", ou null (tous)
 
     // ── 1. Index des livreurs ──
     const allLivreurs = await asService.entities.Livreur.list("id", 500);
@@ -119,6 +120,7 @@ Deno.serve(async (req) => {
 
     const detailsParLivreur: Record<string, any> = {};
     const anomalies: any[] = [];
+    const certainCoursesForBackfill: any[] = [];
 
     // Helper : extraire livreur_id depuis "Acceptée par <id>" dans notes
     function extractLivreurIdFromNotes(course: any): string | null {
@@ -238,20 +240,15 @@ Deno.serve(async (req) => {
 
       if (niveau === "CERTAIN") stats.certain_total++;
 
-      // ── Étape D : Backfill (CERTAIN uniquement) ──
-      if (niveau === "CERTAIN" && livreurFinal && !dryRun) {
-        try {
-          await asService.entities.CourseExterne.update(course.id, {
-            livreur_financier_id: livreurFinal.id,
-          });
-          stats.backfillees++;
-        } catch (err: any) {
-          stats.erreurs++;
-          anomalies.push({
-            course_id: course.id,
-            erreur: err?.message || String(err),
-          });
-        }
+      // ── Étape D : Collecter les courses CERTAINES pour backfill différé ──
+      // Le backfill réel est appliqué APRÈS classification + filtrage par groupe
+      if (niveau === "CERTAIN" && livreurFinal) {
+        certainCoursesForBackfill.push({
+          course_id: course.id,
+          livreur_final_id: livreurFinal.id,
+          commission: Number(course.commission_silga) || 0,
+          already_backfilled: !!course.livreur_financier_id,
+        });
       }
 
       // ── Étape E : Détail par livreur ──
@@ -309,14 +306,80 @@ Deno.serve(async (req) => {
 
     const tableauAvecStocke = tableauFinal.map((d: any) => {
       const livreur = livreurStockeMap[d.livreur_id];
+      const montantStocke = livreur?.montant_du_silga ?? livreur?.encours ?? 0;
+      // Écart réel = du_apres_backfill - du_avant_backfill
+      // du_avant = max(0, commissions_avant - paiements) où commissions_avant utilise livreur_id (fallback)
+      // du_apres = max(0, commissions_certaines - paiements)
+      const duAvant = Math.max(0, (d.total_commissions - d.commissions_certaines) - d.paiements_traites);
+      const duApres = Math.max(0, d.commissions_certaines - d.paiements_traites);
+      const ecartReel = duApres - duAvant;
       return {
         ...d,
-        montant_du_silga_stocke: livreur?.montant_du_silga ?? livreur?.encours ?? 0,
-        ecart: d.du_theorique - (livreur?.montant_du_silga ?? livreur?.encours ?? 0),
+        montant_du_silga_stocke: montantStocke,
+        ecart: ecartReel,
+        du_avant: duAvant,
+        du_apres: duApres,
+        credit_avant: Math.max(0, d.paiements_traites - (d.total_commissions - d.commissions_certaines)),
+        credit_apres: Math.max(0, d.paiements_traites - d.commissions_certaines),
       };
     });
 
-    // ── 7. Détail spécifique IRISSO (si demandé) ──
+    // ── 7. Filtrage par groupe (A/B/C) si demandé ──
+    let livreursEligibles: Set<string> | null = null;
+    if (groupFilter) {
+      livreursEligibles = new Set<string>();
+      for (const d of tableauAvecStocke) {
+        const ecart = d.ecart;
+        let groupe = "A";
+        if (ecart > 5000) groupe = "C";
+        else if (ecart > 1000) groupe = "B";
+        if (groupe === groupFilter) {
+          livreursEligibles.add(d.livreur_id);
+        }
+      }
+    }
+
+    // ── 8. Backfill différé (CERTAIN uniquement, filtré par groupe si demandé) ──
+    if (!dryRun) {
+      for (const item of certainCoursesForBackfill) {
+        // Skip si déjà backfillée (immuable)
+        if (item.already_backfilled) continue;
+        // Skip si filtre de groupe et livreur non éligible
+        if (livreursEligibles && !livreursEligibles.has(item.livreur_final_id)) continue;
+        try {
+          await asService.entities.CourseExterne.update(item.course_id, {
+            livreur_financier_id: item.livreur_final_id,
+          });
+          stats.backfillees++;
+        } catch (err: any) {
+          stats.erreurs++;
+          anomalies.push({
+            course_id: item.course_id,
+            erreur: err?.message || String(err),
+          });
+        }
+      }
+    }
+
+    // ── 9. Rapport des 10 cas où le crédit disparaît (groupe A uniquement) ──
+    let creditDisparaitRapport: any[] = [];
+    if (groupFilter === "A" || !groupFilter) {
+      creditDisparaitRapport = tableauAvecStocke
+        .filter((d: any) => d.credit_avant > 0 && d.credit_apres === 0)
+        .map((d: any) => ({
+          livreur_nom: d.livreur_nom,
+          livreur_id: d.livreur_id,
+          credit_avant: d.credit_avant,
+          credit_apres: d.credit_apres,
+          commissions_restaurees: d.commissions_certaines,
+          paiements_traites: d.paiements_traites,
+          verification: d.credit_avant <= d.commissions_certaines
+            ? "OK — crédit consommé par de vraies commissions"
+            : "ANOMALIE — crédit supérieur aux commissions restaurées",
+        }));
+    }
+
+    // ── 10. Détail spécifique IRISSO (si demandé) ──
     const irissoDetail = tableauAvecStocke.find((d: any) =>
       (d.livreur_nom || "").toUpperCase().includes("IRISSO")
     );
@@ -324,9 +387,11 @@ Deno.serve(async (req) => {
     return Response.json({
       success: true,
       dry_run: dryRun,
+      group_filter: groupFilter,
       stats,
       tableau_livreurs: tableauAvecStocke,
       detail_irisso: irissoDetail || null,
+      credit_disparait_rapport: creditDisparaitRapport,
       anomalies: anomalies.slice(0, 20),
       timestamp: new Date().toISOString(),
     });
