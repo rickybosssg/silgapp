@@ -145,10 +145,10 @@ Deno.serve(async (req) => {
     for (const course of (allCourses || [])) {
       stats.total_courses++;
 
-      // Déjà backfillée → skip (immuable)
-      if (course.livreur_financier_id) {
+      // Déjà backfillée → on la classe quand même pour le rapport, mais on ne la re-backfillera pas
+      const alreadyBackfilled = !!course.livreur_financier_id;
+      if (alreadyBackfilled) {
         stats.deja_backfillees++;
-        continue;
       }
 
       const nom = (course.livreur_nom || "").trim().toUpperCase();
@@ -262,9 +262,12 @@ Deno.serve(async (req) => {
           probable: 0,
           ambigu: 0,
           commissions_certaines: 0,
+          commissions_deja_backfillees: 0,
+          commissions_a_backfiller: 0,
           commissions_probables: 0,
           commissions_ambigues: 0,
           courses_certaines_ids: [],
+          courses_a_backfiller_ids: [],
         };
       }
       if (niveau === "CERTAIN") {
@@ -272,6 +275,12 @@ Deno.serve(async (req) => {
         detailsParLivreur[key].commissions_certaines += commission;
         detailsParLivreur[key].courses_certaines_ids.push(course.id);
         preuves.forEach(p => detailsParLivreur[key].preuves_detectees.add(p));
+        if (alreadyBackfilled) {
+          detailsParLivreur[key].commissions_deja_backfillees += commission;
+        } else {
+          detailsParLivreur[key].commissions_a_backfiller += commission;
+          detailsParLivreur[key].courses_a_backfiller_ids.push(course.id);
+        }
       } else if (niveau === "PROBABLE") {
         detailsParLivreur[key].probable++;
         detailsParLivreur[key].commissions_probables += commission;
@@ -307,10 +316,13 @@ Deno.serve(async (req) => {
     const tableauAvecStocke = tableauFinal.map((d: any) => {
       const livreur = livreurStockeMap[d.livreur_id];
       const montantStocke = livreur?.montant_du_silga ?? livreur?.encours ?? 0;
-      // Écart réel = du_apres_backfill - du_avant_backfill
-      // du_avant = max(0, commissions_avant - paiements) où commissions_avant utilise livreur_id (fallback)
-      // du_apres = max(0, commissions_certaines - paiements)
-      const duAvant = Math.max(0, (d.total_commissions - d.commissions_certaines) - d.paiements_traites);
+      // ══ ÉCART RÉEL CORRIGÉ ══
+      // du_avant = solde actuel depuis les courses CERTAINES DÉJÀ backfillées
+      //   (seules les courses avec livreur_financier_id sont comptées dans le solde réel)
+      // du_apres = solde si TOUTES les courses CERTAINES sont backfillées
+      // ecart = du_apres - du_avant = impact financier réel du backfill
+      const commissionsDejaBackfillees = d.commissions_deja_backfillees || 0;
+      const duAvant = Math.max(0, commissionsDejaBackfillees - d.paiements_traites);
       const duApres = Math.max(0, d.commissions_certaines - d.paiements_traites);
       const ecartReel = duApres - duAvant;
       return {
@@ -319,13 +331,17 @@ Deno.serve(async (req) => {
         ecart: ecartReel,
         du_avant: duAvant,
         du_apres: duApres,
-        credit_avant: Math.max(0, d.paiements_traites - (d.total_commissions - d.commissions_certaines)),
+        credit_avant: Math.max(0, d.paiements_traites - commissionsDejaBackfillees),
         credit_apres: Math.max(0, d.paiements_traites - d.commissions_certaines),
       };
     });
 
     // ── 7. Filtrage par groupe (A/B/C) si demandé ──
+    // SÉCURITÉ STRICTE : classification basée sur l'écart RÉEL (commissions déjà backfillées
+    // vs. commissions à backfiller). Un livreur ne peut être inclus que si son groupe
+    // correspond exactement au groupe demandé.
     let livreursEligibles: Set<string> | null = null;
+    let livreursParGroupe: Record<string, string[]> = { A: [], B: [], C: [] };
     if (groupFilter) {
       livreursEligibles = new Set<string>();
       for (const d of tableauAvecStocke) {
@@ -333,6 +349,7 @@ Deno.serve(async (req) => {
         let groupe = "A";
         if (ecart > 5000) groupe = "C";
         else if (ecart > 1000) groupe = "B";
+        livreursParGroupe[groupe].push(d.livreur_id);
         if (groupe === groupFilter) {
           livreursEligibles.add(d.livreur_id);
         }
@@ -340,12 +357,22 @@ Deno.serve(async (req) => {
     }
 
     // ── 8. Backfill différé (CERTAIN uniquement, filtré par groupe si demandé) ──
+    // SÉCURITÉ STRICTE : si un livreur n'appartient pas au groupe autorisé,
+    // l'opération est REFUSÉE (erreur explicite), pas ignorée silencieusement.
     if (!dryRun) {
+      const violationsGroupe: any[] = [];
       for (const item of certainCoursesForBackfill) {
-        // Skip si déjà backfillée (immuable)
+        // Skip si déjà backfillée (immuable) — pas une violation
         if (item.already_backfilled) continue;
-        // Skip si filtre de groupe et livreur non éligible
-        if (livreursEligibles && !livreursEligibles.has(item.livreur_final_id)) continue;
+        // SÉCURITÉ : refus si filtre de groupe et livreur non éligible
+        if (livreursEligibles && !livreursEligibles.has(item.livreur_final_id)) {
+          violationsGroupe.push({
+            course_id: item.course_id,
+            livreur_id: item.livreur_final_id,
+            erreur: `REFUSÉ — livreur hors groupe ${groupFilter} (sécurité stricte)`,
+          });
+          continue;
+        }
         try {
           await asService.entities.CourseExterne.update(item.course_id, {
             livreur_financier_id: item.livreur_final_id,
@@ -358,6 +385,11 @@ Deno.serve(async (req) => {
             erreur: err?.message || String(err),
           });
         }
+      }
+      // Si des violations ont été détectées, les ajouter au rapport
+      if (violationsGroupe.length > 0) {
+        stats.erreurs += violationsGroupe.length;
+        anomalies.push(...violationsGroupe);
       }
     }
 
