@@ -47,6 +47,11 @@ export async function calculerSoldeLivreur(base44: any, livreurId: string): Prom
     return { solde: 0, creditDisponible: 0, totalCommissions: 0, totalPaye: 0 };
   }
 
+  // 0. Récupérer le livreur pour vérifier la base comptable
+  const livreur = await base44.asServiceRole.entities.Livreur.get(livreurId).catch(() => null);
+  const baseDate = livreur?.base_comptable_date || null;
+  const baseSoldeInitial = Number(livreur?.base_comptable_solde_initial) || 0;
+
   // 1. Toutes les courses livrées du livreur (dette brute)
   //    On récupère par livreur_financier_id ET par livreur_id (fallback)
   //    puis on déduplique en mémoire.
@@ -70,7 +75,15 @@ export async function calculerSoldeLivreur(base44: any, livreurId: string): Prom
     if (!seenIds.has(c.id)) { seenIds.add(c.id); allCourses.push(c); }
   }
 
-  const totalCommissions = allCourses.reduce(
+  // Filtrer par base comptable si définie
+  const coursesForCalc = baseDate
+    ? allCourses.filter((c: any) => {
+        const d = c.heure_livraison || c.colis_livre_at || c.created_date;
+        return d && new Date(d) >= new Date(baseDate);
+      })
+    : allCourses;
+
+  const totalCommissions = coursesForCalc.reduce(
     (sum: number, c: any) => sum + (Number(c.commission_silga) || 0), 0
   );
 
@@ -80,13 +93,28 @@ export async function calculerSoldeLivreur(base44: any, livreurId: string): Prom
     '-date_envoi', 500
   ).catch(() => []);
 
-  const totalPaye = (paiements || []).reduce(
+  // Filtrer par base comptable si définie (paiements traités après la base)
+  const paiementsForCalc = baseDate
+    ? (paiements || []).filter((p: any) => {
+        const d = p.traite_at || p.date_envoi;
+        return d && new Date(d) >= new Date(baseDate);
+      })
+    : (paiements || []);
+
+  const totalPaye = paiementsForCalc.reduce(
     (sum: number, p: any) => sum + (Number(p.montant_paye) || 0), 0
   );
 
-  // 3. Formule unique
-  const solde = Math.max(0, totalCommissions - totalPaye);
-  const creditDisponible = Math.max(0, totalPaye - totalCommissions);
+  // 3. Formule avec base comptable
+  //    solde = base_solde_initial + commissions(après base) - paiements(après base)
+  //    du = max(0, solde)
+  //    credit = max(0, -solde)
+  const soldeBrut = baseDate
+    ? baseSoldeInitial + totalCommissions - totalPaye
+    : totalCommissions - totalPaye;
+
+  const solde = Math.max(0, soldeBrut);
+  const creditDisponible = Math.max(0, -soldeBrut);
 
   return { solde, creditDisponible, totalCommissions, totalPaye };
 }

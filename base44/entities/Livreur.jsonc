@@ -196,6 +196,16 @@
       "type": "number",
       "default": 0
     },
+    "base_comptable_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date de coupure comptable. Si d\u00e9finie, seules les courses livr\u00e9es apr\u00e8s cette date ET les paiements trait\u00e9s apr\u00e8s cette date entrent dans le calcul du solde. Le solde initial de la base (base_comptable_solde_initial) est ajout\u00e9. Null = comportement historique (toutes les courses et paiements)."
+    },
+    "base_comptable_solde_initial": {
+      "type": "number",
+      "default": 0,
+      "description": "Solde initial (dette ou cr\u00e9dit) au moment de la base comptable. Si positif = dette initiale. Si n\u00e9gatif = cr\u00e9dit initial. Ajout\u00e9 au calcul: solde = base_comptable_solde_initial + commissions(apr\u00e8s base) - paiements(apr\u00e8s base)."
+    },
     "dernier_paiement_date": {
       "type": "string",
       "format": "date-time",
