@@ -10,7 +10,11 @@ const schema = JSON.parse(read('base44/entities/AppConfig.jsonc'));
 
 assert.match(source, /const owner = crypto\.randomUUID\(\)/);
 assert.match(source, /AppConfig\.updateMany\([\s\S]*lock_owner: owner/);
+assert.match(source, /Number\(claimResult\?\.updated \|\| 0\) === 1/);
 assert.match(source, /acquireCreationMutex\(base44, normalizedRequestId, user\.email\)/);
+assert.match(source, /persistCreationReceipt\([\s\S]*course\.id/);
+assert.match(source, /findReceiptCourse\(base44, claimedMutex, requestId, userEmail\)/);
+assert.match(source, /MAX_RECENT_RECEIPTS = 100/);
 assert.match(source, /finally \{[\s\S]*releaseCreationMutex/);
 assert.doesNotMatch(source, /Post-creation dedup|Doublon request_id supprimé/);
 assert.equal(schema.properties.lock_owner.type, 'string');

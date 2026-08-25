@@ -3,8 +3,44 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
 const CREATION_MUTEX_KEY = 'COURSE_CREATION_MUTEX';
 const LOCK_TTL_MS = 15_000;
 const LOCK_WAIT_MS = 12_000;
+const MAX_RECENT_RECEIPTS = 100;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+type CreationReceipt = {
+  key: string;
+  request_id: string;
+  course_id: string;
+  completed_at: string;
+};
+
+function receiptKey(requestId: string) {
+  return requestId;
+}
+
+function parseReceipts(rawValue: unknown): CreationReceipt[] {
+  if (typeof rawValue !== 'string' || !rawValue.trim().startsWith('[')) return [];
+  try {
+    const parsed = JSON.parse(rawValue);
+    return Array.isArray(parsed) ? parsed.filter((item) => item?.key && item?.course_id) : [];
+  } catch {
+    return [];
+  }
+}
+
+async function findReceiptCourse(base44: any, mutex: any, requestId: string, userEmail: string) {
+  const key = receiptKey(requestId);
+  const receipt = parseReceipts(mutex?.valeur).find((item) => item.key === key);
+  if (!receipt) return null;
+
+  try {
+    const course = await base44.asServiceRole.entities.CourseExterne.get(receipt.course_id);
+    if (course?.request_id === requestId && course?.client_user_email === userEmail) return course;
+  } catch {
+    // Le recu peut pointer vers une ancienne donnee QA supprimee.
+  }
+  return null;
+}
 
 async function findExistingCourse(base44: any, requestId: string, userEmail: string) {
   const existing = await base44.asServiceRole.entities.CourseExterne.filter(
@@ -33,6 +69,10 @@ async function acquireCreationMutex(base44: any, requestId: string, userEmail: s
   const deadline = Date.now() + LOCK_WAIT_MS;
 
   while (Date.now() < deadline) {
+    const currentMutex = await base44.asServiceRole.entities.AppConfig.get(mutex.id);
+    const receiptCourse = await findReceiptCourse(base44, currentMutex, requestId, userEmail);
+    if (receiptCourse) return { existing: receiptCourse, mutex, owner: null };
+
     const existing = await findExistingCourse(base44, requestId, userEmail);
     if (existing) return { existing, mutex, owner: null };
 
@@ -41,7 +81,7 @@ async function acquireCreationMutex(base44: any, requestId: string, userEmail: s
 
     // updateMany realise le compare-and-set dans la base. Un seul appel peut
     // remplacer un mutex libre ou expire par son propre jeton proprietaire.
-    await base44.asServiceRole.entities.AppConfig.updateMany(
+    const claimResult = await base44.asServiceRole.entities.AppConfig.updateMany(
       {
         id: mutex.id,
         $or: [
@@ -60,8 +100,18 @@ async function acquireCreationMutex(base44: any, requestId: string, userEmail: s
       }
     );
 
-    const verified = await base44.asServiceRole.entities.AppConfig.get(mutex.id);
-    if (verified?.lock_owner === owner) {
+    if (Number(claimResult?.updated || 0) === 1) {
+      const claimedMutex = await base44.asServiceRole.entities.AppConfig.get(mutex.id);
+      if (claimedMutex?.lock_owner !== owner) {
+        throw new Error('COURSE_CREATION_MUTEX_OWNERSHIP_LOST');
+      }
+
+      // Une creation precedente peut avoir ete finalisee juste avant notre prise
+      // du verrou, alors que l'index de recherche CourseExterne n'est pas encore
+      // coherent. Le recu lu par ID ferme cette fenetre de visibilite.
+      const completedCourse = await findReceiptCourse(base44, claimedMutex, requestId, userEmail);
+      if (completedCourse) return { existing: completedCourse, mutex, owner };
+
       return { existing: null, mutex, owner };
     }
 
@@ -71,6 +121,35 @@ async function acquireCreationMutex(base44: any, requestId: string, userEmail: s
   const existing = await findExistingCourse(base44, requestId, userEmail);
   if (existing) return { existing, mutex, owner: null };
   throw new Error('COURSE_CREATION_MUTEX_TIMEOUT');
+}
+
+async function persistCreationReceipt(
+  base44: any,
+  mutexId: string,
+  owner: string,
+  requestId: string,
+  courseId: string
+) {
+  const mutex = await base44.asServiceRole.entities.AppConfig.get(mutexId);
+  if (mutex?.lock_owner !== owner) throw new Error('COURSE_CREATION_MUTEX_OWNERSHIP_LOST');
+
+  const key = receiptKey(requestId);
+  const receipt: CreationReceipt = {
+    key,
+    request_id: requestId,
+    course_id: courseId,
+    completed_at: new Date().toISOString(),
+  };
+  const receipts = [receipt, ...parseReceipts(mutex.valeur).filter((item) => item.key !== key)]
+    .slice(0, MAX_RECENT_RECEIPTS);
+
+  const result = await base44.asServiceRole.entities.AppConfig.updateMany(
+    { id: mutexId, lock_owner: owner },
+    { $set: { valeur: JSON.stringify(receipts) } }
+  );
+  if (Number(result?.updated || 0) !== 1) {
+    throw new Error('COURSE_CREATION_RECEIPT_NOT_PERSISTED');
+  }
 }
 
 async function releaseCreationMutex(base44: any, mutexId: string, owner: string) {
@@ -131,6 +210,9 @@ export default async function(req: Request): Promise<Response> {
     if (normalizedRequestId) {
       mutex = await acquireCreationMutex(base44, normalizedRequestId, user.email);
       if (mutex.existing) {
+        if (mutex.owner && mutex.mutex?.id) {
+          await releaseCreationMutex(base44, mutex.mutex.id, mutex.owner);
+        }
         return Response.json({ success: true, course: mutex.existing, idempotent: true });
       }
     }
@@ -184,10 +266,20 @@ export default async function(req: Request): Promise<Response> {
       cleanData.request_id = normalizedRequestId;
     }
 
-    // ── Créer la course ──
-    const course = await base44.asServiceRole.entities.CourseExterne.create(cleanData);
+      // ── Créer la course ──
+      const course = await base44.asServiceRole.entities.CourseExterne.create(cleanData);
 
-    return Response.json({ success: true, course });
+      if (normalizedRequestId && mutex?.owner && mutex?.mutex?.id) {
+        await persistCreationReceipt(
+          base44,
+          mutex.mutex.id,
+          mutex.owner,
+          normalizedRequestId,
+          course.id
+        );
+      }
+
+      return Response.json({ success: true, course });
     } finally {
       if (mutex?.owner && mutex?.mutex?.id) {
         await releaseCreationMutex(base44, mutex.mutex.id, mutex.owner).catch((error: any) => {
