@@ -77,22 +77,34 @@ export async function sendOneFcm(projectId: string, accessToken: string, token: 
   return { ok: response.ok, status: response.status, result };
 }
 
-export async function sendReactivationPush(targets: { token: string; recipient_id: string }[], title: string, message: string, campaignId: string): Promise<{ success: number; failed: number; invalid: string[] }> {
+export interface PushResult {
+  recipient_id: string;
+  ok: boolean;
+  error?: string;
+}
+
+export async function sendReactivationPush(
+  targets: { token: string; recipient_id: string }[],
+  title: string,
+  message: string,
+  campaignId: string
+): Promise<{ success: number; failed: number; invalid: string[]; results: PushResult[] }> {
   const { projectId, clientEmail, privateKey } = getFirebaseConfig();
   if (!projectId || !clientEmail || !privateKey) {
     throw new Error("Firebase non configuré — FIREBASE_SERVICE_ACCOUNT_JSON manquant");
   }
 
   const accessToken = await getAccessToken(clientEmail, privateKey);
-  const BATCH_SIZE = 100;
+  const BATCH_SIZE = 5;
 
   let success = 0;
   let failed = 0;
   const invalid: string[] = [];
+  const results: PushResult[] = [];
 
   for (let i = 0; i < targets.length; i += BATCH_SIZE) {
     const batch = targets.slice(i, i + BATCH_SIZE);
-    const results = await Promise.all(batch.map(async (target) => {
+    const batchResults = await Promise.all(batch.map(async (target) => {
       const fcmPayload = {
         notification: { title, body: message },
         data: {
@@ -123,16 +135,17 @@ export async function sendReactivationPush(targets: { token: string; recipient_i
         if (["UNREGISTERED", "INVALID_ARGUMENT"].includes(errorCode)) {
           invalid.push(target.token);
         }
-        return false;
+        return { recipient_id: target.recipient_id, ok: false, error: errorCode || "unknown" };
       }
-      return true;
+      return { recipient_id: target.recipient_id, ok: true };
     }));
-    success += results.filter(Boolean).length;
-    failed += results.filter((r) => !r).length;
+    results.push(...batchResults);
+    success += batchResults.filter((r) => r.ok).length;
+    failed += batchResults.filter((r) => !r.ok).length;
     if (i + BATCH_SIZE < targets.length) await new Promise((r) => setTimeout(r, 200));
   }
 
-  return { success, failed, invalid };
+  return { success, failed, invalid, results };
 }
 
 // ── Segmentation ──────────────────────────────────────────────────────────────
@@ -246,6 +259,7 @@ export interface TargetSelectionParams {
   inactive_days_min?: number;
   control_group_pct?: number;
   ab_variants?: any[];
+  campaign_id?: string;
 }
 
 export interface TargetClient {
@@ -300,15 +314,22 @@ export async function selectTargets(base44: any, params: TargetSelectionParams):
   }
 
   // ── Anti-spam : exclure les clients déjà ciblés dans les dernières 48h ──
+  //    + exclure les clients qui ont DÉJÀ un recipient dans cette campagne (idempotence)
   const antiSpamMs = DEFAULT_ANTI_SPAM_HOURS * 3600000;
   const recentRecipients = await base44.asServiceRole.entities.ReactivationCampaignRecipient.list();
   const recentSet = new Set<string>();
+  const alreadyInCampaign = new Set<string>();
   for (const r of recentRecipients) {
+    // Exclure si déjà un recipient dans CETTE campagne (peu importe le statut)
+    if (params.campaign_id && r.campaign_id === params.campaign_id) {
+      if (r.client_id) alreadyInCampaign.add(r.client_id);
+    }
+    // Exclure si envoyé dans une autre campagne dans les dernières 48h
     if (r.sent_at && (now - new Date(r.sent_at).getTime()) < antiSpamMs) {
       if (r.client_id) recentSet.add(r.client_id);
     }
   }
-  eligible = eligible.filter((t) => !recentSet.has(t.client.id));
+  eligible = eligible.filter((t) => !recentSet.has(t.client.id) && !alreadyInCampaign.has(t.client.id));
 
   // ── Limite max_targets (campagnes pilotes) ──
   const maxTargets = params.max_targets || 0;
