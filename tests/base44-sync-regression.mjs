@@ -38,8 +38,8 @@ const createAdmin = read("base44/functions/creerCourseAdmin/entry.ts");
 assert.match(createAdmin, /user\.role === 'admin' \|\| user\.can_create_admin_course === true/, "Le backend doit vérifier la permission agent");
 
 const createClient = read("base44/functions/creerCourseClient/entry.ts");
-assert.match(createClient, /cleanData\.country_code = String\(cleanData\.country_code \|\| ''\)\.trim\(\)\.toUpperCase\(\)/, "Le backend Client doit conserver un country_code normalisé");
-assert.match(createClient, /cleanData\.statut = cleanData\.date_souhaitee \? 'programmee' : 'recherche_livreur'/, "Le backend doit dériver le statut initial sans attendre le dispatch");
+assert.match(createClient, /cleanData\.country_code = String\(cleanData\.country_code\)\.trim\(\)\.toUpperCase\(\)/, "Le backend Client doit conserver un country_code normalisé");
+assert.match(createClient, /cleanData\.statut = 'nouvelle'/, "Le backend doit créer la course dans l'état initial nouvelle");
 assert.match(createClient, /cleanData\.dispatch_status = 'en_attente'/, "Le backend doit initialiser le dispatch de façon déterministe");
 
 const scanner = read("src/components/livreur/QRScannerModal.jsx");
