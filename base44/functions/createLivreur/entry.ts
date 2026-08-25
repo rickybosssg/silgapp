@@ -48,7 +48,8 @@ Deno.serve(async (req) => {
       note_moyenne: 0,
       nombre_avis: 0,
       montant_du_silga: 0,
-      statut_paiement: 'non_paye',
+      credit_surplus: 0,
+      statut_paiement: 'paye', // Nouveau livreur = dû 0 → à jour
     });
     console.log(" [createLivreur] Livreur créé:", created.id);
     return Response.json({ success: true, livreur: created });

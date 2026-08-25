@@ -34,10 +34,29 @@ export default async function(req: Request): Promise<Response> {
     if (!user) return Response.json({ error: 'Non autorisé' }, { status: 401 });
 
     const body = await req.json();
-    const { course_data, is_duplicate } = body;
+    const { course_data, is_duplicate, request_id } = body;
 
     if (!course_data || typeof course_data !== 'object') {
       return Response.json({ error: 'course_data requis' }, { status: 400 });
+    }
+
+    // ── Anti-double-création idempotente via request_id ──
+    // Si le frontend envoie un request_id, vérifier si une course avec ce même
+    // request_id existe déjà. Si oui, la retourner sans en créer une nouvelle.
+    // Cas couverts : double-clic rapide, retry réseau, re-render React.
+    if (request_id && typeof request_id === 'string') {
+      try {
+        const existing = await base44.asServiceRole.entities.CourseExterne.filter(
+          { request_id },
+          '-created_date',
+          1
+        );
+        if (existing && existing.length > 0) {
+          return Response.json({ success: true, course: existing[0], idempotent: true });
+        }
+      } catch (_) {
+        // Ne pas bloquer la création si la vérification échoue
+      }
     }
 
     // ── Nettoyer les champs sensibles ──
@@ -80,6 +99,11 @@ export default async function(req: Request): Promise<Response> {
       delete cleanData.delivery_code_4_digits;
       delete cleanData.tracking_token;
       delete cleanData.tracking_link;
+    }
+
+    // ── Sauvegarder request_id pour l'idempotence future ──
+    if (request_id && typeof request_id === 'string') {
+      cleanData.request_id = request_id;
     }
 
     // ── Créer la course ──

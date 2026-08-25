@@ -13,7 +13,8 @@
 //   soldeBrut        = totalCommissions - totalPaye (avec base comptable si définie)
 //   solde            = max(0, soldeBrut)           → dû réel
 //   creditDisponible = max(0, -soldeBrut)          → écart mathématique (AUDIT UNIQUEMENT)
-//   creditSurplus    = livreur.credit_surplus       → crédit persistant validé par l'admin
+//   creditSurplus    = min(livreur.credit_surplus, creditDisponible)
+//                     → crédit persistant, consommé par les futures commissions
 //
 // RÈGLE MÉTIER DÉFINITIVE (25/08/2026) :
 //   credit_surplus est une valeur PERSISTANTE et traçable, créée uniquement quand
@@ -60,7 +61,7 @@ export async function calculerSoldeLivreur(base44: any, livreurId: string): Prom
   const livreur = await base44.asServiceRole.entities.Livreur.get(livreurId).catch(() => null);
   const baseDate = livreur?.base_comptable_date || null;
   const baseSoldeInitial = Number(livreur?.base_comptable_solde_initial) || 0;
-  const creditSurplus = Number(livreur?.credit_surplus) || 0;
+  const rawCreditSurplus = Number(livreur?.credit_surplus) || 0;
 
   // 1. Toutes les courses livrées du livreur (dette brute)
   //    On récupère par livreur_financier_id ET par livreur_id (fallback)
@@ -125,6 +126,13 @@ export async function calculerSoldeLivreur(base44: any, livreurId: string): Prom
 
   const solde = Math.max(0, soldeBrut);
   const creditDisponible = Math.max(0, -soldeBrut);
+
+  // credit_surplus = valeur persistante, consommée automatiquement par les futures commissions.
+  // Règle : credit_surplus ne peut jamais dépasser creditDisponible (l'écart mathématique réel).
+  // Quand les commissions rattrapent les paiements, creditDisponible diminue → credit_surplus aussi.
+  // Ex: credit_surplus=700, nouvelle commission 300 → creditDisponible passe de 1000 à 700 → credit_surplus reste 700.
+  //     Nouvelle commission 100 de plus → creditDisponible=600 → credit_surplus=min(700, 600)=600 (consommé 100).
+  const creditSurplus = Math.min(rawCreditSurplus, creditDisponible);
 
   return { solde, creditDisponible, creditSurplus, totalCommissions, totalPaye };
 }
@@ -214,10 +222,11 @@ export async function calculerSoldesLivreursBatch(
     const soldeBrut = base
       ? base.soldeInitial + totalCommissions - totalPaye
       : totalCommissions - totalPaye;
+    const creditDisp = Math.max(0, -soldeBrut);
     result[id] = {
       solde: Math.max(0, soldeBrut),
-      creditDisponible: Math.max(0, -soldeBrut),
-      creditSurplus: creditSurplusMap[id] || 0,
+      creditDisponible: creditDisp,
+      creditSurplus: Math.min(creditSurplusMap[id] || 0, creditDisp),
       totalCommissions,
       totalPaye,
     };
