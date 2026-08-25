@@ -49,6 +49,24 @@ export default async function(req: Request): Promise<Response> {
     // ── Résoudre client_user_email côté backend ──
     cleanData.client_user_email = user.email;
 
+    // ── Normaliser country_code (uppercase, trim) ──
+    if (cleanData.country_code) {
+      cleanData.country_code = String(cleanData.country_code).trim().toUpperCase();
+    }
+
+    // ── Forcer le statut initial et dispatch_status après nettoyage ──
+    // statut et dispatch_status sont dans FORBIDDEN_FIELDS (le frontend ne peut pas les définir),
+    // mais ils DOIVENT être initialisés côté backend après le nettoyage.
+    // Sans ça, dispatch_status reste null (pas de default dans le schema) et la course
+    // n'est pas prise en charge par le dispatch automatique.
+    cleanData.statut = 'nouvelle';
+    cleanData.dispatch_status = 'en_attente';
+
+    // ── S'assurer que les champs multi-colis sont préservés ──
+    // is_multi_colis, nb_colis, nb_colis_livres, nb_colis_annules ne sont pas sensibles
+    // et doivent être conservés tels quels depuis le frontend.
+    // (aucune action nécessaire — ils ne sont pas dans FORBIDDEN_FIELDS)
+
     // ── Pour les duplications, ne pas copier les QR codes ──
     if (is_duplicate) {
       delete cleanData.id;
