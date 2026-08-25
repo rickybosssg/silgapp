@@ -209,7 +209,7 @@ export default function ReactivationClients() {
                   Lancer
                 </button>
               )}
-              {(c.status === "sent" || c.status === "completed") && (
+              {(c.status === "sent" || c.status === "completed" || c.status === "cancelled") && (c.sent_count > 0 || c.target_count > 0) && (
                 <button
                   onClick={() => setSelectedCampaign(c)}
                   className="h-8 px-3 rounded-lg bg-blue-50 text-blue-700 text-[11px] font-bold flex items-center gap-1 shrink-0"
@@ -233,6 +233,17 @@ export default function ReactivationClients() {
                   Commission: {(c.commission_generated || 0).toLocaleString()} FCFA — Coût: 0 FCFA — Net: +{(c.commission_generated || 0).toLocaleString()} FCFA
                 </div>
               </div>
+            )}
+
+            {/* Full-width results button — impossible to miss on mobile */}
+            {(c.status === "sent" || c.status === "completed" || c.status === "cancelled") && (c.sent_count > 0 || c.target_count > 0) && (
+              <button
+                onClick={() => setSelectedCampaign(c)}
+                className="mt-2 w-full h-10 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-black flex items-center justify-center gap-2 shadow-sm active:scale-[0.98] transition-all"
+              >
+                <Eye className="w-4 h-4" />
+                Voir les résultats
+              </button>
             )}
           </div>
         ))}
