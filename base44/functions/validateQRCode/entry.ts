@@ -193,6 +193,38 @@ Deno.serve(async (req) => {
           distAdmin = haversineKm(latRecupAdmin, lngRecupAdmin, gpsLat, gpsLng);
         }
 
+        // ── RÈGLE MÉTIER : prix_propose_admin est la source de vérité ──
+        // Écrit atomiquement prix_final, commission_silga, montant_livreur
+        // au moment de la validation de livraison. Aucun fallback frontend.
+        const prixFinalAdmin = Number(course.prix_propose_admin) || 0;
+        if (prixFinalAdmin <= 0) {
+          return Response.json({
+            success: false,
+            error: 'prix_propose_admin manquant pour cette course admin — impossible de finaliser la livraison',
+            blocked_reason: 'missing_admin_price',
+          }, { status: 400 });
+        }
+
+        // Charger la commission du pays
+        let adminCommissionPct = null;
+        try {
+          const countriesDB = await base44.asServiceRole.entities.Country.filter({ code: course.country_code, actif: true });
+          if (countriesDB?.[0]) {
+            adminCommissionPct = normalizeCommissionPct(countriesDB[0].commission_pct);
+          }
+        } catch (_) {}
+
+        if (adminCommissionPct === null) {
+          return Response.json({
+            success: false,
+            error: `Commission non configurée pour le pays ${course.country_code}`,
+            blocked_reason: 'missing_country_commission_pct',
+          }, { status: 400 });
+        }
+
+        const adminCommission = Math.round(prixFinalAdmin * (adminCommissionPct / 100));
+        const adminMontantLivreur = prixFinalAdmin - adminCommission;
+
         const adminUpdateData = {
           statut: 'livree',
           heure_livraison: now,
@@ -203,7 +235,9 @@ Deno.serve(async (req) => {
           latitude_arrivee_livraison: gpsLat || null,
           longitude_arrivee_livraison: gpsLng || null,
           colis_livre_at: now,
-          // PRIX NON CALCULÉ — saisi par le livreur côté app
+          prix_final: prixFinalAdmin,
+          commission_silga: adminCommission,
+          montant_livreur: adminMontantLivreur,
         };
         if (distAdmin != null) {
           adminUpdateData.distance_reelle_km = Math.max(Number(distAdmin) || 0, 0.01);
@@ -213,13 +247,16 @@ Deno.serve(async (req) => {
 
         return Response.json({
           success: true,
-          message: 'Livraison confirmée — saisir le montant payé par le client',
+          message: 'Livraison confirmée',
           course: {
             statut: 'livree',
             heure_livraison: now,
             latitude_livraison: gpsLat || null,
             longitude_livraison: gpsLng || null,
             distance_reelle_km: adminUpdateData.distance_reelle_km || null,
+            prix_final: prixFinalAdmin,
+            commission_silga: adminCommission,
+            montant_livreur: adminMontantLivreur,
           },
         });
       }

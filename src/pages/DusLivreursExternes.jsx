@@ -320,7 +320,7 @@ export default function DusLivreursExternes() {
       const dateLivraison = c.heure_livraison || c.colis_livre_at || c.updated_date;
       const isToday = dateLivraison ? new Date(dateLivraison) >= startOfToday : false;
       if (!map[c.livreur_id]) {
-        const info = livreurs.find(l => l.id === c.livreur_id);
+        const info = livreursList.find(l => l.id === c.livreur_id);
         map[c.livreur_id] = { id: c.livreur_id, nom: info?.nom || c.livreur_nom || "Inconnu", prenom: info?.prenom || "", telephone: c.livreur_telephone || info?.telephone || "", livreurInfo: info || null, courses: [], montantTotal: 0, commissionTotal: 0, commissionJour: 0, nbCoursesJour: 0, montantPaye: 0, montantDu: 0 };
       }
       map[c.livreur_id].courses.push(c);

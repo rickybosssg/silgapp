@@ -26,10 +26,18 @@ export function trackAppInstall() {
     const platform = detectPlatform();
     let countryCode = '';
     try { countryCode = localStorage.getItem('silgapp_selected_country') || ''; } catch {}
-    base44.functions.invoke('trackAppInstall', {
+    // Fire-and-forget avec timeout — un échec de tracking ne doit JAMAIS
+    // bloquer l'ouverture de SILGAPP ni remonter comme erreur critique.
+    const invokePromise = base44.functions.invoke('trackAppInstall', {
       device_id: deviceId,
       platform,
       country_code: countryCode,
-    }).catch(() => null);
-  } catch {}
+    });
+    Promise.race([
+      invokePromise,
+      new Promise((_, reject) => setTimeout(() => reject(new Error('trackAppInstall timeout')), 5000)),
+    ]).catch(() => null);
+  } catch {
+    // Silencieux — le tracking d'installation n'est jamais bloquant
+  }
 }

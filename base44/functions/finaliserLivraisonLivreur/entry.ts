@@ -79,12 +79,13 @@ export default async function(req: Request): Promise<Response> {
     // ── CAS 1: Course admin — le livreur saisit le prix (montant brut) ──
     // Le backend calcule commission_silga et montant_livreur côté backend uniquement.
     if (isAdminCourse) {
-      // Validation: le prix doit être fourni par le frontend (montant brut uniquement)
-      const montant = Number(prix_final_livreur);
+      // ── RÈGLE MÉTIER : prix_propose_admin est la source de vérité ──
+      // Le livreur ne peut jamais remplacer ce prix. prix_final_livreur est ignoré.
+      const montant = Number(course.prix_propose_admin);
       if (!Number.isFinite(montant) || montant <= 0) {
         return Response.json({
-          error: 'Montant invalide — le prix final doit être un nombre positif',
-          blocked_reason: 'invalid_amount',
+          error: 'prix_propose_admin manquant pour cette course admin — impossible de finaliser',
+          blocked_reason: 'missing_admin_price',
         }, { status: 400 });
       }
 
@@ -98,7 +99,7 @@ export default async function(req: Request): Promise<Response> {
         }, { status: 400 });
       }
 
-      // Calcul côté backend uniquement — le frontend ne transmet QUE le montant brut
+      // Calcul côté backend uniquement — prix_propose_admin est la source
       const commissionSilga = Math.round(montant * (commissionPct / 100));
       const montantLivreur = montant - commissionSilga;
 

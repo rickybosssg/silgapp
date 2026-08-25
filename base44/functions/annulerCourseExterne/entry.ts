@@ -213,9 +213,12 @@ Deno.serve(async (req) => {
       }
 
       // ── Notification admin (modal — alerte_critique_dispatch pour déclencher le SystemAlertModal) ──
+      // ⚠️ Le message ne contient QUE les faits + l'explication du livreur.
+      // Les instructions système (redispatch) sont affichées séparément côté frontend
+      // (SystemAlertModal) en tant que bloc statique, jamais concaténées au motif.
       await asService.entities.Notification.create({
-        titre: "Course annulée par le livreur — action admin requise",
-        message: `Le livreur ${course.livreur_nom || "?"} a annulé la course #${course_id.slice(-8)} (${course.adresse_depart || "?"} vers ${course.adresse_arrivee || "?"}). Motif : ${motif || "non spécifié"}. ${motif_detail ? `Détail : ${motif_detail}.` : ""} La course est en attente et ne sera pas reproposée automatiquement. Utilisez l'action Relancer pour rechercher un autre livreur ; le livreur ayant annulé restera exclu de cette course.`,
+        titre: "⏸ Course annulée par le livreur — redispatch requis",
+        message: `Le livreur ${course.livreur_nom || "?"} a annulé la course #${course_id.slice(-8)} (${course.adresse_depart || "?"} → ${course.adresse_arrivee || "?"}). Motif: ${motif || "non spécifié"}. ${motif_detail ? `Détail: ${motif_detail}` : "Aucun détail fourni par le livreur."}`,
         type: "alerte_critique_dispatch",
         course_id,
         destinataire_email: "admin",
