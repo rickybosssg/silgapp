@@ -221,7 +221,7 @@
         "programmee",
         "recherche_livreur",
         "livreur_en_route",
-        "client_contacte",
+        "client_contacto",
         "en_route_expediteur",
         "arrive_prise_en_charge",
         "colis_recupere",
@@ -277,6 +277,10 @@
     },
     "livreur_id": {
       "type": "string"
+    },
+    "livreur_financier_id": {
+      "type": "string",
+      "description": "Identite financiere IMMUABLE du livreur qui a reellement realise la livraison. Renseigne cote backend au moment de la finalisation de la livraison (jamais depuis le frontend). Une fois defini sur une course livree, ce champ NE DOIT JAMAIS etre modifie, meme en cas de redispatch, annulation, nettoyage ou changement de livreur_id. C'est la cle de rattachement financier utilisee par soldeCalculator.ts pour le calcul des commissions dues. Distinct de livreur_id qui reste operationnel/dispatch et peut evoluer."
     },
     "livreur_nom": {
       "type": "string"

@@ -95,17 +95,14 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ── Refuser un paiement supérieur au solde dû ──
-    //    Pas de crédit/avance implicite — si le montant dépasse la dette,
-    //    le paiement est refusé. L'admin doit d'abord corriger le solde.
-    if (montant > ancienSolde) {
-      return Response.json({
-        error: `Montant (${montant} FCFA) supérieur au solde dû (${ancienSolde} FCFA). Paiement refusé — aucun système de crédit/avance livreur n'est activé.`,
-        solde_du: ancienSolde,
-        montant_demande: montant,
-      }, { status: 400 });
-    }
-    const nouveauSolde = ancienSolde - montant;
+    // ── Surplus reconnu (RÈGLE MÉTIER DÉFINITIVE) ──
+    //    Si le paiement dépasse le dû réel, l'excédent devient un credit_surplus
+    //    PERSISTANT et traçable. Ce crédit sera consommé par les futures commissions.
+    //    Ex: dû 1300, paiement 2000 → credit_surplus += 700, dû = 0.
+    const surplusCree = Math.max(0, montant - ancienSolde);
+    const nouveauSolde = Math.max(0, ancienSolde - montant);
+    const ancienCreditSurplus = Number(livreur.credit_surplus) || 0;
+    const nouveauCreditSurplus = ancienCreditSurplus + surplusCree;
 
     // ── Créer l'enregistrement PaiementSilgapp (TRAÇABILITÉ OBLIGATOIRE) ──
     const paiementRecord = await base44.asServiceRole.entities.PaiementSilgapp.create({
@@ -148,12 +145,13 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ── Mettre à jour montant_paye et dernier_paiement_date ──
+    // ── Mettre à jour montant_paye, dernier_paiement_date et credit_surplus ──
     await base44.entities.Livreur.update(livreur_id, {
       montant_paye: (livreur.montant_paye || 0) + montant,
       dernier_paiement_date: now,
       heure_paiement: now,
       admin_paiement: user.full_name || user.email || 'admin',
+      credit_surplus: nouveauCreditSurplus,
     });
 
     // ── Recalculer le solde depuis les sources financières ──
@@ -176,7 +174,7 @@ Deno.serve(async (req) => {
       });
     } catch (_) {}
 
-    console.log(`[PAIEMENT] ${livreur_id} a payé ${montant}F (${typePaiement}) — solde: ${ancienSolde} → ${nouveauSolde}`);
+    console.log(`[PAIEMENT] ${livreur_id} a payé ${montant}F (${typePaiement}) — solde: ${ancienSolde} → ${nouveauSolde}, credit_surplus: ${ancienCreditSurplus} → ${nouveauCreditSurplus}`);
 
     return Response.json({
       success: true,
@@ -184,6 +182,8 @@ Deno.serve(async (req) => {
       paiement_id: paiementRecord.id,
       ancien_solde: ancienSolde,
       nouveau_solde: nouveauSolde,
+      credit_surplus: nouveauCreditSurplus,
+      surplus_cree: surplusCree,
       type_paiement: typePaiement,
       courses_concernees: coursesConcernees,
       montant,

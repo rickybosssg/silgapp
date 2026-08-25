@@ -23,6 +23,7 @@ export default function PayerSilgapp({ userType: forcedType }) {
   const [userType, setUserType] = useState(forcedType || null);
   const [userInfo, setUserInfo] = useState(null);
   const [montantDu, setMontantDu] = useState(0);
+  const [creditDisponible, setCreditDisponible] = useState(0);
   const [montantPaye, setMontantPaye] = useState("");
   const [preuveUrl, setPreuveUrl] = useState(null);
   const [preuveType, setPreuveType] = useState("");
@@ -46,8 +47,15 @@ export default function PayerSilgapp({ userType: forcedType }) {
             telephone: livreurs[0].telephone,
             country_code: livreurs[0].country_code,
           });
-          // ── Source de vérité unique : montant_du_silga (champ stocké, mis à jour à chaque paiement)
-          setMontantDu(livreurs[0].montant_du_silga ?? livreurs[0].encours ?? 0);
+          // ── Source de vérité unique : getSoldeLivreur (même formule que recalculerSoldeLivreur) ──
+          try {
+            const res = await base44.functions.invoke('getSoldeLivreur', { livreur_id: livreurs[0].id });
+            const data = res?.data || res;
+            setMontantDu(data?.montantDu ?? 0);
+            setCreditDisponible(data?.creditDisponible ?? 0);
+          } catch (_) {
+            setMontantDu(livreurs[0].montant_du_silga ?? livreurs[0].encours ?? 0);
+          }
           return;
         }
 
@@ -100,8 +108,16 @@ export default function PayerSilgapp({ userType: forcedType }) {
     const interval = setInterval(async () => {
       try {
         if (userType === "livreur") {
-          const l = await base44.entities.Livreur.filter({ id: userInfo.id });
-          if (l?.[0]) setMontantDu(l[0].montant_du_silga ?? l[0].encours ?? 0);
+          // ── Source de vérité unique : getSoldeLivreur ──
+          try {
+            const res = await base44.functions.invoke('getSoldeLivreur', { livreur_id: userInfo.id });
+            const data = res?.data || res;
+            setMontantDu(data?.montantDu ?? 0);
+            setCreditDisponible(data?.creditDisponible ?? 0);
+          } catch (_) {
+            const l = await base44.entities.Livreur.filter({ id: userInfo.id });
+            if (l?.[0]) setMontantDu(l[0].montant_du_silga ?? l[0].encours ?? 0);
+          }
         } else if (userType === "client") {
           const frais = await base44.entities.FraisAnnulation.filter({ client_id: userInfo.id });
           const impaye = (frais || []).filter((f) => f.statut_paiement !== "paye").reduce((s, f) => s + (f.montant || 0), 0);
@@ -237,10 +253,22 @@ export default function PayerSilgapp({ userType: forcedType }) {
         </div>
 
         {montantDu <= 0 ? (
-          <div className="bg-green-50 border border-green-200 rounded-2xl p-6 text-center">
-            <CheckCircle2 className="w-10 h-10 text-green-600 mx-auto mb-2" />
-            <p className="font-bold text-green-800">Vous êtes à jour</p>
-            <p className="text-xs text-green-600 mt-1">Aucun montant dû à SILGAPP pour le moment.</p>
+          <div className="space-y-4">
+            <div className="bg-green-50 border border-green-200 rounded-2xl p-6 text-center">
+              <CheckCircle2 className="w-10 h-10 text-green-600 mx-auto mb-2" />
+              <p className="font-bold text-green-800">Vous êtes à jour</p>
+              <p className="text-xs text-green-600 mt-1">Aucun montant dû à SILGAPP pour le moment.</p>
+            </div>
+            {creditDisponible > 0 && (
+              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-5 text-center">
+                <Wallet className="w-8 h-8 text-blue-600 mx-auto mb-2" />
+                <p className="text-xs text-blue-600 font-medium mb-1">Crédit disponible</p>
+                <p className="text-3xl font-black text-blue-700">
+                  {creditDisponible.toLocaleString()}<span className="text-sm font-normal ml-1">F</span>
+                </p>
+                <p className="text-xs text-blue-500 mt-2">Vos prochaines commissions SILGAPP seront automatiquement déduites de ce crédit.</p>
+              </div>
+            )}
           </div>
         ) : (
           <div className="space-y-4">

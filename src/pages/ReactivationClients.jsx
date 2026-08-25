@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Bell, Users, Smartphone, Mail, UserX, TrendingUp, Send, Loader2, ChevronRight, FlaskConical, ShieldOff, Eye, DollarSign, Activity } from "lucide-react";
 import { MESSAGE_TEMPLATES } from "@/lib/reactivationMessages";
+import { computeCampaignStats } from "@/lib/reactivationStats";
 
 const SEGMENT_LABELS = {
   push_active: "Push actif",
@@ -208,29 +209,34 @@ export default function ReactivationClients() {
                   Lancer
                 </button>
               )}
-              {c.status === "sent" && (
-                <button
-                  onClick={() => setSelectedCampaign(c)}
-                  className="h-8 px-3 rounded-lg bg-blue-50 text-blue-700 text-[11px] font-bold flex items-center gap-1 shrink-0"
-                >
-                  <Eye className="w-3 h-3" /> Résultats
-                </button>
-              )}
             </div>
 
-            {/* Mini funnel for sent campaigns */}
-            {c.status === "sent" && c.target_count > 0 && (
+            {/* Mini funnel for sent/completed campaigns */}
+            {(c.status === "sent" || c.status === "completed") && c.target_count > 0 && (
               <div className="mt-2 pt-2 border-t border-slate-100">
                 <div className="flex items-center gap-1">
                   <FunnelStep label="Ciblés" value={c.target_count || 0} pct={100} />
-                  <FunnelStep label="Envoyés" value={c.sent_count || 0} pct={Math.round((c.sent_count / c.target_count) * 100)} />
-                  <FunnelStep label="Courses" value={c.course_created_count || 0} pct={c.target_count ? Math.round((c.course_created_count / c.target_count) * 100) : 0} />
+                  <FunnelStep label="Envoyés" value={c.sent_count || 0} pct={c.target_count ? Math.round((c.sent_count / c.target_count) * 100) : 0} />
+                  <FunnelStep label="Ouverts" value={c.opened_count || 0} pct={c.sent_count ? Math.round((c.opened_count / c.sent_count) * 100) : 0} />
+                  <FunnelStep label="Courses" value={c.course_created_count || 0} pct={c.sent_count ? Math.round((c.course_created_count / c.sent_count) * 100) : 0} />
                   <FunnelStep label="CA" value={`${(c.revenue_generated || 0).toLocaleString()}`} isLast />
                 </div>
                 <div className="mt-1.5 text-[10px] text-green-600 font-bold">
                   Commission: {(c.commission_generated || 0).toLocaleString()} FCFA — Coût: 0 FCFA — Net: +{(c.commission_generated || 0).toLocaleString()} FCFA
                 </div>
               </div>
+            )}
+
+            {/* Full-width results button — always visible for any launched campaign */}
+            {c.status !== "draft" && (
+              <button
+                onClick={() => setSelectedCampaign(c)}
+                className="mt-3 w-full h-11 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-black flex items-center justify-center gap-2 shadow-md active:scale-[0.98] transition-all"
+                style={{ minHeight: "44px" }}
+              >
+                <Eye className="w-4 h-4" />
+                📊 Voir les résultats
+              </button>
             )}
           </div>
         ))}
@@ -475,24 +481,7 @@ function CampaignResults({ campaign, onClose }) {
     },
   });
 
-  const funnel = useMemo(() => {
-    const total = recipients.length;
-    const control = recipients.filter(r => r.is_control_group).length;
-    const sent = recipients.filter(r => r.status !== "control" && r.status !== "pending").length;
-    const delivered = recipients.filter(r => ["delivered", "opened", "converted"].includes(r.status)).length;
-    const opened = recipients.filter(r => ["opened", "converted"].includes(r.status)).length;
-    const courseCreated = recipients.filter(r => r.course_created_at).length;
-    const courseCompleted = recipients.filter(r => r.course_completed_at).length;
-    const revenue = recipients.reduce((sum, r) => sum + (r.revenue || 0), 0);
-    const commission = recipients.reduce((sum, r) => sum + (r.commission || 0), 0);
-    const controlConverted = recipients.filter(r => r.is_control_group && r.course_created_at).length;
-    const campaignConverted = courseCreated;
-    const controlRate = control > 0 ? (controlConverted / control * 100) : 0;
-    const campaignRate = sent > 0 ? (campaignConverted / sent * 100) : 0;
-    const uplift = campaignRate - controlRate;
-
-    return { total, control, sent, delivered, opened, courseCreated, courseCompleted, revenue, commission, controlRate, campaignRate, uplift };
-  }, [recipients]);
+  const funnel = useMemo(() => computeCampaignStats(recipients), [recipients]);
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-2 overflow-y-auto">
@@ -508,12 +497,15 @@ function CampaignResults({ campaign, onClose }) {
             <p className="text-[11px] font-black uppercase tracking-wider text-slate-500 mb-2">Funnel de conversion</p>
             <div className="flex items-center gap-1 mb-2">
               <FunnelStep label="Ciblés" value={funnel.total} pct={100} />
-              <FunnelStep label="Envoyés" value={funnel.sent} pct={funnel.total ? Math.round(funnel.sent / funnel.total * 100) : 0} />
-              <FunnelStep label="Courses" value={funnel.courseCreated} pct={funnel.sent ? Math.round(funnel.courseCreated / funnel.sent * 100) : 0} />
+              <FunnelStep label="Envoyés" value={funnel.sent} pct={funnel.sendRate} />
+              <FunnelStep label="Ouverts" value={funnel.opened} pct={funnel.openRate} />
+              <FunnelStep label="Courses" value={funnel.courseCreated} pct={funnel.conversionRate} />
               <FunnelStep label="Livrées" value={funnel.courseCompleted} isLast />
             </div>
             <div className="space-y-1 text-[11px]">
-              <div className="flex justify-between"><span className="text-slate-500">Ouvertures:</span><span className="font-bold text-slate-700">{funnel.opened}</span></div>
+              <div className="flex justify-between"><span className="text-slate-500">Taux d'envoi:</span><span className="font-bold text-slate-700">{funnel.sendRate}%</span></div>
+              <div className="flex justify-between"><span className="text-slate-500">Taux d'ouverture:</span><span className="font-bold text-slate-700">{funnel.openRate}%</span></div>
+              <div className="flex justify-between"><span className="text-slate-500">Taux de conversion:</span><span className="font-bold text-slate-700">{funnel.conversionRate}%</span></div>
               <div className="flex justify-between"><span className="text-slate-500">Courses créées:</span><span className="font-bold text-slate-700">{funnel.courseCreated}</span></div>
               <div className="flex justify-between"><span className="text-slate-500">Courses livrées:</span><span className="font-bold text-slate-700">{funnel.courseCompleted}</span></div>
             </div>

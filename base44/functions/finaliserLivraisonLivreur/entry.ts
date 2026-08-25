@@ -109,6 +109,10 @@ export default async function(req: Request): Promise<Response> {
         prix_final: montant,
         commission_silga: commissionSilga,
         montant_livreur: montantLivreur,
+        // ── Identité financière immuable ──
+        // Renseigné côté backend au moment de la livraison, JAMAIS modifié ensuite.
+        // Si déjà présent (re-finalisation), on ne l'écrase pas.
+        ...(course.livreur_financier_id ? {} : { livreur_financier_id: course.livreur_id }),
       };
 
       // Multi-colis: mettre à jour les colis individuels

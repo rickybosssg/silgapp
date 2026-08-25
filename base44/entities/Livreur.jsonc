@@ -107,7 +107,7 @@
     },
     "gps_accuracy": {
       "type": "number",
-      "description": "Pr\u00e9cision GPS en m\u00e8tres au moment de la derni\u00e8re position enregistr\u00e9e. Plus c'est bas, plus c'est pr\u00e9cis."
+      "description": "Pr\u00e9cision GPS en m\u00e8res au moment de la derni\u00e8re position enregistr\u00e9e. Plus c'est bas, plus c'est pr\u00e9cis."
     },
     "courses_du_jour": {
       "type": "number",
@@ -195,6 +195,21 @@
     "montant_du_silga": {
       "type": "number",
       "default": 0
+    },
+    "credit_surplus": {
+      "type": "number",
+      "default": 0,
+      "description": "Cr\u00e9dit de surplus PERSISTANT et tra\u00e7able. Uniquement cr\u00e9\u00e9 quand l'admin valide un paiement > d\u00fb r\u00e9el au moment du traitement (ex: d\u00fb 1300, paiement 2000 \u2192 credit_surplus = 700). Consomm\u00e9 automatiquement par les futures commissions (ex: commission 300 \u2192 credit_surplus 400, d\u00fb 0). NE JAMAIS recalculer depuis l'historique des paiements \u2014 ce n'est PAS max(0, totalPaye - totalCommissions). Diff\u00e9rent de creditDisponible (\u00e9cart math\u00e9matique historique pour audit uniquement)."
+    },
+    "base_comptable_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date de coupure comptable. Si d\u00e9finie, seules les courses livr\u00e9es apr\u00e8s cette date ET les paiements trait\u00e9s apr\u00e8s cette date entrent dans le calcul du solde. Le solde initial de la base (base_comptable_solde_initial) est ajout\u00e9. Null = comportement historique (toutes les courses et paiements)."
+    },
+    "base_comptable_solde_initial": {
+      "type": "number",
+      "default": 0,
+      "description": "Solde initial (dette ou cr\u00e9dit) au moment de la base comptable. Si positif = dette initiale. Si n\u00e9gatif = cr\u00e9dit initial. Ajout\u00e9 au calcul: solde = base_comptable_solde_initial + commissions(apr\u00e8s base) - paiements(apr\u00e8s base)."
     },
     "dernier_paiement_date": {
       "type": "string",

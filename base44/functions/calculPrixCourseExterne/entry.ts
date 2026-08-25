@@ -88,6 +88,9 @@ Deno.serve(async (req) => {
         montant_livreur: montantLivreur,
         statut: 'livree',
         heure_livraison: new Date().toISOString(),
+        // ⚠️ livreur_financier_id N'EST PAS fixé ici — calculPrixCourseExterne peut être
+        // appelée avant la livraison définitive (re-finalisation). Fixé uniquement dans
+        // finaliserLivraisonLivreur quand la livraison est confirmée.
       });
       return Response.json({
         success: true,
@@ -190,6 +193,7 @@ Deno.serve(async (req) => {
       montant_livreur: montantLivreur,
       statut: 'livree',
       heure_livraison: new Date().toISOString(),
+      // ⚠️ livreur_financier_id N'EST PAS fixé ici — voir finaliserLivraisonLivreur.
     });
 
     // ── Comptabiliser la commission dans le solde du livreur ──

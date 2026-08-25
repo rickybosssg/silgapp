@@ -2,97 +2,47 @@
  * Moteur de réactivation clients SILGAPP.
  * - Calcul des segments (push actif, récupérables, externe)
  * - Sélection des cibles avec anti-spam + groupe contrôle + A/B
- * - Envoi FCM (réutilise l'infrastructure existante)
+ * - Envoi FCM (réutilise fcmUtils.ts — source unique)
  * - Attribution des conversions
  *
  * RÈGLE FONDAMENTALE : aucune dépense automatique (pas de WhatsApp/SMS payant).
  * Le canal est exclusivement FCM push gratuit.
  */
 
-const FCM_SCOPE = "https://www.googleapis.com/auth/firebase.messaging";
-const TOKEN_URL = "https://oauth2.googleapis.com/token";
-const APP_URL = "https://silga-dispatch-go.base44.app";
-const ANDROID_CHANNEL_ID = "silgapp_default";
+import { getFirebaseConfig, getAccessToken, sendFcmMessage, APP_URL, ANDROID_CHANNEL_ID } from './fcmUtils.ts';
+
 const DEFAULT_ATTRIBUTION_WINDOW_HOURS = 72;
 const DEFAULT_ANTI_SPAM_HOURS = 48;
 const DEFAULT_CONTROL_GROUP_PCT = 15;
 
-// ── Firebase FCM (extrait de sendPushCampagne, réutilisé) ─────────────────────
-
-function base64UrlEncode(input: string): string {
-  const bytes = new TextEncoder().encode(input);
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+export interface PushResult {
+  recipient_id: string;
+  ok: boolean;
+  error?: string;
 }
 
-function pemToArrayBuffer(pem: string): ArrayBuffer {
-  const normalized = pem.replace(/\\n/g, "\n");
-  const base64 = normalized
-    .replace("-----BEGIN PRIVATE KEY-----", "")
-    .replace("-----END PRIVATE KEY-----", "")
-    .replace(/\s/g, "");
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes.buffer;
-}
-
-async function signJwt(clientEmail: string, privateKey: string): Promise<string> {
-  const now = Math.floor(Date.now() / 1000);
-  const header = { alg: "RS256", typ: "JWT" };
-  const payload = { iss: clientEmail, scope: FCM_SCOPE, aud: TOKEN_URL, iat: now, exp: now + 3600 };
-  const unsigned = `${base64UrlEncode(JSON.stringify(header))}.${base64UrlEncode(JSON.stringify(payload))}`;
-  const key = await crypto.subtle.importKey("pkcs8", pemToArrayBuffer(privateKey), { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["sign"]);
-  const signature = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, new TextEncoder().encode(unsigned));
-  return `${unsigned}.${base64UrlEncode(signature)}`;
-}
-
-function getFirebaseConfig() {
-  const json = Deno.env.get("FIREBASE_SERVICE_ACCOUNT_JSON");
-  if (!json) return { projectId: null as string | null, clientEmail: null as string | null, privateKey: null as string | null };
-  const sa = JSON.parse(json);
-  return { projectId: sa.project_id, clientEmail: sa.client_email, privateKey: sa.private_key };
-}
-
-async function getAccessToken(clientEmail: string, privateKey: string): Promise<string> {
-  const assertion = await signJwt(clientEmail, privateKey);
-  const response = await fetch(TOKEN_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion }),
-  });
-  const result = await response.json();
-  if (!response.ok) throw new Error(result.error_description || result.error || "Unable to get Firebase access token");
-  return result.access_token;
-}
-
-export async function sendOneFcm(projectId: string, accessToken: string, token: string, payload: any): Promise<{ ok: boolean; status: number; result: any }> {
-  const response = await fetch(`https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ message: { token, ...payload } }),
-  });
-  const result = await response.json();
-  return { ok: response.ok, status: response.status, result };
-}
-
-export async function sendReactivationPush(targets: { token: string; recipient_id: string }[], title: string, message: string, campaignId: string): Promise<{ success: number; failed: number; invalid: string[] }> {
-  const { projectId, clientEmail, privateKey } = getFirebaseConfig();
-  if (!projectId || !clientEmail || !privateKey) {
+export async function sendReactivationPush(
+  targets: { token: string; recipient_id: string }[],
+  title: string,
+  message: string,
+  campaignId: string
+): Promise<{ success: number; failed: number; invalid: string[]; results: PushResult[] }> {
+  const config = getFirebaseConfig();
+  if (!config.projectId || !config.clientEmail || !config.privateKey) {
     throw new Error("Firebase non configuré — FIREBASE_SERVICE_ACCOUNT_JSON manquant");
   }
 
-  const accessToken = await getAccessToken(clientEmail, privateKey);
-  const BATCH_SIZE = 100;
+  const accessToken = await getAccessToken(config.clientEmail, config.privateKey);
+  const BATCH_SIZE = 5;
 
   let success = 0;
   let failed = 0;
   const invalid: string[] = [];
+  const results: PushResult[] = [];
 
   for (let i = 0; i < targets.length; i += BATCH_SIZE) {
     const batch = targets.slice(i, i + BATCH_SIZE);
-    const results = await Promise.all(batch.map(async (target) => {
+    const batchResults = await Promise.all(batch.map(async (target) => {
       const fcmPayload = {
         notification: { title, body: message },
         data: {
@@ -117,22 +67,23 @@ export async function sendReactivationPush(targets: { token: string; recipient_i
         },
         webpush: { fcm_options: { link: APP_URL } },
       };
-      const r = await sendOneFcm(projectId, accessToken, target.token, fcmPayload);
+      const r = await sendFcmMessage(config.projectId, accessToken, target.token, fcmPayload);
       if (!r.ok) {
         const errorCode = r.result?.error?.details?.[0]?.errorCode || r.result?.error?.status;
         if (["UNREGISTERED", "INVALID_ARGUMENT"].includes(errorCode)) {
           invalid.push(target.token);
         }
-        return false;
+        return { recipient_id: target.recipient_id, ok: false, error: errorCode || "unknown" };
       }
-      return true;
+      return { recipient_id: target.recipient_id, ok: true };
     }));
-    success += results.filter(Boolean).length;
-    failed += results.filter((r) => !r).length;
+    results.push(...batchResults);
+    success += batchResults.filter((r) => r.ok).length;
+    failed += batchResults.filter((r) => !r.ok).length;
     if (i + BATCH_SIZE < targets.length) await new Promise((r) => setTimeout(r, 200));
   }
 
-  return { success, failed, invalid };
+  return { success, failed, invalid, results };
 }
 
 // ── Segmentation ──────────────────────────────────────────────────────────────
@@ -246,6 +197,7 @@ export interface TargetSelectionParams {
   inactive_days_min?: number;
   control_group_pct?: number;
   ab_variants?: any[];
+  campaign_id?: string;
 }
 
 export interface TargetClient {
@@ -287,7 +239,8 @@ export async function selectTargets(base44: any, params: TargetSelectionParams):
 
     // Segment filtering
     if (params.segment_type === "push_active") {
-      if (!token) continue;
+      // Exclure les tokens web_ (pas natifs Android/iOS) dès la sélection
+      if (!token || !token.token || String(token.token).startsWith("web_")) continue;
     } else if (params.segment_type === "push_recoverable") {
       if (!c.user_email || token) continue;
     } else if (params.segment_type === "all_push_eligible") {
@@ -300,15 +253,22 @@ export async function selectTargets(base44: any, params: TargetSelectionParams):
   }
 
   // ── Anti-spam : exclure les clients déjà ciblés dans les dernières 48h ──
+  //    + exclure les clients qui ont DÉJÀ un recipient dans cette campagne (idempotence)
   const antiSpamMs = DEFAULT_ANTI_SPAM_HOURS * 3600000;
   const recentRecipients = await base44.asServiceRole.entities.ReactivationCampaignRecipient.list();
   const recentSet = new Set<string>();
+  const alreadyInCampaign = new Set<string>();
   for (const r of recentRecipients) {
+    // Exclure si déjà un recipient dans CETTE campagne (peu importe le statut)
+    if (params.campaign_id && r.campaign_id === params.campaign_id) {
+      if (r.client_id) alreadyInCampaign.add(r.client_id);
+    }
+    // Exclure si envoyé dans une autre campagne dans les dernières 48h
     if (r.sent_at && (now - new Date(r.sent_at).getTime()) < antiSpamMs) {
       if (r.client_id) recentSet.add(r.client_id);
     }
   }
-  eligible = eligible.filter((t) => !recentSet.has(t.client.id));
+  eligible = eligible.filter((t) => !recentSet.has(t.client.id) && !alreadyInCampaign.has(t.client.id));
 
   // ── Limite max_targets (campagnes pilotes) ──
   const maxTargets = params.max_targets || 0;
@@ -344,7 +304,7 @@ export async function selectTargets(base44: any, params: TargetSelectionParams):
 
 // ── Attribution des conversions ──────────────────────────────────────────────
 
-export async function attributeConversions(base44: any): Promise<{ attributed: number; revenueTotal: number; commissionTotal: number }> {
+export async function attributeConversions(base44: any): Promise<{ attributed: number; revenueTotal: number; commissionTotal: number; campaignsProcessed: number }> {
   // Lire la fenêtre d'attribution depuis AppConfig (configurable)
   let windowHours = DEFAULT_ATTRIBUTION_WINDOW_HOURS;
   try {
@@ -356,77 +316,106 @@ export async function attributeConversions(base44: any): Promise<{ attributed: n
   const windowMs = windowHours * 3600000;
   const now = Date.now();
 
-  // Récupérer les recipients envoyés mais pas encore convertis
-  const recipients = await base44.asServiceRole.entities.ReactivationCampaignRecipient.filter(
-    { status: "sent" },
-    "-sent_at",
-    500
-  );
+  // ── Ne traiter que les campagnes pertinentes (lancées et dans la fenêtre) ──
+  const allCampaigns = await base44.asServiceRole.entities.ReactivationCampaign.filter({
+    status: "completed",
+  }, "-started_at", 100);
+
+  const relevantCampaigns = allCampaigns.filter((c: any) => {
+    if (!c.started_at) return false;
+    const startedMs = new Date(c.started_at).getTime();
+    // Campagne encore dans la fenêtre d'attribution (started_at + window > now)
+    return (now - startedMs) < windowMs;
+  });
+
+  if (relevantCampaigns.length === 0) return { attributed: 0, revenueTotal: 0, commissionTotal: 0, campaignsProcessed: 0 };
 
   let attributed = 0;
   let revenueTotal = 0;
   let commissionTotal = 0;
+  const campaignIdsProcessed = new Set<string>();
 
-  for (const r of recipients) {
-    if (!r.sent_at) continue;
-    const sentTime = new Date(r.sent_at).getTime();
-    if ((now - sentTime) > windowMs * 2) continue; // Skip if beyond 2x window
+  for (const campaign of relevantCampaigns) {
+    const campaignStartedMs = new Date(campaign.started_at).getTime();
+    const recipients = await base44.asServiceRole.entities.ReactivationCampaignRecipient.filter({
+      campaign_id: campaign.id,
+    });
 
-    // Chercher les courses créées par ce client après l'envoi
-    if (!r.client_id) continue;
-    const courses = await base44.asServiceRole.entities.CourseExterne.filter({
-      client_telephone: r.client_telephone,
-    }, "-created_date", 10);
-
-    for (const course of courses) {
-      const courseCreated = course.created_date ? new Date(course.created_date).getTime() : 0;
-      if (courseCreated < sentTime) continue;
-      if ((courseCreated - sentTime) > windowMs) continue;
-
-      // Course attribuée !
-      const revenue = course.prix_final || course.prix_propose_client || course.prix_propose_admin || 0;
-      const commission = course.commission_silga || 0;
-
-      await base44.asServiceRole.entities.ReactivationCampaignRecipient.update(r.id, {
-        course_created_at: course.created_date,
-        course_id: course.id,
-        revenue,
-        commission,
-        status: course.statut === "livree" ? "converted" : "opened",
-        course_completed_at: course.statut === "livree" ? (course.heure_livraison || course.colis_livre_at) : null,
-      });
-
-      attributed++;
-      revenueTotal += revenue;
-      commissionTotal += commission;
-      break; // Only attribute first course
+    // ── Collecter les course_id déjà attribués pour éviter les doubles ──
+    const alreadyAttributedCourseIds = new Set<string>();
+    for (const r of recipients) {
+      if (r.course_id) alreadyAttributedCourseIds.add(r.course_id);
     }
-  }
 
-  // Mettre à jour les stats agrégées des campagnes
-  const campaignIds = new Set(recipients.map((r) => r.campaign_id));
-  for (const cid of campaignIds) {
-    if (!cid) continue;
-    const allRecipients = await base44.asServiceRole.entities.ReactivationCampaignRecipient.filter({ campaign_id: cid });
-    const sentCount = allRecipients.filter((r) => r.status !== "control" && r.status !== "pending").length;
-    const deliveredCount = allRecipients.filter((r) => ["delivered", "opened", "converted"].includes(r.status)).length;
-    const openedCount = allRecipients.filter((r) => ["opened", "converted"].includes(r.status)).length;
-    const courseCreatedCount = allRecipients.filter((r) => r.course_created_at).length;
-    const courseCompletedCount = allRecipients.filter((r) => r.course_completed_at).length;
-    const revenue = allRecipients.reduce((sum, r) => sum + (r.revenue || 0), 0);
-    const commission = allRecipients.reduce((sum, r) => sum + (r.commission || 0), 0);
+    for (const r of recipients) {
+      // Skip already converted recipients (idempotence)
+      if (r.course_created_at) continue;
+      if (r.status === "converted") continue;
+      if (!r.client_id) continue;
 
-    await base44.asServiceRole.entities.ReactivationCampaign.update(cid, {
+      // ── Référence temporelle : sent_at pour les exposés, started_at pour le contrôle ──
+      const referenceTime = r.sent_at ? new Date(r.sent_at).getTime() : (r.is_control_group ? campaignStartedMs : 0);
+      if (!referenceTime) continue;
+
+      // Skip si hors fenêtre (campagne expirée)
+      if ((now - referenceTime) > windowMs) continue;
+
+      // Chercher les courses créées par ce client après la référence
+      const courses = await base44.asServiceRole.entities.CourseExterne.filter({
+        client_telephone: r.client_telephone,
+      }, "-created_date", 10);
+
+      for (const course of courses) {
+        const courseCreated = course.created_date ? new Date(course.created_date).getTime() : 0;
+        if (courseCreated < referenceTime) continue;
+        if ((courseCreated - referenceTime) > windowMs) continue;
+
+        // ── Anti-double attribution : ne pas attribuer une course déjà attribuée ──
+        if (alreadyAttributedCourseIds.has(course.id)) continue;
+
+        const revenue = course.prix_final || course.prix_propose_client || course.prix_propose_admin || 0;
+        const commission = course.commission_silga || 0;
+        const isDelivered = course.statut === "livree";
+
+        await base44.asServiceRole.entities.ReactivationCampaignRecipient.update(r.id, {
+          course_created_at: course.created_date,
+          course_id: course.id,
+          revenue,
+          commission,
+          // Le groupe contrôle garde son statut "control" mais reçoit course_created_at
+          status: r.is_control_group ? "control" : (isDelivered ? "converted" : "opened"),
+          course_completed_at: isDelivered ? (course.heure_livraison || course.colis_livre_at) : null,
+        });
+
+        alreadyAttributedCourseIds.add(course.id);
+        attributed++;
+        revenueTotal += revenue;
+        commissionTotal += commission;
+        break; // Only attribute first course
+      }
+    }
+
+    // ── Recalculer les stats agrégées de la campagne ──
+    const allRecipients = await base44.asServiceRole.entities.ReactivationCampaignRecipient.filter({ campaign_id: campaign.id });
+    const sentCount = allRecipients.filter((r: any) => r.status !== "control" && r.status !== "pending").length;
+    const openedCount = allRecipients.filter((r: any) => ["opened", "converted"].includes(r.status)).length;
+    const courseCreatedCount = allRecipients.filter((r: any) => r.course_created_at).length;
+    const courseCompletedCount = allRecipients.filter((r: any) => r.course_completed_at).length;
+    const revenue = allRecipients.reduce((sum: number, r: any) => sum + (r.revenue || 0), 0);
+    const commission = allRecipients.reduce((sum: number, r: any) => sum + (r.commission || 0), 0);
+
+    await base44.asServiceRole.entities.ReactivationCampaign.update(campaign.id, {
       sent_count: sentCount,
-      delivered_count: deliveredCount,
       opened_count: openedCount,
       course_created_count: courseCreatedCount,
       course_completed_count: courseCompletedCount,
       revenue_generated: revenue,
       commission_generated: commission,
-      net_result: commission, // promo_cost is always 0
+      net_result: commission,
     });
+
+    campaignIdsProcessed.add(campaign.id);
   }
 
-  return { attributed, revenueTotal, commissionTotal };
+  return { attributed, revenueTotal, commissionTotal, campaignsProcessed: campaignIdsProcessed.size };
 }

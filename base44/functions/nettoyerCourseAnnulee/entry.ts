@@ -53,6 +53,7 @@ Deno.serve(async (req) => {
         heure_acceptation: null,
         heure_sollicitation: null,
         timeout_expires_at: null,
+        // ⚠️ livreur_financier_id N'EST JAMAIS effacé (immuable) — sécurité financière
       });
 
       const livreur = await base44.entities.Livreur.get(course.livreur_id).catch(() => null);
