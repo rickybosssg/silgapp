@@ -97,12 +97,12 @@ export default function SystemAlertModal() {
                 </div>
               </div>
 
-              {/* ── Explication du livreur (extraite du message) ── */}
+              {/* ── Explication du livreur (extraite du message — UNIQUEMENT le texte du livreur) ── */}
               {(() => {
                 const msg = alert.message || "";
-                const match = msg.match(/Détail:\s*(.+?)(?:\.?\s+La course a été|$)/i);
+                const match = msg.match(/Détail:\s*(.+)$/i);
                 const detail = match ? match[1].trim().replace(/\.$/, "") : null;
-                if (!detail) return null;
+                if (!detail || detail.startsWith("Aucun détail")) return null;
                 return (
                   <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
                     <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wide mb-1">
@@ -112,6 +112,18 @@ export default function SystemAlertModal() {
                   </div>
                 );
               })()}
+
+              {/* ── Action requise (instructions système — séparées du motif livreur) ── */}
+              {alert.type === "alerte_critique_dispatch" && (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-3">
+                  <p className="text-[10px] font-bold text-red-700 uppercase tracking-wide mb-1">
+                    Action requise
+                  </p>
+                  <p className="text-sm text-red-900 font-medium leading-relaxed">
+                    Cette course est passée en Redispatch. Elle ne sera pas reproposée automatiquement. Relancez manuellement la recherche d'un livreur si nécessaire (le livreur ayant annulé reste exclu).
+                  </p>
+                </div>
+              )}
 
               {alert.course_id && (
                 <div className="bg-gray-50 rounded-xl p-3 text-xs text-gray-500">
