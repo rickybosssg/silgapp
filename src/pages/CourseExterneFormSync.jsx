@@ -768,6 +768,7 @@ export default function CourseExterneFormSync() {
     });
 
     createMutation.mutate({
+      request_id: crypto.randomUUID(),
       country_code: courseCountryCode,
       client_nom: finalClientNom,
       client_telephone: finalClientTel,
