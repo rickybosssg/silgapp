@@ -54,6 +54,24 @@ assert.match(validateQr, /course\.gps_arrivee_lat/, "Le fallback doit privilégi
 const balance = read("base44/shared/recalculerSoldeLivreur.ts");
 assert.doesNotMatch(balance, /CourseExterne\.updateMany\([\s\S]*statut_paiement_livreur:\s*'paye'/, "Un solde global nul ne doit jamais marquer toutes les courses payées");
 
+const createLivreur = read("base44/functions/createLivreur/entry.ts");
+assert.match(createLivreur, /credit_surplus:\s*0/, "Un nouveau livreur doit commencer sans crédit comptable artificiel");
+assert.match(createLivreur, /statut_paiement:\s*'paye'/, "Un nouveau livreur sans dette doit commencer à jour");
+
+const soldeCalculator = read("base44/shared/soldeCalculator.ts");
+assert.match(soldeCalculator, /Math\.min\(rawCreditSurplus,\s*creditDisponible\)/, "Le crédit excédentaire doit rester plafonné au crédit réellement disponible");
+assert.match(soldeCalculator, /SOURCE DE VÉRITÉ unique/, "Le calcul comptable doit rester centralisé dans une source unique");
+assert.match(soldeCalculator, /base_comptable_solde_initial/, "La base comptable validée doit rester intégrée au calcul");
+
+const reactivation = read("src/pages/ReactivationClients.jsx");
+assert.match(reactivation, /Voir les résultats/, "Les résultats des campagnes de réactivation doivent rester accessibles");
+assert.match(reactivation, /ReactivationCampaignRecipient\.filter/, "Le détail d'une campagne doit charger ses destinataires réels");
+
+const phoneUtils = read("src/lib/phoneUtils.js");
+assert.match(phoneUtils, /Country\.filter\(\{ actif: true \}\)/, "Les règles téléphone doivent être chargées dynamiquement pour tous les pays actifs");
+assert.match(phoneUtils, /phone_min_length/, "La longueur minimale doit provenir de la configuration pays");
+assert.match(phoneUtils, /phone_max_length/, "La longueur maximale doit provenir de la configuration pays");
+
 const messages = read("src/components/chat/MessagesPage.jsx");
 assert.match(messages, /myType === "admin"[\s\S]*normalizeParticipantType\(p\?\.type\) === "admin"/, "L'Admin doit voir toutes ses conversations, y compris support historique");
 
