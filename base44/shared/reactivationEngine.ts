@@ -304,7 +304,7 @@ export async function selectTargets(base44: any, params: TargetSelectionParams):
 
 // ── Attribution des conversions ──────────────────────────────────────────────
 
-export async function attributeConversions(base44: any): Promise<{ attributed: number; revenueTotal: number; commissionTotal: number }> {
+export async function attributeConversions(base44: any): Promise<{ attributed: number; revenueTotal: number; commissionTotal: number; campaignsProcessed: number }> {
   // Lire la fenêtre d'attribution depuis AppConfig (configurable)
   let windowHours = DEFAULT_ATTRIBUTION_WINDOW_HOURS;
   try {
@@ -316,77 +316,106 @@ export async function attributeConversions(base44: any): Promise<{ attributed: n
   const windowMs = windowHours * 3600000;
   const now = Date.now();
 
-  // Récupérer les recipients envoyés mais pas encore convertis
-  const recipients = await base44.asServiceRole.entities.ReactivationCampaignRecipient.filter(
-    { status: "sent" },
-    "-sent_at",
-    500
-  );
+  // ── Ne traiter que les campagnes pertinentes (lancées et dans la fenêtre) ──
+  const allCampaigns = await base44.asServiceRole.entities.ReactivationCampaign.filter({
+    status: "completed",
+  }, "-started_at", 100);
+
+  const relevantCampaigns = allCampaigns.filter((c: any) => {
+    if (!c.started_at) return false;
+    const startedMs = new Date(c.started_at).getTime();
+    // Campagne encore dans la fenêtre d'attribution (started_at + window > now)
+    return (now - startedMs) < windowMs;
+  });
+
+  if (relevantCampaigns.length === 0) return { attributed: 0, revenueTotal: 0, commissionTotal: 0, campaignsProcessed: 0 };
 
   let attributed = 0;
   let revenueTotal = 0;
   let commissionTotal = 0;
+  const campaignIdsProcessed = new Set<string>();
 
-  for (const r of recipients) {
-    if (!r.sent_at) continue;
-    const sentTime = new Date(r.sent_at).getTime();
-    if ((now - sentTime) > windowMs * 2) continue; // Skip if beyond 2x window
+  for (const campaign of relevantCampaigns) {
+    const campaignStartedMs = new Date(campaign.started_at).getTime();
+    const recipients = await base44.asServiceRole.entities.ReactivationCampaignRecipient.filter({
+      campaign_id: campaign.id,
+    });
 
-    // Chercher les courses créées par ce client après l'envoi
-    if (!r.client_id) continue;
-    const courses = await base44.asServiceRole.entities.CourseExterne.filter({
-      client_telephone: r.client_telephone,
-    }, "-created_date", 10);
-
-    for (const course of courses) {
-      const courseCreated = course.created_date ? new Date(course.created_date).getTime() : 0;
-      if (courseCreated < sentTime) continue;
-      if ((courseCreated - sentTime) > windowMs) continue;
-
-      // Course attribuée !
-      const revenue = course.prix_final || course.prix_propose_client || course.prix_propose_admin || 0;
-      const commission = course.commission_silga || 0;
-
-      await base44.asServiceRole.entities.ReactivationCampaignRecipient.update(r.id, {
-        course_created_at: course.created_date,
-        course_id: course.id,
-        revenue,
-        commission,
-        status: course.statut === "livree" ? "converted" : "opened",
-        course_completed_at: course.statut === "livree" ? (course.heure_livraison || course.colis_livre_at) : null,
-      });
-
-      attributed++;
-      revenueTotal += revenue;
-      commissionTotal += commission;
-      break; // Only attribute first course
+    // ── Collecter les course_id déjà attribués pour éviter les doubles ──
+    const alreadyAttributedCourseIds = new Set<string>();
+    for (const r of recipients) {
+      if (r.course_id) alreadyAttributedCourseIds.add(r.course_id);
     }
-  }
 
-  // Mettre à jour les stats agrégées des campagnes
-  const campaignIds = new Set(recipients.map((r) => r.campaign_id));
-  for (const cid of campaignIds) {
-    if (!cid) continue;
-    const allRecipients = await base44.asServiceRole.entities.ReactivationCampaignRecipient.filter({ campaign_id: cid });
-    const sentCount = allRecipients.filter((r) => r.status !== "control" && r.status !== "pending").length;
-    const deliveredCount = allRecipients.filter((r) => ["delivered", "opened", "converted"].includes(r.status)).length;
-    const openedCount = allRecipients.filter((r) => ["opened", "converted"].includes(r.status)).length;
-    const courseCreatedCount = allRecipients.filter((r) => r.course_created_at).length;
-    const courseCompletedCount = allRecipients.filter((r) => r.course_completed_at).length;
-    const revenue = allRecipients.reduce((sum, r) => sum + (r.revenue || 0), 0);
-    const commission = allRecipients.reduce((sum, r) => sum + (r.commission || 0), 0);
+    for (const r of recipients) {
+      // Skip already converted recipients (idempotence)
+      if (r.course_created_at) continue;
+      if (r.status === "converted") continue;
+      if (!r.client_id) continue;
 
-    await base44.asServiceRole.entities.ReactivationCampaign.update(cid, {
+      // ── Référence temporelle : sent_at pour les exposés, started_at pour le contrôle ──
+      const referenceTime = r.sent_at ? new Date(r.sent_at).getTime() : (r.is_control_group ? campaignStartedMs : 0);
+      if (!referenceTime) continue;
+
+      // Skip si hors fenêtre (campagne expirée)
+      if ((now - referenceTime) > windowMs) continue;
+
+      // Chercher les courses créées par ce client après la référence
+      const courses = await base44.asServiceRole.entities.CourseExterne.filter({
+        client_telephone: r.client_telephone,
+      }, "-created_date", 10);
+
+      for (const course of courses) {
+        const courseCreated = course.created_date ? new Date(course.created_date).getTime() : 0;
+        if (courseCreated < referenceTime) continue;
+        if ((courseCreated - referenceTime) > windowMs) continue;
+
+        // ── Anti-double attribution : ne pas attribuer une course déjà attribuée ──
+        if (alreadyAttributedCourseIds.has(course.id)) continue;
+
+        const revenue = course.prix_final || course.prix_propose_client || course.prix_propose_admin || 0;
+        const commission = course.commission_silga || 0;
+        const isDelivered = course.statut === "livree";
+
+        await base44.asServiceRole.entities.ReactivationCampaignRecipient.update(r.id, {
+          course_created_at: course.created_date,
+          course_id: course.id,
+          revenue,
+          commission,
+          // Le groupe contrôle garde son statut "control" mais reçoit course_created_at
+          status: r.is_control_group ? "control" : (isDelivered ? "converted" : "opened"),
+          course_completed_at: isDelivered ? (course.heure_livraison || course.colis_livre_at) : null,
+        });
+
+        alreadyAttributedCourseIds.add(course.id);
+        attributed++;
+        revenueTotal += revenue;
+        commissionTotal += commission;
+        break; // Only attribute first course
+      }
+    }
+
+    // ── Recalculer les stats agrégées de la campagne ──
+    const allRecipients = await base44.asServiceRole.entities.ReactivationCampaignRecipient.filter({ campaign_id: campaign.id });
+    const sentCount = allRecipients.filter((r: any) => r.status !== "control" && r.status !== "pending").length;
+    const openedCount = allRecipients.filter((r: any) => ["opened", "converted"].includes(r.status)).length;
+    const courseCreatedCount = allRecipients.filter((r: any) => r.course_created_at).length;
+    const courseCompletedCount = allRecipients.filter((r: any) => r.course_completed_at).length;
+    const revenue = allRecipients.reduce((sum: number, r: any) => sum + (r.revenue || 0), 0);
+    const commission = allRecipients.reduce((sum: number, r: any) => sum + (r.commission || 0), 0);
+
+    await base44.asServiceRole.entities.ReactivationCampaign.update(campaign.id, {
       sent_count: sentCount,
-      delivered_count: deliveredCount,
       opened_count: openedCount,
       course_created_count: courseCreatedCount,
       course_completed_count: courseCompletedCount,
       revenue_generated: revenue,
       commission_generated: commission,
-      net_result: commission, // promo_cost is always 0
+      net_result: commission,
     });
+
+    campaignIdsProcessed.add(campaign.id);
   }
 
-  return { attributed, revenueTotal, commissionTotal };
+  return { attributed, revenueTotal, commissionTotal, campaignsProcessed: campaignIdsProcessed.size };
 }
