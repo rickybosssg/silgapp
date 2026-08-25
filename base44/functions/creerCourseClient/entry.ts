@@ -101,6 +101,11 @@ export default async function(req: Request): Promise<Response> {
       delete cleanData.tracking_link;
     }
 
+    // ── Sauvegarder request_id pour l'idempotence future ──
+    if (request_id && typeof request_id === 'string') {
+      cleanData.request_id = request_id;
+    }
+
     // ── Créer la course ──
     const course = await base44.asServiceRole.entities.CourseExterne.create(cleanData);
 
