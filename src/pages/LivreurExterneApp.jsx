@@ -1489,7 +1489,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       </div>
 
       {/* ── Contenu onglets ────────────────────────── */}
-      <div className="max-w-lg mx-auto px-4 pt-4 pb-32">
+      <div className="max-w-lg mx-auto px-4 pt-4 pb-[calc(5rem+env(safe-area-inset-bottom))]">
 
         {activeTab === "courses" && (
           <div className="space-y-4">

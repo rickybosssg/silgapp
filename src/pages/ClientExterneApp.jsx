@@ -1009,7 +1009,7 @@ export default function ClientExterneApp() {
         </div>
       )}
 
-      <div className="px-4 pb-32" style={coursesActives.length > 0 ? { paddingTop: `${coursesActives.length * 76 + 16}px` } : { paddingTop: "16px" }}>
+      <div className="px-4 pb-[calc(5rem+env(safe-area-inset-bottom))]" style={coursesActives.length > 0 ? { paddingTop: `${coursesActives.length * 76 + 16}px` } : { paddingTop: "16px" }}>
         <div className="max-w-lg mx-auto space-y-4">
 
           {/* ── ONGLETS PROMO ─────────────────────── */}

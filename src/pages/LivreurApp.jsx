@@ -408,7 +408,7 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
         />
       )}
 
-      <div className="max-w-lg mx-auto p-4 pb-12">
+      <div className="max-w-lg mx-auto p-4 pb-[calc(5rem+env(safe-area-inset-bottom))]">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
           <TabsList className="w-full">
             <TabsTrigger value="courses" className="flex-1 text-xs">Courses</TabsTrigger>
