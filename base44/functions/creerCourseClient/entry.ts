@@ -1,5 +1,91 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
 
+const CREATION_MUTEX_KEY = 'COURSE_CREATION_MUTEX';
+const LOCK_TTL_MS = 15_000;
+const LOCK_WAIT_MS = 12_000;
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function findExistingCourse(base44: any, requestId: string, userEmail: string) {
+  const existing = await base44.asServiceRole.entities.CourseExterne.filter(
+    { request_id: requestId, client_user_email: userEmail },
+    'created_date',
+    2
+  );
+  return existing?.[0] || null;
+}
+
+async function acquireCreationMutex(base44: any, requestId: string, userEmail: string) {
+  const configs = await base44.asServiceRole.entities.AppConfig.filter(
+    { cle: CREATION_MUTEX_KEY },
+    'created_date',
+    2
+  );
+
+  // Le mutex est provisionne avant le deploiement de cette fonction. Echouer
+  // ferme est preferable a creer une course sans garantie d'idempotence.
+  if (!configs || configs.length !== 1) {
+    throw new Error('COURSE_CREATION_MUTEX_NOT_PROVISIONED');
+  }
+
+  const mutex = configs[0];
+  const owner = crypto.randomUUID();
+  const deadline = Date.now() + LOCK_WAIT_MS;
+
+  while (Date.now() < deadline) {
+    const existing = await findExistingCourse(base44, requestId, userEmail);
+    if (existing) return { existing, mutex, owner: null };
+
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + LOCK_TTL_MS).toISOString();
+
+    // updateMany realise le compare-and-set dans la base. Un seul appel peut
+    // remplacer un mutex libre ou expire par son propre jeton proprietaire.
+    await base44.asServiceRole.entities.AppConfig.updateMany(
+      {
+        id: mutex.id,
+        $or: [
+          { lock_owner: '' },
+          { lock_owner: null },
+          { lock_owner: { $exists: false } },
+          { lock_expires_at: { $lt: now.toISOString() } },
+        ],
+      },
+      {
+        $set: {
+          lock_owner: owner,
+          lock_request_id: requestId,
+          lock_expires_at: expiresAt,
+        },
+      }
+    );
+
+    const verified = await base44.asServiceRole.entities.AppConfig.get(mutex.id);
+    if (verified?.lock_owner === owner) {
+      return { existing: null, mutex, owner };
+    }
+
+    await sleep(75 + Math.floor(Math.random() * 75));
+  }
+
+  const existing = await findExistingCourse(base44, requestId, userEmail);
+  if (existing) return { existing, mutex, owner: null };
+  throw new Error('COURSE_CREATION_MUTEX_TIMEOUT');
+}
+
+async function releaseCreationMutex(base44: any, mutexId: string, owner: string) {
+  await base44.asServiceRole.entities.AppConfig.updateMany(
+    { id: mutexId, lock_owner: owner },
+    {
+      $set: {
+        lock_owner: '',
+        lock_request_id: '',
+        lock_expires_at: new Date(0).toISOString(),
+      },
+    }
+  );
+}
+
 // ── Champs sensibles que le frontend ne doit JAMAIS définir ──
 const FORBIDDEN_FIELDS = [
   'statut', 'dispatch_status', 'livreur_id', 'livreur_nom', 'livreur_telephone',
@@ -35,29 +121,21 @@ export default async function(req: Request): Promise<Response> {
 
     const body = await req.json();
     const { course_data, is_duplicate, request_id } = body;
+    const normalizedRequestId = typeof request_id === 'string' ? request_id.trim() : '';
 
     if (!course_data || typeof course_data !== 'object') {
       return Response.json({ error: 'course_data requis' }, { status: 400 });
     }
 
-    // ── Anti-double-création idempotente via request_id ──
-    // Si le frontend envoie un request_id, vérifier si une course avec ce même
-    // request_id existe déjà. Si oui, la retourner sans en créer une nouvelle.
-    // Cas couverts : double-clic rapide, retry réseau, re-render React.
-    if (request_id && typeof request_id === 'string') {
-      try {
-        const existing = await base44.asServiceRole.entities.CourseExterne.filter(
-          { request_id },
-          '-created_date',
-          1
-        );
-        if (existing && existing.length > 0) {
-          return Response.json({ success: true, course: existing[0], idempotent: true });
-        }
-      } catch (_) {
-        // Ne pas bloquer la création si la vérification échoue
+    let mutex: any = null;
+    if (normalizedRequestId) {
+      mutex = await acquireCreationMutex(base44, normalizedRequestId, user.email);
+      if (mutex.existing) {
+        return Response.json({ success: true, course: mutex.existing, idempotent: true });
       }
     }
+
+    try {
 
     // ── Nettoyer les champs sensibles ──
     const cleanData = { ...course_data };
@@ -102,44 +180,21 @@ export default async function(req: Request): Promise<Response> {
     }
 
     // ── Sauvegarder request_id pour l'idempotence future ──
-    if (request_id && typeof request_id === 'string') {
-      cleanData.request_id = request_id;
+    if (normalizedRequestId) {
+      cleanData.request_id = normalizedRequestId;
     }
 
     // ── Créer la course ──
     const course = await base44.asServiceRole.entities.CourseExterne.create(cleanData);
 
-    // ── Post-creation dedup : protection contre les race conditions ──
-    // Deux requêtes concurrentes avec le même request_id peuvent toutes deux
-    // passer la vérification initiale (TOCTOU). Cette étape détecte et résout
-    // les doublons APRÈS création en gardant la course la plus ancienne.
-    if (request_id && typeof request_id === 'string') {
-      try {
-        const allWithRequestId = await base44.asServiceRole.entities.CourseExterne.filter(
-          { request_id },
-          'created_date',
-          10
-        );
-        if (allWithRequestId && allWithRequestId.length > 1) {
-          // Garder la plus ancienne (premier élément trié par created_date asc)
-          const oldest = allWithRequestId[0];
-          const toDelete = allWithRequestId.slice(1);
-          for (const dup of toDelete) {
-            try {
-              await base44.asServiceRole.entities.CourseExterne.delete(dup.id);
-              console.warn(`[creerCourseClient] Doublon request_id supprimé: ${dup.id} (gardé: ${oldest.id})`);
-            } catch (delErr) {
-              console.error(`[creerCourseClient] Erreur suppression doublon ${dup.id}:`, delErr?.message);
-            }
-          }
-          return Response.json({ success: true, course: oldest, idempotent: true, deduped: true });
-        }
-      } catch (dedupErr) {
-        console.error('[creerCourseClient] Erreur post-creation dedup:', dedupErr?.message);
+    return Response.json({ success: true, course });
+    } finally {
+      if (mutex?.owner && mutex?.mutex?.id) {
+        await releaseCreationMutex(base44, mutex.mutex.id, mutex.owner).catch((error: any) => {
+          console.error('[creerCourseClient] Erreur liberation mutex:', error?.message || String(error));
+        });
       }
     }
-
-    return Response.json({ success: true, course });
   } catch (error) {
     console.error('[creerCourseClient] Erreur:', error);
     return Response.json({ error: error.message }, { status: 500 });

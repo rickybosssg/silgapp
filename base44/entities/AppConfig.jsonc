@@ -13,6 +13,19 @@
     "description": {
       "type": "string",
       "description": "Description de la config pour l'admin"
+    },
+    "lock_owner": {
+      "type": "string",
+      "description": "Jeton interne du proprietaire d'un verrou backend. Ne pas modifier manuellement."
+    },
+    "lock_request_id": {
+      "type": "string",
+      "description": "Request ID traite sous verrou. Utilise uniquement pour le diagnostic d'idempotence."
+    },
+    "lock_expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Expiration du verrou backend afin de recuperer automatiquement apres un crash."
     }
   },
   "required": [
