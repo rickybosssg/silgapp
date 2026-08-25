@@ -2,80 +2,18 @@
  * Moteur de réactivation clients SILGAPP.
  * - Calcul des segments (push actif, récupérables, externe)
  * - Sélection des cibles avec anti-spam + groupe contrôle + A/B
- * - Envoi FCM (réutilise l'infrastructure existante)
+ * - Envoi FCM (réutilise fcmUtils.ts — source unique)
  * - Attribution des conversions
  *
  * RÈGLE FONDAMENTALE : aucune dépense automatique (pas de WhatsApp/SMS payant).
  * Le canal est exclusivement FCM push gratuit.
  */
 
-const FCM_SCOPE = "https://www.googleapis.com/auth/firebase.messaging";
-const TOKEN_URL = "https://oauth2.googleapis.com/token";
-const APP_URL = "https://silga-dispatch-go.base44.app";
-const ANDROID_CHANNEL_ID = "silgapp_default";
+import { getFirebaseConfig, getAccessToken, sendFcmMessage, APP_URL, ANDROID_CHANNEL_ID } from './fcmUtils.ts';
+
 const DEFAULT_ATTRIBUTION_WINDOW_HOURS = 72;
 const DEFAULT_ANTI_SPAM_HOURS = 48;
 const DEFAULT_CONTROL_GROUP_PCT = 15;
-
-// ── Firebase FCM (extrait de sendPushCampagne, réutilisé) ─────────────────────
-
-function base64UrlEncode(input: string): string {
-  const bytes = new TextEncoder().encode(input);
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-
-function pemToArrayBuffer(pem: string): ArrayBuffer {
-  const normalized = pem.replace(/\\n/g, "\n");
-  const base64 = normalized
-    .replace("-----BEGIN PRIVATE KEY-----", "")
-    .replace("-----END PRIVATE KEY-----", "")
-    .replace(/\s/g, "");
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes.buffer;
-}
-
-async function signJwt(clientEmail: string, privateKey: string): Promise<string> {
-  const now = Math.floor(Date.now() / 1000);
-  const header = { alg: "RS256", typ: "JWT" };
-  const payload = { iss: clientEmail, scope: FCM_SCOPE, aud: TOKEN_URL, iat: now, exp: now + 3600 };
-  const unsigned = `${base64UrlEncode(JSON.stringify(header))}.${base64UrlEncode(JSON.stringify(payload))}`;
-  const key = await crypto.subtle.importKey("pkcs8", pemToArrayBuffer(privateKey), { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["sign"]);
-  const signature = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, new TextEncoder().encode(unsigned));
-  return `${unsigned}.${base64UrlEncode(signature)}`;
-}
-
-function getFirebaseConfig() {
-  const json = Deno.env.get("FIREBASE_SERVICE_ACCOUNT_JSON");
-  if (!json) return { projectId: null as string | null, clientEmail: null as string | null, privateKey: null as string | null };
-  const sa = JSON.parse(json);
-  return { projectId: sa.project_id, clientEmail: sa.client_email, privateKey: sa.private_key };
-}
-
-async function getAccessToken(clientEmail: string, privateKey: string): Promise<string> {
-  const assertion = await signJwt(clientEmail, privateKey);
-  const response = await fetch(TOKEN_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion }),
-  });
-  const result = await response.json();
-  if (!response.ok) throw new Error(result.error_description || result.error || "Unable to get Firebase access token");
-  return result.access_token;
-}
-
-export async function sendOneFcm(projectId: string, accessToken: string, token: string, payload: any): Promise<{ ok: boolean; status: number; result: any }> {
-  const response = await fetch(`https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ message: { token, ...payload } }),
-  });
-  const result = await response.json();
-  return { ok: response.ok, status: response.status, result };
-}
 
 export interface PushResult {
   recipient_id: string;
@@ -89,12 +27,12 @@ export async function sendReactivationPush(
   message: string,
   campaignId: string
 ): Promise<{ success: number; failed: number; invalid: string[]; results: PushResult[] }> {
-  const { projectId, clientEmail, privateKey } = getFirebaseConfig();
-  if (!projectId || !clientEmail || !privateKey) {
+  const config = getFirebaseConfig();
+  if (!config.projectId || !config.clientEmail || !config.privateKey) {
     throw new Error("Firebase non configuré — FIREBASE_SERVICE_ACCOUNT_JSON manquant");
   }
 
-  const accessToken = await getAccessToken(clientEmail, privateKey);
+  const accessToken = await getAccessToken(config.clientEmail, config.privateKey);
   const BATCH_SIZE = 5;
 
   let success = 0;
@@ -129,7 +67,7 @@ export async function sendReactivationPush(
         },
         webpush: { fcm_options: { link: APP_URL } },
       };
-      const r = await sendOneFcm(projectId, accessToken, target.token, fcmPayload);
+      const r = await sendFcmMessage(config.projectId, accessToken, target.token, fcmPayload);
       if (!r.ok) {
         const errorCode = r.result?.error?.details?.[0]?.errorCode || r.result?.error?.status;
         if (["UNREGISTERED", "INVALID_ARGUMENT"].includes(errorCode)) {
