@@ -99,11 +99,11 @@ function DetailModal({ entry, livreurInfo, onClose, onPaiement, onBloquer, onDeb
                 <p className="text-xs text-gray-500">Déjà payé</p>
                 <p className="font-bold text-green-600">{entry.montantPaye.toLocaleString()} F</p>
               </div>
-              {entry.creditDisponible > 0 && (
+              {entry.creditSurplus > 0 && (
                 <div className="bg-blue-50 rounded-xl p-3 col-span-2">
-                  <p className="text-xs text-blue-600 font-medium">Crédit disponible (avance)</p>
-                  <p className="text-xl font-black text-blue-700">{entry.creditDisponible.toLocaleString()} F</p>
-                  <p className="text-[10px] text-blue-500 mt-1">Les prochaines commissions seront automatiquement déduites de ce crédit.</p>
+                  <p className="text-xs text-blue-600 font-medium">Crédit de surplus reconnu</p>
+                  <p className="text-xl font-black text-blue-700">{entry.creditSurplus.toLocaleString()} F</p>
+                  <p className="text-[10px] text-blue-500 mt-1">Avance validée — les prochaines commissions seront déduites de ce crédit.</p>
                 </div>
               )}
             </div>
@@ -283,7 +283,11 @@ export default function DusLivreursExternes() {
       const data = res?.data || res;
       const map = {};
       (data?.livreurs || []).forEach(l => {
-        map[l.livreur_id] = l;
+        map[l.livreur_id] = {
+          ...l,
+          creditSurplus: l.creditSurplus ?? 0,
+          creditDisponible: l.creditDisponible ?? 0,
+        };
       });
       return map;
     },
@@ -348,9 +352,13 @@ export default function DusLivreursExternes() {
       // Détecter la divergence entre solde stocké et solde théorique
       entry.soldeTheorique = entry.commissionTotal - entry.montantPaye;
       entry.divergence = entry.montantDu !== entry.soldeTheorique ? Math.abs(entry.montantDu - entry.soldeTheorique) : 0;
-      // ── Crédit disponible depuis getSoldeLivreur (source de vérité unique) ──
+      // ── Crédit de surplus persistant (source de vérité unique) ──
+      //    creditSurplus = champ persistant validé par l'admin, PAS un calcul mathématique.
+      //    creditDisponible (écart mathématique) reste disponible pour audit mais n'est
+      //    JAMAIS affiché comme du crédit utilisable.
       const soldeBackend = soldesLivreurs[entry.id];
-      entry.creditDisponible = soldeBackend?.creditDisponible ?? 0;
+      entry.creditSurplus = soldeBackend?.creditSurplus ?? 0;
+      entry.creditDisponible = soldeBackend?.creditDisponible ?? 0; // audit uniquement, non affiché
       // Synchroniser montantDu avec le backend si disponible (plus précis que le champ stocké)
       if (soldeBackend && soldeBackend.montantDu !== undefined) {
         entry.montantDu = soldeBackend.montantDu;
@@ -361,8 +369,8 @@ export default function DusLivreursExternes() {
     let result = Object.values(map);
     const totalCommissionJour = result.reduce((s, r) => s + (r.commissionJour || 0), 0);
     if (filtre === "arecouvrer") result = result.filter(r => r.montantDu > 0);
-    if (filtre === "ajour") result = result.filter(r => r.montantDu <= 0 && !(r.creditDisponible > 0));
-    if (filtre === "en_credit") result = result.filter(r => r.creditDisponible > 0);
+    if (filtre === "ajour") result = result.filter(r => r.montantDu <= 0 && !(r.creditSurplus > 0));
+    if (filtre === "en_credit") result = result.filter(r => r.creditSurplus > 0);
     // Total calculé APRÈS le filtre → correspond à la liste affichée
     // On ne somme que les dettes positives (les crédits négatifs ne réduisent pas le total dû)
     const totalDuGlobal = result.reduce((s, r) => s + Math.max(0, r.montantDu), 0);
@@ -688,19 +696,19 @@ export default function DusLivreursExternes() {
                       <span className="text-gray-400">Commission générée :</span>
                       <span className="font-bold text-green-600">{(entry.commissionTotal || 0).toLocaleString()} F</span>
                       {entry.courses.length > 0 && <span className="text-gray-400">· {entry.courses.length} course(s)</span>}
-                      {entry.creditDisponible > 0 && (
-                        <span className="text-blue-600 font-bold ml-auto">Crédit : {entry.creditDisponible.toLocaleString()} F</span>
+                      {entry.creditSurplus > 0 && (
+                        <span className="text-blue-600 font-bold ml-auto">Crédit : {entry.creditSurplus.toLocaleString()} F</span>
                       )}
-                      {entry.nbCoursesJour > 0 && entry.creditDisponible === 0 && (
+                      {entry.nbCoursesJour > 0 && entry.creditSurplus === 0 && (
                         <span className="text-gray-300 ml-auto">Aujourd'hui : {(entry.commissionJour || 0).toLocaleString()} F</span>
                       )}
                     </div>
-                    {entry.creditDisponible > 0 && (
+                    {entry.creditSurplus > 0 && (
                       <div className="mt-2 bg-blue-50 border border-blue-200 rounded-xl px-3 py-2 flex items-center gap-2">
                         <Wallet className="w-4 h-4 text-blue-600 shrink-0" />
                         <div className="min-w-0">
-                          <p className="text-xs font-bold text-blue-700">Crédit disponible : {entry.creditDisponible.toLocaleString()} F</p>
-                          <p className="text-[10px] text-blue-500">Les prochaines commissions seront déduites de ce crédit.</p>
+                          <p className="text-xs font-bold text-blue-700">Crédit de surplus : {entry.creditSurplus.toLocaleString()} F</p>
+                          <p className="text-[10px] text-blue-500">Avance validée — les prochaines commissions seront déduites de ce crédit.</p>
                         </div>
                       </div>
                     )}

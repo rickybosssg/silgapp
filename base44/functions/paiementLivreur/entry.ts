@@ -95,12 +95,14 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ── Surplus autorisé ──
-    //    Si le montant dépasse le solde dû, le surplus devient un crédit
-    //    implicite (conservé dans le journal PaiementSilgapp.montant_paye).
-    //    Les futures commissions sont automatiquement absorbées par recalculerSoldeLivreur
-    //    via la formule : solde = max(0, totalCommissions - totalPaye).
+    // ── Surplus reconnu (RÈGLE MÉTIER DÉFINITIVE) ──
+    //    Si le paiement dépasse le dû réel, l'excédent devient un credit_surplus
+    //    PERSISTANT et traçable. Ce crédit sera consommé par les futures commissions.
+    //    Ex: dû 1300, paiement 2000 → credit_surplus += 700, dû = 0.
+    const surplusCree = Math.max(0, montant - ancienSolde);
     const nouveauSolde = Math.max(0, ancienSolde - montant);
+    const ancienCreditSurplus = Number(livreur.credit_surplus) || 0;
+    const nouveauCreditSurplus = ancienCreditSurplus + surplusCree;
 
     // ── Créer l'enregistrement PaiementSilgapp (TRAÇABILITÉ OBLIGATOIRE) ──
     const paiementRecord = await base44.asServiceRole.entities.PaiementSilgapp.create({
@@ -143,12 +145,13 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ── Mettre à jour montant_paye et dernier_paiement_date ──
+    // ── Mettre à jour montant_paye, dernier_paiement_date et credit_surplus ──
     await base44.entities.Livreur.update(livreur_id, {
       montant_paye: (livreur.montant_paye || 0) + montant,
       dernier_paiement_date: now,
       heure_paiement: now,
       admin_paiement: user.full_name || user.email || 'admin',
+      credit_surplus: nouveauCreditSurplus,
     });
 
     // ── Recalculer le solde depuis les sources financières ──
@@ -171,7 +174,7 @@ Deno.serve(async (req) => {
       });
     } catch (_) {}
 
-    console.log(`[PAIEMENT] ${livreur_id} a payé ${montant}F (${typePaiement}) — solde: ${ancienSolde} → ${nouveauSolde}`);
+    console.log(`[PAIEMENT] ${livreur_id} a payé ${montant}F (${typePaiement}) — solde: ${ancienSolde} → ${nouveauSolde}, credit_surplus: ${ancienCreditSurplus} → ${nouveauCreditSurplus}`);
 
     return Response.json({
       success: true,
@@ -179,6 +182,8 @@ Deno.serve(async (req) => {
       paiement_id: paiementRecord.id,
       ancien_solde: ancienSolde,
       nouveau_solde: nouveauSolde,
+      credit_surplus: nouveauCreditSurplus,
+      surplus_cree: surplusCree,
       type_paiement: typePaiement,
       courses_concernees: coursesConcernees,
       montant,

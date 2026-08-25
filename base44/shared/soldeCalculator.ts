@@ -10,8 +10,16 @@
 //   totalPaye        = SUM(montant_paye FROM PaiementSilgapp WHERE statut=traite)
 //                      clé de rattachement = user_id (= livreur_id)
 //
-//   solde            = max(0, totalCommissions - totalPaye)
-//   creditDisponible = max(0, totalPaye - totalCommissions)
+//   soldeBrut        = totalCommissions - totalPaye (avec base comptable si définie)
+//   solde            = max(0, soldeBrut)           → dû réel
+//   creditDisponible = max(0, -soldeBrut)          → écart mathématique (AUDIT UNIQUEMENT)
+//   creditSurplus    = livreur.credit_surplus       → crédit persistant validé par l'admin
+//
+// RÈGLE MÉTIER DÉFINITIVE (25/08/2026) :
+//   credit_surplus est une valeur PERSISTANTE et traçable, créée uniquement quand
+//   l'admin valide un paiement > dû réel. Elle est consommée par les futures commissions.
+//   creditDisponible (écart mathématique) NE DOIT JAMAIS être présenté comme du
+//   crédit utilisable — c'est un indicateur d'audit uniquement.
 //
 // Ce module est la SOURCE DE VÉRITÉ unique pour le calcul du solde et du crédit.
 // - recalculerSoldeLivreur.ts l'utilise puis écrit le résultat sur le livreur.
@@ -40,17 +48,19 @@ function getLivreurFinancierId(course: any): string {
 export async function calculerSoldeLivreur(base44: any, livreurId: string): Promise<{
   solde: number;
   creditDisponible: number;
+  creditSurplus: number;
   totalCommissions: number;
   totalPaye: number;
 }> {
   if (!livreurId) {
-    return { solde: 0, creditDisponible: 0, totalCommissions: 0, totalPaye: 0 };
+    return { solde: 0, creditDisponible: 0, creditSurplus: 0, totalCommissions: 0, totalPaye: 0 };
   }
 
-  // 0. Récupérer le livreur pour vérifier la base comptable
+  // 0. Récupérer le livreur pour vérifier la base comptable et credit_surplus
   const livreur = await base44.asServiceRole.entities.Livreur.get(livreurId).catch(() => null);
   const baseDate = livreur?.base_comptable_date || null;
   const baseSoldeInitial = Number(livreur?.base_comptable_solde_initial) || 0;
+  const creditSurplus = Number(livreur?.credit_surplus) || 0;
 
   // 1. Toutes les courses livrées du livreur (dette brute)
   //    On récupère par livreur_financier_id ET par livreur_id (fallback)
@@ -116,7 +126,7 @@ export async function calculerSoldeLivreur(base44: any, livreurId: string): Prom
   const solde = Math.max(0, soldeBrut);
   const creditDisponible = Math.max(0, -soldeBrut);
 
-  return { solde, creditDisponible, totalCommissions, totalPaye };
+  return { solde, creditDisponible, creditSurplus, totalCommissions, totalPaye };
 }
 
 /**
@@ -128,7 +138,7 @@ export async function calculerSoldeLivreur(base44: any, livreurId: string): Prom
 export async function calculerSoldesLivreursBatch(
   base44: any,
   countryCode: string | null
-): Promise<Record<string, { solde: number; creditDisponible: number; totalCommissions: number; totalPaye: number }>> {
+): Promise<Record<string, { solde: number; creditDisponible: number; creditSurplus: number; totalCommissions: number; totalPaye: number }>> {
   // 1. Toutes les courses livrées du pays
   const coursesFilter = countryCode
     ? { statut: 'livree', country_code: countryCode }
@@ -157,6 +167,7 @@ export async function calculerSoldesLivreursBatch(
   });
 
   const livreursAvecBase: Record<string, { date: string; soldeInitial: number }> = {};
+  const creditSurplusMap: Record<string, number> = {};
   for (const id of livreurIds) {
     const l = await base44.asServiceRole.entities.Livreur.get(id).catch(() => null);
     if (l?.base_comptable_date) {
@@ -165,6 +176,7 @@ export async function calculerSoldesLivreursBatch(
         soldeInitial: Number(l.base_comptable_solde_initial) || 0,
       };
     }
+    creditSurplusMap[id] = Number(l?.credit_surplus) || 0;
   }
 
   // 4. Agréger par livreur_financier_id (fallback livreur_id)
@@ -205,6 +217,7 @@ export async function calculerSoldesLivreursBatch(
     result[id] = {
       solde: Math.max(0, soldeBrut),
       creditDisponible: Math.max(0, -soldeBrut),
+      creditSurplus: creditSurplusMap[id] || 0,
       totalCommissions,
       totalPaye,
     };

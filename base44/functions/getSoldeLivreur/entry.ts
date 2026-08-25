@@ -40,11 +40,12 @@ export default async function(req: Request): Promise<Response> {
       ).catch(() => []);
 
       const result = (livreurs || []).map((l: any) => {
-        const s = soldes[l.id] || { solde: 0, creditDisponible: 0, totalCommissions: 0, totalPaye: 0 };
+        const s = soldes[l.id] || { solde: 0, creditDisponible: 0, creditSurplus: 0, totalCommissions: 0, totalPaye: 0 };
         return {
           livreur_id: l.id,
           montantDu: s.solde,
           creditDisponible: s.creditDisponible,
+          creditSurplus: s.creditSurplus,
           totalCommissions: s.totalCommissions,
           totalPaye: s.totalPaye,
         };
@@ -66,11 +67,12 @@ export default async function(req: Request): Promise<Response> {
       }
     }
 
-    const { solde, creditDisponible, totalCommissions, totalPaye } = await calculerSoldeLivreur(base44, livreur_id);
+    const { solde, creditDisponible, creditSurplus, totalCommissions, totalPaye } = await calculerSoldeLivreur(base44, livreur_id);
 
     return Response.json({
       montantDu: solde,
       creditDisponible,
+      creditSurplus,
       totalCommissions,
       totalPaye,
     });

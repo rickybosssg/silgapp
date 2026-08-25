@@ -43,6 +43,7 @@ import { calculerSoldeLivreur } from './soldeCalculator.ts';
 export async function recalculerSoldeLivreur(base44: any, livreurId: string): Promise<{
   solde: number;
   creditDisponible: number;
+  creditSurplus: number;
   seuil: number | null;
   bloque: boolean;
   statut_paiement: string;
@@ -51,19 +52,19 @@ export async function recalculerSoldeLivreur(base44: any, livreurId: string): Pr
   totalPaye: number;
 }> {
   if (!livreurId) {
-    return { solde: 0, creditDisponible: 0, seuil: null, bloque: false, statut_paiement: 'paye', devise: 'FCFA', totalCommissions: 0, totalPaye: 0 };
+    return { solde: 0, creditDisponible: 0, creditSurplus: 0, seuil: null, bloque: false, statut_paiement: 'paye', devise: 'FCFA', totalCommissions: 0, totalPaye: 0 };
   }
 
   // 1. Récupérer le livreur
   const livreur = await base44.asServiceRole.entities.Livreur.get(livreurId).catch(() => null);
   if (!livreur) {
-    return { solde: 0, creditDisponible: 0, seuil: null, bloque: false, statut_paiement: 'paye', devise: 'FCFA', totalCommissions: 0, totalPaye: 0 };
+    return { solde: 0, creditDisponible: 0, creditSurplus: 0, seuil: null, bloque: false, statut_paiement: 'paye', devise: 'FCFA', totalCommissions: 0, totalPaye: 0 };
   }
 
   // 2-6. Calcul via le module shared (SOURCE DE VÉRITÉ unique)
   //    soldeCalculator.ts contient la formule canonique utilisée partout
   //    (recalculerSoldeLivreur + getSoldeLivreur + UI).
-  const { solde, creditDisponible, totalCommissions, totalPaye } = await calculerSoldeLivreur(base44, livreurId);
+  const { solde, creditDisponible, creditSurplus, totalCommissions, totalPaye } = await calculerSoldeLivreur(base44, livreurId);
 
   // 7. Récupérer le seuil du pays
   const countryConfig = await chargerConfigPays(base44, livreur.country_code);
@@ -76,8 +77,9 @@ export async function recalculerSoldeLivreur(base44: any, livreurId: string): Pr
       montant_du_silga: solde,
       encours: solde,
       statut_paiement: solde > 0 ? 'non_paye' : 'paye',
+      credit_surplus: creditSurplus,
     });
-    return { solde, creditDisponible, seuil: null, bloque: false, statut_paiement: solde > 0 ? 'non_paye' : 'paye', devise, totalCommissions, totalPaye };
+    return { solde, creditDisponible, creditSurplus, seuil: null, bloque: false, statut_paiement: solde > 0 ? 'non_paye' : 'paye', devise, totalCommissions, totalPaye };
   }
 
   // 8. Déterminer le statut dérivé (solde > 0 → dette, solde = 0 → réglé)
@@ -91,6 +93,7 @@ export async function recalculerSoldeLivreur(base44: any, livreurId: string): Pr
     encours: solde, // alias legacy synchronisé
     statut_paiement: statutPaiement,
     bloque_encours: bloque,
+    credit_surplus: creditSurplus,
   };
 
   if (bloque) {
@@ -117,5 +120,5 @@ export async function recalculerSoldeLivreur(base44: any, livreurId: string): Pr
 
   console.log(`[SOLDE] Livreur ${livreurId}: solde=${solde} ${devise} (commissions=${totalCommissions}, payé=${totalPaye}, seuil=${seuil}, bloque=${bloque})`);
 
-  return { solde, creditDisponible, seuil, bloque, statut_paiement: statutPaiement, devise, totalCommissions, totalPaye };
+  return { solde, creditDisponible, creditSurplus, seuil, bloque, statut_paiement: statutPaiement, devise, totalCommissions, totalPaye };
 }
