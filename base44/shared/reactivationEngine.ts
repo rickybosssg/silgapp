@@ -239,7 +239,8 @@ export async function selectTargets(base44: any, params: TargetSelectionParams):
 
     // Segment filtering
     if (params.segment_type === "push_active") {
-      if (!token) continue;
+      // Exclure les tokens web_ (pas natifs Android/iOS) dès la sélection
+      if (!token || !token.token || String(token.token).startsWith("web_")) continue;
     } else if (params.segment_type === "push_recoverable") {
       if (!c.user_email || token) continue;
     } else if (params.segment_type === "all_push_eligible") {
