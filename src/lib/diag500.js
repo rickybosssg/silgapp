@@ -19,6 +19,16 @@ const MAX_LOG_ENTRIES = 100;
 const diagnosticLog = [];
 let listeners = [];
 
+// ── Fonctions non critiques (fire-and-forget) ──
+// Ces fonctions ne doivent JAMAIS déclencher le panneau DIAG 500.
+// Un échec de tracking d'installation n'est pas une erreur critique.
+const NON_CRITICAL_FUNCTIONS = new Set([
+  'trackAppInstall',
+  'trackDownload',
+  'trackDownloadPublic',
+  'trackReactivationOpened',
+]);
+
 function addEntry(entry) {
   diagnosticLog.push(entry);
   if (diagnosticLog.length > MAX_LOG_ENTRIES) diagnosticLog.shift();
@@ -93,6 +103,11 @@ export function init500Diagnostic() {
       // Essayer d'extraire le nom de la fonction backend depuis l'URL
       const funcMatch = url.match(/\/functions?\/([^/?#]+)/);
       const functionName = funcMatch?.[1] || null;
+
+      // Ignorer les fonctions non critiques (trackAppInstall, etc.)
+      if (functionName && NON_CRITICAL_FUNCTIONS.has(functionName)) {
+        return response;
+      }
 
       addEntry({
         type: 'http_5xx',
@@ -175,6 +190,10 @@ async function wrapBase44Invoke() {
           return result;
         } catch (err) {
           const status = err?.response?.status || err?.status || 0;
+          // Ignorer les fonctions non critiques (trackAppInstall, etc.)
+          if (NON_CRITICAL_FUNCTIONS.has(functionName)) {
+            throw err; // re-throw sans logger au DIAG 500
+          }
           if (status >= 500 || (err?.message || '').includes('500')) {
             let backendMessage = '';
             const respData = err?.response?.data;
