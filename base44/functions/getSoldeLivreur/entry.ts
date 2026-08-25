@@ -21,14 +21,21 @@ export default async function(req: Request): Promise<Response> {
     const body = await req.json().catch(() => ({}));
     const { livreur_id, country_code } = body || {};
 
-    // ── Mode batch (admin) : tous les livreurs d'un pays ──
-    if (country_code) {
+    // ── Mode batch (admin) : tous les livreurs d'un pays (ou tous pays si country_code vide) ──
+    //    Un admin global sans pays sélectionné envoie country_code=undefined.
+    //    On entre quand même en mode batch pour éviter l'erreur 400.
+    const isBatchRequest = !livreur_id && (user.role === 'admin');
+    if (isBatchRequest) {
       if (user.role !== 'admin') {
         return Response.json({ error: 'Admin only' }, { status: 403 });
       }
-      const soldes = await calculerSoldesLivreursBatch(base44, country_code);
+      const cc = country_code || null;
+      const soldes = await calculerSoldesLivreursBatch(base44, cc);
+      const livreurFilter = cc
+        ? { type_livreur: 'externe', country_code: cc }
+        : { type_livreur: 'externe' };
       const livreurs = await base44.asServiceRole.entities.Livreur.filter(
-        { type_livreur: 'externe', country_code },
+        livreurFilter,
         '-created_date', 200
       ).catch(() => []);
 
