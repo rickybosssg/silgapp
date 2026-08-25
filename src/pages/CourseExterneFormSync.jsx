@@ -382,7 +382,10 @@ export default function CourseExterneFormSync() {
         finalData.delivery_confirmed_at = null;
       }
 
-      const createResult = await base44.functions.invoke("creerCourseClient", { course_data: finalData });
+      const createResult = await base44.functions.invoke("creerCourseClient", {
+        course_data: finalData,
+        request_id: finalData.request_id,
+      });
       // Safety: SDK peut wrapper la réponse dans { data: { ... } }
       const course = createResult?.data?.course || createResult?.course;
 

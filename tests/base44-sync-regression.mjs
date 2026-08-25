@@ -42,6 +42,9 @@ assert.match(createClient, /cleanData\.country_code = String\(cleanData\.country
 assert.match(createClient, /cleanData\.statut = 'nouvelle'/, "Le backend doit créer la course dans l'état initial nouvelle");
 assert.match(createClient, /cleanData\.dispatch_status = 'en_attente'/, "Le backend doit initialiser le dispatch de façon déterministe");
 
+const courseForm = read("src/pages/CourseExterneFormSync.jsx");
+assert.match(courseForm, /course_data:\s*finalData,\s*request_id:\s*finalData\.request_id/, "Le formulaire doit transmettre request_id au niveau attendu par creerCourseClient");
+
 const scanner = read("src/components/livreur/QRScannerModal.jsx");
 const validateQr = read("base44/functions/validateQRCode/entry.ts");
 assert.doesNotMatch(scanner, /Position GPS indisponible[\s\S]*return;/, "Le PIN/QR ne doit plus être bloqué par un GPS indisponible");
