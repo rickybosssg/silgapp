@@ -382,9 +382,13 @@ export default function CourseExterneFormSync() {
         finalData.delivery_confirmed_at = null;
       }
 
+      // ── request_id au niveau supérieur du payload (pas dans course_data) ──
+      // Le backend lit request_id au niveau racine pour l'idempotence.
+      // Si request_id reste dans course_data, il est ignoré par le backend.
+      const { request_id: _rq, ...courseDataWithoutRequestId } = finalData;
       const createResult = await base44.functions.invoke("creerCourseClient", {
-        course_data: finalData,
-        request_id: finalData.request_id,
+        course_data: courseDataWithoutRequestId,
+        request_id: _rq || crypto.randomUUID(),
       });
       // Safety: SDK peut wrapper la réponse dans { data: { ... } }
       const course = createResult?.data?.course || createResult?.course;
