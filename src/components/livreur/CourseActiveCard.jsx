@@ -156,7 +156,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
     if (showPrixModal && (course.pricing_mode === "admin_manuel" || course.source === "admin") && course.prix_propose_admin) {
       setPrixReel(String(course.prix_propose_admin));
     }
-  }, [showPrixModal]);
+  }, [showPrixModal, course.prix_propose_admin]);
 
   const effectiveStatut = optimisticStatut || course.statut;
   const isDeplacement = course.type_course === "deplacement";
@@ -291,14 +291,16 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
     }
 
     if (course.pricing_mode === "admin_manuel" || course.source === "admin") {
-      // ── RÈGLE MÉTIER : Le prix fixé par l'admin est OBLIGATOIREMENT le prix final. ──
-      // Le livreur ne peut pas le modifier. Si prix_propose_admin est défini, on l'utilise
-      // systématiquement, peu importe ce que le livreur a saisi.
-      const montant = course.prix_propose_admin
-        ? Number(course.prix_propose_admin)
-        : parseFloat(prixReel);
+      // ── RÈGLE MÉTIER : prix_propose_admin est la source de vérité ──
+      // Aucun fallback vers prixReel ou placeholder. Le livreur ne peut pas
+      // remplacer ce prix.
+      if (!course.prix_propose_admin || Number(course.prix_propose_admin) <= 0) {
+        toast.error("Prix admin manquant — impossible de finaliser. Contactez le support.");
+        return;
+      }
+      const montant = Number(course.prix_propose_admin);
       if (!montant || isNaN(montant) || montant <= 0) {
-        toast.error("Entrez le montant reçu du client");
+        toast.error("Prix admin invalide — contactez le support.");
         return;
       }
       const split = getRequiredSplit(montant);

@@ -47,8 +47,27 @@ export default async function(req: Request): Promise<Response> {
     const course = await base44.asServiceRole.entities.CourseExterne.get(course_id);
     if (!course) return Response.json({ error: 'Course introuvable' }, { status: 404 });
 
-    // Idempotence: si déjà livrée, retourner success
+    const isAdminCourse = course.pricing_mode === 'admin_manuel' || course.source === 'admin';
+
+    // Idempotence: si déjà livrée, ne pas écraser le prix existant
     if (course.statut === 'livree') {
+      // Courses admin : corriger le trou historique (prix_final = 0/null)
+      // en écrivant prix_propose_admin comme source de vérité.
+      if (isAdminCourse && (!course.prix_final || course.prix_final === 0) && Number(course.prix_propose_admin) > 0) {
+        const prixFix = Number(course.prix_propose_admin);
+        const countryFix = await chargerConfigPays(base44, course.country_code || '');
+        const commissionPctFix = normalizeCommissionPct(countryFix?.commission_pct);
+        if (commissionPctFix !== null) {
+          const commissionFix = Math.round(prixFix * (commissionPctFix / 100));
+          const montantFix = prixFix - commissionFix;
+          await base44.asServiceRole.entities.CourseExterne.update(course_id, {
+            prix_final: prixFix,
+            commission_silga: commissionFix,
+            montant_livreur: montantFix,
+          });
+          console.warn(`[finaliserLivraisonLivreur] TROU CORRIGÉ: course ${course_id} prix_final=${prixFix} (was 0/null, source=prix_propose_admin)`);
+        }
+      }
       return Response.json({ success: true, skipped: 'already_delivered', course_id });
     }
 
@@ -68,18 +87,18 @@ export default async function(req: Request): Promise<Response> {
       return Response.json({ error: 'Vous n\'êtes pas le livreur assigné' }, { status: 403 });
     }
 
-    const isAdminCourse = course.pricing_mode === 'admin_manuel' || course.source === 'admin';
     const now = new Date().toISOString();
 
     // ── CAS 1: Course admin — le livreur saisit le prix (montant brut) ──
     // Le backend calcule commission_silga et montant_livreur côté backend uniquement.
     if (isAdminCourse) {
-      // Validation: le prix doit être fourni par le frontend (montant brut uniquement)
-      const montant = Number(prix_final_livreur);
+      // ── RÈGLE MÉTIER : prix_propose_admin est la source de vérité ──
+      // Le livreur ne peut jamais remplacer ce prix. prix_final_livreur est ignoré.
+      const montant = Number(course.prix_propose_admin);
       if (!Number.isFinite(montant) || montant <= 0) {
         return Response.json({
-          error: 'Montant invalide — le prix final doit être un nombre positif',
-          blocked_reason: 'invalid_amount',
+          error: 'prix_propose_admin manquant pour cette course admin — impossible de finaliser',
+          blocked_reason: 'missing_admin_price',
         }, { status: 400 });
       }
 
@@ -93,7 +112,7 @@ export default async function(req: Request): Promise<Response> {
         }, { status: 400 });
       }
 
-      // Calcul côté backend uniquement — le frontend ne transmet QUE le montant brut
+      // Calcul côté backend uniquement — prix_propose_admin est la source
       const commissionSilga = Math.round(montant * (commissionPct / 100));
       const montantLivreur = montant - commissionSilga;
 
