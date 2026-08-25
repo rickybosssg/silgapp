@@ -109,6 +109,36 @@ export default async function(req: Request): Promise<Response> {
     // ── Créer la course ──
     const course = await base44.asServiceRole.entities.CourseExterne.create(cleanData);
 
+    // ── Post-creation dedup : protection contre les race conditions ──
+    // Deux requêtes concurrentes avec le même request_id peuvent toutes deux
+    // passer la vérification initiale (TOCTOU). Cette étape détecte et résout
+    // les doublons APRÈS création en gardant la course la plus ancienne.
+    if (request_id && typeof request_id === 'string') {
+      try {
+        const allWithRequestId = await base44.asServiceRole.entities.CourseExterne.filter(
+          { request_id },
+          'created_date',
+          10
+        );
+        if (allWithRequestId && allWithRequestId.length > 1) {
+          // Garder la plus ancienne (premier élément trié par created_date asc)
+          const oldest = allWithRequestId[0];
+          const toDelete = allWithRequestId.slice(1);
+          for (const dup of toDelete) {
+            try {
+              await base44.asServiceRole.entities.CourseExterne.delete(dup.id);
+              console.warn(`[creerCourseClient] Doublon request_id supprimé: ${dup.id} (gardé: ${oldest.id})`);
+            } catch (delErr) {
+              console.error(`[creerCourseClient] Erreur suppression doublon ${dup.id}:`, delErr?.message);
+            }
+          }
+          return Response.json({ success: true, course: oldest, idempotent: true, deduped: true });
+        }
+      } catch (dedupErr) {
+        console.error('[creerCourseClient] Erreur post-creation dedup:', dedupErr?.message);
+      }
+    }
+
     return Response.json({ success: true, course });
   } catch (error) {
     console.error('[creerCourseClient] Erreur:', error);
