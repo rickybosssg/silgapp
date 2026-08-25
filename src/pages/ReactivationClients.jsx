@@ -209,14 +209,6 @@ export default function ReactivationClients() {
                   Lancer
                 </button>
               )}
-              {(c.status === "sent" || c.status === "completed" || c.status === "cancelled") && (c.sent_count > 0 || c.target_count > 0) && (
-                <button
-                  onClick={() => setSelectedCampaign(c)}
-                  className="h-8 px-3 rounded-lg bg-blue-50 text-blue-700 text-[11px] font-bold flex items-center gap-1 shrink-0"
-                >
-                  <Eye className="w-3 h-3" /> Résultats
-                </button>
-              )}
             </div>
 
             {/* Mini funnel for sent/completed campaigns */}
@@ -235,14 +227,15 @@ export default function ReactivationClients() {
               </div>
             )}
 
-            {/* Full-width results button — impossible to miss on mobile */}
-            {(c.status === "sent" || c.status === "completed" || c.status === "cancelled") && (c.sent_count > 0 || c.target_count > 0) && (
+            {/* Full-width results button — always visible for any launched campaign */}
+            {c.status !== "draft" && (
               <button
                 onClick={() => setSelectedCampaign(c)}
-                className="mt-2 w-full h-10 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-black flex items-center justify-center gap-2 shadow-sm active:scale-[0.98] transition-all"
+                className="mt-3 w-full h-11 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-black flex items-center justify-center gap-2 shadow-md active:scale-[0.98] transition-all"
+                style={{ minHeight: "44px" }}
               >
                 <Eye className="w-4 h-4" />
-                Voir les résultats
+                📊 Voir les résultats
               </button>
             )}
           </div>
