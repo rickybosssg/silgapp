@@ -3,6 +3,7 @@ import { Loader2, Globe, Locate, Maximize } from "lucide-react";
 import HeatmapLayer from "./HeatmapLayer";
 import HeatmapControls from "./HeatmapControls";
 import HeatmapLegend from "./HeatmapLegend";
+import { CARTO_TILE_URL, CARTO_TILE_CONFIG } from "@/lib/cartTiles";
 import CountrySelector from "@/components/international/CountrySelector";
 import { useZonesChaudesHalos } from "./ZonesChaudes";
 import { GPS_EXPIRE_SEUIL_MIN, getLivreurCategorie } from "@/lib/dispatchRules";
@@ -876,10 +877,7 @@ export default function DispatchMap({
           preferCanvas: true,
         }).setView([pos.latitude, pos.longitude], pos.zoom ?? 12);
 
-        window.L.tileLayer(
-          "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
-          { maxZoom: 19, subdomains: "abcd" }
-        ).addTo(map);
+        window.L.tileLayer(CARTO_TILE_URL, CARTO_TILE_CONFIG).addTo(map);
 
         window.L.control.zoom({ position: "bottomright" }).addTo(map);
 
