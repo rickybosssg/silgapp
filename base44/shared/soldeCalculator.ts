@@ -13,19 +13,22 @@
 // ALGORITHME — Traitement chronologique des événements :
 //
 //   1. balance = base_comptable_solde_initial
-//   2. credit_surplus = credit_surplus stocké en DB (valeur persistante)
-//   3. Trier tous les événements (commissions + paiements) par date croissante
-//   4. Pour chaque événement :
+//   2. Trier tous les événements (commissions + paiements) par date croissante
+//   3. Pour chaque événement :
 //      - Commission : balance += amount
-//        Si balance > 0 et credit_surplus > 0, absorber depuis credit_surplus
 //      - Paiement : balance -= amount
 //        Si balance < 0, balance = 0 (l'excès n'est PAS reporté)
-//   5. solde = max(0, balance)
+//   4. raw_solde = max(0, balance)
+//   5. credit_surplus est appliqué comme CAP final : solde = max(0, raw_solde - credit_surplus)
+//      credit_surplus n'est JAMAIS modifié ni consommé — il reste à sa valeur DB.
+//
+// IDEMPOTENCE : credit_surplus étant lu (jamais écrit), 2 recalculs successifs
+// produisent rigoureusement le même résultat.
 //
 // CONSEQUENCE : un paiement effectué avant une nouvelle commission (sans dû
 // existant à ce moment) est "consommé" et ne peut pas annuler une commission
 // future. Seul credit_surplus (validé par l'admin) peut absorber les futures
-// commissions.
+// commissions, en tant que cap sur le solde final.
 //
 // RÈGLE D'IMMUTABILITÉ :
 //   livreur_financier_id est renseigné à la livraison et JAMAIS modifié ensuite.
@@ -50,7 +53,6 @@ function processTimeline(
   events: { type: 'commission' | 'payment'; date: string; amount: number }[]
 ): { solde: number; creditSurplus: number; totalCommissions: number; totalPaye: number } {
   let balance = baseSoldeInitial;
-  let creditSurplus = rawCreditSurplus;
   let totalCommissions = 0;
   let totalPaye = 0;
 
@@ -65,12 +67,6 @@ function processTimeline(
     if (e.type === 'commission') {
       totalCommissions += e.amount;
       balance += e.amount;
-      // Absorber depuis credit_surplus si balance > 0
-      if (balance > 0 && creditSurplus > 0) {
-        const absorbed = Math.min(creditSurplus, balance);
-        creditSurplus -= absorbed;
-        balance -= absorbed;
-      }
     } else {
       totalPaye += e.amount;
       balance -= e.amount;
@@ -79,9 +75,14 @@ function processTimeline(
     }
   }
 
+  // Le credit_surplus est un CAP appliqué à la fin — il n'est JAMAIS consommé
+  // ni réécrit. Cela garantit l'idempotence : 2 recalculs successifs = 0 modification.
+  const rawSolde = Math.max(0, balance);
+  const solde = rawCreditSurplus > 0 ? Math.max(0, rawSolde - rawCreditSurplus) : rawSolde;
+
   return {
-    solde: Math.max(0, balance),
-    creditSurplus,
+    solde,
+    creditSurplus: rawCreditSurplus, // Inchangé — jamais modifié par le calcul
     totalCommissions,
     totalPaye,
   };
