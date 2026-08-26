@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { MapPin, Loader2, Check, Edit3, X, Navigation } from "lucide-react";
+import { CARTO_TILE_URL, CARTO_TILE_CONFIG } from "@/lib/cartTiles";
 
 /**
  * PartenaireLocalisation — Permet au partenaire d'enregistrer une position GPS FIXE.
@@ -58,10 +59,7 @@ export default function PartenaireLocalisation({ type, existingLat, existingLng,
         scrollWheelZoom: true,
       }).setView([lat, lng], 16);
 
-      window.L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
-        maxZoom: 19,
-        subdomains: "abcd",
-      }).addTo(map);
+      window.L.tileLayer(CARTO_TILE_URL, CARTO_TILE_CONFIG).addTo(map);
 
       const color = isRestaurant ? "#ec4899" : "#8b5cf6";
       const icon = window.L.divIcon({
