@@ -7,7 +7,9 @@ import '@/index.css'
 
 // DIAGNOSTIC TEMPORAIRE — intercepteur d'erreurs 500
 import { init500Diagnostic } from '@/lib/diag500';
+import { initCartoTiles } from '@/lib/cartTiles';
 init500Diagnostic();
+initCartoTiles();
 
 installNativeGeolocationShim()
 
@@ -116,6 +118,7 @@ rootElement?.setAttribute('data-dynamic-content', 'silgapp2-root');
 async function initApp() {
   restoreTokenFromCookie();
   await syncTokenFromPreferences();
+  await initCartoTiles();
   ReactDOM.createRoot(rootElement).render(
     <ErrorBoundary>
       <App />

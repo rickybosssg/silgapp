@@ -26,6 +26,7 @@ import {
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import QRCodeDisplay from "@/components/client/QRCodeDisplay";
+import { CARTO_TILE_URL, CARTO_TILE_CONFIG } from "@/lib/cartTiles";
 
 const APK_DOWNLOAD_URL = "/telecharger-app";
 const LOADING_TIMEOUT_MS = 8000; // 8 secondes max avant d'afficher une erreur
@@ -163,10 +164,7 @@ export default function PublicSuiviCourse() {
     const map = window.L.map(container, { zoomControl: false }).setView([livreurPos.lat, livreurPos.lng], 14);
     window.L.control.zoom({ position: 'topleft' }).addTo(map);
 
-    window.L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
-      attribution: '&copy; OpenStreetMap',
-      maxZoom: 19
-    }).addTo(map);
+    window.L.tileLayer(CARTO_TILE_URL, CARTO_TILE_CONFIG).addTo(map);
 
     // Marqueur livreur — bonhomme sur scooter (SVG vectoriel)
     const livreurIcon = window.L.divIcon({

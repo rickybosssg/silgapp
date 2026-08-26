@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { LogOut, Wifi, WifiOff, MapPin, MapPinOff, Power, Navigation, Star, Smartphone, Users, Package } from "lucide-react";
+import { LogOut, Wifi, WifiOff, MapPin, MapPinOff, Power, Navigation, Star, Users, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { base44 } from "@/api/base44Client";
 
@@ -98,10 +98,10 @@ export default function LivreurHeader({
         "bg-white/10"
       )} />
 
-      <div className="p-4">
+      <div className="p-3.5">
 
         {/* Ligne 1 : Heure + reseau + deconnexion */}
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-3">
           <div>
             <p className="text-3xl font-black tracking-tight tabular-nums leading-none">{heureStr}</p>
             <p className="text-[11px] text-white/75 capitalize mt-0.5">{dateStr}</p>
@@ -127,7 +127,7 @@ export default function LivreurHeader({
         </div>
 
         {/* Ligne 2 : Avatar + infos + boutons */}
-        <div className="flex items-center gap-3 mb-4">
+        <div className="flex items-center gap-3 mb-3">
 
           {/* Avatar */}
           <div className="relative flex-shrink-0">
@@ -202,38 +202,7 @@ export default function LivreurHeader({
           </div>
         </div>
 
-        {/* Ligne 3 : Badges statut horizontaux */}
-        <div className="flex items-center gap-1.5 mb-3">
-          {/* Badge ON/OFF */}
-          <span className={cn(
-            "inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold tracking-wide flex-1 justify-center",
-            isON
-              ? "bg-green-500/18 text-green-300 border border-green-400/25"
-              : "bg-red-500/15 text-red-300 border border-red-400/20"
-          )}>
-            <span className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0", isON ? "bg-green-400 animate-pulse" : "bg-red-400")} />
-            {isON ? "ON" : "OFF"}
-          </span>
-
-          {/* Badge Libre / En course / Hors ligne */}
-          <span className={cn(
-            "inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold tracking-wide flex-1 justify-center",
-            isLibre
-              ? "bg-emerald-500/18 text-emerald-300 border border-emerald-400/25"
-              : isEnCourse
-                ? "bg-blue-500/18 text-blue-300 border border-blue-400/25"
-                : "bg-white/8 text-white/75 border border-white/20"
-          )}>
-            {isLibre ? "Libre" : isEnCourse ? "En course" : "En pause"}
-          </span>
-
-          {/* Badge App ouverte */}
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold tracking-wide flex-1 justify-center bg-sky-500/15 text-sky-300 border border-sky-400/20">
-            <Smartphone className="w-3 h-3 flex-shrink-0" /> App ouverte
-          </span>
-        </div>
-
-        {/* Ligne 4 : Compteurs clients + courses */}
+        {/* Ligne 3 : Compteurs clients + courses */}
         <div className="grid grid-cols-2 gap-2">
           {/* Clients en ligne */}
           <div className="bg-white/10 border border-white/10 rounded-2xl px-3 py-2.5 flex items-center gap-2 backdrop-blur-sm">

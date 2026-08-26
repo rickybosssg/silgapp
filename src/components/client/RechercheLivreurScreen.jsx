@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Bike, Clock, X, Radio, Users, Zap } from "lucide-react";
 import { MapContainer, TileLayer, Marker, Tooltip, Circle } from "react-leaflet";
 import L from "leaflet";
+import { CARTO_TILE_URL } from "@/lib/cartTiles";
 import "leaflet/dist/leaflet.css";
 import { haversineKm as haversine } from "@/lib/priceEstimate";
 import { base44 } from "@/api/base44Client";
@@ -151,7 +152,7 @@ export default function RechercheLivreurScreen({ course, position, countryCode, 
           ref={(ref) => { mapRef.current = ref; }}
         >
           <TileLayer
-            url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+            url={CARTO_TILE_URL}
             attribution='&copy; OpenStreetMap'
           />
 

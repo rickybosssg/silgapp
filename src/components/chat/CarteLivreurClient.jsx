@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { MapPin, Loader2 } from "lucide-react";
+import { CARTO_TILE_URL, CARTO_TILE_CONFIG } from "@/lib/cartTiles";
 
 export default function CarteLivreurClient({ livreurLat, livreurLng, livreurNom, departLat, departLng, arriveeLat, arriveeLng, statut }) {
   const [mapLoaded, setMapLoaded] = useState(false);
@@ -56,10 +57,7 @@ export default function CarteLivreurClient({ livreurLat, livreurLng, livreurNom,
     const map = L.map(container, { zoomControl: false, attributionControl: true }).setView([livreurLat, livreurLng], 14);
     container._leaflet_map = map;
     L.control.zoom({ position: 'topleft' }).addTo(map);
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
-      attribution: '&copy; OpenStreetMap',
-      maxZoom: 19
-    }).addTo(map);
+    L.tileLayer(CARTO_TILE_URL, CARTO_TILE_CONFIG).addTo(map);
 
     // Marqueur livreur (position live) — bonhomme sur scooter, design moderne
     const livreurIcon = L.divIcon({

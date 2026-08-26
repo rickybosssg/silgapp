@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { isLibre } from "@/lib/dispatchRules";
+import { CARTO_TILE_URL, CARTO_TILE_CONFIG } from "@/lib/cartTiles";
 
 export default function ModernMap({
   position,
@@ -255,11 +256,7 @@ export default function ModernMap({
     }).setView([position.latitude, position.longitude], 14);
 
     // Tiles style Uber/Glovo (CartoDB Voyager - propre et moderne)
-    window.L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-      maxZoom: 19,
-      subdomains: 'abcd',
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
-    }).addTo(map);
+    window.L.tileLayer(CARTO_TILE_URL, CARTO_TILE_CONFIG).addTo(map);
 
     // Controles de zoom stylises
     const zoomControl = window.L.control.zoom({

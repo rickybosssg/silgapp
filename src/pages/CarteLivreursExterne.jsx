@@ -1,12 +1,11 @@
 import { useState, useMemo, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
-import { MapPin, Truck, Wifi, WifiOff, X, Clock, Users, Wrench } from "lucide-react";
+import { MapPin, Truck, X, Clock, Users, Wrench } from "lucide-react";
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import DispatchMap from "@/components/carte/DispatchMap";
 import MarkerInfoPanel from "@/components/carte/MarkerInfoPanel";
-import NetworkHealthBanner from "@/components/carte/NetworkHealthBanner";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
 import { useAdminContext } from "@/hooks/useAdminContext.js";
@@ -19,9 +18,6 @@ import ZonesChaudesWidget from "@/components/carte/ZonesChaudes";
 
 import {
   isLibre,
-  isEnCourse,
-  isON,
-  isAppActive,
   hasValidGPS,
   isClientGPSRecent,
 } from "@/lib/dispatchRules.js";
@@ -53,46 +49,6 @@ function getLastGPS(entity) {
   } catch { return null; }
 }
 
-// ─── Badges ─────────────────────────────────────────────────────────────────
-
-function ONBadge({ livreur }) {
-  return isON(livreur) ? (
-    <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-700">
-      <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />ON
-    </span>
-  ) : (
-    <span className="inline-flex items-center gap-1 text-xs font-semibold text-gray-600">
-      <span className="w-2 h-2 rounded-full bg-gray-300 inline-block" />OFF
-    </span>
-  );
-}
-
-function StatutBadge({ livreur }) {
-  if (isLibre(livreur)) return (
-    <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700">
-      <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />Libre
-    </span>
-  );
-  if (isEnCourse(livreur)) return (
-    <span className="inline-flex items-center gap-1 text-xs font-semibold text-orange-700">
-      <span className="w-2 h-2 rounded-full bg-orange-500 inline-block" />En course
-    </span>
-  );
-  return null;
-}
-
-function AppBadge({ entity }) {
-  return isAppActive(entity) ? (
-    <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-700">
-      <Wifi className="w-3 h-3" />App ouverte
-    </span>
-  ) : (
-    <span className="inline-flex items-center gap-1 text-xs text-gray-600">
-      <WifiOff className="w-3 h-3" />App fermée
-    </span>
-  );
-}
-
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function CarteLivreursExterne() {
@@ -102,10 +58,10 @@ export default function CarteLivreursExterne() {
   const [heatmapMode, setHeatmapMode] = useState("off"); // "off" | "demande" | "couverture" | "opportunite"
   const [showHeatmapHint, setShowHeatmapHint] = useState(true);
   const [zonesChaudesData, setZonesChaudesData] = useState([]);
-  const [masquerInactifs, setMasquerInactifs] = useState(false);
-  const [showClients, setShowClients] = useState(true);
+  const [masquerInactifs, setMasquerInactifs] = useState(true);
+  const [showClients, setShowClients] = useState(false);
   const [showLivreurs, setShowLivreurs] = useState(true);
-  const [showPartenaires, setShowPartenaires] = useState(true);
+  const [showPartenaires, setShowPartenaires] = useState(false);
   const [correctionEnCours, setCorrectionEnCours] = useState(false);
   const [categoryDialog, setCategoryDialog] = useState(null); // { category, livreurs }
 
@@ -326,9 +282,6 @@ export default function CarteLivreursExterne() {
       verts: libres,
       oranges: cats.filter(c => c === "en_course").length,
       noirs: cats.filter(c => c === "gps_expire").length + cats.filter(c => c === "hors_ligne").length,
-      on: eligibles.filter(l => isON(l)).length,
-      off: eligibles.filter(l => !isON(l)).length,
-      appActive: eligibles.filter(l => isAppActive(l)).length,
       surCarte: eligibles.length,
       visibleCarte: libres + cats.filter(c => c === "en_course").length,
     };
@@ -414,16 +367,6 @@ export default function CarteLivreursExterne() {
     return { latitude: 12.3569, longitude: -1.5353, zoom: 12 };
   }, [paysData]);
 
-  const filtresBtns = [
-    { key: "tous", label: `Tous (${compteursLivreurs.total})` },
-    { key: "on", label: `ON (${compteursLivreurs.on})` },
-    { key: "off", label: `OFF (${compteursLivreurs.off})` },
-    { key: "libres", label: `Libres (${compteursLivreurs.libres})` },
-    { key: "en_course", label: `En course (${compteursLivreurs.enCourse})` },
-    { key: "app_active",label: `App active (${compteursLivreurs.appActive})` },
-    { key: "carte", label: `Sur carte (${compteursLivreurs.surCarte})` },
-  ];
-
   // ─── Filtres livreurs (pour la liste) ─────────────────────────────────────
   const FILTRES = [
     { key: "tous", label: "Tous", count: compteursLivreurs.total, dot: "bg-gray-400" },
@@ -478,44 +421,26 @@ export default function CarteLivreursExterne() {
             </div>
           </div>
 
-          {/* KPI tiles — 6 compteurs livreurs */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-5">
-            {[
-              { val: compteursLivreurs.verts, label: "Libres", sub: "livreurs", dot: "bg-green-400", glow: "shadow-green-500/20" },
-              { val: compteursLivreurs.oranges, label: "En mission", sub: "livreurs", dot: "bg-orange-400", glow: "shadow-orange-500/20" },
-              { val: compteursClients.bleus, label: "Clients GPS", sub: "< 30 min", dot: "bg-blue-400", glow: "shadow-blue-500/20" },
-              { val: coursesEnAttente.length, label: "En attente", sub: `${coursesEnAttenteAvecGPS.length} avec GPS`, dot: "bg-red-400", glow: "shadow-red-500/20" },
-            { val: coursesVraimentActives.length, label: "En cours", sub: `livreur assigné`, dot: "bg-orange-400", glow: "shadow-orange-500/20" },
-            ].map((item, i) => (
-              <button
-                key={i}
-                onClick={item.cat ? () => {
-                  const eligibles = livreurs.filter(l => l.validation === "valide" && l.actif !== false);
-                  setCategoryDialog({ category: item.cat, livreurs: eligibles.filter(l => getLivreurCategorie(l, livreurIdsEnCourseReelle) === item.cat) });
-                } : undefined}
-                className={`bg-white/8 backdrop-blur-sm border border-white/10 rounded-2xl p-3 text-center shadow-lg ${item.glow} ${item.cat ? "hover:bg-white/15 cursor-pointer transition-all" : "cursor-default"}`}
-              >
-                <div className={`w-2 h-2 rounded-full ${item.dot} mx-auto mb-2`} />
-                <p className="text-2xl font-black text-white leading-none">{item.val}</p>
-                <p className="text-[10px] font-bold text-white/80 mt-1 leading-tight">{item.label}</p>
-                <p className="text-[9px] text-white/60 mt-0.5">{item.sub}</p>
-              </button>
-            ))}
-          </div>
-          {/* Operational counters */}
-          <div className="grid grid-cols-3 gap-2 mt-2">
-            {[
-              { val: compteursClients.bleus,            label: "Clients GPS",  sub: "< 30 min",                    dot: "bg-blue-400" },
-              { val: coursesEnAttente.length,            label: "En attente",   sub: `${coursesEnAttenteAvecGPS.length} avec GPS`, dot: "bg-red-400" },
-              { val: coursesVraimentActives.length,      label: "En cours",     sub: "livreur assigné",             dot: "bg-orange-400" },
-            ].map((item, i) => (
-              <div key={i} className="bg-white/5 backdrop-blur-sm border border-white/5 rounded-xl p-2.5 text-center">
-                <div className={`w-1.5 h-1.5 rounded-full ${item.dot} mx-auto mb-1.5`} />
-                <p className="text-lg font-black text-white leading-none">{item.val}</p>
-                <p className="text-[9px] font-bold text-white/75 mt-1">{item.label}</p>
-                <p className="text-[8px] text-white/55">{item.sub}</p>
-              </div>
-            ))}
+          {/* Compteurs essentiels — 3 chiffres cliquables */}
+          <div className="flex items-center gap-2 mt-4">
+            <button
+              onClick={() => setCategoryDialog({ category: "libre", livreurs: livreurs.filter(l => l.validation === "valide" && l.actif !== false && getLivreurCategorie(l, livreurIdsEnCourseReelle) === "libre") })}
+              className="flex-1 bg-white/8 backdrop-blur-sm border border-white/10 rounded-xl p-2.5 text-center shadow-lg shadow-green-500/20 hover:bg-white/15 transition-all"
+            >
+              <p className="text-2xl font-black text-green-400 leading-none">{compteursLivreurs.verts}</p>
+              <p className="text-[10px] font-bold text-white/80 mt-1">Disponibles</p>
+            </button>
+            <button
+              onClick={() => setCategoryDialog({ category: "en_course", livreurs: livreurs.filter(l => l.validation === "valide" && l.actif !== false && getLivreurCategorie(l, livreurIdsEnCourseReelle) === "en_course") })}
+              className="flex-1 bg-white/8 backdrop-blur-sm border border-white/10 rounded-xl p-2.5 text-center shadow-lg shadow-orange-500/20 hover:bg-white/15 transition-all"
+            >
+              <p className="text-2xl font-black text-orange-400 leading-none">{compteursLivreurs.oranges}</p>
+              <p className="text-[10px] font-bold text-white/80 mt-1">En mission</p>
+            </button>
+            <div className="flex-1 bg-white/8 backdrop-blur-sm border border-white/10 rounded-xl p-2.5 text-center shadow-lg shadow-red-500/20">
+              <p className="text-2xl font-black text-red-400 leading-none">{coursesEnAttente.length}</p>
+              <p className="text-[10px] font-bold text-white/80 mt-1">À dispatcher</p>
+            </div>
           </div>
         </div>
       </div>
@@ -753,43 +678,26 @@ export default function CarteLivreursExterne() {
       {showMap && (
         <div className="fixed inset-0 z-50 bg-background flex flex-col">
           <div className="flex-shrink-0 border-b bg-slate-900">
-            <div className="flex items-center justify-between px-4 pt-3 pb-2">
-              <div className="flex items-center gap-3">
-                <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-                <h2 className="text-base font-black text-white">Carte Dispatch — Temps réel</h2>
-              </div>
-              <button
-                onClick={() => { setShowMap(false); setSelectedMarker(null); }}
-                className="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
-              >
-                <X className="w-4 h-4 text-white" />
-              </button>
-            </div>
-            <div className="px-4 pb-3 flex items-center gap-3">
-              <div className="flex-1">
-                <NetworkHealthBanner
-                  libres={compteursLivreurs.verts}
-                  enCourse={compteursLivreurs.oranges}
-                  clientsGPS={compteursClients.gpsRecents}
-                  clientsTotal={compteursClients.surCarte}
-                  enAttente={coursesEnAttente.length}
-                />
-              </div>
+            <div className="flex items-center justify-between px-3 py-2.5">
               <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                <h2 className="text-sm font-black text-white">Carte Dispatch</h2>
+              </div>
+              <div className="flex items-center gap-1.5">
                 <button
                   onClick={() => setMasquerInactifs(v => !v)}
-                  className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[11px] font-semibold border transition-all ${
                     masquerInactifs
                       ? "bg-white text-slate-900 border-white"
                       : "bg-white/10 text-white/70 border-white/20 hover:bg-white/20"
                   }`}
                 >
                   <span className="w-2 h-2 rounded-full bg-gray-400 flex-shrink-0" />
-                  {masquerInactifs ? " Masqués" : "Voir inactifs"}
+                  {masquerInactifs ? " Masqués" : "Inactifs"}
                 </button>
                 <button
                   onClick={() => setShowLivreurs(v => !v)}
-                  className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[11px] font-semibold border transition-all ${
                     showLivreurs
                       ? "bg-green-600 text-white border-green-600"
                       : "bg-white/10 text-white/70 border-white/20 hover:bg-white/20"
@@ -800,7 +708,7 @@ export default function CarteLivreursExterne() {
                 </button>
                 <button
                   onClick={() => setShowClients(v => !v)}
-                  className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[11px] font-semibold border transition-all ${
                     showClients
                       ? "bg-blue-600 text-white border-blue-600"
                       : "bg-white/10 text-white/70 border-white/20 hover:bg-white/20"
@@ -811,7 +719,7 @@ export default function CarteLivreursExterne() {
                 </button>
                 <button
                   onClick={() => setShowPartenaires(v => !v)}
-                  className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[11px] font-semibold border transition-all ${
                     showPartenaires
                       ? "bg-violet-600 text-white border-violet-600"
                       : "bg-white/10 text-white/70 border-white/20 hover:bg-white/20"
@@ -819,6 +727,12 @@ export default function CarteLivreursExterne() {
                 >
                   <span className="w-2 h-2 rounded-full bg-violet-500 flex-shrink-0" />
                   Partenaires
+                </button>
+                <button
+                  onClick={() => { setShowMap(false); setSelectedMarker(null); }}
+                  className="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors flex-shrink-0"
+                >
+                  <X className="w-4 h-4 text-white" />
                 </button>
               </div>
             </div>

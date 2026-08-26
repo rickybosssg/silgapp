@@ -7,6 +7,7 @@ import "leaflet/dist/leaflet.css";
 import CourseTimeline from "./CourseTimeline";
 import LivreurCardModerne from "./LivreurCardModerne";
 import { useETACourse } from "@/hooks/useETACourse";
+import { CARTO_TILE_URL, CARTO_TILE_CONFIG } from "@/lib/cartTiles";
 
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -211,8 +212,10 @@ export default function SuiviCourseFullscreen({ course, position, onClose, onCal
           zoomControl={false}
         >
           <TileLayer
-            url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-            attribution='&copy; OpenStreetMap'
+            url={CARTO_TILE_URL}
+            attribution={CARTO_TILE_CONFIG.attribution}
+            maxZoom={CARTO_TILE_CONFIG.maxZoom}
+            subdomains={CARTO_TILE_CONFIG.subdomains}
           />
           <FitBounds positions={fitPositions} phase={isLivraison ? "livraison" : "approche"} />
 

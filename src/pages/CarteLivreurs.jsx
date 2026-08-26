@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
 import { getDialCodeSync } from "@/lib/countryService";
+import { CARTO_TILE_LIGHT_URL, CARTO_TILE_CONFIG } from "@/lib/cartTiles";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -95,11 +96,7 @@ function MapView({ livreurs, livreursInactifs = [], showInactifs = false, course
       const map = L.map(mapRef.current, { zoomControl: false }).setView([12.3714, -1.5197], 13);
       mapInstanceRef.current = map;
 
-      L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
-        subdomains: "abcd",
-        maxZoom: 20,
-      }).addTo(map);
+      L.tileLayer(CARTO_TILE_LIGHT_URL, CARTO_TILE_CONFIG).addTo(map);
 
       L.control.zoom({ position: "bottomright" }).addTo(map);
       renderMarkers(L, map, livreurs, livreursInactifs, showInactifs, coursesActives, onSelectLivreur);

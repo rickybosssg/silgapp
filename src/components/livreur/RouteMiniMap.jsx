@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Marker, Polyline, useMap } from "react-leaflet
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useRouteORS } from "@/hooks/useRouteORS";
+import { CARTO_TILE_URL } from "@/lib/cartTiles";
 
 // ── Icônes ──
 delete L.Icon.Default.prototype._getIconUrl;
@@ -77,7 +78,7 @@ function LeafletRouteMiniMap({ livreurLat, livreurLng, destLat, destLng, courseI
         attributionControl={false}
         scrollWheelZoom={false}
       >
-        <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
+        <TileLayer url={CARTO_TILE_URL} />
         <FitBounds positions={allPositions} />
 
         {/* Itinéraire road-based (ou fallback ligne droite) */}
