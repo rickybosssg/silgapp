@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
-import { MapPin, Truck, Wifi, WifiOff, X, Clock, Users, Wrench } from "lucide-react";
+import { MapPin, Truck, X, Clock, Users, Wrench } from "lucide-react";
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import DispatchMap from "@/components/carte/DispatchMap";
@@ -18,9 +18,6 @@ import ZonesChaudesWidget from "@/components/carte/ZonesChaudes";
 
 import {
   isLibre,
-  isEnCourse,
-  isON,
-  isAppActive,
   hasValidGPS,
   isClientGPSRecent,
 } from "@/lib/dispatchRules.js";
@@ -50,46 +47,6 @@ function getLastGPS(entity) {
   try {
     return formatDistanceToNow(new Date(dt), { addSuffix: true, locale: fr });
   } catch { return null; }
-}
-
-// ─── Badges ─────────────────────────────────────────────────────────────────
-
-function ONBadge({ livreur }) {
-  return isON(livreur) ? (
-    <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-700">
-      <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />ON
-    </span>
-  ) : (
-    <span className="inline-flex items-center gap-1 text-xs font-semibold text-gray-600">
-      <span className="w-2 h-2 rounded-full bg-gray-300 inline-block" />OFF
-    </span>
-  );
-}
-
-function StatutBadge({ livreur }) {
-  if (isLibre(livreur)) return (
-    <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700">
-      <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />Libre
-    </span>
-  );
-  if (isEnCourse(livreur)) return (
-    <span className="inline-flex items-center gap-1 text-xs font-semibold text-orange-700">
-      <span className="w-2 h-2 rounded-full bg-orange-500 inline-block" />En course
-    </span>
-  );
-  return null;
-}
-
-function AppBadge({ entity }) {
-  return isAppActive(entity) ? (
-    <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-700">
-      <Wifi className="w-3 h-3" />App ouverte
-    </span>
-  ) : (
-    <span className="inline-flex items-center gap-1 text-xs text-gray-600">
-      <WifiOff className="w-3 h-3" />App fermée
-    </span>
-  );
 }
 
 // ─── Page ────────────────────────────────────────────────────────────────────
@@ -325,9 +282,6 @@ export default function CarteLivreursExterne() {
       verts: libres,
       oranges: cats.filter(c => c === "en_course").length,
       noirs: cats.filter(c => c === "gps_expire").length + cats.filter(c => c === "hors_ligne").length,
-      on: eligibles.filter(l => isON(l)).length,
-      off: eligibles.filter(l => !isON(l)).length,
-      appActive: eligibles.filter(l => isAppActive(l)).length,
       surCarte: eligibles.length,
       visibleCarte: libres + cats.filter(c => c === "en_course").length,
     };
@@ -412,16 +366,6 @@ export default function CarteLivreursExterne() {
     }
     return { latitude: 12.3569, longitude: -1.5353, zoom: 12 };
   }, [paysData]);
-
-  const filtresBtns = [
-    { key: "tous", label: `Tous (${compteursLivreurs.total})` },
-    { key: "on", label: `ON (${compteursLivreurs.on})` },
-    { key: "off", label: `OFF (${compteursLivreurs.off})` },
-    { key: "libres", label: `Libres (${compteursLivreurs.libres})` },
-    { key: "en_course", label: `En course (${compteursLivreurs.enCourse})` },
-    { key: "app_active",label: `App active (${compteursLivreurs.appActive})` },
-    { key: "carte", label: `Sur carte (${compteursLivreurs.surCarte})` },
-  ];
 
   // ─── Filtres livreurs (pour la liste) ─────────────────────────────────────
   const FILTRES = [
