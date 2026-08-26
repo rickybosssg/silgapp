@@ -95,17 +95,18 @@ Deno.serve(async (req) => {
 
     const now = new Date().toISOString();
 
+    // ── Recalculer le solde AVANT de marquer la course ──
+    // Le recalcul doit voir cette commission comme "nouvelle" (encours_comptabilise_at = null)
+    // pour consommer le credit_surplus. Le marquage se fait APRÈS pour garantir l'idempotence.
+    const resultat = await recalculerSoldeLivreur(base44, livreurId);
+    const { solde, seuil, bloque, statut_paiement, devise } = resultat;
+
     // ── Marquer la course comme comptabilisée (garde d'idempotence) ──
+    // À faire APRÈS le recalcul pour que calculerSoldeLivreur voie la commission comme nouvelle.
     await base44.asServiceRole.entities.CourseExterne.update(courseId, {
       encours_comptabilise_at: now,
       encours_comptabilise_montant: commission,
     });
-
-    // ── Recalculer le solde depuis les sources financières ──
-    // montant_du_silga = projection = somme des commissions non payées
-    // encours = alias legacy synchronisé (conservé pour anciens APK)
-    const resultat = await recalculerSoldeLivreur(base44, livreurId);
-    const { solde, seuil, bloque, statut_paiement, devise } = resultat;
 
     if (seuil === null || seuil <= 0) {
       return Response.json({

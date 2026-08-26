@@ -50,8 +50,8 @@ function getLivreurFinancierId(course: any): string {
 function processTimeline(
   baseSoldeInitial: number,
   rawCreditSurplus: number,
-  events: { type: 'commission' | 'payment'; date: string; amount: number }[]
-): { solde: number; creditSurplus: number; totalCommissions: number; totalPaye: number } {
+  events: { type: 'commission' | 'payment'; date: string; amount: number; encours_comptabilise_at?: string | null }[]
+): { solde: number; creditSurplus: number; consumedCredit: number; totalCommissions: number; totalPaye: number } {
   let balance = baseSoldeInitial;
   let totalCommissions = 0;
   let totalPaye = 0;
@@ -75,14 +75,24 @@ function processTimeline(
     }
   }
 
-  // Le credit_surplus est un CAP appliqué à la fin — il n'est JAMAIS consommé
-  // ni réécrit. Cela garantit l'idempotence : 2 recalculs successifs = 0 modification.
+  // Le credit_surplus est un CAP appliqué à la fin pour le calcul du solde.
   const rawSolde = Math.max(0, balance);
   const solde = rawCreditSurplus > 0 ? Math.max(0, rawSolde - rawCreditSurplus) : rawSolde;
 
+  // ── Consommation réelle de credit_surplus ──
+  // Seules les commissions NON encore comptabilisées (encours_comptabilise_at = null)
+  // consomment le crédit. Les commissions déjà comptabilisées l'ont été lors d'un
+  // précédent passage — elles ne doivent pas le consommer une deuxième fois.
+  // Le batch read-only (sans encours_comptabilise_at dans les events) ne consomme rien.
+  const newCommissionsTotal = sorted
+    .filter((e: any) => e.type === 'commission' && !e.encours_comptabilise_at)
+    .reduce((s, e: any) => s + e.amount, 0);
+  const consumedCredit = Math.min(rawCreditSurplus, newCommissionsTotal);
+
   return {
     solde,
-    creditSurplus: rawCreditSurplus, // Inchangé — jamais modifié par le calcul
+    creditSurplus: rawCreditSurplus, // Valeur DB inchangée — la consommation est retournée séparément
+    consumedCredit,
     totalCommissions,
     totalPaye,
   };
@@ -95,11 +105,12 @@ export async function calculerSoldeLivreur(base44: any, livreurId: string): Prom
   solde: number;
   creditDisponible: number;
   creditSurplus: number;
+  consumedCredit: number;
   totalCommissions: number;
   totalPaye: number;
 }> {
   if (!livreurId) {
-    return { solde: 0, creditDisponible: 0, creditSurplus: 0, totalCommissions: 0, totalPaye: 0 };
+    return { solde: 0, creditDisponible: 0, creditSurplus: 0, consumedCredit: 0, totalCommissions: 0, totalPaye: 0 };
   }
 
   // 0. Récupérer le livreur
@@ -151,11 +162,12 @@ export async function calculerSoldeLivreur(base44: any, livreurId: string): Prom
   });
 
   // 3. Construire la timeline chronologique
-  const events: { type: 'commission' | 'payment'; date: string; amount: number }[] = [
+  const events: { type: 'commission' | 'payment'; date: string; amount: number; encours_comptabilise_at?: string | null }[] = [
     ...coursesForCalc.map((c: any) => ({
       type: 'commission' as const,
       date: c.heure_livraison || c.colis_livre_at || c.created_date,
       amount: Number(c.commission_silga) || 0,
+      encours_comptabilise_at: c.encours_comptabilise_at || null,
     })),
     ...paiementsForCalc.map((p: any) => ({
       type: 'payment' as const,
@@ -165,13 +177,13 @@ export async function calculerSoldeLivreur(base44: any, livreurId: string): Prom
   ];
 
   // 4. Traiter chronologiquement
-  const { solde, creditSurplus, totalCommissions, totalPaye } = processTimeline(
+  const { solde, creditSurplus, consumedCredit, totalCommissions, totalPaye } = processTimeline(
     baseSoldeInitial,
     rawCreditSurplus,
     events
   );
 
-  return { solde, creditDisponible: 0, creditSurplus, totalCommissions, totalPaye };
+  return { solde, creditDisponible: 0, creditSurplus, consumedCredit, totalCommissions, totalPaye };
 }
 
 /**
@@ -180,7 +192,7 @@ export async function calculerSoldeLivreur(base44: any, livreurId: string): Prom
 export async function calculerSoldesLivreursBatch(
   base44: any,
   countryCode: string | null
-): Promise<Record<string, { solde: number; creditDisponible: number; creditSurplus: number; totalCommissions: number; totalPaye: number }>> {
+): Promise<Record<string, { solde: number; creditDisponible: number; creditSurplus: number; consumedCredit: number; totalCommissions: number; totalPaye: number }>> {
   // 1. Toutes les courses livrées du pays
   const coursesFilter = countryCode
     ? { statut: 'livree', country_code: countryCode }
@@ -222,7 +234,7 @@ export async function calculerSoldesLivreursBatch(
   }
 
   // 4. Grouper les événements par livreur (filtrés par base comptable)
-  const eventsByDriver: Record<string, { type: 'commission' | 'payment'; date: string; amount: number }[]> = {};
+  const eventsByDriver: Record<string, { type: 'commission' | 'payment'; date: string; amount: number; encours_comptabilise_at?: string | null }[]> = {};
 
   (allCourses || []).forEach((c: any) => {
     const fid = getLivreurFinancierId(c);
@@ -237,6 +249,7 @@ export async function calculerSoldesLivreursBatch(
       type: 'commission',
       date: d,
       amount: Number(c.commission_silga) || 0,
+      encours_comptabilise_at: c.encours_comptabilise_at || null,
     });
   });
 
@@ -269,7 +282,7 @@ export async function calculerSoldesLivreursBatch(
       return;
     }
 
-    const { solde, creditSurplus, totalCommissions, totalPaye } = processTimeline(
+    const { solde, creditSurplus, consumedCredit, totalCommissions, totalPaye } = processTimeline(
       base.soldeInitial,
       creditSurplusMap[id] || 0,
       eventsByDriver[id] || []
@@ -279,6 +292,7 @@ export async function calculerSoldesLivreursBatch(
       solde,
       creditDisponible: 0,
       creditSurplus: creditSurplus,
+      consumedCredit,
       totalCommissions,
       totalPaye,
     };
