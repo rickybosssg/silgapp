@@ -359,11 +359,17 @@ export default function DusLivreursExternes() {
       const soldeBackend = soldesLivreurs[entry.id];
       entry.creditSurplus = soldeBackend?.creditSurplus ?? 0;
       entry.creditDisponible = soldeBackend?.creditDisponible ?? 0; // audit uniquement, non affiché
-      // Synchroniser montantDu avec le backend si disponible (plus précis que le champ stocké)
-      if (soldeBackend && soldeBackend.montantDu !== undefined) {
+      // Synchroniser montantDu avec le backend UNIQUEMENT si la valeur est fiable.
+      // Si montant_du_silga stocké > 0 et que le backend retourne 0, on garde la
+      // valeur stockée pour éviter que la liste "À recouvrer" disparaisse pendant
+      // un refetch (le backend peut retourner 0 si base_comptable_solde_initial = 0).
+      if (soldeBackend && soldeBackend.montantDu !== undefined && soldeBackend.montantDu > 0) {
         entry.montantDu = soldeBackend.montantDu;
         entry.soldeTheorique = soldeBackend.totalCommissions - soldeBackend.totalPaye;
-        entry.divergence = 0; // backend = source de vérité, pas de divergence
+        entry.divergence = 0;
+      } else if (soldeBackend && soldeBackend.montantDu === 0 && entry.montantDu > 0) {
+        // Backend retourne 0 mais BDD a un dû positif → garder la valeur BDD
+        entry.divergence = 0;
       }
     });
     let result = Object.values(map);
