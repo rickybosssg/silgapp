@@ -86,13 +86,17 @@ export async function calculerSoldeLivreur(base44: any, livreurId: string): Prom
     if (!seenIds.has(c.id)) { seenIds.add(c.id); allCourses.push(c); }
   }
 
-  // Filtrer par base comptable si définie
+  // ══ CUT-OFF COMPTABLE 25/08/2026 ══
+  // Base comptable obligatoire. Si non définie, aucun dû reconnu
+  // (anti-reconstruction de l'historique pré-cut-off).
+  // Le solde d'ouverture reconnu = base_comptable_solde_initial.
+  // Les commissions/paiements postérieurs au cut-off s'ajoutent/soustraient.
   const coursesForCalc = baseDate
     ? allCourses.filter((c: any) => {
         const d = c.heure_livraison || c.colis_livre_at || c.created_date;
         return d && new Date(d) >= new Date(baseDate);
       })
-    : allCourses;
+    : [];
 
   const totalCommissions = coursesForCalc.reduce(
     (sum: number, c: any) => sum + (Number(c.commission_silga) || 0), 0
@@ -104,13 +108,13 @@ export async function calculerSoldeLivreur(base44: any, livreurId: string): Prom
     '-date_envoi', 500
   ).catch(() => []);
 
-  // Filtrer par base comptable si définie (paiements traités après la base)
+  // Base comptable obligatoire — si non définie, aucun paiement reconnu
   const paiementsForCalc = baseDate
     ? (paiements || []).filter((p: any) => {
         const d = p.traite_at || p.date_envoi;
         return d && new Date(d) >= new Date(baseDate);
       })
-    : (paiements || []);
+    : [];
 
   const totalPaye = paiementsForCalc.reduce(
     (sum: number, p: any) => sum + (Number(p.montant_paye) || 0), 0
@@ -120,9 +124,10 @@ export async function calculerSoldeLivreur(base44: any, livreurId: string): Prom
   //    solde = base_solde_initial + commissions(après base) - paiements(après base)
   //    du = max(0, solde)
   //    credit = max(0, -solde)
+  // Cut-off comptable : si pas de base définie, aucun dû reconnu (anti-reconstruction historique)
   const soldeBrut = baseDate
     ? baseSoldeInitial + totalCommissions - totalPaye
-    : totalCommissions - totalPaye;
+    : 0;
 
   const solde = Math.max(0, soldeBrut);
   const creditDisponible = Math.max(0, -soldeBrut);
@@ -219,9 +224,10 @@ export async function calculerSoldesLivreursBatch(
     const totalCommissions = commissionsByLivreur[id] || 0;
     const totalPaye = payeByLivreur[id] || 0;
     const base = livreursAvecBase[id];
+    // Cut-off comptable : si pas de base définie, aucun dû reconnu
     const soldeBrut = base
       ? base.soldeInitial + totalCommissions - totalPaye
-      : totalCommissions - totalPaye;
+      : 0;
     const creditDisp = Math.max(0, -soldeBrut);
     result[id] = {
       solde: Math.max(0, soldeBrut),
