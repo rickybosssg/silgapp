@@ -128,26 +128,61 @@ function buildStyles() {
 
     /* ─── Cluster de marqueurs ─── */
     .dmap-cluster-container {
-      transition: filter 0.2s ease;
+      transition: filter 0.2s ease, opacity 0.2s ease;
       cursor: pointer;
     }
     .dmap-cluster-container:hover {
       filter: brightness(1.15);
       z-index: 9999 !important;
     }
-    .dmap-cluster-wrapper {
-      width: 44px;
-      height: 44px;
+    /* Opacité réduite à faible zoom — laisse respirer les noms de quartiers */
+    .dmap-cluster-low-zoom {
+      opacity: 0.65;
+    }
+    /* Petit cluster (2–5) — compact */
+    .dmap-cluster-small {
+      width: 28px;
+      height: 28px;
       border-radius: 50%;
       background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
-      border: 3px solid white;
-      box-shadow: 0 2px 12px rgba(99, 102, 241, 0.5);
+      border: 2px solid white;
+      box-shadow: 0 1px 6px rgba(99, 102, 241, 0.4);
       display: flex;
       align-items: center;
       justify-content: center;
       color: white;
       font-weight: 800;
-      font-size: 15px;
+      font-size: 11px;
+    }
+    /* Cluster moyen (6–20) — taille intermédiaire */
+    .dmap-cluster-medium {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+      border: 2.5px solid white;
+      box-shadow: 0 1px 8px rgba(99, 102, 241, 0.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 800;
+      font-size: 13px;
+    }
+    /* Gros cluster (20+) — légèrement plus grand mais sans masquer la carte */
+    .dmap-cluster-large {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+      border: 3px solid white;
+      box-shadow: 0 2px 10px rgba(99, 102, 241, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 800;
+      font-size: 14px;
     }
 
     /* ─── Livreur NOIR (⚫ hors ligne) ─── */
@@ -581,12 +616,21 @@ function buildLivreurIcon(livreur, livreurIdsEnCourseReelle, zoom = 15) {
   });
 }
 
-function buildClusterIcon(count) {
+function buildClusterIcon(count, zoom = 15) {
+  // Taille variable selon le nombre de marqueurs
+  const sizeClass = count <= 5 ? "dmap-cluster-small"
+    : count <= 20 ? "dmap-cluster-medium"
+    : "dmap-cluster-large";
+  // Opacité réduite à faible zoom pour laisser respirer les noms de quartiers
+  const lowZoomClass = zoom <= 12 ? " dmap-cluster-low-zoom" : "";
+  const size = count <= 5 ? 28 : count <= 20 ? 36 : 42;
+  const anchor = size / 2;
+
   return window.L.divIcon({
-    html: `<div class="dmap-cluster-wrapper">${count}</div>`,
+    html: `<div class="${sizeClass}${lowZoomClass}">${count}</div>`,
     className: "dmap-cluster-container",
-    iconSize: [44, 44],
-    iconAnchor: [22, 22],
+    iconSize: [size, size],
+    iconAnchor: [anchor, anchor],
   });
 }
 
@@ -996,7 +1040,7 @@ export default function DispatchMap({
 
       clusters.forEach(cluster => {
         if (cluster.type === "cluster" && cluster.count > 1) {
-          const icon = buildClusterIcon(cluster.count);
+          const icon = buildClusterIcon(cluster.count, currentZoom);
           const marker = window.L.marker([cluster.latitude, cluster.longitude], { icon, zIndexOffset: 1300 }).addTo(map);
           marker.bindPopup(`<div style="min-width:120px;font-family:sans-serif"><p style="font-weight:700;font-size:13px">${cluster.count} livreurs à cet endroit</p><p style="font-size:11px;color:#666">Zoomez pour voir les détails</p></div>`, { maxWidth: 200 });
           markersRef.current.push(marker);
