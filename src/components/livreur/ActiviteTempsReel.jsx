@@ -2,7 +2,7 @@ import React, { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { useCoursesDisponibles } from "@/hooks/useCoursesDisponibles";
-import { MapPin, Package, Sparkles, Loader2, Flame } from "lucide-react";
+import { MapPin, Sparkles, Loader2, Flame } from "lucide-react";
 import { haversineKm } from "@/lib/priceEstimate";
 
 /**
@@ -28,22 +28,6 @@ export default function ActiviteTempsReel({ livreurProfil, mesCourses = [], isEx
   const isDisponible = statut === "disponible";
   const livreurId = livreurProfil?.id;
   const hasGPS = typeof latitude === "number" && typeof longitude === "number";
-
-  // ── AUJOURD'HUI: courses terminées et montant total ──
-  const todayStr = new Date().toDateString();
-  const livreesToday = useMemo(
-    () =>
-      (mesCourses || []).filter(
-        (c) =>
-          c.statut === "livree" &&
-          new Date(c.heure_livraison || c.colis_livre_at || c.updated_date || c.created_date).toDateString() === todayStr
-      ),
-    [mesCourses, todayStr]
-  );
-  const montantToday = useMemo(
-    () => livreesToday.reduce((s, c) => s + (c.prix_final || c.prix_reel || 0), 0),
-    [livreesToday]
-  );
 
   // ── Courses disponibles (SOURCE UNIQUE — hook partagé avec CoursesDisponibles) ──
   const { eligibleCourses, isLoading: loadingCourses } = useCoursesDisponibles(livreurProfil);
@@ -117,59 +101,58 @@ export default function ActiviteTempsReel({ livreurProfil, mesCourses = [], isEx
     if (!isExterne) {
       return "Recherche en cours — nous te préviendrons dès qu'une mission sera disponible.";
     }
-    if (loadingCourses) return "Analyse des courses disponibles autour de toi…";
+    if (loadingCourses) return "Analyse des courses disponibles…";
     if (coursesWithDistance.length === 0) {
-      return "Aucune course disponible autour de toi pour le moment. Je continue la recherche.";
+      return "Aucune course pour le moment. Je continue la recherche.";
     }
     if (coursesWithDistance.length === 1) {
-      return "1 course est actuellement disponible dans ton rayon.";
+      return "1 course disponible dans ton rayon.";
     }
-    return `${coursesWithDistance.length} courses sont actuellement disponibles dans ton rayon.`;
+    return `${coursesWithDistance.length} courses disponibles dans ton rayon.`;
   }, [isExterne, loadingCourses, coursesWithDistance.length]);
 
   // ── Rendu ──
   return (
     <div className="bg-white rounded-2xl border border-black/5 shadow-[0_8px_24px_rgba(15,23,42,0.06)] overflow-hidden">
-      {/* En-tête: statut */}
-      <div className="flex items-center gap-2 px-4 py-2.5 bg-green-50 border-b border-green-100">
-        <span className="w-2 h-2 rounded-full bg-success animate-pulse flex-shrink-0" />
-        <p className="text-[11px] font-black text-success uppercase tracking-wider leading-none">
-          Disponible — Recherche en cours
-        </p>
+      {/* En-tête: statut principal */}
+      <div className="flex items-center gap-2.5 px-4 py-3 bg-green-50 border-b border-green-100">
+        <span className="w-2.5 h-2.5 rounded-full bg-success animate-pulse flex-shrink-0" />
+        <div className="min-w-0">
+          <p className="text-sm font-black text-success leading-none">🟢 Disponible</p>
+          <p className="text-[11px] text-slate-500 mt-0.5">Recherche d'une course en cours…</p>
+        </div>
       </div>
 
       {/* Section: AUTOUR DE MOI */}
       <div className="px-4 py-3 border-b border-slate-100">
         <div className="flex items-center gap-1.5 mb-2">
           <MapPin className="w-3 h-3 text-slate-400 flex-shrink-0" />
-          <p className="text-[9px] font-black text-slate-500 uppercase tracking-wider">Autour de moi</p>
+          <p className="text-[10px] font-black text-slate-600 uppercase tracking-wider">Autour de moi</p>
         </div>
-        <div className="grid grid-cols-2 gap-1.5">
+        <div className="grid grid-cols-2 gap-3">
           <div className="min-w-0">
-            <p className="text-[9px] text-slate-400 leading-tight">Courses dispo</p>
             {loadingCourses && isExterne ? (
-              <Loader2 className="w-3.5 h-3.5 text-slate-300 animate-spin mt-0.5" />
+              <Loader2 className="w-4 h-4 text-slate-300 animate-spin" />
             ) : (
-              <p
-                className={`text-sm font-black leading-tight ${
-                  coursesWithDistance.length > 0 ? "text-orange-500" : "text-slate-300"
-                }`}
-              >
+              <p className={`text-xl font-black leading-none ${
+                coursesWithDistance.length > 0 ? "text-orange-500" : "text-slate-400"
+              }`}>
                 {isExterne ? coursesWithDistance.length : "—"}
               </p>
             )}
+            <p className="text-[10px] text-slate-500 mt-1">Courses dispo</p>
           </div>
           <div className="min-w-0">
-            <p className="text-[9px] text-slate-400 leading-tight">Livreurs</p>
-            <p className="text-sm font-black text-slate-700 leading-tight">
+            <p className="text-xl font-black text-slate-700 leading-none">
               {hasGPS ? nearbyDriversCount : "—"}
             </p>
+            <p className="text-[10px] text-slate-500 mt-1">Livreurs dispo</p>
           </div>
         </div>
 
         {/* Course la plus proche */}
         {closestCourse && closestCourse.__distance !== null && (
-          <div className="mt-2 flex items-center gap-1.5 text-[11px] text-slate-500 min-w-0">
+          <div className="mt-2.5 flex items-center gap-1.5 text-[11px] text-slate-500 min-w-0">
             <Flame className="w-3 h-3 text-orange-400 flex-shrink-0" />
             <span className="whitespace-nowrap">
               Plus proche: <strong className="text-slate-700">{closestCourse.__distance.toFixed(1)} km</strong>
@@ -179,45 +162,6 @@ export default function ActiviteTempsReel({ livreurProfil, mesCourses = [], isEx
             )}
           </div>
         )}
-
-        {/* Aucune course */}
-        {isExterne && !loadingCourses && coursesWithDistance.length === 0 && (
-          <p className="mt-2 text-[11px] text-slate-400 italic leading-tight">
-            Recherche automatique en cours…
-          </p>
-        )}
-      </div>
-
-      {/* Section: AUJOURD'HUI */}
-      <div className="px-4 py-3 border-b border-slate-100">
-        <div className="flex items-center gap-1.5 mb-2">
-          <Package className="w-3 h-3 text-slate-400 flex-shrink-0" />
-          <p className="text-[9px] font-black text-slate-500 uppercase tracking-wider">Aujourd'hui</p>
-        </div>
-        <div className="grid grid-cols-3 gap-1.5">
-          <div className="min-w-0">
-            <p className="text-[9px] text-slate-400 leading-tight">Terminées</p>
-            <p className="text-sm font-black text-slate-900 leading-tight">{livreesToday.length}</p>
-          </div>
-          <div className="min-w-0">
-            <p className="text-[9px] text-slate-400 leading-tight">Total</p>
-            <p className="text-sm font-black text-slate-900 leading-tight">
-              {montantToday.toLocaleString()}
-              <span className="text-[9px] font-normal ml-0.5">F</span>
-            </p>
-          </div>
-          <div className="min-w-0">
-            <p className="text-[9px] text-slate-400 leading-tight">Dû SILGAPP</p>
-            <p
-              className={`text-sm font-black leading-tight ${
-                montant_du_silga > 0 ? "text-orange-500" : "text-slate-300"
-              }`}
-            >
-              {montant_du_silga.toLocaleString()}
-              <span className="text-[9px] font-normal ml-0.5">F</span>
-            </p>
-          </div>
-        </div>
       </div>
 
       {/* Section: VENUS (discrète) */}
@@ -232,7 +176,7 @@ export default function ActiviteTempsReel({ livreurProfil, mesCourses = [], isEx
           <p className="text-[11px] text-slate-600 leading-snug mt-0.5">{venusMessage}</p>
           {hotZone && (
             <p className="text-[11px] text-slate-600 leading-snug mt-0.5">
-              L'activité est actuellement plus forte vers{" "}
+              L'activité est plus forte vers{" "}
               <strong className="text-slate-800">{hotZone.quartier}</strong>.
             </p>
           )}

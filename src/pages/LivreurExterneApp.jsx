@@ -23,7 +23,7 @@ import {
 } from "@/lib/livreurUrgentAlert";
 import LivreurHeader from "@/components/livreur/LivreurHeader";
 import LivreurStatsBanner from "@/components/livreur/LivreurStatsBanner";
-import LivreurStatutCard from "@/components/livreur/LivreurStatutCard";
+
 import ActiviteTempsReel from "@/components/livreur/ActiviteTempsReel";
 import CourseEnAttenteModalExterne from "@/components/livreur/CourseEnAttenteModalExterne";
 import CourseActiveCard from "@/components/livreur/CourseActiveCard";
@@ -1587,31 +1587,37 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
             />
 
             <Link to="/payer-silgapp">
-              <div className={`rounded-2xl border p-3.5 flex items-center justify-between shadow-sm active:scale-[0.98] transition ${
-                montantDuSilga > 0 ? "bg-orange-50 border-orange-200" : montantDuSilga < 0 ? "bg-green-50 border-green-200" : "bg-white border-black/5"
+              <div className={`rounded-2xl border flex items-center justify-between transition active:scale-[0.98] ${
+                montantDuSilga > 0
+                  ? "bg-orange-50 border-orange-200 p-3.5 shadow-sm"
+                  : montantDuSilga < 0
+                  ? "bg-green-50 border-green-200 p-3.5 shadow-sm"
+                  : "bg-white border-black/5 p-2.5"
               }`}>
-                <div className="flex items-center gap-3">
-                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
-                    montantDuSilga > 0 ? "bg-orange-500/15" : montantDuSilga < 0 ? "bg-green-500/15" : "bg-white/5"
+                <div className="flex items-center gap-2.5">
+                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${
+                    montantDuSilga > 0 ? "bg-orange-500/15" : montantDuSilga < 0 ? "bg-green-500/15" : "bg-slate-100"
                   }`}>
-                    <Wallet className={`w-5 h-5 ${montantDuSilga > 0 ? "text-orange-400" : montantDuSilga < 0 ? "text-green-500" : "text-primary"}`} />
+                    <Wallet className={`w-4 h-4 ${montantDuSilga > 0 ? "text-orange-500" : montantDuSilga < 0 ? "text-green-500" : "text-slate-400"}`} />
                   </div>
                   <div>
-                    <p className="text-sm font-bold text-slate-900">Payer SILGAPP</p>
-                    <p className="text-xs text-slate-500">
-                      {montantDuSilga > 0
-                        ? `Total dû : ${montantDuSilga.toLocaleString()} FCFA`
-                        : montantDuSilga < 0
-                        ? `Surplus à rembourser : ${Math.abs(montantDuSilga).toLocaleString()} FCFA`
-                        : "Aucun dû pour le moment"}
-                    </p>
+                    <p className={`font-bold ${montantDuSilga !== 0 ? "text-sm" : "text-xs text-slate-500"}`}>Payer SILGAPP</p>
+                    {montantDuSilga > 0 ? (
+                      <p className="text-xs text-orange-600 font-semibold">
+                        Dû : {montantDuSilga.toLocaleString()} FCFA
+                      </p>
+                    ) : montantDuSilga < 0 ? (
+                      <p className="text-xs text-green-600">
+                        Surplus : {Math.abs(montantDuSilga).toLocaleString()} FCFA
+                      </p>
+                    ) : (
+                      <p className="text-[11px] text-slate-400">Aucun dû</p>
+                    )}
                   </div>
                 </div>
-                <ChevronRight className="w-4 h-4 text-slate-400" />
+                <ChevronRight className={`w-4 h-4 ${montantDuSilga !== 0 ? "text-slate-400" : "text-slate-300"}`} />
               </div>
             </Link>
-
-            <LivreurStatutCard statut={livreurProfil.statut} livreur={livreurProfil} isExterne={true} />
 
             {coursesActives.length > 0 && (
               <div className="space-y-3">

@@ -9,14 +9,15 @@
 
 /**
  * Retourne le seuil de regroupement (en pixels) adapté au niveau de zoom.
- * - Zoom élevé (≥15) : seuil faible (45px) — marqueurs individuels
- * - Zoom moyen (13-14) : seuil intermédiaire (80px)
- * - Zoom faible (≤12) : seuil important (120px) — regroupement agressif
+ * Réglage moins agressif — les clusters se séparent rapidement au zoom.
+ * - Zoom ≥ 14   : 40px  — livreurs individuels + photos
+ * - Zoom 12-13  : 55px  — transition progressive
+ * - Zoom ≤ 11   : 75px  — clusters autorisés mais géographiquement limités
  */
 export function getClusterThreshold(zoom) {
-  if (!zoom || zoom >= 15) return 45;
-  if (zoom >= 13) return 80;
-  return 120;
+  if (!zoom || zoom >= 14) return 40;
+  if (zoom >= 12) return 55;
+  return 75;
 }
 
 /**

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { TrendingUp, Package, CheckCircle, AlertCircle, Banknote } from "lucide-react";
+import { TrendingUp, Package, CheckCircle, AlertCircle } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 
 export default function LivreurStatsBanner({ mesCourses, totalEncaisse, montantDuSilga, isExterne = false }) {
@@ -43,51 +43,30 @@ export default function LivreurStatsBanner({ mesCourses, totalEncaisse, montantD
 
   if (isExterne) {
     return (
-      <div className="space-y-2">
-        {/* KPI row */}
-        <div className="grid grid-cols-3 gap-2.5">
-          {[
-            { icon: <Package className="w-4 h-4 text-primary" />, bg: "bg-blue-50", val: coursesAujourdHui, label: "Courses", valClass: "text-primary" },
-            { icon: <CheckCircle className="w-4 h-4 text-success" />, bg: "bg-green-500/10", val: livreesToday.length,    label: "Livrées",   valClass: "text-success" },
-            { icon: montantDuSilga < 0 ? <CheckCircle className="w-4 h-4 text-green-500" /> : <AlertCircle className="w-4 h-4 text-orange-400" />, bg: montantDuSilga < 0 ? "bg-green-500/10" : "bg-orange-500/10", val: null, label: montantDuSilga < 0 ? "Surplus" : "Dû SILGAPP", valClass: montantDuSilga < 0 ? "text-green-500" : "text-orange-400" },
-          ].map((item, i) => (
-            <div key={i} className="bg-white rounded-3xl p-3.5 shadow-[0_8px_24px_rgba(15,23,42,0.06)] border border-black/5 text-center">
-              <div className={`w-9 h-9 rounded-2xl ${item.bg} flex items-center justify-center mx-auto mb-1.5`}>
-                {item.icon}
-              </div>
-              {item.val !== null ? (
-                <p className={`text-2xl font-black ${item.valClass}`}>{item.val}</p>
-              ) : (
-                <p className={`text-xs font-black ${item.valClass} leading-tight`}>
-                  {montantDuSilga !== 0 ? `${Math.abs(montantDuSilga).toLocaleString()}` : "0"}<span className="text-[9px] ml-0.5">F</span>
-                </p>
-              )}
-              <p className="text-[10px] text-slate-500 font-medium mt-0.5">{item.label}</p>
-            </div>
-          ))}
+      <div className="grid grid-cols-3 gap-2.5">
+        {/* Livrées */}
+        <div className="bg-white rounded-2xl p-3 shadow-[0_8px_24px_rgba(15,23,42,0.06)] border border-black/5 text-center">
+          <p className="text-2xl font-black text-success leading-none">{livreesToday.length}</p>
+          <p className="text-[10px] text-slate-600 font-semibold mt-1">Livrées</p>
         </div>
-
-        {/* Bilan financier du jour */}
-        {livreesToday.length > 0 && (
-          <div className="rounded-3xl overflow-hidden shadow-[0_8px_24px_rgba(15,23,42,0.06)] border border-black/5">
-            <div className="bg-slate-50 px-4 py-2.5 flex items-center gap-2 border-b border-slate-100">
-              <Banknote className="w-3.5 h-3.5 text-slate-500" />
-              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Bilan du jour</p>
-            </div>
-            <div className="bg-white grid grid-cols-3 divide-x divide-slate-100">
-              {[
-                { label: "Total client", val: prixTotalToday, color: "text-slate-900" },
-                { label: "Votre gain", val: gainToday,    color: "text-success" },
-                { label: "Commission SILGAPP", val: commissionToday, color: "text-orange-400" },
-              ].map((s, i) => (
-                <div key={i} className="p-3 text-center">
-                  <p className={`text-sm font-black ${s.color}`}>{s.val.toLocaleString()}<span className="text-[9px] ml-0.5 font-normal">F</span></p>
-                  <p className="text-[9px] text-slate-500 mt-0.5">{s.label}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* Gains */}
+        <div className="bg-white rounded-2xl p-3 shadow-[0_8px_24px_rgba(15,23,42,0.06)] border border-black/5 text-center">
+          <p className="text-base font-black text-slate-900 leading-none">
+            {totalEncaisse > 0 ? totalEncaisse.toLocaleString() : "0"}<span className="text-[10px] font-normal ml-0.5">F</span>
+          </p>
+          <p className="text-[10px] text-slate-600 font-semibold mt-1">Gains</p>
+        </div>
+        {/* Dû SILGAPP */}
+        <div className={`rounded-2xl p-3 shadow-[0_8px_24px_rgba(15,23,42,0.06)] border text-center ${
+          montantDuSilga > 0 ? "bg-orange-50 border-orange-200" : montantDuSilga < 0 ? "bg-green-50 border-green-200" : "bg-white border-black/5"
+        }`}>
+          <p className={`text-base font-black leading-none ${
+            montantDuSilga > 0 ? "text-orange-500" : montantDuSilga < 0 ? "text-green-500" : "text-slate-400"
+          }`}>
+            {Math.abs(montantDuSilga).toLocaleString()}<span className="text-[10px] font-normal ml-0.5">F</span>
+          </p>
+          <p className="text-[10px] text-slate-600 font-semibold mt-1">Dû SILGAPP</p>
+        </div>
       </div>
     );
   }
