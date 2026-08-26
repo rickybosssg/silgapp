@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Loader2, X, MapPin, Check, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CARTO_TILE_URL, CARTO_TILE_CONFIG } from "@/lib/cartTiles";
 
 const COUNTRY_CENTERS = {
   BF: [12.3714, -1.5197],
@@ -71,10 +72,7 @@ export default function MapPickerModal({ open, onClose, onSelect, countryCode = 
       attributionControl: false,
     }).setView(center, 13);
 
-    window.L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-      maxZoom: 19,
-      subdomains: 'abcd',
-    }).addTo(map);
+    window.L.tileLayer(CARTO_TILE_URL, CARTO_TILE_CONFIG).addTo(map);
 
     // Click to place marker
     map.on('click', (e) => {
