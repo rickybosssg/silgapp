@@ -88,7 +88,7 @@
     "react-markdown": "^9.0.1",
     "react-quill": "^2.0.0",
     "react-resizable-panels": "^2.1.7",
-    "react-router-dom": "^6.26.0",
+    "react-router-dom": "^6.30.6",
     "recharts": "^2.15.4",
     "sonner": "^2.0.1",
     "tailwind-merge": "^3.0.2",
@@ -101,6 +101,11 @@
     "@esbuild/linux-x64": "0.25.12",
     "@rollup/rollup-linux-x64-gnu": "4.57.1",
     "@rollup/rollup-linux-x64-musl": "4.57.1"
+  },
+  "overrides": {
+    "brace-expansion": "2.1.4",
+    "dompurify": "3.4.14",
+    "nanoid": "3.3.18"
   },
   "devDependencies": {
     "@eslint/js": "^9.19.0",
