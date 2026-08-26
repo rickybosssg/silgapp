@@ -6,7 +6,7 @@ import HeatmapLegend from "./HeatmapLegend";
 import CountrySelector from "@/components/international/CountrySelector";
 import { useZonesChaudesHalos } from "./ZonesChaudes";
 import { GPS_EXPIRE_SEUIL_MIN, getLivreurCategorie } from "@/lib/dispatchRules";
-import { calculateClusters } from "@/lib/markerCluster";
+import { calculateClusters, getClusterThreshold } from "@/lib/markerCluster";
 
 /**
  * DispatchMap — Carte dédiée au dispatch temps réel
@@ -433,6 +433,36 @@ function buildStyles() {
       z-index: 1;
     }
 
+    /* ─── Livreur compact (zoom 13-14) ─── */
+    .dmap-livreur-compact {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: 2px solid white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+      color: white;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.25);
+    }
+    .dmap-livreur-compact-libre { background: linear-gradient(135deg, #16a34a, #059669); }
+    .dmap-livreur-compact-course { background: linear-gradient(135deg, #ea580c, #c2410c); }
+    .dmap-livreur-compact-noir { background: linear-gradient(135deg, #6b7280, #374151); }
+
+    /* ─── Livreur point (zoom ≤12) ─── */
+    .dmap-livreur-point {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      border: 2px solid white;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+    }
+    .dmap-livreur-point-libre { background: #16a34a; }
+    .dmap-livreur-point-course { background: #ea580c; }
+    .dmap-livreur-point-noir { background: #6b7280; }
+
     /* ─── Containers Leaflet ─── */
     .dmap-livreur-container,
     .dmap-client-container {
@@ -497,13 +527,43 @@ function buildStyles() {
   `;
 }
 
-function buildLivreurIcon(livreur, livreurIdsEnCourseReelle) {
+function buildLivreurIcon(livreur, livreurIdsEnCourseReelle, zoom = 15) {
   const cat = getLivreurCategorie(livreur, livreurIdsEnCourseReelle);
   const estNoir = cat === "hors_ligne" || cat === "gps_expire";
-  const cssClass = cat === "en_course" ? "dmap-livreur-course"
-    : cat === "libre" ? "dmap-livreur-libre"
-    : "dmap-livreur-noir";
+  const estEnCourse = cat === "en_course";
+  const estLibre = cat === "libre";
   const initial = livreur.nom?.charAt(0)?.toUpperCase() || "L";
+
+  // Zoom ≤ 12 : point compact (14×14px) sans texte ni photo
+  if (zoom <= 12) {
+    const pointClass = estLibre ? "dmap-livreur-point-libre"
+      : estEnCourse ? "dmap-livreur-point-course"
+      : "dmap-livreur-point-noir";
+    return window.L.divIcon({
+      html: `<div class="dmap-livreur-point ${pointClass}"></div>`,
+      className: "dmap-livreur-container",
+      iconSize: [14, 14],
+      iconAnchor: [7, 7],
+    });
+  }
+
+  // Zoom 13-14 : marqueur compact (28×28px) avec initiale
+  if (zoom <= 14) {
+    const compactClass = estLibre ? "dmap-livreur-compact-libre"
+      : estEnCourse ? "dmap-livreur-compact-course"
+      : "dmap-livreur-compact-noir";
+    return window.L.divIcon({
+      html: `<div class="dmap-livreur-compact ${compactClass}">${initial}</div>`,
+      className: "dmap-livreur-container",
+      iconSize: [28, 28],
+      iconAnchor: [14, 14],
+    });
+  }
+
+  // Zoom ≥ 15 : marqueur complet (52×52px) avec photo/avatar (comportement actuel)
+  const cssClass = estEnCourse ? "dmap-livreur-course"
+    : estLibre ? "dmap-livreur-libre"
+    : "dmap-livreur-noir";
   const photoHtml = livreur.photo_url
     ? `<img src="${livreur.photo_url}" alt="" class="dmap-photo" />`
     : `<div class="dmap-avatar-bg">${initial}</div>`;
@@ -741,7 +801,7 @@ export default function DispatchMap({
   const [heatmapModeLocal, setHeatmapModeLocal] = useState(heatmapMode);
   const [showHeatmapHint, setShowHeatmapHint] = useState(true);
   const [zoomLevel, setZoomLevel] = useState(0);
-  const [statsCollapsed, setStatsCollapsed] = useState(false);
+
 
   // Auto-masquer le hint heatmaps après 10s
   useEffect(() => {
@@ -925,12 +985,13 @@ export default function DispatchMap({
       markersRef.current.push(marker);
     });
 
-    // 🟢🟠🟡⚫ Livreurs (filtrés par showLivreurs) — avec clustering
+    // 🟢🟠🟡⚫ Livreurs (filtrés par showLivreurs) — avec clustering progressif
     if (showLivreurs) {
       const livreursAvecGPS = livreurs.filter(l => l.latitude && l.longitude);
-      const useClustering = map.getZoom() < 15;
+      const currentZoom = map.getZoom() || 15;
+      const useClustering = currentZoom < 15;
       const clusters = useClustering
-        ? calculateClusters(livreursAvecGPS, map, 45)
+        ? calculateClusters(livreursAvecGPS, map, getClusterThreshold(currentZoom))
         : livreursAvecGPS.map(l => ({ type: "single", item: l, latitude: l.latitude, longitude: l.longitude }));
 
       clusters.forEach(cluster => {
@@ -944,7 +1005,7 @@ export default function DispatchMap({
           const cat = getLivreurCategorie(livreur, livreurIdsEnCourseReelle);
           const estNoir = cat === "hors_ligne" || cat === "gps_expire";
           if (estNoir && masquerInactifs) return;
-          const icon = buildLivreurIcon(livreur, livreurIdsEnCourseReelle);
+          const icon = buildLivreurIcon(livreur, livreurIdsEnCourseReelle, currentZoom);
           const [lat, lng] = addMarkerOffset(livreur.latitude, livreur.longitude, markerIndex++);
           const estEnCourse = cat === "en_course";
           const marker = window.L.marker([lat, lng], {
@@ -1064,97 +1125,26 @@ export default function DispatchMap({
       {/* Overlay controls */}
       {mapLoaded && (
         <>
-          {/* Stats + légende (top-left) — panneau repliable */}
-          <div className="absolute top-4 left-4 z-[1000]">
-            <div className="bg-[#1f2429]/95 backdrop-blur-md border border-white/10 rounded-xl p-3 shadow-lg">
-              {/* En-tête repliable */}
-              <button
-                onClick={() => setStatsCollapsed(v => !v)}
-                className="flex items-center justify-between w-full gap-2 mb-1"
-              >
-                <span className="text-xs font-bold text-white">Activité terrain</span>
-                <span className="text-[10px] text-white/50">{statsCollapsed ? "Afficher" : "Masquer"}</span>
+          {/* Overlay compact — 3 compteurs essentiels (top-left) */}
+          <div className="absolute top-3 left-3 z-[1000]">
+            <div className="bg-[#1f2429]/95 backdrop-blur-md border border-white/10 rounded-xl px-3 py-2 shadow-lg flex items-center gap-2.5">
+              <button onClick={() => onCategoryClick?.("libre")} className="flex items-center gap-1.5 hover:opacity-80 transition-opacity">
+                <span className="w-2.5 h-2.5 rounded-full bg-green-500 flex-shrink-0" />
+                <span className="text-green-400 font-bold text-sm leading-none">{nbLibres}</span>
+                <span className="text-white/60 text-[10px] leading-none hidden sm:inline">Dispo</span>
               </button>
-              {!statsCollapsed && (
-                <div className="space-y-1 text-xs font-medium">
-                  {courses.length > 0 && (
-                    <div className="flex items-center gap-2">
-                      <span className="w-3 h-3 rounded-full bg-red-500 flex-shrink-0" />
-                      <span className="text-red-400 font-bold">{courses.length} en attente !</span>
-                    </div>
-                  )}
-                  {showLivreurs && nbLibres > 0 && (
-                    <button onClick={() => onCategoryClick?.("libre")} className="flex items-center gap-2 hover:bg-white/10 rounded-lg px-1 -mx-1 transition-colors w-full">
-                      <span className="w-3 h-3 rounded-full bg-green-500 flex-shrink-0" />
-                      <span className="text-green-400 font-bold">{nbLibres} libre{nbLibres > 1 ? "s" : ""} (GPS ≤ 60 min)</span>
-                    </button>
-                  )}
-                  {showLivreurs && nbGPSExpire > 0 && (
-                    <button onClick={() => onCategoryClick?.("gps_expire")} className="flex items-center gap-2 hover:bg-white/10 rounded-lg px-1 -mx-1 transition-colors w-full">
-                      <span className="w-3 h-3 rounded-full bg-amber-500 flex-shrink-0" />
-                      <span className="text-amber-400 font-semibold">{nbGPSExpire} GPS expiré</span>
-                    </button>
-                  )}
-                  {showLivreurs && nbCourse > 0 && (
-                    <button onClick={() => onCategoryClick?.("en_course")} className="flex items-center gap-2 hover:bg-white/10 rounded-lg px-1 -mx-1 transition-colors w-full">
-                      <span className="w-3 h-3 rounded-full bg-orange-500 flex-shrink-0" />
-                      <span className="text-orange-400">{nbCourse} en course</span>
-                    </button>
-                  )}
-                  {showLivreurs && nbHorsLigne > 0 && (
-                    <button onClick={() => onCategoryClick?.("hors_ligne")} className="flex items-center gap-2 hover:bg-white/10 rounded-lg px-1 -mx-1 transition-colors w-full">
-                      <span className="w-3 h-3 rounded-full bg-gray-500 flex-shrink-0" />
-                      <span className="text-white/50">{nbHorsLigne} hors ligne</span>
-                    </button>
-                  )}
-                  {showClients && nbClientsActifs > 0 && (
-                    <div className="flex items-center gap-2">
-                      <span className="w-3 h-3 rounded-full bg-blue-500 flex-shrink-0" />
-                      <span className="text-blue-400">{nbClientsActifs} actif{nbClientsActifs > 1 ? "s" : ""} (&lt;5 min)</span>
-                    </div>
-                  )}
-                  {showClients && nbClientsRecents > 0 && (
-                    <div className="flex items-center gap-2">
-                      <span className="w-3 h-3 rounded-full bg-yellow-500 flex-shrink-0" />
-                      <span className="text-yellow-400">{nbClientsRecents} récent{nbClientsRecents > 1 ? "s" : ""} (5-15 min)</span>
-                    </div>
-                  )}
-                  {!masquerInactifs && showClients && nbClientsInactifs > 0 && (
-                    <div className="flex items-center gap-2">
-                      <span className="w-3 h-3 rounded-full bg-gray-500 flex-shrink-0" />
-                      <span className="text-white/60 font-medium">⚫ {nbClientsInactifs} client{nbClientsInactifs > 1 ? "s" : ""} inactif{nbClientsInactifs > 1 ? "s" : ""}</span>
-                    </div>
-                  )}
-                  {showPartenaires && nbPartenairesBoutiques > 0 && (
-                    <div className="flex items-center gap-2">
-                      <span className="w-3 h-3 rounded-full bg-violet-500 flex-shrink-0" />
-                      <span className="text-violet-400 font-medium">🏪 {nbPartenairesBoutiques} boutique{nbPartenairesBoutiques > 1 ? "s" : ""}</span>
-                    </div>
-                  )}
-                  {showPartenaires && nbPartenairesRestaurants > 0 && (
-                    <div className="flex items-center gap-2">
-                      <span className="w-3 h-3 rounded-full bg-pink-500 flex-shrink-0" />
-                      <span className="text-pink-400 font-medium">🍽️ {nbPartenairesRestaurants} restaurant{nbPartenairesRestaurants > 1 ? "s" : ""}</span>
-                    </div>
-                  )}
-                  {showPartenaires && nbPartenairesPharmacies > 0 && (
-                    <div className="flex items-center gap-2">
-                      <span className="w-3 h-3 rounded-full bg-blue-700 flex-shrink-0" />
-                      <span className="text-blue-400 font-medium">💊 {nbPartenairesPharmacies} pharmacie{nbPartenairesPharmacies > 1 ? "s" : ""}</span>
-                    </div>
-                  )}
-                  {courses.length === 0 && nbLivreursVisibles === 0 && nbClientsVisibles === 0 && (
-                    <span className="text-white/50">Aucun élément visible</span>
-                  )}
-                  {/* Légende GPS qualité fusionnée */}
-                  <div className="pt-1.5 mt-1.5 border-t border-white/10 text-[10px] text-white/50 space-y-0.5">
-                    <div className="font-semibold text-white/70">Qualité GPS</div>
-                    <div>❤️ &lt;2min · 💚 2-5min · 🧡 5-15min</div>
-                    <div>❤️‍🩹 15-30min · ❤️‍🔥 &gt;30min</div>
-                    <div className="text-white/40">⚫ Noir = non dispatchable</div>
-                  </div>
-                </div>
-              )}
+              <div className="w-px h-4 bg-white/10" />
+              <button onClick={() => onCategoryClick?.("en_course")} className="flex items-center gap-1.5 hover:opacity-80 transition-opacity">
+                <span className="w-2.5 h-2.5 rounded-full bg-orange-500 flex-shrink-0" />
+                <span className="text-orange-400 font-bold text-sm leading-none">{nbCourse}</span>
+                <span className="text-white/60 text-[10px] leading-none hidden sm:inline">Mission</span>
+              </button>
+              <div className="w-px h-4 bg-white/10" />
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-red-500 flex-shrink-0" />
+                <span className="text-red-400 font-bold text-sm leading-none">{courses.length}</span>
+                <span className="text-white/60 text-[10px] leading-none hidden sm:inline">À dispo</span>
+              </div>
             </div>
           </div>
 

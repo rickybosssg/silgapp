@@ -1,17 +1,37 @@
 /**
  * Utilitaire de regroupement de marqueurs pour Leaflet.
  * Regroupe les marqueurs proches (en pixels) pour éviter la superposition.
+ *
+ * Clustering progressif : le seuil de regroupement augmente quand l'utilisateur
+ * dézoome, et diminue quand il zoome. Cela permet d'avoir une carte lisible
+ * à tous les niveaux de zoom.
  */
+
+/**
+ * Retourne le seuil de regroupement (en pixels) adapté au niveau de zoom.
+ * - Zoom élevé (≥15) : seuil faible (45px) — marqueurs individuels
+ * - Zoom moyen (13-14) : seuil intermédiaire (80px)
+ * - Zoom faible (≤12) : seuil important (120px) — regroupement agressif
+ */
+export function getClusterThreshold(zoom) {
+  if (!zoom || zoom >= 15) return 45;
+  if (zoom >= 13) return 80;
+  return 120;
+}
 
 /**
  * Calcule les clusters de marqueurs basés sur la distance pixel.
  * @param {Array} items - Items avec { latitude, longitude, ... }
  * @param {Object} map - Instance Leaflet
- * @param {number} threshold - Distance pixel minimale (défaut: 45px)
+ * @param {number} threshold - Distance pixel minimale (si omis, calculé depuis le zoom)
  * @returns {Array} - Clusters: { type: 'cluster'|'single', items?, item?, latitude, longitude, count }
  */
-export function calculateClusters(items, map, threshold = 45) {
+export function calculateClusters(items, map, threshold) {
   if (!map || !items.length) return [];
+
+  if (!threshold) {
+    threshold = getClusterThreshold(map.getZoom());
+  }
 
   const clusters = [];
   const processed = new Set();
