@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, X, Navigation, Package, MapPin } from "lucide-react";
+import { ArrowLeft, X, Navigation, Package, MapPin, UtensilsCrossed, Clock } from "lucide-react";
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { haversineKm as haversine } from "@/lib/priceEstimate";
 import CourseTimeline from "./CourseTimeline";
 import LivreurCardModerne from "./LivreurCardModerne";
+import RestaurantParallelTracking from "./RestaurantParallelTracking";
 import { base44 } from "@/api/base44Client";
 import { useETACourse } from "@/hooks/useETACourse";
 import { CARTO_TILE_URL, CARTO_TILE_CONFIG } from "@/lib/cartTiles";
@@ -28,6 +29,15 @@ const ARRIVAL_ICON = L.divIcon({
   html: '<div style="width:24px;height:24px;border-radius:50%;background:#ef4444;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);"></div>',
   iconSize: [24, 24],
   iconAnchor: [12, 12],
+});
+
+const RESTAURANT_ICON = L.divIcon({
+  html: '<div style="width:32px;height:32px;border-radius:50%;background:#f97316;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">' +
+    '<span style="font-size:16px;">🍽️</span>' +
+    '</div>',
+  iconSize: [32, 32],
+  iconAnchor: [16, 16],
+  className: "livreur-marker-anim",
 });
 
 const LIVREUR_ICON = L.divIcon({
@@ -93,6 +103,30 @@ export default function SuiviCourseFullscreen({ course, position, onClose, onCal
     lng: course.gps_arrivee_lng,
   }), [course]);
 
+  // ── Restaurant : fetch CommandeRestaurant si la course est liée à une commande restaurant ──
+  const isRestaurantCourse = !!course.commande_restaurant_id;
+  const [commandeRestaurant, setCommandeRestaurant] = useState(null);
+
+  useEffect(() => {
+    if (!course.commande_restaurant_id) {
+      setCommandeRestaurant(null);
+      return;
+    }
+    let cancelled = false;
+    base44.entities.CommandeRestaurant.filter({ id: course.commande_restaurant_id })
+      .then(res => {
+        if (!cancelled && res?.[0]) setCommandeRestaurant(res[0]);
+      })
+      .catch(() => {});
+    // Polling léger pour suivre les changements de statut du restaurant
+    const interval = setInterval(() => {
+      base44.entities.CommandeRestaurant.filter({ id: course.commande_restaurant_id })
+        .then(res => { if (!cancelled && res?.[0]) setCommandeRestaurant(res[0]); })
+        .catch(() => {});
+    }, 15000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [course.commande_restaurant_id]);
+
   // Phase: "approche" (livreur va vers départ) ou "livraison" (livreur va vers arrivée)
   const isLivraison = ["en_livraison", "arrivee"].includes(course.statut);
   const isColisRecupere = ["colis_recupere", "passager_embarque", "pris_en_charge"].includes(course.statut);
@@ -136,6 +170,30 @@ export default function SuiviCourseFullscreen({ course, position, onClose, onCal
   const eta = etaHook.etaMinutes != null
     ? { distance: etaHook.distanceKm?.toFixed(1), minutes: etaHook.etaMinutes, isRoadBased: etaHook.isRoadBased, isStale: etaHook.isStale, staleLabel: etaHook.staleLabel }
     : null;
+
+  // ── Calcul de la plage ETA pour les commandes restaurant ──
+  const etaRange = useMemo(() => {
+    if (!isRestaurantCourse || !commandeRestaurant) return null;
+    const now = new Date();
+    const isPrep = commandeRestaurant.statut === "en_preparation";
+    const isLivraisonPhase = ["en_livraison", "arrivee"].includes(course.statut);
+
+    let totalMin = 0;
+    if (isPrep && commandeRestaurant.estimated_ready_at) {
+      const readyAt = new Date(commandeRestaurant.estimated_ready_at);
+      const remainingPrep = Math.max(0, Math.round((readyAt - now) / 60000));
+      totalMin = remainingPrep + (eta?.minutes || 10);
+    } else if (eta?.minutes) {
+      totalMin = eta.minutes;
+    } else {
+      return null;
+    }
+
+    const start = new Date(now.getTime() + Math.max(0, totalMin - 5) * 60000);
+    const end = new Date(now.getTime() + (totalMin + 5) * 60000);
+    const fmt = (d) => `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    return `${fmt(start)} – ${fmt(end)}`;
+  }, [isRestaurantCourse, commandeRestaurant, eta, course.statut]);
 
   // Segments de route — ligne directe livreur → cible (ORS géré par useETACourse)
   const routeSegments = useMemo(() => {
@@ -182,7 +240,17 @@ export default function SuiviCourseFullscreen({ course, position, onClose, onCal
         <button onClick={onClose} className="w-10 h-10 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center shadow-lg">
           <ArrowLeft className="w-5 h-5 text-gray-900" />
         </button>
-        {eta && (
+        {etaRange ? (
+          <motion.div
+            key={etaRange}
+            initial={{ scale: 0.8 }}
+            animate={{ scale: 1 }}
+            className="bg-white/90 backdrop-blur-sm rounded-full px-4 py-2 shadow-lg flex items-center gap-2"
+          >
+            <Clock className="w-4 h-4 text-primary" />
+            <span className="text-sm font-bold text-gray-900">{etaRange}</span>
+          </motion.div>
+        ) : eta && (
           <motion.div
             key={eta.minutes}
             initial={{ scale: 0.8 }}
@@ -221,10 +289,10 @@ export default function SuiviCourseFullscreen({ course, position, onClose, onCal
           />
           <FitBounds positions={fitPositions} phase={isLivraison ? "livraison" : "approche"} />
 
-          {/* Départ */}
+          {/* Départ — ou Restaurant si course restaurant */}
           {depart.lat && (
-            <Marker position={[depart.lat, depart.lng]} icon={DEPARTURE_ICON}>
-              <Popup>Départ: {course.adresse_depart}</Popup>
+            <Marker position={[depart.lat, depart.lng]} icon={isRestaurantCourse ? RESTAURANT_ICON : DEPARTURE_ICON}>
+              <Popup>{isRestaurantCourse ? `Restaurant: ${commandeRestaurant?.restaurant_nom || ""}` : `Départ: ${course.adresse_depart}`}</Popup>
             </Marker>
           )}
           {/* Arrivée */}
@@ -273,6 +341,18 @@ export default function SuiviCourseFullscreen({ course, position, onClose, onCal
         <div className="p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
           {/* Poignée */}
           <div className="w-10 h-1.5 bg-gray-200 rounded-full mx-auto mb-3" />
+
+          {/* ── SUIVI PARALLÈLE RESTAURANT (style Glovo) ── */}
+          {isRestaurantCourse && (
+            <div className="mb-3">
+              <RestaurantParallelTracking
+                course={course}
+                commande={commandeRestaurant}
+                livreur={course._livreur}
+                etaRange={etaRange}
+              />
+            </div>
+          )}
 
           {/* ── MODE LIVRAISON : ambiance dédiée ── */}
           {isLivraison && (
