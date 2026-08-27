@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Bell, Users, Smartphone, Mail, UserX, TrendingUp, Filter, Send, Loader2, ChevronRight, FlaskConical, ShieldOff, Copy, Eye, DollarSign, Activity } from "lucide-react";
+import { Bell, Users, Smartphone, Mail, UserX, TrendingUp, Filter, Send, Loader2, ChevronRight, FlaskConical, ShieldOff, Copy, Eye, DollarSign, Activity, Zap } from "lucide-react";
 import { MESSAGE_TEMPLATES } from "@/lib/reactivationMessages";
 import { computeCampaignStats } from "@/lib/reactivationStats";
 import ReactivationAutoPanel from "@/components/admin/ReactivationAutoPanel";
@@ -154,9 +154,17 @@ export default function ReactivationClients() {
         </div>
       )}
 
+      {/* Moteur automatique J0/J+2/J+5 */}
+      <div className="mb-5">
+        <h2 className="text-sm font-black text-slate-800 mb-2 flex items-center gap-1.5">
+          <Zap className="w-3.5 h-3.5 text-blue-600" /> Moteur Automatique
+        </h2>
+        <ReactivationAutoPanel />
+      </div>
+
       {/* Action bar */}
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-black text-slate-800">Campagnes</h2>
+        <h2 className="text-sm font-black text-slate-800">Campagnes manuelles</h2>
         <button
           onClick={() => setShowForm(true)}
           className="h-9 px-4 rounded-xl bg-blue-600 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm"
