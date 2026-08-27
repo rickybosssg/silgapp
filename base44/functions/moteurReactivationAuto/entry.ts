@@ -6,7 +6,18 @@ import {
   createScenario,
   processPendingScenarios,
   checkScenarioConversion,
+  computeSmartSegment,
 } from '../../shared/reactivationScenarioEngine.ts';
+
+// Hash déterministe local (identique à reactivationScenarioEngine.ts)
+function hashClientIdForDryRun(clientId: string): number {
+  let hash = 0;
+  for (let i = 0; i < clientId.length; i++) {
+    hash = ((hash << 5) - hash) + clientId.charCodeAt(i);
+    hash = hash & hash;
+  }
+  return Math.abs(hash);
+}
 
 /**
  * moteurReactivationAuto — Moteur automatique de réactivation J0/J+2/J+5
@@ -35,13 +46,20 @@ export default async function(req: Request): Promise<Response> {
       }
     }
 
+    // Lire le body pour le mode dry-run (POST) ou query param (GET)
+    let bodyData: any = null;
+    try { bodyData = await req.json(); } catch {}
+    const isDryRun = url.searchParams.get('dry_run') === 'true' || bodyData?.dry_run === true;
+
     const config = await getReactivationConfig(base44);
 
+    // ── Mode dry-run : compter les éligibles sans envoyer ──
+
     // ── 1. Vérifier si le moteur est activé ──
-    if (!config.enabled) {
+    if (!config.enabled && !isDryRun) {
       return Response.json({ success: true, skipped: 'engine_disabled' });
     }
-    if (config.paused) {
+    if (config.paused && !isDryRun) {
       return Response.json({ success: true, skipped: 'engine_paused' });
     }
 
@@ -52,6 +70,86 @@ export default async function(req: Request): Promise<Response> {
         success: false,
         error: 'Aucune campagne automatique configurée. Créez une campagne avec is_automatic=true.',
       }, { status: 400 });
+    }
+
+    // ── Dry-run : retourner les stats sans envoyer ──
+    if (isDryRun) {
+      const maxNewScenarios = config.testMode ? 10 : 500;
+      const eligibleClients = await findEligibleClients(base44, config, campaign, maxNewScenarios);
+
+      // Compter les clients déjà dans un scénario actif ou en cooldown
+      const activeScenarios = await base44.asServiceRole.entities.ReactivationScenario.filter({ status: 'active' });
+      const activeClientIds = new Set(activeScenarios.map((s: any) => s.client_id));
+
+      const cooldownScenarios = await base44.asServiceRole.entities.ReactivationScenario.filter({
+        status: ['completed', 'expired', 'converted'],
+      });
+      const now = Date.now();
+      const cooldownMs = config.cooldownDays * 86400000;
+      const inCooldown = new Set<string>();
+      for (const s of cooldownScenarios) {
+        const refDate = s.cooldown_expires_at ? new Date(s.cooldown_expires_at).getTime() :
+                       s.j5_sent_at ? new Date(s.j5_sent_at).getTime() + cooldownMs :
+                       s.j0_sent_at ? new Date(s.j0_sent_at).getTime() + cooldownMs : 0;
+        if (refDate && now < refDate) inCooldown.add(s.client_id);
+      }
+
+      // Compter les clients sans token FCM valide
+      const allClients = await base44.asServiceRole.entities.ClientExterne.list();
+      const allTokens = await base44.asServiceRole.entities.NotificationToken.filter({ user_type: 'client', actif: true });
+      const tokenByClientEmail: Record<string, any> = {};
+      for (const t of allTokens) {
+        if (t.user_email) tokenByClientEmail[t.user_email] = t;
+      }
+
+      let noValidToken = 0;
+      let withValidToken = 0;
+      const segmentCounts: Record<string, number> = { vip: 0, regular: 0, occasional: 0, no_course: 0 };
+
+      for (const c of allClients) {
+        const token = c.user_email ? tokenByClientEmail[c.user_email] || null : null;
+        if (!token || !token.token || String(token.token).startsWith('web_')) {
+          noValidToken++;
+        } else {
+          withValidToken++;
+        }
+        const seg = computeSmartSegment(c);
+        segmentCounts[seg]++;
+      }
+
+      // Simuler le groupe contrôle et l'A/B
+      const controlPct = campaign.control_group_pct || 0;
+      let controlCount = 0;
+      let willReceiveJ0 = 0;
+      for (const e of eligibleClients) {
+        const hash = hashClientIdForDryRun(e.client.id);
+        const isControl = controlPct > 0 && (hash % 100) < controlPct;
+        if (isControl) controlCount++;
+        else willReceiveJ0++;
+      }
+
+      return Response.json({
+        success: true,
+        dry_run: true,
+        test_mode: config.testMode,
+        enabled: config.enabled,
+        paused: config.paused,
+        campaign_id: campaign.id,
+        total_clients: allClients.length,
+        eligible_total: eligibleClients.length,
+        by_segment: {
+          vip: eligibleClients.filter((e: any) => e.segment === 'vip').length,
+          regular: eligibleClients.filter((e: any) => e.segment === 'regular').length,
+          occasional: eligibleClients.filter((e: any) => e.segment === 'occasional').length,
+          no_course: eligibleClients.filter((e: any) => e.segment === 'no_course').length,
+        },
+        will_receive_j0: willReceiveJ0,
+        control_group: controlCount,
+        no_valid_token: noValidToken,
+        with_valid_token: withValidToken,
+        already_in_active_scenario: activeClientIds.size,
+        in_cooldown: inCooldown.size,
+      });
     }
 
     // ── 3. Vérifier les conversions sur les scénarios actifs ──
