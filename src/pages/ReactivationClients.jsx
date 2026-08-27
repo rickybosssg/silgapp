@@ -48,11 +48,17 @@ function StatCard({ icon: Icon, label, value, sublabel, color }) {
   );
 }
 
-function FunnelStep({ label, value, pct, isLast }) {
+function FunnelStep({ label, value, pct, isLast, color = "blue" }) {
+  const colorMap = {
+    blue: "from-blue-500 to-blue-600",
+    red: "from-red-500 to-red-600",
+    green: "from-green-500 to-green-600",
+    slate: "from-slate-500 to-slate-600",
+  };
   return (
     <div className="flex items-center gap-2 flex-1">
       <div className="flex-1 text-center">
-        <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg py-2 px-2 shadow-sm">
+        <div className={`bg-gradient-to-r ${colorMap[color] || colorMap.blue} text-white rounded-lg py-2 px-2 shadow-sm`}>
           <p className="text-lg font-black leading-none">{value}</p>
           <p className="text-[9px] font-semibold opacity-90 mt-0.5">{label}</p>
           {pct != null && <p className="text-[9px] opacity-75 mt-0.5">{pct}%</p>}
@@ -193,6 +199,7 @@ export default function ReactivationClients() {
                   {c.country_code && <span>• {c.country_code}</span>}
                   <span>• Ciblés: {c.target_count || 0}</span>
                   {c.sent_count > 0 && <span>• Envoyés: {c.sent_count}</span>}
+                  {c.failed_count > 0 && <span>• Échecs: {c.failed_count}</span>}
                 </div>
               </div>
               {c.status === "draft" && (
@@ -217,9 +224,10 @@ export default function ReactivationClients() {
                 <div className="flex items-center gap-1">
                   <FunnelStep label="Ciblés" value={c.target_count || 0} pct={100} />
                   <FunnelStep label="Envoyés" value={c.sent_count || 0} pct={c.target_count ? Math.round((c.sent_count / c.target_count) * 100) : 0} />
+                  <FunnelStep label="Échecs" value={c.failed_count || 0} color="red" />
                   <FunnelStep label="Ouverts" value={c.opened_count || 0} pct={c.sent_count ? Math.round((c.opened_count / c.sent_count) * 100) : 0} />
                   <FunnelStep label="Courses" value={c.course_created_count || 0} pct={c.sent_count ? Math.round((c.course_created_count / c.sent_count) * 100) : 0} />
-                  <FunnelStep label="CA" value={`${(c.revenue_generated || 0).toLocaleString()}`} isLast />
+                  <FunnelStep label="Livrées" value={c.course_completed_count || 0} isLast />
                 </div>
                 <div className="mt-1.5 text-[10px] text-green-600 font-bold">
                   Commission: {(c.commission_generated || 0).toLocaleString()} FCFA — Coût: 0 FCFA — Net: +{(c.commission_generated || 0).toLocaleString()} FCFA
@@ -498,6 +506,7 @@ function CampaignResults({ campaign, onClose }) {
             <div className="flex items-center gap-1 mb-2">
               <FunnelStep label="Ciblés" value={funnel.total} pct={100} />
               <FunnelStep label="Envoyés" value={funnel.sent} pct={funnel.sendRate} />
+              <FunnelStep label="Échecs" value={funnel.failed} color="red" />
               <FunnelStep label="Ouverts" value={funnel.opened} pct={funnel.openRate} />
               <FunnelStep label="Courses" value={funnel.courseCreated} pct={funnel.conversionRate} />
               <FunnelStep label="Livrées" value={funnel.courseCompleted} isLast />
@@ -526,6 +535,11 @@ function CampaignResults({ campaign, onClose }) {
           {funnel.control > 0 && (
             <div className="rounded-xl border border-slate-200 p-3">
               <p className="text-[11px] font-black uppercase tracking-wider text-slate-500 mb-2">Groupe contrôle vs campagne</p>
+              {funnel.controlTooSmall && (
+                <div className="mb-2 rounded-lg bg-amber-50 border border-amber-200 px-2 py-1.5">
+                  <p className="text-[10px] font-bold text-amber-700">⚠️ Échantillon contrôle trop faible ({funnel.control} &lt; 30) pour une conclusion fiable.</p>
+                </div>
+              )}
               <div className="space-y-1 text-xs">
                 <div className="flex justify-between"><span className="text-slate-500">Taux campagne:</span><span className="font-bold text-blue-700">{funnel.campaignRate.toFixed(1)}%</span></div>
                 <div className="flex justify-between"><span className="text-slate-500">Taux contrôle:</span><span className="font-bold text-slate-700">{funnel.controlRate.toFixed(1)}%</span></div>

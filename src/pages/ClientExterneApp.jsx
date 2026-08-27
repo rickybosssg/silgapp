@@ -369,10 +369,22 @@ export default function ClientExterneApp() {
       if (data.destination === "create_course" || data.type === "reactivation_campaign") {
         // Tracer l'ouverture côté backend (attribution reactivation)
         if (data.campaign_id && data.recipient_id) {
-          base44.functions.invoke("trackReactivationOpened", {
-            campaign_id: data.campaign_id,
-            recipient_id: data.recipient_id,
-          }).catch(() => null);
+          // ── Retry contrôlé : l'ouverture n'est jamais perdue au cold start ──
+          // Idempotent côté backend (status already opened → no-op).
+          // Ne bloque jamais l'ouverture de l'app.
+          const trackOpen = async (attempt = 0) => {
+            try {
+              await base44.functions.invoke("trackReactivationOpened", {
+                campaign_id: data.campaign_id,
+                recipient_id: data.recipient_id,
+              });
+            } catch (_) {
+              if (attempt < 3) {
+                setTimeout(() => trackOpen(attempt + 1), 1000 * Math.pow(2, attempt));
+              }
+            }
+          };
+          trackOpen();
         }
         navigate("/client/course/expedier");
         return;
