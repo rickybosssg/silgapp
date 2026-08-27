@@ -115,8 +115,14 @@ export default function DashboardExterne() {
     [coursesFiltrees]
   );
 
+  // ⚠️ ORDRE D'INITIALISATION — livreurIdsEnCourseReelle DOIT être déclaré avant
+  //    livreursEnLigne et compteursLivreurs qui l'utilisent (TDZ sinon).
+  //    MÊME définition que CarteLivreursExterne et DispatchMap
+  const livreurIdsEnCourseReelle = useMemo(() => {
+    return new Set(coursesEnTraitement.filter(c => STATUTS_LIVREUR_OCCUPE.includes(c.statut) && c.livreur_id).map(c => c.livreur_id));
+  }, [coursesEnTraitement]);
+
   // "En ligne" = Libre (disponible + GPS ≤ 30 min) OU en mission (course active réelle)
-  // MÊME définition que CarteLivreursExterne et DispatchMap
   const livreursEnLigne = useMemo(
     () => livreurs.filter(l =>
       l.validation === "valide" &&
@@ -130,10 +136,6 @@ export default function DashboardExterne() {
     () => clients.filter(c => isClientEligibleCarte(c)),
     [clients]
   );
-
-  const livreurIdsEnCourseReelle = useMemo(() => {
-    return new Set(coursesEnTraitement.filter(c => STATUTS_LIVREUR_OCCUPE.includes(c.statut) && c.livreur_id).map(c => c.livreur_id));
-  }, [coursesEnTraitement]);
 
   const compteursLivreurs = useMemo(() =>
     calculateLivreurCounters(
