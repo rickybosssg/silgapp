@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Bell, Users, Smartphone, Mail, UserX, TrendingUp, Filter, Send, Loader2, ChevronRight, FlaskConical, ShieldOff, Copy, Eye, DollarSign, Activity } from "lucide-react";
 import { MESSAGE_TEMPLATES } from "@/lib/reactivationMessages";
 import { computeCampaignStats } from "@/lib/reactivationStats";
+import ReactivationAutoPanel from "@/components/admin/ReactivationAutoPanel";
 
 const SEGMENT_LABELS = {
   push_active: "Push actif",
