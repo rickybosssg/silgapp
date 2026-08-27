@@ -33,16 +33,17 @@ export function isLivreurNoir(livreur, livreurIdsEnCourseReelle) {
 /**
  * Calcule TOUS les compteurs livreurs avec une source unique de vérité
  * @param {Array} livreurs - Liste des livreurs (déjà filtrés: validation === "valide" && actif !== false)
- * @param {Set} livreurIdsEnCourseReelle - IDs des livreurs avec course active
+ * @param {Set} livreurIdsEnCourseReelle - IDs des livreurs avec course active (course au statut occupé)
  * @returns {Object} - Compteurs détaillés
  */
-export function calculateLivreurCounters(livreurs) {
+export function calculateLivreurCounters(livreurs, livreurIdsEnCourseReelle = new Set()) {
   const libres = livreurs.filter(l => isLibre(l));
-  const enCourse = livreurs.filter(l => isEnCourse(l));
+  // En course = livreur avec course ACTIVE réelle (croisement avec CourseExterne)
+  const enCourse = livreurs.filter(l => livreurIdsEnCourseReelle.has(l.id));
 
   return {
     total: livreurs.length,
-    libres,                                // TOUS dispatchables (GPS ≤ 60 min)
+    libres,                                // TOUS dispatchables (GPS ≤ gps_expire_seuil_min)
     libres_recent: libres,                 // alias rétro-compatibilité
     libres_ancien: 0,                      // plus de distinction
     sans_gps_valide: 0,                    // alias rétro-compatibilité
@@ -53,7 +54,7 @@ export function calculateLivreurCounters(livreurs) {
     on: livreurs.filter(l => isON(l)).length,
     off: livreurs.filter(l => !isON(l)).length,
     appActive: livreurs.filter(l => isAppActive(l)).length,
-    noirs: livreurs.filter(l => isLivreurNoir(l)).length,
+    noirs: livreurs.filter(l => isLivreurNoir(l, livreurIdsEnCourseReelle)).length,
     verts: libres.length, // alias pour libres
     oranges: enCourse.length, // alias pour enCourse
     surCarte: livreurs.length, // TOUS les livreurs enregistrés

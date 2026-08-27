@@ -10,7 +10,7 @@ import { usePaysActifs } from "@/components/international/CountrySelector.jsx";
 import { useAdminContext } from "@/hooks/useAdminContext.js";
 import LivreursEnLigne from "@/components/dashboard/LivreursEnLigne";
 import ClientsEnLigne from "@/components/dashboard/ClientsEnLigne";
-import { isClientEligibleCarte } from "@/lib/dispatchRules.js";
+import { isClientEligibleCarte, isLibre, STATUTS_LIVREUR_OCCUPE } from "@/lib/dispatchRules.js";
 import { calculateLivreurCounters, calculateClientCounters } from "@/lib/livreurCounters.js";
 import CoursesEnTraitement from "@/components/dashboard/CoursesEnTraitement";
 import CoursesTerminees from "@/components/dashboard/CoursesTerminees";
@@ -115,13 +115,15 @@ export default function DashboardExterne() {
     [coursesFiltrees]
   );
 
+  // "En ligne" = Libre (disponible + GPS ≤ 30 min) OU en mission (course active réelle)
+  // MÊME définition que CarteLivreursExterne et DispatchMap
   const livreursEnLigne = useMemo(
     () => livreurs.filter(l =>
-      (l.statut === "disponible" || l.statut === "en_course") &&
       l.validation === "valide" &&
-      l.actif !== false
+      l.actif !== false &&
+      (isLibre(l) || livreurIdsEnCourseReelle.has(l.id))
     ),
-    [livreurs]
+    [livreurs, livreurIdsEnCourseReelle]
   );
 
   const clientsEnLigne = useMemo(
@@ -130,8 +132,7 @@ export default function DashboardExterne() {
   );
 
   const livreurIdsEnCourseReelle = useMemo(() => {
-    const STATUTS_OCCUPE = ["livreur_en_route", "client_contacte", "en_route_expediteur", "colis_recupere", "en_livraison"];
-    return new Set(coursesEnTraitement.filter(c => STATUTS_OCCUPE.includes(c.statut) && c.livreur_id).map(c => c.livreur_id));
+    return new Set(coursesEnTraitement.filter(c => STATUTS_LIVREUR_OCCUPE.includes(c.statut) && c.livreur_id).map(c => c.livreur_id));
   }, [coursesEnTraitement]);
 
   const compteursLivreurs = useMemo(() =>
@@ -153,7 +154,7 @@ export default function DashboardExterne() {
     const annulees = coursesTerminees.filter(c => c.statut === "annulee").length;
     const enCours = coursesEnTraitement.length;
     const ca = coursesTerminees.filter(c => c.statut === "livree").reduce((s, c) => s + (c.prix_final || 0), 0);
-    return { total: todayAll.length, livrees, annulees, enCours, ca, libres: livreursEnLigne.filter(l => l.statut === "disponible").length };
+    return { total: todayAll.length, livrees, annulees, enCours, ca, libres: compteursLivreurs.verts, enMission: compteursLivreurs.oranges };
   }, [coursesFiltrees, coursesEnTraitement, coursesTerminees, livreursEnLigne]);
 
   const taux = stats.total > 0 ? Math.round((stats.livrees / stats.total) * 100) : 0;
@@ -191,7 +192,7 @@ export default function DashboardExterne() {
               {/* Pill live */}
               <div className="flex items-center gap-2 bg-white/10 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white/80">
                 <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-                {livreursEnLigne.length} livreur{livreursEnLigne.length > 1 ? "s" : ""} en ligne
+                {compteursLivreurs.verts} dispo · {compteursLivreurs.oranges} en mission · {compteursLivreurs.total} en ligne
               </div>
               <div className="flex items-center gap-2 bg-white/10 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white/80">
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
@@ -293,7 +294,7 @@ export default function DashboardExterne() {
               <ClientsEnLigne clients={clientsEnLigne} />
             </div>
             <div className="bg-card rounded-2xl border border-border shadow-[0_8px_24px_rgba(0,0,0,0.06)] overflow-hidden">
-              <LivreursEnLigne livreurs={livreursEnLigne} />
+              <LivreursEnLigne livreurs={livreursEnLigne} livreurIdsEnCourseReelle={livreurIdsEnCourseReelle} />
             </div>
           </div>
         </div>

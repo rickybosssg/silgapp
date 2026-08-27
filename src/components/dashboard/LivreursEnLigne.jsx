@@ -2,11 +2,14 @@ import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { Truck, Phone, MapPin, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { isLibre } from "@/lib/dispatchRules.js";
 
-export default function LivreursEnLigne({ livreurs = [] }) {
+export default function LivreursEnLigne({ livreurs = [], livreurIdsEnCourseReelle }) {
   const [open, setOpen] = useState(false);
-  const disponibles = livreurs.filter(l => l.statut === "disponible");
-  const enCourse = livreurs.filter(l => l.statut === "en_course");
+  // SOURCE UNIQUE : isLibre() (GPS ≤ gps_expire_seuil_min) + croisement courses actives
+  const disponibles = livreurs.filter(l => isLibre(l));
+  const enCourseSet = livreurIdsEnCourseReelle || new Set();
+  const enCourse = livreurs.filter(l => enCourseSet.has(l.id));
   const avecGPS = livreurs.filter(l => l.latitude && l.longitude);
   const tauxDispo = livreurs.length > 0 ? Math.round((disponibles.length / livreurs.length) * 100) : 0;
   const tauxGPS = livreurs.length > 0 ? Math.round((avecGPS.length / livreurs.length) * 100) : 0;
@@ -81,7 +84,7 @@ export default function LivreursEnLigne({ livreurs = [] }) {
               <div className="flex flex-wrap gap-2">
                 {livreurs.map(l => {
                   const nom = `${l.prenom || ""} ${l.nom}`.trim();
-                  const isDispo = l.statut === "disponible";
+                  const isDispo = isLibre(l);
                   const hasGPS = !!(l.latitude && l.longitude);
                   return (
                     <div

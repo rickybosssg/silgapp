@@ -158,7 +158,23 @@ export function getNotificationChannel(livreur) {
   return heartbeatAge < getHeartbeatSeuilMin() ? "silgapp" : "whatsapp";
 }
 
-/** En course = statut en_course + ON */
+// ── Statuts de course signifiant qu'un livreur est OCCUPÉ (en mission) ──
+// SOURCE UNIQUE : tous les écrans (Dashboard, Carte Dispatch, Carte interactive)
+// doivent utiliser cette liste pour déterminer si un livreur est "en mission".
+// Inclut les étapes intermédiaires du workflow administratif (client_contacto,
+// en_route_expediteur, arrive_prise_en_charge, pris_en_charge) car le livreur
+// est déjà engagé et ne peut pas accepter une autre course.
+export const STATUTS_LIVREUR_OCCUPE = [
+  "livreur_en_route",
+  "client_contacto",
+  "en_route_expediteur",
+  "arrive_prise_en_charge",
+  "colis_recupere",
+  "pris_en_charge",
+  "en_livraison",
+];
+
+/** En course = statut en_course + ON (legacy — utiliser livreurIdsEnCourseReelle pour le croisement réel) */
 export function isEnCourse(livreur) {
   return livreur.statut === "en_course" && isON(livreur);
 }
