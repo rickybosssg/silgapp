@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Upload, Save, X, AlertTriangle, MapPin } from "lucide-react";
+import { Loader2, Upload, Save, X, AlertTriangle, MapPin, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import PartenaireLocalisation from "@/components/partenaire/PartenaireLocalisation";
 import SmartAddressInput from "@/components/location/SmartAddressInput";
@@ -128,6 +128,16 @@ export default function EtablissementForm({ type, existing, partenaireId, userEm
 
   return (
     <div className="bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden">
+      {/* ── Bouton Retour ── */}
+      {onCancel && (
+        <button
+          onClick={onCancel}
+          className="flex items-center gap-1.5 text-sm font-semibold text-gray-600 hover:text-gray-900 mb-3 transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" /> Retour
+        </button>
+      )}
+
       {/* ── Header premium ── */}
       <div className={`bg-gradient-to-r ${accentColor} px-6 py-5`}>
         <div className="flex items-center gap-3">
@@ -364,7 +374,7 @@ export default function EtablissementForm({ type, existing, partenaireId, userEm
           <Button onClick={handleSave} disabled={saving || !form.nom} className={`flex-1 h-13 py-3.5 rounded-2xl bg-gradient-to-r ${accentColor} hover:opacity-90 text-white font-bold text-sm shadow-lg`}>
             {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />} Enregistrer
           </Button>
-          {onCancel && <Button variant="outline" onClick={onCancel} className="h-13 px-4 rounded-2xl border-gray-200"><X className="w-5 h-5" /></Button>}
+          {onCancel && <Button variant="outline" onClick={onCancel} className="h-13 px-4 rounded-2xl border-gray-200"><X className="w-5 h-5" /> Annuler</Button>}
         </div>
       </div>
     </div>

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { requestNativeAppPermissions } from "@/lib/nativePermissions";
 import { toast } from "sonner";
-import { User, Check, Loader2, Phone, Gift, Sparkles, Globe, Home } from "lucide-react";
+import { User, Check, Loader2, Phone, Gift, Sparkles, Globe, Home, ArrowLeft } from "lucide-react";
 import { useActiveCountries } from "@/lib/countryService";
 import { normalizePhone, validateLocalPhone } from "@/lib/phoneUtils";
 import CountrySelect from "@/components/ui/CountrySelect";
@@ -50,7 +50,7 @@ async function requestPostGpsPermissions(clientProfil) {
 
 // GPS is requested with native permissions after profile detection; it must not block onboarding.
 // ─── Profil ────────────────────────────────────────────────────────────────────
-function EtapeProfil({ clientProfil, onSuccess }) {
+function EtapeProfil({ clientProfil, onSuccess, onBack }) {
   const { countries, loading: countriesLoading } = useActiveCountries();
   const [nom, setNom] = useState(clientProfil?.nom || "");
   const [prenom, setPrenom] = useState(clientProfil?.prenom || "");
@@ -188,6 +188,14 @@ function EtapeProfil({ clientProfil, onSuccess }) {
       <div className="max-w-md w-full my-4 rounded-[1.75rem] bg-white shadow-2xl shadow-blue-950/10 border border-white overflow-hidden">
         {/* Header — dégradé bleu SILGAPP avec relief */}
         <div className="relative bg-gradient-to-br from-primary-dark via-primary to-primary-dark px-6 py-7 text-white silgapp-relief-surface">
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="absolute left-4 top-4 z-10 flex items-center gap-1.5 rounded-xl bg-white/10 hover:bg-white/20 px-3 py-1.5 text-xs font-bold text-white backdrop-blur transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" /> Retour
+            </button>
+          )}
           <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-white/10" />
           <div className="absolute -left-12 bottom-0 h-28 w-28 rounded-full bg-sky-300/20" />
           <div className="relative flex items-center gap-4">
@@ -385,7 +393,7 @@ function EtapeProfil({ clientProfil, onSuccess }) {
 }
 
 // ─── Orchestrateur principal ──────────────────────────────────────────────────
-export default function ClientOnboarding({ clientProfil, onComplete }) {
+export default function ClientOnboarding({ clientProfil, onComplete, onBack }) {
   // "gps" | "profil" | "done" | null (calcul en cours)
   const [step, setStep] = useState(null);
   const onCompleteRef = useRef(onComplete);
@@ -439,6 +447,7 @@ export default function ClientOnboarding({ clientProfil, onComplete }) {
     return (
       <EtapeProfil
         clientProfil={clientProfil}
+        onBack={onBack}
         onSuccess={(updatedProfil) => {
           let gpsPos = null;
           try { gpsPos = JSON.parse(localStorage.getItem("client_gps_position") || "null"); } catch (_) {}
