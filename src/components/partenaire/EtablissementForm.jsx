@@ -72,6 +72,7 @@ export default function EtablissementForm({ type, existing, partenaireId, userEm
       set("logo_url", file_url);
     } catch (err) {
       console.error("Upload logo:", err);
+      toast?.error?.("Erreur lors de l'upload du logo");
     }
     setUploading(false);
   };

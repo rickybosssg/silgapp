@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, X, Navigation, Package, MapPin, UtensilsCrossed, Clock } from "lucide-react";
+import { ArrowLeft, X, Navigation, Package, MapPin, Clock } from "lucide-react";
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -90,7 +90,6 @@ export default function SuiviCourseFullscreen({ course, position, onClose, onCal
   const [showTimeline, setShowTimeline] = useState(false);
   const [livreurPos, setLivreurPos] = useState(null);
   const [reassuranceIdx, setReassuranceIdx] = useState(0);
-  const livreurPosRef = useRef(null);
 
   // Positions
   const depart = useMemo(() => ({
@@ -176,7 +175,6 @@ export default function SuiviCourseFullscreen({ course, position, onClose, onCal
     if (!isRestaurantCourse || !commandeRestaurant) return null;
     const now = new Date();
     const isPrep = commandeRestaurant.statut === "en_preparation";
-    const isLivraisonPhase = ["en_livraison", "arrivee"].includes(course.statut);
 
     let totalMin = 0;
     if (isPrep && commandeRestaurant.estimated_ready_at) {
