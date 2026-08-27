@@ -20,9 +20,10 @@ import {
   isLibre,
   hasValidGPS,
   isClientGPSRecent,
+  getLivreurCategorie,
+  STATUTS_LIVREUR_OCCUPE,
 } from "@/lib/dispatchRules.js";
 import { isLivreurNoir } from "@/lib/livreurCounters.js";
-import { getLivreurCategorie } from "@/lib/dispatchRules.js";
 import LivreurCategoryDialog from "@/components/carte/LivreurCategoryDialog.jsx";
 import { getDialCodeSync } from "@/lib/countryService";
 
@@ -221,7 +222,7 @@ export default function CarteLivreursExterne() {
   // EXCLU : annulee, livree (qui peuvent conserver livreur_id pour l'historique)
   const coursesVraimentActives = useMemo(() => {
     // Seuls ces statuts signifient qu'un livreur est réellement occupé
-    const STATUTS_LIVREUR_OCCUPE = ["livreur_en_route", "colis_recupere", "en_livraison"];
+    // SOURCE UNIQUE : STATUTS_LIVREUR_OCCUPE (dispatchRules.js)
     const STATUTS_TERMINAUX = ["annulee", "livree", "terminee", "completed"];
 
     const actives = toutesCoursesExternes.filter(c =>
@@ -498,12 +499,12 @@ export default function CarteLivreursExterne() {
           </div>
           <div className="mt-2.5 pt-2.5 border-t border-gray-100 flex gap-4 text-xs">
             <span className="flex items-center gap-1.5 text-gray-500">
-              <span className="w-2.5 h-2.5 rounded-full bg-red-500 flex-shrink-0" />
-              Avec GPS : <strong className="text-gray-800 ml-0.5">{coursesEnAttenteAvecGPS.length}</strong>
+              <span className="w-2.5 h-2.5 rounded-full bg-green-500 flex-shrink-0" />
+              Livreurs avec GPS : <strong className="text-gray-800 ml-0.5">{compteursLivreurs.verts + compteursLivreurs.oranges}</strong>
             </span>
             <span className="flex items-center gap-1.5 text-gray-500">
               <span className="w-2.5 h-2.5 rounded-full bg-gray-300 flex-shrink-0" />
-              Sans GPS : <strong className="text-gray-800 ml-0.5">{coursesEnAttenteSansGPS.length}</strong>
+              GPS expiré : <strong className="text-gray-800 ml-0.5">{compteursLivreurs.gps_expire}</strong>
             </span>
           </div>
         </div>

@@ -33,8 +33,19 @@ export default function SmartAddressInput({
   const [loading, setLoading] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
   const [activeIndex, setActiveIndex] = useState(-1);
+  // Empêche la réouverture de la liste après sélection d'une suggestion.
+  // Sans ce flag, l'useEffect ci-dessous rouvrirait la liste car `value`
+  // change suite à la sélection, déclenchant le cache + setOpen(true).
+  const justSelectedRef = useRef(false);
 
   useEffect(() => {
+    // Si la valeur vient d'être définie par une sélection, ne pas rouvrir la liste.
+    if (justSelectedRef.current) {
+      justSelectedRef.current = false;
+      setLoading(false);
+      return undefined;
+    }
+
     const query = value.trim();
     if (!countryCode || query.length < 2) {
       setSuggestions([]);
@@ -44,7 +55,6 @@ export default function SmartAddressInput({
 
     const cached = getCachedLocationSuggestions(countryCode, query);
     setSuggestions(cached);
-    setOpen(true);
 
     const controller = new AbortController();
     const timer = window.setTimeout(async () => {
@@ -75,6 +85,7 @@ export default function SmartAddressInput({
 
   const choose = (item) => {
     const selectedValue = item.address || item.label;
+    justSelectedRef.current = true;
     onChange?.(selectedValue, item);
     onSelect?.(item);
     setOpen(false);

@@ -239,6 +239,7 @@ export default function AddressAutocomplete({
               <button
                 key={q.id || idx}
                 type="button"
+                onPointerDown={(e) => e.preventDefault()}
                 onClick={() => handleSelect(q)}
                 onMouseEnter={() => setHighlightIndex(idx)}
                 className={`flex items-center gap-2 w-full text-left px-4 py-2.5 text-sm transition-colors ${

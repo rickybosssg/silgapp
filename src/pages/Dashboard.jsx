@@ -8,6 +8,7 @@ import { format, isToday } from "date-fns";
 import { fr } from "date-fns/locale";
 import StatCard from "@/components/dashboard/StatCard";
 import LivreursEnLigne from "@/components/dashboard/LivreursEnLigne";
+import { isLibre, STATUTS_LIVREUR_OCCUPE } from "@/lib/dispatchRules.js";
 import CoursesADispatcher from "@/components/dashboard/CoursesADispatcher";
 import CoursesEnTraitement from "@/components/dashboard/CoursesEnTraitement";
 import CoursesTerminees from "@/components/dashboard/CoursesTerminees";
@@ -87,14 +88,20 @@ export default function Dashboard() {
     [courses]
   );
 
-  // Livreurs en ligne = disponible ou en_course, validés et actifs
+  // Livreurs en course réelle (croisement avec Course — SOURCE UNIQUE STATUTS_LIVREUR_OCCUPE)
+  const livreurIdsEnCourseReelle = useMemo(() => {
+    return new Set(courses.filter(c => STATUTS_LIVREUR_OCCUPE.includes(c.statut) && c.livreur_id).map(c => c.livreur_id));
+  }, [courses]);
+
+  // Livreurs en ligne = Libre (GPS ≤ 30 min) OU en mission (course active réelle)
+  // MÊME définition que CarteLivreursExterne et DispatchMap
   const livreursEnLigne = useMemo(
     () => livreurs.filter(l =>
-      l.statut !== "hors_ligne" &&
       l.validation === "valide" &&
-      l.actif !== false
+      l.actif !== false &&
+      (isLibre(l) || livreurIdsEnCourseReelle.has(l.id))
     ),
-    [livreurs]
+    [livreurs, livreurIdsEnCourseReelle]
   );
 
   const stats = useMemo(() => {
@@ -106,8 +113,9 @@ export default function Dashboard() {
     const aDispatcher = coursesADispatcher.length;
     const ca = courses.filter(c => c.statut === "livree" && isToday(new Date(c.heure_livraison || c.created_date)))
       .reduce((s, c) => s + (c.prix_reel || c.prix || 0), 0);
-    const dispoLivreurs = livreursEnLigne.filter(l => l.statut === "disponible").length;
-    return { total, livrees, annulees, enCours, aDispatcher, ca, dispoLivreurs };
+    const dispoLivreurs = livreursEnLigne.filter(l => isLibre(l)).length;
+    const enMission = livreurIdsEnCourseReelle.size;
+    return { total, livrees, annulees, enCours, aDispatcher, ca, dispoLivreurs, enMission };
   }, [courses, coursesADispatcher, coursesEnTraitement, livreursEnLigne]);
 
   const { pulling, refreshing } = usePullToRefresh(async () => {
@@ -189,7 +197,7 @@ export default function Dashboard() {
       </div>
 
       {/* Livreurs en ligne */}
-      <LivreursEnLigne livreurs={livreursEnLigne} />
+      <LivreursEnLigne livreurs={livreursEnLigne} livreurIdsEnCourseReelle={livreurIdsEnCourseReelle} />
 
       {/* Courses à dispatcher */}
       <CoursesADispatcher

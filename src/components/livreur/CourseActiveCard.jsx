@@ -16,7 +16,7 @@ import ChatWindow from "@/components/chat/ChatWindow";
 import AnnulationExplicationChat from "./AnnulationExplicationChat";
 import { getPrixAffichable, getDeviseAffichable } from "@/utils/getPrixAffichable";
 
-import { getCountryConfig } from "@/lib/phoneUtils";
+import { getCourseContactForPhase, normalizePhoneForWhatsapp } from "@/lib/courseContact";
 import { haversineKm as haversine } from "@/lib/priceEstimate";
 
 function isInternalDispatchNote(value) {
@@ -781,82 +781,18 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
             <ETABadge course={course} colisRecupere={colisRecupere} />
           )}
 
-          {/* Contact dynamique : expéditeur avant récupération, destinataire après */}
+          {/* Contact dynamique : source unique courseContact.js — expéditeur avant, destinataire après */}
           {(() => {
-            // DÉPLACEMENT : afficher le passager comme contact unique
-            if (isDeplacement) {
-              const contactNom = course.passager_nom || course.client_nom || "Passager";
-              const contactTel = course.contact_createur_course || course.passager_telephone || course.client_telephone;
-              const contactRole = "Passager";
+            const phase = colisRecupere ? "livraison" : "recuperation";
+            const contact = getCourseContactForPhase(course, phase);
+            const contactNom = contact.nom;
+            const contactTel = contact.telephone;
+            const contactRole = contact.role;
 
-              const handleWhatsApp = () => {
-                let num = (contactTel || "").replace(/\D/g, "");
-                const cfg = getCountryConfig(course.country_code);
-                const dial = cfg.dial;
-                const localLen = cfg.len;
-                if (num.startsWith(dial) && num.length === dial.length + localLen) {
-                  // déjà international
-                } else if (num.startsWith("0") && num.length === localLen + 1) {
-                  num = dial + num.slice(1);
-                } else if (num.length === localLen) {
-                  num = dial + num;
-                } else if (num.startsWith("0")) {
-                  num = dial + num.slice(1);
-                }
-                const msg = encodeURIComponent(
-                  "Bonjour, je suis votre chauffeur SILGAPP. Je suis en route pour vous prendre en charge."
-                );
-                const lien = `https://wa.me/${num}?text=${msg}`;
-                const popup = window.open(lien, "_blank", "noopener,noreferrer");
-                if (!popup || popup.closed || typeof popup.closed === "undefined") {
-                  window.location.href = lien;
-                }
-              };
-
-              return (
-                <div className="flex items-center justify-between rounded-2xl p-3 bg-gray-50">
-                  <div>
-                    <p className="text-[10px] text-gray-600 font-semibold uppercase">{contactRole}</p>
-                    <p className="font-black text-gray-900 text-base">{contactNom}</p>
-                    <p className="text-xs text-gray-500">{contactTel}</p>
-                  </div>
-                  <div className="flex gap-2">
-                    <a href={`tel:${contactTel}`}>
-                      <div className="w-11 h-11 rounded-2xl border flex items-center justify-center bg-blue-50 border-blue-100">
-                        <Phone className="w-5 h-5 text-blue-600" />
-                      </div>
-                    </a>
-                    <button onClick={handleWhatsApp}>
-                      <div className="w-11 h-11 rounded-2xl border flex items-center justify-center bg-green-50 border-green-100">
-                        <svg viewBox="0 0 24 24" className="w-5 h-5 fill-green-600" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-                        </svg>
-                      </div>
-                    </button>
-                  </div>
-                </div>
-              );
-            }
-
-            const contactNom = colisRecupere
-              ? (course.destinataire_nom || course.client_nom || "Destinataire")
-              : (course.expediteur_nom || course.client_nom || "Expéditeur");
-            // ── Fallback robuste : s'assurer qu'un numéro est TOUJOURS affiché ──
-            // 1. contact_createur_course (contact principal, surtout VENUS/admin)
-            // 2. Phase récupération : expediteur_telephone → client_telephone
-            // 3. Phase livraison : destinataire_telephone → destinataire_phone_normalized → client_telephone
-            const contactTel = course.contact_createur_course || (colisRecupere
-              ? (course.destinataire_telephone || course.destinataire_phone_normalized || course.client_telephone)
-              : (course.expediteur_telephone || course.client_telephone));
-            const contactRole = colisRecupere ? "Destinataire" : "Expéditeur";
-
-            // ── Courses admin : le clic sur Appeler/WhatsApp déclenche « Client contacté »
-            //    puis 60s plus tard passe automatiquement à « En route vers l'expéditeur » ──
+            // ── Courses admin : le clic sur Appeler/WhatsApp déclenche « Client contacté » ──
             const triggerClientContacte = () => {
               if (!isClientContactePhase) return;
               const now = new Date().toISOString();
-              // Étape 1 : Client contacté (avec timestamp) — fire-and-forget pour ne pas
-              // être interrompu par l'ouverture du dialer/WhatsApp
               updateOptimisticStatut("client_contacte", { heure_contact_client: now });
               invokeCourseBackend("transitionStatutLivreur", {
                 course_id: course.id,
@@ -868,29 +804,16 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
 
             const handleWhatsApp = () => {
               triggerClientContacte();
-              // Normalisation multi-pays : si le numéro a déjà un indicatif international (10+ chiffres), ok
-              // Sinon on laisse le numéro tel quel — wa.me gère les numéros locaux avec indicatif
-              let num = (contactTel || "").replace(/\D/g, "");
-              const cfg = getCountryConfig(course.country_code);
-              const dial = cfg.dial;
-              const localLen = cfg.len;
-              // Normaliser vers le format international pour wa.me
-              if (num.startsWith(dial) && num.length === dial.length + localLen) {
-                // déjà international
-              } else if (num.startsWith("0") && num.length === localLen + 1) {
-                num = dial + num.slice(1); // retirer le 0 trunk
-              } else if (num.length === localLen) {
-                num = dial + num; // numéro local, le 0 fait partie du numéro
-              } else if (num.startsWith("0")) {
-                num = dial + num.slice(1); // fallback: retirer le 0
-              }
+              const num = normalizePhoneForWhatsapp(contactTel, course.country_code);
               const livreurNomFormate = livreurNom ? livreurNom.trim() : null;
               const msg = encodeURIComponent(
-                colisRecupere
-                  ? "Bonjour, je suis votre livreur SILGAPP. Je suis en route pour vous livrer votre colis."
-                  : (livreurNomFormate
-                    ? `Bonjour, je suis ${livreurNomFormate}, votre livreur SILGAPP. Je suis en route pour récupérer votre colis. Merci de m'envoyer la localisation du lieu de récupération.`
-                    : "Bonjour, je suis votre livreur SILGAPP. Je suis en route pour récupérer votre colis. Merci de m'envoyer la localisation du lieu de récupération.")
+                isDeplacement
+                  ? "Bonjour, je suis votre chauffeur SILGAPP. Je suis en route pour vous prendre en charge."
+                  : colisRecupere
+                    ? "Bonjour, je suis votre livreur SILGAPP. Je suis en route pour vous livrer votre colis."
+                    : (livreurNomFormate
+                      ? `Bonjour, je suis ${livreurNomFormate}, votre livreur SILGAPP. Je suis en route pour récupérer votre colis. Merci de m'envoyer la localisation du lieu de récupération.`
+                      : "Bonjour, je suis votre livreur SILGAPP. Je suis en route pour récupérer votre colis. Merci de m'envoyer la localisation du lieu de récupération.")
               );
               const lien = `https://wa.me/${num}?text=${msg}`;
               const popup = window.open(lien, "_blank", "noopener,noreferrer");
@@ -1079,7 +1002,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                 destLat={course.gps_depart_lat}
                 destLng={course.gps_depart_lng}
                 destLabel={course.adresse_depart}
-                destinataireTelephone={course.expediteur_telephone || course.client_telephone}
+                destinataireTelephone={getCourseContactForPhase(course, "recuperation").telephone}
                 contactClientId={course.expediteur_client_id || null}
               />
             ) : (
@@ -1092,11 +1015,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                 destLat={course.gps_arrivee_lat}
                 destLng={course.gps_arrivee_lng}
                 destLabel={course.adresse_arrivee}
-                destinataireTelephone={
-                  course.destinataire_telephone ||
-                  course.destinataire_phone_normalized ||
-                  course.client_telephone
-                }
+                destinataireTelephone={getCourseContactForPhase(course, "livraison").telephone}
                 contactClientId={course.destinataire_client_id || null}
                 destinationInconnue={!!course.destination_inconnue}
               />

@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { MapPin, Phone, Navigation, Check, X, Package, Clock, Truck, AlertCircle, MessageCircle, Ruler } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { haversineKm as haversine } from "@/lib/priceEstimate";
+import { getCourseContactForPhase, normalizePhoneForWhatsapp } from "@/lib/courseContact";
 
 // Vibration continue pendant que le modal est ouvert
 function useVibration(active) {
@@ -305,28 +306,34 @@ export default function CourseEnAttenteModal({
         </div>
 
         <div className="p-5 space-y-4">
-          {/* Client + contacts */}
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">Client</p>
-              <p className="text-lg font-black text-gray-900">{course.client_nom || "Client"}</p>
-            </div>
-            <div className="flex gap-2">
-              <a
-                href={`https://wa.me/${(course.contact_createur_course || course.client_telephone)?.replace(/[^0-9]/g, "").replace(/^0+/, "")}`}
-                target="_blank" rel="noreferrer"
-              >
-                <button className="w-11 h-11 rounded-2xl bg-green-50 border border-green-200 flex items-center justify-center">
-                  <MessageCircle className="w-5 h-5 text-green-600" />
-                </button>
-              </a>
-              <a href={`tel:${course.contact_createur_course || course.client_telephone}`}>
-                <button className="w-11 h-11 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center">
-                  <Phone className="w-5 h-5 text-blue-600" />
-                </button>
-              </a>
-            </div>
-          </div>
+          {/* Client + contacts — source unique courseContact.js */}
+          {(() => {
+            const contact = getCourseContactForPhase(course, "recuperation");
+            const waNum = normalizePhoneForWhatsapp(contact.telephone, course.country_code);
+            return (
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">{contact.role}</p>
+                  <p className="text-lg font-black text-gray-900">{contact.nom}</p>
+                </div>
+                <div className="flex gap-2">
+                  <a
+                    href={`https://wa.me/${waNum}`}
+                    target="_blank" rel="noreferrer"
+                  >
+                    <button className="w-11 h-11 rounded-2xl bg-green-50 border border-green-200 flex items-center justify-center">
+                      <MessageCircle className="w-5 h-5 text-green-600" />
+                    </button>
+                  </a>
+                  <a href={`tel:${contact.telephone}`}>
+                    <button className="w-11 h-11 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center">
+                      <Phone className="w-5 h-5 text-blue-600" />
+                    </button>
+                  </a>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Trajet */}
           <div className="bg-gray-50 rounded-2xl p-4 space-y-3">
