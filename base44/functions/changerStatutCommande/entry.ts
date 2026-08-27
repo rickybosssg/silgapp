@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { calculerDistance } from '../../shared/dispatchConstants.ts';
 
 function generateToken() { return crypto.randomUUID().replace(/-/g, ''); }
 function generatePIN() { return String(Math.floor(1000 + Math.random() * 9000)); }
@@ -104,11 +105,187 @@ Deno.serve(async (req) => {
       return Response.json({ success: false, error: `Action impossible: statut actuel = ${commande.statut}`, current_statut: commande.statut });
     }
 
+    // ── Cas spécial: commencer_preparation avec temps estimé (restaurants uniquement) ──
+    // Crée la CourseExterne en avance avec dispatch_status = en_attente.
+    // Le dispatch réel sera déclenché par l'automation dispatchAnticipeRestaurant
+    // quand now >= dispatch_at, ou par le bouton "Prête" si le restaurant termine avant.
+    if (action === 'commencer_preparation' && isRestaurant && body.preparation_time_minutes) {
+      const preparationTimeMin = Number(body.preparation_time_minutes);
+      if (![5, 10, 15, 20, 30].includes(preparationTimeMin)) {
+        return Response.json({ error: 'preparation_time_minutes invalide (5, 10, 15, 20 ou 30)' }, { status: 400 });
+      }
+
+      // Anti-double-création
+      if (commande.course_id) {
+        console.log(`[changerStatutCommande] Course déjà créée pour commande ${commande_id}: ${commande.course_id}`);
+        return Response.json({ success: true, message: 'Course déjà créée', course_id: commande.course_id, already_exists: true });
+      }
+
+      // Mettre à jour le statut
+      await asService.entities[commandeEntity].update(commande_id, { statut: 'en_preparation' });
+
+      // ── Calculer estimated_ready_at ──
+      const now = new Date();
+      const estimatedReadyAt = new Date(now.getTime() + preparationTimeMin * 60000);
+
+      // ── Calculer ETA du livreur le plus proche vers le restaurant ──
+      let etaMin = 10; // défaut si aucun livreur disponible
+      try {
+        const livreursDispo = await asService.entities.Livreur.filter({
+          type_livreur: 'externe',
+          validation: 'valide',
+          actif: true,
+          statut: 'disponible',
+          country_code: commande.pays_code,
+          bloque_encours: false,
+          manual_hors_ligne: { $ne: true },
+          admin_hors_ligne: { $ne: true },
+        }, '-last_seen_at', 50).catch(() => []);
+
+        if (livreursDispo && livreursDispo.length > 0 && etablissement.latitude && etablissement.longitude) {
+          let minDist = null;
+          for (const l of livreursDispo) {
+            if (!l.latitude || !l.longitude) continue;
+            const d = calculerDistance(etablissement.latitude, etablissement.longitude, l.latitude, l.longitude);
+            if (d !== null && (minDist === null || d < minDist)) minDist = d;
+          }
+          if (minDist !== null) {
+            // 25 km/h moyenne ville → 2.4 min/km, min 2, max 20
+            etaMin = Math.min(20, Math.max(2, Math.round(minDist * 2.4)));
+          }
+        }
+      } catch (e) {
+        console.warn(`[changerStatutCommande] Erreur calcul ETA: ${e?.message}`);
+      }
+
+      // ── Marge configurable (default 2 min) ──
+      let marginMin = 2;
+      try {
+        const marginConfig = await asService.entities.AppConfig.filter({ cle: 'RESTAURANT_DISPATCH_MARGIN_MIN' }).catch(() => []);
+        if (marginConfig?.[0]?.valeur) marginMin = Number(marginConfig[0].valeur) || 2;
+      } catch (_) {}
+
+      // ── Calculer dispatch_at = estimated_ready_at - ETA - marge ──
+      const dispatchAt = new Date(estimatedReadyAt.getTime() - (etaMin + marginMin) * 60000);
+
+      // ── Créer la CourseExterne (en_attente — non visible par les livreurs) ──
+      const trackingToken = generateToken();
+      const pickupToken = generateToken();
+      let deliveryToken = generateToken();
+      while (deliveryToken === pickupToken) deliveryToken = generateToken();
+      const pickupPIN = generatePIN();
+      let deliveryPIN = generatePIN();
+      while (deliveryPIN === pickupPIN) deliveryPIN = generatePIN();
+
+      const appBaseUrl = Deno.env.get('VITE_BASE44_APP_BASE_URL') || '';
+      const trackingLink = appBaseUrl ? `${appBaseUrl}/suivi-public/${trackingToken}` : '';
+
+      const itemsSummary = (() => {
+        try {
+          const items = JSON.parse(commande.items || '[]');
+          return items.map(i => `${i.nom} x${i.quantite}`).join(', ');
+        } catch { return ''; }
+      })();
+
+      const course = await asService.entities.CourseExterne.create({
+        country_code: commande.pays_code,
+        source: 'client',
+        type_course: 'expedier',
+        client_nom: commande.client_nom,
+        client_telephone: commande.client_telephone,
+        expediteur_nom: etablissement.nom,
+        expediteur_telephone: etablissement.telephone || '',
+        destinataire_nom: commande.client_nom,
+        destinataire_telephone: commande.client_telephone,
+        destinataire_client_id: commande.client_id,
+        recipient_has_app: true,
+        adresse_depart: `${etablissement.quartier || ''} ${etablissement.ville || ''}`.trim() || etablissement.nom,
+        adresse_arrivee: commande.adresse_livraison || commande.quartier_livraison || '',
+        quartier_depart: etablissement.quartier || '',
+        quartier_arrivee: commande.quartier_livraison || '',
+        ville_depart: etablissement.ville || '',
+        gps_depart_lat: etablissement.latitude || null,
+        gps_depart_lng: etablissement.longitude || null,
+        gps_arrivee_lat: commande.gps_lat || null,
+        gps_arrivee_lng: commande.gps_lng || null,
+        latitude_livraison: commande.gps_lat || null,
+        longitude_livraison: commande.gps_lng || null,
+        latitude_arrivee_livraison: commande.gps_lat || null,
+        longitude_arrivee_livraison: commande.gps_lng || null,
+        notes: `Commande restaurant #${commande_id.slice(-6)} - ${commande.client_nom} - ${(commande.total || 0).toLocaleString()} FCFA${itemsSummary ? ' - ' + itemsSummary : ''}`,
+        prix_estimate: 0,
+        devise: 'FCFA',
+        statut: 'nouvelle',
+        dispatch_status: 'en_attente',
+        pricing_mode: 'manual',
+        tracking_token: trackingToken,
+        tracking_link: trackingLink,
+        pickup_qr_token: pickupToken,
+        pickup_code_4_digits: pickupPIN,
+        delivery_qr_token: deliveryToken,
+        delivery_code_4_digits: deliveryPIN,
+        commande_restaurant_id: commande_id,
+      });
+
+      // Lier la course à la commande + stocker les timestamps
+      await asService.entities.CommandeRestaurant.update(commande_id, {
+        course_id: course.id,
+        preparation_time_minutes: preparationTimeMin,
+        estimated_ready_at: estimatedReadyAt.toISOString(),
+        dispatch_at: dispatchAt.toISOString(),
+      });
+
+      console.log(`[changerStatutCommande] Course ${course.id} créée en en_attente pour commande ${commande_id} — dispatch_at=${dispatchAt.toISOString()}`);
+
+      // ── Notifications ──
+      await notifierClient(
+        'Commande en préparation',
+        `Votre commande chez ${etablissement.nom} est en préparation. Temps estimé : ${preparationTimeMin} min. Un livreur sera recherché automatiquement.`,
+        'en_preparation', course.id
+      );
+
+      return Response.json({
+        success: true,
+        course_id: course.id,
+        dispatch_at: dispatchAt.toISOString(),
+        estimated_ready_at: estimatedReadyAt.toISOString(),
+        message: 'Course créée en attente — dispatch programmé',
+      });
+    }
+
     // ── Cas spécial: prete_recuperation → créer course + dispatch ──────
     if (action === 'prete_recuperation') {
       // Anti-double-création de course
       if (commande.course_id) {
         console.log(`[changerStatutCommande]  Course déjà créée pour commande ${commande_id}: ${commande.course_id}`);
+        // ── Course créée pendant la préparation (dispatch anticipé) ──
+        // Si la course n'est pas encore dispatchée, déclencher le dispatch maintenant.
+        const existingCourse = await asService.entities.CourseExterne.get(commande.course_id).catch(() => null);
+        if (existingCourse && !['disponible_push', 'accepte', 'propose'].includes(existingCourse.dispatch_status)) {
+          await asService.entities[commandeEntity].update(commande_id, { statut: 'prete_recuperation' });
+          try {
+            await base44.functions.invoke('dispatchExterneAuto', {
+              action: 'lancer_recherche_auto',
+              course_id: existingCourse.id,
+            });
+            console.log(`[changerStatutCommande]  Dispatch anticipé déclenché pour course ${existingCourse.id} (bouton Prête)`);
+          } catch (err) {
+            console.error(`[changerStatutCommande]  Erreur dispatch anticipé: ${err.message}`);
+          }
+          await notifierClient(
+            'Commande prête — livraison en cours',
+            `Votre commande chez ${etablissement.nom} est prête. Recherche d'un livreur en cours...`,
+            'commande_prete', existingCourse.id
+          );
+          await notifierPartenaire(
+            'Livraison déclenchée',
+            `Recherche d'un livreur pour la commande de ${commande.client_nom}`,
+            'livraison_declenchee'
+          );
+          return Response.json({ success: true, course_id: existingCourse.id, message: 'Dispatch déclenché — recherche livreur en cours' });
+        }
+        // Course déjà dispatchée ou assignée — juste mettre à jour le statut
+        await asService.entities[commandeEntity].update(commande_id, { statut: 'prete_recuperation' });
         return Response.json({ success: true, message: 'Course déjà créée', course_id: commande.course_id, already_exists: true });
       }
 

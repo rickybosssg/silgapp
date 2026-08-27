@@ -81,7 +81,7 @@
     },
     "course_id": {
       "type": "string",
-      "description": "ID de la CourseExterne cr\u00e9\u00e9e quand pr\u00eate"
+      "description": "ID de la CourseExterne cr\u00e9\u00e9e quand pr\u00eate (ou en avance si dispatch anticip\u00e9)"
     },
     "partenaire_id": {
       "type": "string",
@@ -95,6 +95,20 @@
     },
     "motif_annulation": {
       "type": "string"
+    },
+    "preparation_time_minutes": {
+      "type": "number",
+      "description": "Temps de pr\u00e9paration estim\u00e9 par le restaurant (5, 10, 15, 20 ou 30 min). Saisi au passage en en_preparation. Si d\u00e9fini, la CourseExterne est cr\u00e9\u00e9e en avance avec dispatch_status=en_attente et le dispatch est d\u00e9clench\u00e9 automatiquement au bon moment (dispatch_at)."
+    },
+    "estimated_ready_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Heure estim\u00e9e \u00e0 laquelle la commande sera pr\u00eate = heure_debut_preparation + preparation_time_minutes."
+    },
+    "dispatch_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Heure \u00e0 laquelle le dispatch doit \u00eatre d\u00e9clench\u00e9 = estimated_ready_at - ETA_livreur - marge. L'automation dispatchAnticipeRestaurant bascule la course de en_attente vers disponible_push quand now >= dispatch_at."
     }
   },
   "required": [
