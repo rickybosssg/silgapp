@@ -37,12 +37,77 @@ export const DEFAULT_J5_TITLE = "Revenez sur SILGAPP !";
 
 export type SmartSegment = 'vip' | 'regular' | 'occasional' | 'no_course';
 
+/**
+ * Calcule le segment intelligent à partir du nombre de courses LIVRÉES.
+ *
+ * SOURCE DE VÉRITÉ : CourseExterne (courses réellement livrées), retrouvées par
+ * téléphone normalisé en priorité, fallback sur téléphone brut.
+ *
+ * nb_courses_total (cache ClientExterne) n'est plus la source unique — il reste
+ * un indicateur secondaire utilisé uniquement si la requête CourseExterne échoue.
+ */
+export function computeSmartSegmentFromCount(deliveredCount: number): SmartSegment {
+  if (deliveredCount === 0) return 'no_course';
+  if (deliveredCount === 1) return 'occasional';
+  if (deliveredCount >= 2 && deliveredCount <= 4) return 'regular';
+  return 'vip'; // 5+
+}
+
+/**
+ * Compte les courses LIVRÉES d'un client en interrogeant CourseExterne.
+ * Matching : client_phone_normalized en priorité, fallback sur client_telephone.
+ * Déduplique par course.id.
+ */
+export async function countDeliveredCourses(
+  base44: any,
+  client: any
+): Promise<number> {
+  const seenIds = new Set<string>();
+  let courses: any[] = [];
+
+  // 1. Recherche par téléphone normalisé (priorité)
+  if (client.telephone_normalized) {
+    try {
+      courses = await base44.asServiceRole.entities.CourseExterne.filter(
+        { client_phone_normalized: client.telephone_normalized },
+        '-created_date', 500
+      );
+    } catch {}
+  }
+
+  // 2. Fallback : recherche par téléphone brut
+  if (courses.length === 0 && client.telephone) {
+    try {
+      courses = await base44.asServiceRole.entities.CourseExterne.filter(
+        { client_telephone: client.telephone },
+        '-created_date', 500
+      );
+    } catch {}
+  }
+
+  // 3. Dédupliquer par course.id et ne compter que les courses livrées
+  for (const c of courses) {
+    if (c.id) seenIds.add(c.id);
+  }
+
+  // Compter les courses livrées uniquement
+  let deliveredCount = 0;
+  const uniqueCourses = Array.from(seenIds);
+  // On a déjà les courses en mémoire, pas besoin de re-requêter
+  for (const c of courses) {
+    if (c.statut === 'livree') deliveredCount++;
+  }
+
+  return deliveredCount;
+}
+
+/**
+ * @deprecated Utiliser computeSmartSegmentFromCount + countDeliveredCourses.
+ * Conservée pour rétrocompatibilité — ne se fie qu'au cache nb_courses_total.
+ */
 export function computeSmartSegment(client: any): SmartSegment {
   const nb = client.nb_courses_total || 0;
-  if (nb === 0) return 'no_course';
-  if (nb === 1) return 'occasional';
-  if (nb >= 2 && nb <= 4) return 'regular';
-  return 'vip'; // 5+
+  return computeSmartSegmentFromCount(nb);
 }
 
 export const SEGMENT_PRIORITY: SmartSegment[] = ['vip', 'regular', 'occasional', 'no_course'];
@@ -186,7 +251,8 @@ export async function findEligibleClients(
     // Filtre pays si défini
     if (campaign.country_code && c.country_code !== campaign.country_code) continue;
 
-    const segment = computeSmartSegment(c);
+    const deliveredCount = await countDeliveredCourses(base44, c);
+    const segment = computeSmartSegmentFromCount(deliveredCount);
 
     // Filtre par smart_segment si défini
     if (campaign.smart_segment && campaign.smart_segment !== 'all' && segment !== campaign.smart_segment) continue;
@@ -515,4 +581,61 @@ function hashClientId(clientId: string): number {
     hash = hash & hash; // Convertir en 32-bit integer
   }
   return Math.abs(hash);
+}
+
+// ── Recalculer les segments des scénarios existants ─────────────────────────
+//
+// CORRECTION CIBLÉE — Recalcule UNIQUEMENT le champ `segment` des scénarios
+// existants en utilisant les courses réellement livrées dans CourseExterne.
+//
+// NE TOUCHE PAS : ab_variant, is_control_group, j0_sent_at, j2_sent_at,
+// j5_sent_at, next_push_at, next_push_step, cooldown_expires_at, status,
+// ou tout autre champ du scénario.
+//
+// Retourne le nombre de scénarios corrigés et la distribution finale.
+
+export async function recalculateScenarioSegments(
+  base44: any,
+  campaignId?: string
+): Promise<{
+  total: number;
+  corrected: number;
+  distribution: { no_course: number; occasional: number; regular: number; vip: number };
+}> {
+  const filter: any = campaignId ? { campaign_id: campaignId } : {};
+  const scenarios = await base44.asServiceRole.entities.ReactivationScenario.filter(
+    filter, '-created_date', 200
+  );
+
+  const clientIds = scenarios.map((s: any) => s.client_id).filter(Boolean);
+  const clients = await base44.asServiceRole.entities.ClientExterne.filter({
+    id: { $in: clientIds }
+  });
+  const clientMap: Record<string, any> = {};
+  for (const c of clients) clientMap[c.id] = c;
+
+  let corrected = 0;
+  const distribution = { no_course: 0, occasional: 0, regular: 0, vip: 0 };
+
+  for (const s of scenarios) {
+    const client = clientMap[s.client_id];
+    if (!client) {
+      distribution[s.segment as keyof typeof distribution]++;
+      continue;
+    }
+
+    const deliveredCount = await countDeliveredCourses(base44, client);
+    const realSegment = computeSmartSegmentFromCount(deliveredCount);
+    distribution[realSegment]++;
+
+    if (realSegment !== s.segment) {
+      // CORRECTION : uniquement le champ segment
+      await base44.asServiceRole.entities.ReactivationScenario.update(s.id, {
+        segment: realSegment,
+      });
+      corrected++;
+    }
+  }
+
+  return { total: scenarios.length, corrected, distribution };
 }
