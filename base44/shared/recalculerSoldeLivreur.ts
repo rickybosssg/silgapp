@@ -119,5 +119,5 @@ export async function recalculerSoldeLivreur(base44: any, livreurId: string): Pr
 
   console.log(`[SOLDE] Livreur ${livreurId}: solde=${solde} ${devise} (commissions=${totalCommissions}, payé=${totalPaye}, seuil=${seuil}, bloque=${bloque})`);
 
-  return { solde, creditDisponible, creditSurplus: newCreditSurplus, consumedCredit, seuil, bloque, statut_paiement: statutPaiement, devise, totalCommissions, totalPaye };
+  return { solde, creditDisponible, creditSurplus, consumedCredit, seuil, bloque, statut_paiement: statutPaiement, devise, totalCommissions, totalPaye };
 }
