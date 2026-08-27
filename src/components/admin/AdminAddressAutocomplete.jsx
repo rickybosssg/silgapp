@@ -119,6 +119,8 @@ export default function AdminAddressAutocomplete({
   const containerRef = useRef(null);
   const debounceRef = useRef(null);
   const abortRef = useRef(null);
+  // Empêche la réouverture de la liste après sélection d'une suggestion.
+  const justSelectedRef = useRef(false);
 
   // ── Charger les quartiers actifs du pays (isolation stricte par country_code) ──
   useEffect(() => {
@@ -255,6 +257,11 @@ export default function AdminAddressAutocomplete({
   // Debounce la recherche
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
+    // Ne pas relancer la recherche si la valeur vient d'une sélection.
+    if (justSelectedRef.current) {
+      justSelectedRef.current = false;
+      return;
+    }
     const q = query.trim();
     if (q.length < 3) {
       setSuggestions([]);
@@ -271,6 +278,7 @@ export default function AdminAddressAutocomplete({
 
   const handleSelect = (result) => {
     const label = result.label || result.name || result.quartier || "";
+    justSelectedRef.current = true;
     setQuery(label);
     setShowSuggestions(false);
     setHighlightIndex(-1);
@@ -341,6 +349,7 @@ export default function AdminAddressAutocomplete({
               <button
                 key={idx}
                 type="button"
+                onPointerDown={(e) => e.preventDefault()}
                 onClick={() => handleSelect(r)}
                 onMouseEnter={() => setHighlightIndex(idx)}
                 className={`flex items-center gap-2 w-full text-left px-4 py-2.5 text-sm transition-colors ${
