@@ -1,4 +1,4 @@
-import { getCountryConfig } from "@/lib/phoneUtils";
+import { normalizePhone } from "@/lib/phoneUtils";
 
 /**
  * Source de vérité unique pour le contact d'une course selon la phase.
@@ -76,38 +76,7 @@ export function getCourseContactForPhase(course, phase = "recuperation") {
  */
 export function normalizePhoneForWhatsapp(phone, countryCode = "") {
   if (!phone) return "";
-  let num = String(phone).replace(/\D/g, "");
+  const num = String(phone).replace(/\D/g, "");
   if (!num) return "";
-
-  const cfg = getCountryConfig(countryCode);
-
-  if (!cfg) {
-    // Pas de config pays → retourner les chiffres (wa.me gère mal mais au moins pas de crash)
-    return num;
-  }
-
-  const dial = cfg.dial;
-  const localLen = cfg.len;
-
-  // Déjà au format international (indicatif + longueur locale)
-  if (num.startsWith(dial) && num.length === dial.length + localLen) {
-    return num;
-  }
-
-  // Numéro local avec 0 trunk (ex: 070123456 → 22670123456)
-  if (num.startsWith("0") && num.length === localLen + 1) {
-    return dial + num.slice(1);
-  }
-
-  // Numéro local sans 0 (ex: 70123456 → 22670123456)
-  if (num.length === localLen) {
-    return dial + num;
-  }
-
-  // Fallback : si commence par 0 et longueur > localLen+1, retirer le 0
-  if (num.startsWith("0")) {
-    return dial + num.slice(1);
-  }
-
-  return num;
+  return normalizePhone(num, countryCode) || num;
 }
