@@ -10,6 +10,7 @@
  */
 
 import { getFirebaseConfig, getAccessToken, sendFcmMessage, APP_URL, ANDROID_CHANNEL_ID } from './fcmUtils.ts';
+import { normalizePhone } from './phoneUtils.ts';
 
 const DEFAULT_ATTRIBUTION_WINDOW_HOURS = 72;
 const DEFAULT_ANTI_SPAM_HOURS = 48;
@@ -360,10 +361,21 @@ export async function attributeConversions(base44: any): Promise<{ attributed: n
       // Skip si hors fenêtre (campagne expirée)
       if ((now - referenceTime) > windowMs) continue;
 
-      // Chercher les courses créées par ce client après la référence
-      const courses = await base44.asServiceRole.entities.CourseExterne.filter({
-        client_telephone: r.client_telephone,
-      }, "-created_date", 10);
+      // ── Matching téléphone normalisé (prioritaire) + fallback brut ──
+      let courses: any[] = [];
+      const normalizedPhone = normalizePhone(r.client_telephone, r.country_code || undefined);
+      if (normalizedPhone) {
+        courses = await base44.asServiceRole.entities.CourseExterne.filter(
+          { client_phone_normalized: normalizedPhone },
+          "-created_date", 10
+        ).catch(() => []);
+      }
+      if (courses.length === 0 && r.client_telephone) {
+        courses = await base44.asServiceRole.entities.CourseExterne.filter(
+          { client_telephone: r.client_telephone },
+          "-created_date", 10
+        ).catch(() => []);
+      }
 
       for (const course of courses) {
         const courseCreated = course.created_date ? new Date(course.created_date).getTime() : 0;
@@ -397,7 +409,8 @@ export async function attributeConversions(base44: any): Promise<{ attributed: n
 
     // ── Recalculer les stats agrégées de la campagne ──
     const allRecipients = await base44.asServiceRole.entities.ReactivationCampaignRecipient.filter({ campaign_id: campaign.id });
-    const sentCount = allRecipients.filter((r: any) => r.status !== "control" && r.status !== "pending").length;
+    // sent_count = envois FCM RÉUSSIS uniquement (exclut failed, control, pending)
+    const sentCount = allRecipients.filter((r: any) => ["sent", "opened", "converted"].includes(r.status)).length;
     const openedCount = allRecipients.filter((r: any) => ["opened", "converted"].includes(r.status)).length;
     const courseCreatedCount = allRecipients.filter((r: any) => r.course_created_at).length;
     const courseCompletedCount = allRecipients.filter((r: any) => r.course_completed_at).length;

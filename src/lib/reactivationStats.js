@@ -12,7 +12,8 @@
 export function computeCampaignStats(recipients = []) {
   const total = recipients.length;
   const control = recipients.filter(r => r.is_control_group).length;
-  const sent = recipients.filter(r => r.status !== "control" && r.status !== "pending").length;
+  // sent = envois FCM RÉUSSIS uniquement (exclut failed, control, pending)
+  const sent = recipients.filter(r => ["sent", "opened", "converted"].includes(r.status)).length;
   const failed = recipients.filter(r => r.status === "failed").length;
   const opened = recipients.filter(r => ["opened", "converted"].includes(r.status)).length;
   const courseCreated = recipients.filter(r => r.course_created_at).length;
@@ -21,7 +22,7 @@ export function computeCampaignStats(recipients = []) {
   const commission = recipients.reduce((sum, r) => sum + (r.commission || 0), 0);
 
   // ── Taux ──
-  const sendRate = total > 0 ? Math.round((sent / total) * 100) : 0;
+  const sendRate = (total - control) > 0 ? Math.round((sent / (total - control)) * 100) : 0;
   const openRate = sent > 0 ? Math.round((opened / sent) * 100) : 0;
   const conversionRate = sent > 0 ? Math.round((courseCreated / sent) * 100) : 0;
 
@@ -33,6 +34,8 @@ export function computeCampaignStats(recipients = []) {
   const controlRate = control > 0 ? (controlConverted / control * 100) : 0;
   const campaignRate = sent > 0 ? (campaignConverted / sent * 100) : 0;
   const uplift = campaignRate - controlRate;
+  // Un groupe contrôle < 30 n'a pas de valeur statistique
+  const controlTooSmall = control > 0 && control < 30;
 
   return {
     total,
@@ -56,6 +59,7 @@ export function computeCampaignStats(recipients = []) {
     controlRate,
     campaignRate,
     uplift,
+    controlTooSmall,
   };
 }
 

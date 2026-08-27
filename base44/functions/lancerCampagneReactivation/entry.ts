@@ -162,6 +162,7 @@ export default async function(req: Request): Promise<Response> {
             await base44.asServiceRole.entities.ReactivationCampaignRecipient.update(pr.recipient_id, {
               status: pr.ok ? 'sent' : 'failed',
               sent_at: pr.ok ? new Date().toISOString() : null,
+              fcm_error: pr.ok ? null : (pr.error || null),
             });
           }
           successCount += result.success;
@@ -193,6 +194,7 @@ export default async function(req: Request): Promise<Response> {
           await base44.asServiceRole.entities.ReactivationCampaignRecipient.update(pr.recipient_id, {
             status: pr.ok ? 'sent' : 'failed',
             sent_at: pr.ok ? new Date().toISOString() : null,
+            fcm_error: pr.ok ? null : (pr.error || null),
           });
         }
         successCount += result.success;
@@ -215,7 +217,7 @@ export default async function(req: Request): Promise<Response> {
       status: 'completed',
       sent_count: successCount,
       failed_count: failedCount,
-      delivered_count: 0, // FCM Android ne fournit pas d'accusé de livraison fiable
+      // delivered_count : non mesurable avec FCM Android — ne pas afficher 0 comme un résultat réel
       completed_at: new Date().toISOString(),
     });
 

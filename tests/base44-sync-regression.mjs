@@ -83,9 +83,18 @@ assert.match(createLivreur, /credit_surplus:\s*0/, "Un nouveau livreur doit comm
 assert.match(createLivreur, /statut_paiement:\s*'paye'/, "Un nouveau livreur sans dette doit commencer à jour");
 
 const soldeCalculator = read("base44/shared/soldeCalculator.ts");
-assert.match(soldeCalculator, /Math\.min\(rawCreditSurplus,\s*creditDisponible\)/, "Le crédit excédentaire doit rester plafonné au crédit réellement disponible");
+assert.match(soldeCalculator, /if \(balance < 0\) balance = 0/, "Un ancien paiement excédentaire ne doit pas régler une commission future");
+assert.match(soldeCalculator, /Math\.max\(0, rawSolde - rawCreditSurplus\)/, "Le crédit explicite doit réduire le solde sans produire de dette négative");
 assert.match(soldeCalculator, /SOURCE DE VÉRITÉ unique/, "Le calcul comptable doit rester centralisé dans une source unique");
 assert.match(soldeCalculator, /base_comptable_solde_initial/, "La base comptable validée doit rester intégrée au calcul");
+
+const verifierEncours = read("base44/functions/verifierEncoursLivreur/entry.ts");
+assert.match(verifierEncours, /if \(course\.encours_comptabilise_at\)/, "Une course déjà comptabilisée doit être ignorée");
+assert.match(verifierEncours, /Math\.min\(creditSurplusActuel, commission\)/, "Une commission ne doit consommer que le crédit réellement disponible");
+assert.ok(
+  verifierEncours.indexOf("encours_comptabilise_at: now") < verifierEncours.indexOf("credit_surplus: nouveauCreditSurplus"),
+  "La garde d'idempotence doit être écrite avant la réduction du crédit"
+);
 
 const reactivation = read("src/pages/ReactivationClients.jsx");
 assert.match(reactivation, /Voir les résultats/, "Les résultats des campagnes de réactivation doivent rester accessibles");
@@ -95,6 +104,21 @@ const phoneUtils = read("src/lib/phoneUtils.js");
 assert.match(phoneUtils, /Country\.filter\(\{ actif: true \}\)/, "Les règles téléphone doivent être chargées dynamiquement pour tous les pays actifs");
 assert.match(phoneUtils, /phone_min_length/, "La longueur minimale doit provenir de la configuration pays");
 assert.match(phoneUtils, /phone_max_length/, "La longueur maximale doit provenir de la configuration pays");
+
+const clientOnboarding = read("src/components/client/ClientOnboarding.jsx");
+assert.match(clientOnboarding, /function EtapeProfil\(\{ clientProfil, onSuccess, onBack \}\)/, "Le formulaire Client doit exposer une navigation Retour");
+assert.match(clientOnboarding, /<ArrowLeft[\s\S]*Retour/, "Le bouton Retour Client doit être visible");
+
+const roleSelection = read("src/pages/RoleSelection.jsx");
+assert.match(roleSelection, /<ClientOnboarding[\s\S]*onBack=\{\(\) => setStep\("choix"\)\}/, "Le Retour Client doit revenir au choix de rôle");
+assert.match(roleSelection, /<LivreurRegistrationForm/, "Le parcours Livreur doit rester accessible");
+
+const establishmentForm = read("src/components/partenaire/EtablissementForm.jsx");
+assert.doesNotMatch(establishmentForm, /paysConfig\.digits|paysConfig\.emoji\b/, "Le formulaire établissement ne doit plus accéder aux anciennes propriétés pays non sûres");
+assert.match(establishmentForm, /paysConfig\?\.phone_min_length/, "Le minimum téléphone établissement doit être dynamique");
+assert.match(establishmentForm, /paysConfig\?\.phone_max_length/, "Le maximum téléphone établissement doit être dynamique");
+assert.match(establishmentForm, /paysConfig\?\.emoji_flag/, "Le drapeau établissement doit rester null-safe");
+assert.match(establishmentForm, /onClick=\{onCancel\}[\s\S]*Retour/, "Le formulaire établissement doit proposer un Retour visible");
 
 const driverDebts = read("src/pages/DusLivreursExternes.jsx");
 assert.match(driverDebts, /const livreursList = livreurs \|\| \[\]/, "Dûs Livreurs doit normaliser les réponses backend absentes");

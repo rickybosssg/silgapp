@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
-import { Truck, Package, ArrowRight, Loader2, CheckCircle, Store } from "lucide-react";
+import { Truck, Package, ArrowRight, ArrowLeft, Loader2, CheckCircle, Store } from "lucide-react";
 import ClientOnboarding from "@/components/client/ClientOnboarding";
 import LivreurRegistrationForm from "@/components/auth/LivreurRegistrationForm";
 import { SILGAPP_LOGO_URL } from "@/lib/branding";
@@ -111,10 +111,7 @@ export default function RoleSelection({ onPartenaire }) {
     return (
       <div className="min-h-screen bg-background p-6">
         <div className="max-w-lg mx-auto">
-          <button onClick={() => setStep("choix")} className="text-sm text-muted-foreground hover:text-foreground mb-6">
-            Retour
-          </button>
-          <ClientOnboarding clientProfil={null} onComplete={handleClientComplete} />
+          <ClientOnboarding clientProfil={null} onComplete={handleClientComplete} onBack={() => setStep("choix")} />
         </div>
       </div>
     );
@@ -124,8 +121,8 @@ export default function RoleSelection({ onPartenaire }) {
     return (
       <div className="min-h-screen bg-background p-6">
         <div className="max-w-lg mx-auto">
-          <button onClick={() => setStep("choix")} className="text-sm text-muted-foreground hover:text-foreground mb-6">
-            Retour
+          <button onClick={() => setStep("choix")} className="flex items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-foreground mb-6">
+            <ArrowLeft className="w-4 h-4" /> Retour
           </button>
           <LivreurRegistrationForm user={user} onComplete={handleLivreurComplete} />
         </div>

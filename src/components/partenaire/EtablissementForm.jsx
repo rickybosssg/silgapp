@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Upload, Save, X, AlertTriangle, MapPin } from "lucide-react";
+import { Loader2, Upload, Save, X, AlertTriangle, MapPin, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import PartenaireLocalisation from "@/components/partenaire/PartenaireLocalisation";
 import SmartAddressInput from "@/components/location/SmartAddressInput";
@@ -78,22 +78,26 @@ export default function EtablissementForm({ type, existing, partenaireId, userEm
 
   // Validation téléphone selon le pays — dynamique depuis Country
   const paysConfig = countries.find(p => p.code === form.pays_code) || null;
-  const paysDigits = paysConfig?.format_numero
-    ? parseInt(paysConfig.format_numero.replace(/\D/g, "").length) || 8
-    : 8;
+  const paysMinDigits = Number(paysConfig?.phone_min_length) || 8;
+  const paysMaxDigits = Number(paysConfig?.phone_max_length) || paysMinDigits;
+  const paysDigitsLabel = paysMinDigits === paysMaxDigits
+    ? `${paysMaxDigits}`
+    : `${paysMinDigits} à ${paysMaxDigits}`;
   const telDigits = (form.telephone || "").replace(/\D/g, "");
-  const telValide = !form.telephone || telDigits.length === paysDigits;
-  const telDepotValide = !form.telephone_depot || (form.telephone_depot.replace(/\D/g, "").length === paysDigits);
+  const telDepotDigits = (form.telephone_depot || "").replace(/\D/g, "");
+  const isValidPhoneLength = (length) => length >= paysMinDigits && length <= paysMaxDigits;
+  const telValide = !form.telephone || isValidPhoneLength(telDigits.length);
+  const telDepotValide = !form.telephone_depot || isValidPhoneLength(telDepotDigits.length);
 
   const handleSave = async () => {
     if (!form.nom || !form.pays_code) return;
     // Blocage si téléphone invalide — Correction 5
     if (form.telephone && !telValide) {
-      toast?.error?.(`Téléphone invalide : ${paysConfig.nom} requiert ${paysConfig.digits} chiffres`);
+      toast?.error?.(`Téléphone invalide : ${paysConfig?.nom || "ce pays"} requiert ${paysDigitsLabel} chiffres`);
       return;
     }
     if (form.telephone_depot && !telDepotValide) {
-      toast?.error?.(`Numéro Mobile Money invalide : ${paysConfig.digits} chiffres requis pour ${paysConfig.nom}`);
+      toast?.error?.(`Numéro Mobile Money invalide : ${paysDigitsLabel} chiffres requis pour ${paysConfig?.nom || "ce pays"}`);
       return;
     }
     setSaving(true);
@@ -128,6 +132,16 @@ export default function EtablissementForm({ type, existing, partenaireId, userEm
 
   return (
     <div className="bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden">
+      {/* ── Bouton Retour ── */}
+      {onCancel && (
+        <button
+          onClick={onCancel}
+          className="flex items-center gap-1.5 text-sm font-semibold text-gray-600 hover:text-gray-900 mb-3 transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" /> Retour
+        </button>
+      )}
+
       {/* ── Header premium ── */}
       <div className={`bg-gradient-to-r ${accentColor} px-6 py-5`}>
         <div className="flex items-center gap-3">
@@ -281,27 +295,27 @@ export default function EtablissementForm({ type, existing, partenaireId, userEm
             <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wide">Contact & Paiement</h3>
           </div>
           <div>
-            <Label className="text-xs font-semibold text-gray-600">Téléphone ({paysConfig.digits} chiffres pour {paysConfig.nom})</Label>
+            <Label className="text-xs font-semibold text-gray-600">Téléphone ({paysDigitsLabel} chiffres pour {paysConfig?.nom || "votre pays"})</Label>
             <div className="relative mt-1.5">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-mono">{paysConfig.emoji}</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-mono">{paysConfig?.emoji_flag || ""}</span>
               <Input
                 value={form.telephone || ""}
-                onChange={e => set("telephone", e.target.value.replace(/\D/g, "").slice(0, paysConfig.digits))}
-                placeholder={`${paysConfig.digits} chiffres`}
+                onChange={e => set("telephone", e.target.value.replace(/\D/g, "").slice(0, paysMaxDigits))}
+                placeholder={`${paysDigitsLabel} chiffres`}
                 inputMode="numeric"
                 className={`h-12 rounded-xl text-sm font-mono tracking-wider pl-10 ${form.telephone && !telValide ? "border-red-400 ring-2 ring-red-100" : ""}`}
               />
             </div>
-            {form.telephone && !telValide && <p className="text-[11px] text-red-500 mt-1 font-medium">⚠️ {telDigits.length}/{paysConfig.digits} chiffres saisis</p>}
+            {form.telephone && !telValide && <p className="text-[11px] text-red-500 mt-1 font-medium">⚠️ {telDigits.length}/{paysDigitsLabel} chiffres saisis</p>}
           </div>
           <div>
             <Label className="text-xs font-semibold text-gray-600">Numéro Mobile Money (dépôt) *</Label>
             <div className="relative mt-1.5">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-mono">{paysConfig.emoji}</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-mono">{paysConfig?.emoji_flag || ""}</span>
               <Input
                 value={form.telephone_depot || ""}
-                onChange={e => set("telephone_depot", e.target.value.replace(/\D/g, "").slice(0, paysConfig.digits))}
-                placeholder={`${paysConfig.digits} chiffres`}
+                onChange={e => set("telephone_depot", e.target.value.replace(/\D/g, "").slice(0, paysMaxDigits))}
+                placeholder={`${paysDigitsLabel} chiffres`}
                 inputMode="numeric"
                 className={`h-12 rounded-xl text-sm font-mono tracking-wider pl-10 ${form.telephone_depot && !telDepotValide ? "border-red-400 ring-2 ring-red-100" : ""}`}
               />
@@ -364,7 +378,7 @@ export default function EtablissementForm({ type, existing, partenaireId, userEm
           <Button onClick={handleSave} disabled={saving || !form.nom} className={`flex-1 h-13 py-3.5 rounded-2xl bg-gradient-to-r ${accentColor} hover:opacity-90 text-white font-bold text-sm shadow-lg`}>
             {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />} Enregistrer
           </Button>
-          {onCancel && <Button variant="outline" onClick={onCancel} className="h-13 px-4 rounded-2xl border-gray-200"><X className="w-5 h-5" /></Button>}
+          {onCancel && <Button variant="outline" onClick={onCancel} className="h-13 px-4 rounded-2xl border-gray-200"><X className="w-5 h-5" /> Annuler</Button>}
         </div>
       </div>
     </div>

@@ -95,17 +95,33 @@ Deno.serve(async (req) => {
 
     const now = new Date().toISOString();
 
+    // ── Recalculer le solde AVANT de marquer la course ──
+    // Le recalcul doit voir cette commission comme "nouvelle" (encours_comptabilise_at = null)
+    // pour consommer le credit_surplus. Le marquage se fait APRÈS pour garantir l'idempotence.
+    const resultat = await recalculerSoldeLivreur(base44, livreurId);
+    const { solde, seuil, bloque, statut_paiement, devise } = resultat;
+
     // ── Marquer la course comme comptabilisée (garde d'idempotence) ──
+    // À faire APRÈS le recalcul pour que calculerSoldeLivreur voie la commission comme nouvelle.
     await base44.asServiceRole.entities.CourseExterne.update(courseId, {
       encours_comptabilise_at: now,
       encours_comptabilise_montant: commission,
     });
 
-    // ── Recalculer le solde depuis les sources financières ──
-    // montant_du_silga = projection = somme des commissions non payées
-    // encours = alias legacy synchronisé (conservé pour anciens APK)
-    const resultat = await recalculerSoldeLivreur(base44, livreurId);
-    const { solde, seuil, bloque, statut_paiement, devise } = resultat;
+    // ── Réduire le credit_surplus du livreur par le montant de la commission ──
+    // credit_surplus est un cap en lecture seule pendant le calcul du solde.
+    // Sa réduction se fait ICI, une seule fois, au moment du marquage de la course.
+    // L'idempotence est garantie par le garde-fou encours_comptabilise_at ci-dessus :
+    // un second appel skippe avant d'atteindre ce point.
+    const creditSurplusActuel = Number(livreur.credit_surplus) || 0;
+    if (creditSurplusActuel > 0 && commission > 0) {
+      const reductionCredit = Math.min(creditSurplusActuel, commission);
+      const nouveauCreditSurplus = Math.max(0, creditSurplusActuel - reductionCredit);
+      await base44.asServiceRole.entities.Livreur.update(livreurId, {
+        credit_surplus: nouveauCreditSurplus,
+      });
+      console.log(`[ENCOURS] Credit_surplus réduit pour ${livreurId}: ${creditSurplusActuel} → ${nouveauCreditSurplus} (commission ${commission})`);
+    }
 
     if (seuil === null || seuil <= 0) {
       return Response.json({

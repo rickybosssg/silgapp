@@ -120,7 +120,7 @@
     "net_result": {
       "type": "number",
       "default": 0,
-      "description": "R\u00e9sultat net = commission g\u00e9n\u00e9r\u00e9e - co\u00fbt promotionnel"
+      "description": "R\u00e9sultat net = commission g\u00e9n\u00e9r\u00e9e - co\u00f9t promotionnel"
     },
     "is_ab_test": {
       "type": "boolean",
@@ -155,6 +155,76 @@
       "type": "number",
       "default": 0,
       "description": "Nombre d'\u00e9checs d'envoi FCM"
+    },
+    "is_automatic": {
+      "type": "boolean",
+      "default": false,
+      "description": "True si la campagne est g\u00e9r\u00e9e par le moteur automatique J0/J+2/J+5. Les campagnes manuelles restent is_automatic=false."
+    },
+    "scenario_paused": {
+      "type": "boolean",
+      "default": false,
+      "description": "True si le moteur automatique est en pause (admin). Les sc\u00e9narios en cours continuent mais aucun nouveau sc\u00e9nario ne d\u00e9marre."
+    },
+    "test_mode": {
+      "type": "boolean",
+      "default": false,
+      "description": "True si le moteur est en mode test (uniquement les t\u00e9l\u00e9phones de test, d\u00e9lais raccourcis)"
+    },
+    "test_phones": {
+      "type": "string",
+      "description": "JSON: tableau des t\u00e9l\u00e9phones de test (mode test uniquement)"
+    },
+    "smart_segment": {
+      "type": "string",
+      "enum": [
+        "vip",
+        "regular",
+        "occasional",
+        "no_course",
+        "all"
+      ],
+      "default": "all",
+      "description": "Segment intelligent pour le moteur auto: vip (5+ courses inactif), regular (2-4 courses inactif), occasional (1 course inactif), no_course (0 course inscrit), all (tous \u00e9ligibles)"
+    },
+    "j0_message_a": {
+      "type": "string",
+      "description": "Message J0 variante A (moteur auto)"
+    },
+    "j0_message_b": {
+      "type": "string",
+      "description": "Message J0 variante B (moteur auto)"
+    },
+    "j2_message_a": {
+      "type": "string",
+      "description": "Message J+2 variante A (moteur auto)"
+    },
+    "j2_message_b": {
+      "type": "string",
+      "description": "Message J+2 variante B (moteur auto)"
+    },
+    "j5_message_a": {
+      "type": "string",
+      "description": "Message J+5 variante A (moteur auto)"
+    },
+    "j5_message_b": {
+      "type": "string",
+      "description": "Message J+5 variante B (moteur auto)"
+    },
+    "push_interval_days": {
+      "type": "number",
+      "default": 2,
+      "description": "D\u00e9lai en jours entre J0 et J+2"
+    },
+    "push_interval_2_days": {
+      "type": "number",
+      "default": 3,
+      "description": "D\u00e9lai en jours entre J+2 et J+5"
+    },
+    "cooldown_days": {
+      "type": "number",
+      "default": 30,
+      "description": "D\u00e9lai en jours avant qu'un m\u00eame client puisse entrer dans un nouveau sc\u00e9nario"
     }
   },
   "required": [
