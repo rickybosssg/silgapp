@@ -89,11 +89,11 @@ export default function EtablissementForm({ type, existing, partenaireId, userEm
     if (!form.nom || !form.pays_code) return;
     // Blocage si téléphone invalide — Correction 5
     if (form.telephone && !telValide) {
-      toast?.error?.(`Téléphone invalide : ${paysConfig.nom} requiert ${paysConfig.digits} chiffres`);
+      toast?.error?.(`Téléphone invalide : ${paysConfig?.nom || "ce pays"} requiert ${paysDigits} chiffres`);
       return;
     }
     if (form.telephone_depot && !telDepotValide) {
-      toast?.error?.(`Numéro Mobile Money invalide : ${paysConfig.digits} chiffres requis pour ${paysConfig.nom}`);
+      toast?.error?.(`Numéro Mobile Money invalide : ${paysDigits} chiffres requis pour ${paysConfig?.nom || "ce pays"}`);
       return;
     }
     setSaving(true);
@@ -281,27 +281,27 @@ export default function EtablissementForm({ type, existing, partenaireId, userEm
             <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wide">Contact & Paiement</h3>
           </div>
           <div>
-            <Label className="text-xs font-semibold text-gray-600">Téléphone ({paysConfig.digits} chiffres pour {paysConfig.nom})</Label>
+            <Label className="text-xs font-semibold text-gray-600">Téléphone ({paysDigits} chiffres pour {paysConfig?.nom || "votre pays"})</Label>
             <div className="relative mt-1.5">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-mono">{paysConfig.emoji}</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-mono">{paysConfig?.emoji_flag || ""}</span>
               <Input
                 value={form.telephone || ""}
-                onChange={e => set("telephone", e.target.value.replace(/\D/g, "").slice(0, paysConfig.digits))}
-                placeholder={`${paysConfig.digits} chiffres`}
+                onChange={e => set("telephone", e.target.value.replace(/\D/g, "").slice(0, paysDigits))}
+                placeholder={`${paysDigits} chiffres`}
                 inputMode="numeric"
                 className={`h-12 rounded-xl text-sm font-mono tracking-wider pl-10 ${form.telephone && !telValide ? "border-red-400 ring-2 ring-red-100" : ""}`}
               />
             </div>
-            {form.telephone && !telValide && <p className="text-[11px] text-red-500 mt-1 font-medium">⚠️ {telDigits.length}/{paysConfig.digits} chiffres saisis</p>}
+            {form.telephone && !telValide && <p className="text-[11px] text-red-500 mt-1 font-medium">⚠️ {telDigits.length}/{paysDigits} chiffres saisis</p>}
           </div>
           <div>
             <Label className="text-xs font-semibold text-gray-600">Numéro Mobile Money (dépôt) *</Label>
             <div className="relative mt-1.5">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-mono">{paysConfig.emoji}</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-mono">{paysConfig?.emoji_flag || ""}</span>
               <Input
                 value={form.telephone_depot || ""}
-                onChange={e => set("telephone_depot", e.target.value.replace(/\D/g, "").slice(0, paysConfig.digits))}
-                placeholder={`${paysConfig.digits} chiffres`}
+                onChange={e => set("telephone_depot", e.target.value.replace(/\D/g, "").slice(0, paysDigits))}
+                placeholder={`${paysDigits} chiffres`}
                 inputMode="numeric"
                 className={`h-12 rounded-xl text-sm font-mono tracking-wider pl-10 ${form.telephone_depot && !telDepotValide ? "border-red-400 ring-2 ring-red-100" : ""}`}
               />
