@@ -108,6 +108,21 @@ Deno.serve(async (req) => {
       encours_comptabilise_montant: commission,
     });
 
+    // ── Réduire le credit_surplus du livreur par le montant de la commission ──
+    // credit_surplus est un cap en lecture seule pendant le calcul du solde.
+    // Sa réduction se fait ICI, une seule fois, au moment du marquage de la course.
+    // L'idempotence est garantie par le garde-fou encours_comptabilise_at ci-dessus :
+    // un second appel skippe avant d'atteindre ce point.
+    const creditSurplusActuel = Number(livreur.credit_surplus) || 0;
+    if (creditSurplusActuel > 0 && commission > 0) {
+      const reductionCredit = Math.min(creditSurplusActuel, commission);
+      const nouveauCreditSurplus = Math.max(0, creditSurplusActuel - reductionCredit);
+      await base44.asServiceRole.entities.Livreur.update(livreurId, {
+        credit_surplus: nouveauCreditSurplus,
+      });
+      console.log(`[ENCOURS] Credit_surplus réduit pour ${livreurId}: ${creditSurplusActuel} → ${nouveauCreditSurplus} (commission ${commission})`);
+    }
+
     if (seuil === null || seuil <= 0) {
       return Response.json({
         success: false,

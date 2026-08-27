@@ -75,24 +75,17 @@ function processTimeline(
     }
   }
 
-  // Le credit_surplus est un CAP appliqué à la fin pour le calcul du solde.
+  // credit_surplus est un CAP en lecture seule — JAMAIS muté ni consommé ici.
+  // Sa réduction est gérée exclusivement par verifierEncoursLivreur au moment du
+  // marquage de la course (encours_comptabilise_at), ce qui garantit l'idempotence :
+  // un recalcul re-joué N fois produit toujours le même solde sans réduire le crédit.
   const rawSolde = Math.max(0, balance);
   const solde = rawCreditSurplus > 0 ? Math.max(0, rawSolde - rawCreditSurplus) : rawSolde;
 
-  // ── Consommation réelle de credit_surplus ──
-  // Seules les commissions NON encore comptabilisées (encours_comptabilise_at = null)
-  // consomment le crédit. Les commissions déjà comptabilisées l'ont été lors d'un
-  // précédent passage — elles ne doivent pas le consommer une deuxième fois.
-  // Le batch read-only (sans encours_comptabilise_at dans les events) ne consomme rien.
-  const newCommissionsTotal = sorted
-    .filter((e: any) => e.type === 'commission' && !e.encours_comptabilise_at)
-    .reduce((s, e: any) => s + e.amount, 0);
-  const consumedCredit = Math.min(rawCreditSurplus, newCommissionsTotal);
-
   return {
     solde,
-    creditSurplus: rawCreditSurplus, // Valeur DB inchangée — la consommation est retournée séparément
-    consumedCredit,
+    creditSurplus: rawCreditSurplus,
+    consumedCredit: 0,
     totalCommissions,
     totalPaye,
   };

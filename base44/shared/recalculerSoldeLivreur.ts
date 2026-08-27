@@ -74,14 +74,12 @@ export async function recalculerSoldeLivreur(base44: any, livreurId: string): Pr
 
   if (seuil === null || seuil <= 0) {
     console.warn(`[SOLDE] ⚠️ Seuil non configuré pour pays ${livreur.country_code} — livreur ${livreurId}`);
-    const newCreditSurplus = Math.max(0, creditSurplus - consumedCredit);
     await base44.asServiceRole.entities.Livreur.update(livreurId, {
       montant_du_silga: solde,
       encours: solde,
       statut_paiement: solde > 0 ? 'non_paye' : 'paye',
-      credit_surplus: newCreditSurplus,
     });
-    return { solde, creditDisponible, creditSurplus: newCreditSurplus, consumedCredit, seuil: null, bloque: false, statut_paiement: solde > 0 ? 'non_paye' : 'paye', devise, totalCommissions, totalPaye };
+    return { solde, creditDisponible, creditSurplus, consumedCredit, seuil: null, bloque: false, statut_paiement: solde > 0 ? 'non_paye' : 'paye', devise, totalCommissions, totalPaye };
   }
 
   // 8. Déterminer le statut dérivé (solde > 0 → dette, solde = 0 → réglé)
@@ -89,14 +87,12 @@ export async function recalculerSoldeLivreur(base44: any, livreurId: string): Pr
   const bloque = solde >= seuil;
   const now = new Date().toISOString();
 
-  // 9. Construire l'update
-  const newCreditSurplus = Math.max(0, creditSurplus - consumedCredit);
+  // 9. Construire l'update — SANS credit_surplus (cap en lecture seule, jamais muté ici)
   const updateData: any = {
     montant_du_silga: solde,
     encours: solde, // alias legacy synchronisé
     statut_paiement: statutPaiement,
     bloque_encours: bloque,
-    credit_surplus: newCreditSurplus,
   };
 
   if (bloque) {
