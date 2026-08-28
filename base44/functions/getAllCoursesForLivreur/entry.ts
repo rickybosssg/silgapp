@@ -76,7 +76,7 @@ Deno.serve(async (req) => {
     const coursesPourLivreur = allCourses.filter((c) => {
       if (normalizeCountry(c.country_code) !== effectiveCountry) return false;
 
-      // 1. Courses deja acceptees.
+      // 1. Courses deja acceptees (ownership opérationnel).
       if (
         sameId(c.livreur_id, livreur_id) ||
         sameId(c.accepted_by_livreur_id, livreur_id) ||
@@ -86,6 +86,17 @@ Deno.serve(async (req) => {
 
       // 2. Courses en dispatch multi-livreur.
       if (c.dispatch_status === 'propose' && !c.livreur_id && includesLivreur(c.dispatch_notified_ids, livreur_id)) {
+        return true;
+      }
+
+      // 3. Ownership historique : livreur_financier_id pour les courses TERMINALES
+      //    uniquement (livree, annulee). Cela permet de récupérer les courses
+      //    dont livreur_id a été vidé par le passé (bug nettoyageMatinal corrigé).
+      //    Pour les courses ACTIVES, livreur_financier_id n'est jamais utilisé
+      //    — cela protégerait le redispatch (un ancien livreur ne doit pas
+      //    voir une course redispatchée comme active chez lui).
+      const isTerminal = c.statut === 'livree' || c.statut === 'annulee';
+      if (isTerminal && sameId(c.livreur_financier_id, livreur_id)) {
         return true;
       }
 

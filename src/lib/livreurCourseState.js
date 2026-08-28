@@ -46,6 +46,21 @@ export function isCourseAcceptedByLivreur(course, livreurId) {
   );
 }
 
+// ── Statuts terminaux : la course n'est plus active opérationnellement ──
+// Pour ces statuts, livreur_financier_id est accepté comme fallback d'ownership
+// afin de récupérer les courses livrées dont livreur_id a été vidé par le passé
+// (bug nettoyageMatinal, désormais corrigé côté source).
+// Pour les courses ACTIVES (non terminales), livreur_financier_id n'est JAMAIS
+// utilisé comme critère d'ownership — cela protégerait le redispatch.
+const TERMINAL_COURSE_STATUSES = new Set(["livree", "annulee", "completed", "delivered", "canceled"]);
+
+export function isCourseHistoricallyOwnedByLivreur(course, livreurId) {
+  if (!course || !livreurId) return false;
+  // Pour les courses terminales uniquement : accepter livreur_financier_id comme fallback
+  if (!TERMINAL_COURSE_STATUSES.has(course.statut)) return false;
+  return sameLivreurId(course.livreur_financier_id, livreurId);
+}
+
 export function normalizeFourDigitPin(value) {
   return String(value ?? "")
     .normalize("NFKC")
