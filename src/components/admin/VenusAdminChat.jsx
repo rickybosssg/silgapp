@@ -49,12 +49,19 @@ export default function VenusAdminChat() {
         country_code: "ALL",
       });
 
-      const reply = result?.success
-        ? result.response
+      // Le SDK peut retourner la réponse directement ou enveloppée dans { data: ... }
+      const data = result?.data !== undefined ? result.data : result;
+      const reply = data?.success
+        ? data.response
         : "Désolé Eric, je n'ai pas pu traiter votre demande pour le moment.";
 
       setMessages([...newMessages, { role: "assistant", content: reply }]);
     } catch (e) {
+      console.error("[VenusAdminChat] Erreur:", {
+        function: "venusAdminChat",
+        message: e?.message || String(e),
+        timestamp: new Date().toISOString(),
+      });
       setMessages([...newMessages, { role: "assistant", content: "Une erreur est survenue. Réessayez dans un instant." }]);
     } finally {
       setIsLoading(false);
