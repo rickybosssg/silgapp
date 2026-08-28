@@ -1,5 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
-import { haversineKm as haversineKmShared } from '../../shared/geoUtils.ts';
+import { haversineKm } from '../../shared/geoUtils.ts';
 
 // ─── Quartiers de référence (Ouagadougou) ────────────────────────────────────
 const QUARTIERS_REF = [
