@@ -29,9 +29,12 @@ Deno.serve(async (req) => {
     // comme garde d'idempotence dédiée — ne pas confondre avec crm_stats_synced).
     //
     // EXCEPTION : une course source=client ne doit JAMAIS être verrouillée par
-    // pricing_mode=admin_manuel (anomalie de données). On corrige le pricing_mode
-    // vers 'automatic' et on procède au calcul normal.
-    if (course.source === 'client' && course.pricing_mode === 'admin_manuel') {
+    // pricing_mode=admin_manuel suite à une anomalie de données (ex: ancien bug Venus).
+    // On corrige le pricing_mode vers 'automatic' et on procède au calcul normal.
+    // MAIS on préserve les overrides admin légitimes (prix_propose_admin set par modifierPrixCourseAdmin
+    // sur une course non-Venus). Les courses Venus avec prix_propose_admin sont corrigées (bug).
+    if (course.source === 'client' && course.pricing_mode === 'admin_manuel' &&
+        (!course.prix_propose_admin || course.created_by_venus)) {
       console.warn('[calculPrixCourseExterne] Course source=client avec pricing_mode=admin_manuel (anomalie) — correction vers automatic');
       await base44.asServiceRole.entities.CourseExterne.update(course_id, { pricing_mode: 'automatic' }).catch(() => {});
       course.pricing_mode = 'automatic';
