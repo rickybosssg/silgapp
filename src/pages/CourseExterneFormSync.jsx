@@ -703,13 +703,13 @@ export default function CourseExterneFormSync() {
     const departGps = resolveGpsForCourse({
       exactLat: formData.gps_depart_lat,
       exactLng: formData.gps_depart_lng,
-      quartierName: formData.quartier_depart,
+      quartierName: (formData.quartier_depart || "").trim(),
       quartiers: quartiersList,
     });
     const arriveeGps = isMulti ? null : resolveGpsForCourse({
       exactLat: gpsArriveLat,
       exactLng: gpsArriveLng,
-      quartierName: formData.quartier_arrivee,
+      quartierName: (formData.quartier_arrivee || "").trim(),
       quartiers: quartiersList,
     });
 

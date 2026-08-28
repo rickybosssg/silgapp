@@ -27,6 +27,16 @@ Deno.serve(async (req) => {
     // Le PRIX est verrouillé, mais la COMMISSION doit quand même être comptabilisée
     // dans la dette du livreur via verifierEncoursLivreur (qui utilise encours_comptabilise_at
     // comme garde d'idempotence dédiée — ne pas confondre avec crm_stats_synced).
+    //
+    // EXCEPTION : une course source=client ne doit JAMAIS être verrouillée par
+    // pricing_mode=admin_manuel (anomalie de données). On corrige le pricing_mode
+    // vers 'automatic' et on procède au calcul normal.
+    if (course.source === 'client' && course.pricing_mode === 'admin_manuel') {
+      console.warn('[calculPrixCourseExterne] Course source=client avec pricing_mode=admin_manuel (anomalie) — correction vers automatic');
+      await base44.asServiceRole.entities.CourseExterne.update(course_id, { pricing_mode: 'automatic' }).catch(() => {});
+      course.pricing_mode = 'automatic';
+    }
+
     if (course.pricing_mode === 'admin_manuel' || course.source === 'admin') {
       // Prix verrouillé — ne pas recalculer. Mais s'assurer que la commission
       // est comptabilisée dans l'encours du livreur (idempotent via encours_comptabilise_at).
@@ -69,10 +79,22 @@ Deno.serve(async (req) => {
     }
 
     if (commissionPct === null) {
+      // ── Prix à confirmer : commission non configurée ──
+      // La course continue (dispatch, livraison) mais le prix reste à confirmer par l'admin.
+      const tarifZoneForSuggestion = await chargerTarifZone(base44, countryCode, course.ville_arrivee || course.ville_depart);
+      const prixSuggere = tarifZoneForSuggestion?.palier_1_prix || tarif?.prix_minimum || null;
+      await base44.asServiceRole.entities.CourseExterne.update(course_id, {
+        prix_a_confirmer: true,
+        raison_prix_a_confirmer: 'commission_pct_manquant',
+        prix_suggere_admin: prixSuggere,
+      }).catch(() => {});
       return Response.json({
-        error: `Commission non configuree pour le pays ${countryCode}`,
-        blocked_reason: 'missing_country_commission_pct',
-      }, { status: 400 });
+        success: false,
+        prix_a_confirmer: true,
+        reason: 'commission_pct_manquant',
+        message: `Commission non configurée pour le pays ${countryCode} — prix à confirmer par l'admin.`,
+        prix_suggere_admin: prixSuggere,
+      });
     }
 
     // ── Garde-fou Client : prix_propose_client est la source de vérité si défini ──
@@ -120,9 +142,23 @@ Deno.serve(async (req) => {
       const lng2 = course.gps_arrivee_lng;
 
       if (!lat1 || !lng1 || !lat2 || !lng2) {
+        // ── Prix à confirmer : GPS manquant ──
+        // La course continue (dispatch, livraison) mais le prix reste à confirmer par l'admin.
+        const raisonGps = !lat1 ? 'gps_depart_manquant' : !lat2 ? 'gps_arrivee_manquant' : 'distance_tarifaire_impossible';
+        const tarifZoneForSuggestion = await chargerTarifZone(base44, countryCode, course.ville_arrivee || course.ville_depart);
+        const prixSuggere = tarifZoneForSuggestion?.palier_1_prix || tarif?.prix_minimum || null;
+        await base44.asServiceRole.entities.CourseExterne.update(course_id, {
+          prix_a_confirmer: true,
+          raison_prix_a_confirmer: raisonGps,
+          prix_suggere_admin: prixSuggere,
+        }).catch(() => {});
         return Response.json({
-          error: 'Coordonnées GPS de création manquantes — distance tarifaire impossible à calculer'
-        }, { status: 400 });
+          success: false,
+          prix_a_confirmer: true,
+          reason: raisonGps,
+          message: 'Coordonnées GPS de création manquantes — prix à confirmer par l\'admin.',
+          prix_suggere_admin: prixSuggere,
+        });
       }
 
       distanceReelle = haversineKm(lat1, lng1, lat2, lng2) ?? 0;
@@ -158,10 +194,19 @@ Deno.serve(async (req) => {
         const seuilStrict = tarifZone.seuil_strict_km;
 
         if (distTarif > palier2KmMax) {
+          // ── Prix à confirmer : distance hors palier ──
+          await base44.asServiceRole.entities.CourseExterne.update(course_id, {
+            prix_a_confirmer: true,
+            raison_prix_a_confirmer: 'distance_exceeds_tarif_zone',
+            prix_suggere_admin: tarifZone.palier_2_prix,
+          }).catch(() => {});
           return Response.json({
-            error: `Distance (${distTarif.toFixed(2)} km) supérieure à ${palier2KmMax} km — tarif personnalisé requis`,
-            blocked_reason: 'distance_exceeds_tarif_zone',
-          }, { status: 400 });
+            success: false,
+            prix_a_confirmer: true,
+            reason: 'distance_exceeds_tarif_zone',
+            message: `Distance (${distTarif.toFixed(2)} km) supérieure à ${palier2KmMax} km — prix à confirmer par l'admin.`,
+            prix_suggere_admin: tarifZone.palier_2_prix,
+          });
         }
 
         if (approx && distTarif >= tolMin && distTarif <= tolMax) {

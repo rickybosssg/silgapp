@@ -159,6 +159,44 @@ export default async function(req: Request): Promise<Response> {
     //   - calcul automatique (distance × prix_par_km, min prix_minimum)
     //   - TarifZone (paliers Grand Ouaga)
     // Il appelle également verifierEncoursLivreur lui-même.
+    //
+    // ── CAS 2b: Course en "prix à confirmer" ──
+    // Si le prix n'a pas pu être calculé automatiquement (GPS manquant, etc.),
+    // le livreur PEUT terminer la livraison. La course passe en "livree" mais
+    // SANS commission (prix_final reste null). L'admin confirmera le prix
+    // ultérieurement via confirmerPrixCourseAdmin, qui calculera alors la
+    // commission et appellera verifierEncoursLivreur.
+    if (course.prix_a_confirmer) {
+      const updateData = {
+        statut: 'livree',
+        heure_livraison: now,
+        colis_livre_at: now,
+        // prix_final reste null — sera défini par confirmerPrixCourseAdmin
+        // commission_silga reste null — sera calculée par confirmerPrixCourseAdmin
+        // montant_livreur reste null — sera calculé par confirmerPrixCourseAdmin
+        ...(course.livreur_financier_id ? {} : { livreur_financier_id: course.livreur_id }),
+      };
+
+      if (is_multi_colis && colis_data) {
+        await handleMultiColis(base44, course_id, colis_data, now);
+      }
+
+      const updated = await base44.asServiceRole.entities.CourseExterne.update(course_id, updateData);
+
+      // NE PAS appeler verifierEncoursLivreur ici — il n'y a pas de commission à comptabiliser.
+      // verifierEncoursLivreur sera appelé par confirmerPrixCourseAdmin après confirmation du prix.
+      return Response.json({
+        success: true,
+        course: updated,
+        prix_a_confirmer: true,
+        prix_final: null,
+        commission_silga: null,
+        montant_livreur: null,
+        prix_source: 'prix_a_confirmer_livraison',
+        message: 'Course livrée. Le prix reste à confirmer par l\'admin. Aucune commission comptabilisée pour le moment.',
+      });
+    }
+
     try {
       const res = await base44.asServiceRole.functions.invoke('calculPrixCourseExterne', { course_id });
       if (res?.success) {
@@ -174,6 +212,31 @@ export default async function(req: Request): Promise<Response> {
           commission_silga: res.commission_silga,
           montant_livreur: res.montant_livreur,
           prix_source: res.prix_source,
+        });
+      } else if (res?.prix_a_confirmer) {
+        // calculPrixCourseExterne a mis la course en "prix à confirmer"
+        // Le livreur peut quand même terminer la livraison.
+        const updateData = {
+          statut: 'livree',
+          heure_livraison: now,
+          colis_livre_at: now,
+          ...(course.livreur_financier_id ? {} : { livreur_financier_id: course.livreur_id }),
+        };
+
+        if (is_multi_colis && colis_data) {
+          await handleMultiColis(base44, course_id, colis_data, now);
+        }
+
+        const updated = await base44.asServiceRole.entities.CourseExterne.update(course_id, updateData);
+        return Response.json({
+          success: true,
+          course: updated,
+          prix_a_confirmer: true,
+          prix_final: null,
+          commission_silga: null,
+          montant_livreur: null,
+          prix_source: 'prix_a_confirmer_livraison',
+          message: 'Course livrée. Le prix reste à confirmer par l\'admin.',
         });
       } else {
         return Response.json({ error: res?.error || 'Erreur calcul prix' }, { status: 400 });

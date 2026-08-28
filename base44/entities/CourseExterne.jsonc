@@ -237,7 +237,7 @@
         "annulee"
       ],
       "default": "nouvelle",
-      "description": "Statut de la course. en_attente = course suspendue (dispatch NON declenche) \u2014 l'admin doit la repasser en 'nouvelle' pour lancer le dispatch. client_contacte et en_route_expediteur sont specifiques au workflow des courses administratives (source=admin, colis) : etapes intermediaires entre l'acceptation et le depart vers l'expediteur."
+      "description": "Statut de la course. en_attente = course suspendue (dispatch NON declenche) \u2014 l'admin doit la repasser en 'nouvelle' pour lancer le dispatch. client_contacto et en_route_expediteur sont specifiques au workflow des courses administratives (source=admin, colis) : etapes intermediaires entre l'acceptation et le depart vers l'expediteur."
     },
     "dispatch_status": {
       "type": "string",
@@ -575,6 +575,28 @@
     "encours_comptabilise_montant": {
       "type": "number",
       "description": "Montant de la commission comptabilisee dans l'encours du livreur (pour audit)"
+    },
+    "prix_a_confirmer": {
+      "type": "boolean",
+      "default": false,
+      "description": "True si le prix n'a pas pu etre calcule automatiquement (GPS manquant, distance indisponible, etc.) et doit etre confirme par l'admin. La course continue normalement (dispatch, livraison) mais aucune commission n'est comptabilisee tant que l'admin n'a pas confirme le prix."
+    },
+    "raison_prix_a_confirmer": {
+      "type": "string",
+      "description": "Raison technique pour laquelle le prix n'a pas pu etre calcule (ex: gps_arrivee_manquant, distance_tarifaire_impossible, commission_pct_manquant)."
+    },
+    "prix_suggere_admin": {
+      "type": "number",
+      "description": "Prix suggere a l'admin pour confirmation. Provenant de TarifZone (palier_1_prix) ou de la configuration Country. Jamais code en dur."
+    },
+    "prix_confirme_par_admin_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date a laquelle l'admin a confirme le prix de cette course."
+    },
+    "prix_confirme_par_admin_id": {
+      "type": "string",
+      "description": "Email de l'admin ayant confirme le prix."
     }
   },
   "required": [
