@@ -116,11 +116,20 @@ async function upsertClientContact(phone, countryCode, name, role, courseData) {
   const [prenom, ...nomParts] = clientName.split(" ");
   const nom = nomParts.join(" ") || clientName || "Client";
 
+  // Un nom existant est considéré comme placeholder s'il est vide ou "Client".
+  // Dans ce cas, on autorise la mise à jour avec le vrai nom saisi par l'admin.
+  // Si le nom existant est un vrai nom (non placeholder), on le conserve (mise à jour prudente).
+  const isPlaceholder = (n) => {
+    if (!n) return true;
+    const t = n.trim().toLowerCase();
+    return t === "" || t === "client" || t === "—";
+  };
+
   const isNew = !existing;
   const updateData = {
     telephone: normalized,
     telephone_normalized: normalized,
-    nom: existing?.nom || nom,
+    nom: !isPlaceholder(existing?.nom) ? existing.nom : nom,
     prenom: existing?.prenom || prenom || "",
     country_code: countryCode,
     roles: JSON.stringify([...roles]),

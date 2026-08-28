@@ -35,8 +35,12 @@ export default function ClientPhoneDetector({ phone, countryCode, onClientFound,
       if (results && results.length > 0) {
         setClient(results[0]);
         onClientFoundRef.current?.(results[0]);
-        if (results[0].nom && !results[0].cree_via_crm) {
-          onClientNameRef.current?.(results[0].nom, results[0].prenom);
+        // Toujours pré-remplir le nom si la fiche client en a un (même si cree_via_crm).
+        // Le callback parent (AdminCourseForm) ne remplit que si le champ est vide.
+        const existingNom = (results[0].nom || "").trim();
+        const existingPrenom = (results[0].prenom || "").trim();
+        if (existingNom && existingNom.toLowerCase() !== "client") {
+          onClientNameRef.current?.(existingNom, existingPrenom);
         }
       } else {
         setClient(null);
