@@ -718,13 +718,13 @@ export default function CourseExterneFormSync() {
     const departGps = resolveGpsForCourse({
       exactLat: formData.gps_depart_lat,
       exactLng: formData.gps_depart_lng,
-      quartierName: formData.quartier_depart,
+      quartierName: (formData.quartier_depart || "").trim(),
       quartiers: quartiersList,
     });
     const arriveeGps = isMulti ? null : resolveGpsForCourse({
       exactLat: gpsArriveLat,
       exactLng: gpsArriveLng,
-      quartierName: formData.quartier_arrivee,
+      quartierName: (formData.quartier_arrivee || "").trim(),
       quartiers: quartiersList,
     });
 
@@ -808,8 +808,8 @@ export default function CourseExterneFormSync() {
       expediteur_has_app: false,
       adresse_depart: isDeplacement ? (formData.adresse_depart || (formData.recuperationGPS ? "Position GPS" : "À définir")) : (formData.adresse_depart || (formData.recuperationGPS ? "Position GPS" : "À définir")),
       adresse_arrivee: adresseArriveeFinale,
-      quartier_depart: formData.quartier_depart || null,
-      quartier_arrivee: formData.quartier_arrivee || null,
+      quartier_depart: (formData.quartier_depart || "").trim() || null,
+      quartier_arrivee: (formData.quartier_arrivee || "").trim() || null,
       type_colis: isDeplacement ? "autre" : (isMulti ? (colis[0]?.type_colis || "petit_colis") : formData.type_colis),
       notes: formData.notes,
       gps_depart_lat: departGps?.lat || null,

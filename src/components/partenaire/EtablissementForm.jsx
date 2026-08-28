@@ -72,11 +72,12 @@ export default function EtablissementForm({ type, existing, partenaireId, userEm
       set("logo_url", file_url);
     } catch (err) {
       console.error("Upload logo:", err);
+      toast?.error?.("Erreur lors de l'upload du logo");
     }
     setUploading(false);
   };
 
-  // Validation téléphone selon le pays — dynamique depuis Country
+  // Validation téléphone selon le pays — utilise phone_min_length / phone_max_length
   const paysConfig = countries.find(p => p.code === form.pays_code) || null;
   const paysMinDigits = Number(paysConfig?.phone_min_length) || 8;
   const paysMaxDigits = Number(paysConfig?.phone_max_length) || paysMinDigits;
@@ -90,8 +91,15 @@ export default function EtablissementForm({ type, existing, partenaireId, userEm
   const telDepotValide = !form.telephone_depot || isValidPhoneLength(telDepotDigits.length);
 
   const handleSave = async () => {
-    if (!form.nom || !form.pays_code) return;
-    // Blocage si téléphone invalide — Correction 5
+    // Validation des champs obligatoires — feedback visible
+    if (!form.nom) {
+      toast?.error?.("Le nom de l'établissement est obligatoire");
+      return;
+    }
+    if (!form.pays_code) {
+      toast?.error?.("Le pays est obligatoire");
+      return;
+    }
     if (form.telephone && !telValide) {
       toast?.error?.(`Téléphone invalide : ${paysConfig?.nom || "ce pays"} requiert ${paysDigitsLabel} chiffres`);
       return;
@@ -121,8 +129,13 @@ export default function EtablissementForm({ type, existing, partenaireId, userEm
       } else {
         await base44.entities[entityName].create(data);
       }
+      toast?.success?.(`${typeLabel} ${existing ? "modifié" : "créé"} avec succès`);
       onSaved?.();
-    } catch (err) {}
+    } catch (err) {
+      console.error("Erreur création établissement:", err);
+      const msg = err?.response?.data?.detail || err?.message || "Erreur lors de l'enregistrement";
+      toast?.error?.(msg);
+    }
     setSaving(false);
   };
 
@@ -304,6 +317,7 @@ export default function EtablissementForm({ type, existing, partenaireId, userEm
                 placeholder={`${paysDigitsLabel} chiffres`}
                 inputMode="numeric"
                 className={`h-12 rounded-xl text-sm font-mono tracking-wider pl-10 ${form.telephone && !telValide ? "border-red-400 ring-2 ring-red-100" : ""}`}
+                maxLength={paysMaxDigits}
               />
             </div>
             {form.telephone && !telValide && <p className="text-[11px] text-red-500 mt-1 font-medium">⚠️ {telDigits.length}/{paysDigitsLabel} chiffres saisis</p>}
@@ -317,6 +331,7 @@ export default function EtablissementForm({ type, existing, partenaireId, userEm
                 onChange={e => set("telephone_depot", e.target.value.replace(/\D/g, "").slice(0, paysMaxDigits))}
                 placeholder={`${paysDigitsLabel} chiffres`}
                 inputMode="numeric"
+                maxLength={paysMaxDigits}
                 className={`h-12 rounded-xl text-sm font-mono tracking-wider pl-10 ${form.telephone_depot && !telDepotValide ? "border-red-400 ring-2 ring-red-100" : ""}`}
               />
             </div>

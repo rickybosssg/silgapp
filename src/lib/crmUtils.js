@@ -1,4 +1,5 @@
 import { base44 } from "@/api/base44Client";
+import { getCountryConfig, normalizePhone as normalizePhoneShared } from "@/lib/phoneUtils";
 
 const COUNTRY_DIAL_CODE = {
   BF: "226", CI: "225", TG: "228", BJ: "229", SN: "221",
@@ -8,6 +9,14 @@ const COUNTRY_DIAL_CODE = {
 export function normalizePhone(phone, countryCode = "") {
   let digits = (phone || "").replace(/\D/g, "");
   if (!digits) return "";
+
+  // Utiliser en priorité la configuration Country dynamique partagée par
+  // l'inscription et les formulaires. Le tableau local reste un fallback
+  // rétrocompatible pendant le chargement de la configuration distante.
+  if (getCountryConfig(countryCode)) {
+    return normalizePhoneShared(phone, countryCode) || digits;
+  }
+
   const dial = COUNTRY_DIAL_CODE[countryCode] || "";
   if (dial && digits.startsWith(dial) && digits.length >= dial.length + 6) return digits;
   if (digits.startsWith("0")) digits = digits.slice(1);
@@ -116,11 +125,20 @@ async function upsertClientContact(phone, countryCode, name, role, courseData) {
   const [prenom, ...nomParts] = clientName.split(" ");
   const nom = nomParts.join(" ") || clientName || "Client";
 
+  // Un nom existant est considéré comme placeholder s'il est vide ou "Client".
+  // Dans ce cas, on autorise la mise à jour avec le vrai nom saisi par l'admin.
+  // Si le nom existant est un vrai nom (non placeholder), on le conserve (mise à jour prudente).
+  const isPlaceholder = (n) => {
+    if (!n) return true;
+    const t = n.trim().toLowerCase();
+    return t === "" || t === "client" || t === "—";
+  };
+
   const isNew = !existing;
   const updateData = {
     telephone: normalized,
     telephone_normalized: normalized,
-    nom: existing?.nom || nom,
+    nom: !isPlaceholder(existing?.nom) ? existing.nom : nom,
     prenom: existing?.prenom || prenom || "",
     country_code: countryCode,
     roles: JSON.stringify([...roles]),

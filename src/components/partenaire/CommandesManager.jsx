@@ -112,6 +112,7 @@ export default function CommandesManager({ type, etablissementId, etablissementN
   const [expandedId, setExpandedId] = useState(null);
   const [chatOpenId, setChatOpenId] = useState(null);
   const [actionLoading, setActionLoading] = useState(null);
+  const [prepPickerCmdId, setPrepPickerCmdId] = useState(null);
 
   const { data: commandes = [], isLoading } = useQuery({
     queryKey: ["commandes", type, etablissementId],
@@ -149,10 +150,11 @@ export default function CommandesManager({ type, etablissementId, etablissementN
     return map;
   }, [livreurs]);
 
-  const handleAction = async (commande, action) => {
+  const handleAction = async (commande, action, extra = {}) => {
     setActionLoading(commande.id);
+    setPrepPickerCmdId(null);
     try {
-      await base44.functions.invoke("changerStatutCommande", { commande_id: commande.id, type, action });
+      await base44.functions.invoke("changerStatutCommande", { commande_id: commande.id, type, action, ...extra });
       queryClient.invalidateQueries({ queryKey: ["commandes", type, etablissementId] });
       queryClient.invalidateQueries({ queryKey: ["courses-commandes-partenaires"] });
     } catch (err) {
@@ -160,6 +162,8 @@ export default function CommandesManager({ type, etablissementId, etablissementN
     }
     setActionLoading(null);
   };
+
+  const PREP_TIMES = [5, 10, 15, 20, 30];
 
   const filtered = filter === "all"
     ? commandes
@@ -291,18 +295,63 @@ export default function CommandesManager({ type, etablissementId, etablissementN
                     </div>
                   )}
                   {cmd.statut === "paiement_valide" && (
-                    <Button size="sm" onClick={() => handleAction(cmd, "commencer_preparation")} disabled={actionLoading === cmd.id} className="bg-blue-600 hover:bg-blue-700 text-xs h-9">
-                      {actionLoading === cmd.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <ChefHat className="w-3 h-3" />} Commencer préparation
-                    </Button>
+                    isRestaurant ? (
+                      <div className="space-y-2">
+                        <p className="text-[11px] font-bold text-gray-500 uppercase">Temps de préparation estimé</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {PREP_TIMES.map(t => (
+                            <button
+                              key={t}
+                              type="button"
+                              onClick={() => handleAction(cmd, "commencer_preparation", { preparation_time_minutes: t })}
+                              disabled={actionLoading === cmd.id}
+                              className="px-3 py-2 rounded-xl text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition disabled:opacity-50"
+                            >
+                              {t} min
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <Button size="sm" onClick={() => handleAction(cmd, "commencer_preparation")} disabled={actionLoading === cmd.id} className="bg-blue-600 hover:bg-blue-700 text-xs h-9">
+                        {actionLoading === cmd.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <ChefHat className="w-3 h-3" />} Commencer préparation
+                      </Button>
+                    )
                   )}
                   {cmd.statut === "en_preparation" && (
-                    <Button size="sm" onClick={() => handleAction(cmd, "prete_recuperation")} disabled={actionLoading === cmd.id} className="bg-blue-600 hover:bg-blue-700 text-xs h-9">
-                      {actionLoading === cmd.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Rocket className="w-3 h-3" />} Prête - déclencher livraison
-                    </Button>
+                    <div className="space-y-2">
+                      {isRestaurant && cmd.preparation_time_minutes && (
+                        <div className="rounded-xl bg-blue-50 border border-blue-100 p-2.5 space-y-1">
+                          <p className="text-xs font-bold text-blue-700 flex items-center gap-1.5">
+                            <ChefHat className="w-3.5 h-3.5" />
+                            Préparation estimée : {cmd.preparation_time_minutes} min
+                          </p>
+                          <p className="text-[11px] text-blue-600">
+                            ⏱️ Livreur recherché automatiquement au bon moment
+                          </p>
+                        </div>
+                      )}
+                      <Button size="sm" onClick={() => handleAction(cmd, "prete_recuperation")} disabled={actionLoading === cmd.id} className="bg-blue-600 hover:bg-blue-700 text-xs h-9">
+                        {actionLoading === cmd.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Rocket className="w-3 h-3" />} Prête - déclencher livraison
+                      </Button>
+                    </div>
                   )}
 
                   {cmd.statut === "prete_recuperation" && !livreur && (
                     <p className="text-xs text-blue-600 font-bold flex items-center gap-1 py-1"><Loader2 className="w-3 h-3 animate-spin" /> Recherche livreur en cours...</p>
+                  )}
+
+                  {/* ── Statut parallèle : livreur en route pendant la préparation ── */}
+                  {cmd.statut === "en_preparation" && livreur && course && (
+                    <div className="rounded-xl bg-green-50 border border-green-100 p-2.5 space-y-1">
+                      <p className="text-xs font-bold text-green-700 flex items-center gap-1.5">
+                        <Truck className="w-3.5 h-3.5" />
+                        Livreur en route vers le restaurant
+                      </p>
+                      <p className="text-[11px] text-green-600">
+                        {livreur.prenom} {livreur.nom} arrive pendant que vous préparez
+                      </p>
+                    </div>
                   )}
 
                   {livreur && ACTIVE_DELIVERY_STATUSES.has(effectiveStatut) && <LivreurCompactCard livreur={livreur} />}

@@ -15,6 +15,7 @@
     "test:base44-sync": "node tests/base44-sync-regression.mjs",
     "test:carto-driver-ui": "node tests/carto-driver-ui-regression.mjs",
     "test:contact-address": "node tests/contact-address-regression.mjs",
+    "test:latest-base44": "node tests/latest-base44-regression.mjs",
     "test:venus-admin": "node --experimental-strip-types tests/venus-admin-regression.mjs",
     "test:venus-whatsapp": "node --experimental-strip-types tests/venus-whatsapp-regression.mjs",
     "preview": "vite preview"

@@ -1,15 +1,17 @@
 import React, { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Package, MapPin, Clock, Search, RefreshCw } from "lucide-react";
+import { ArrowLeft, Package, MapPin, Clock, Search, RefreshCw, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import CourseStatusBadge from "@/components/courses/CourseStatusBadge";
 import CanalNotifBadge from "@/components/courses/CanalNotifBadge";
 import PriorityBadge from "@/components/courses/PriorityBadge";
+import PrixAConfirmerBadge from "@/components/courses/PrixAConfirmerBadge";
+import PrixAConfirmerModal from "@/components/courses/PrixAConfirmerModal";
 import { useAdminContext } from "@/hooks/useAdminContext.js";
 import MultiColisProgressBadge from "@/components/multi-colis/MultiColisProgressBadge";
 
@@ -28,6 +30,8 @@ export default function ToutesCoursesExternes() {
   const [filtreActif, setFiltreActif] = useState("tous");
   const [filtreType, setFiltreType] = useState("tous");
   const [search, setSearch] = useState("");
+  const [coursePrixAConfirmer, setCoursePrixAConfirmer] = useState(null);
+  const queryClient = useQueryClient();
 
   const { data: courses = [], dataUpdatedAt, isFetching } = useQuery({
     queryKey: ["courses-externes", effectiveCountry],
@@ -44,7 +48,13 @@ export default function ToutesCoursesExternes() {
     enCours: courses.filter(c => ["recherche_livreur", "livreur_en_route", "client_contacte", "en_route_expediteur", "colis_recupere", "en_livraison", "arrive_prise_en_charge", "passager_embarque"].includes(c.statut)).length,
     livree: courses.filter(c => c.statut === "livree").length,
     annulee: courses.filter(c => c.statut === "annulee").length,
+    prixAConfirmer: courses.filter(c => c.prix_a_confirmer).length,
   }), [courses]);
+
+  const handlePrixAConfirmerConfirmed = () => {
+    queryClient.invalidateQueries(["courses-externes"]);
+    setCoursePrixAConfirmer(null);
+  };
 
   const coursesFiltrees = useMemo(() => {
     let filtered = courses;
@@ -110,6 +120,19 @@ export default function ToutesCoursesExternes() {
           </div>
         </div>
       </div>
+
+      {/* ── ALERTE PRIX À CONFIRMER ───────────────────────────────── */}
+      {stats.prixAConfirmer > 0 && (
+        <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-amber-200 flex items-center justify-center flex-shrink-0">
+            <AlertTriangle className="w-5 h-5 text-amber-700" />
+          </div>
+          <div className="flex-1">
+            <p className="font-bold text-amber-900 text-sm">Prix à confirmer : {stats.prixAConfirmer}</p>
+            <p className="text-xs text-amber-700">Cliquez sur "⚠️ Confirmer" dans la liste pour définir le prix.</p>
+          </div>
+        </div>
+      )}
 
       {/* ── STATS KPI ───────────────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-2.5">
@@ -242,6 +265,7 @@ export default function ToutesCoursesExternes() {
                     />
                     <span className="font-bold text-sm text-foreground truncate">{course.client_nom || "Client"}</span>
                     <CourseStatusBadge statut={course.statut} courseSource={course.source} />
+                    <PrixAConfirmerBadge course={course} />
                     {course.livreur_id && <CanalNotifBadge course={course} />}
                     <MultiColisProgressBadge
                       nbColis={course.nb_colis || 1}
@@ -264,7 +288,14 @@ export default function ToutesCoursesExternes() {
 
                 {/* Prix */}
                 <div className="flex-shrink-0 text-right ml-2">
-                  {course.prix_final ? (
+                  {course.prix_a_confirmer ? (
+                    <button
+                      onClick={() => setCoursePrixAConfirmer(course)}
+                      className="px-2 py-1 rounded-lg bg-amber-100 border border-amber-300 text-amber-700 text-xs font-bold hover:bg-amber-200 transition"
+                    >
+                      ⚠️ Confirmer
+                    </button>
+                  ) : course.prix_final ? (
                     <span className="font-black text-sm text-green-600">{course.prix_final.toLocaleString()} F</span>
                   ) : course.prix_estimate ? (
                     <span className="text-xs text-muted-foreground">~{course.prix_estimate.toLocaleString()} F</span>
@@ -280,6 +311,14 @@ export default function ToutesCoursesExternes() {
           </div>
         )}
       </div>
+
+      {/* ── MODAL PRIX À CONFIRMER ─────────────────────────────── */}
+      <PrixAConfirmerModal
+        course={coursePrixAConfirmer}
+        open={!!coursePrixAConfirmer}
+        onClose={() => setCoursePrixAConfirmer(null)}
+        onConfirmed={handlePrixAConfirmerConfirmed}
+      />
     </div>
   );
 }

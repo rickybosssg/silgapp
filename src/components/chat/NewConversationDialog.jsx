@@ -3,6 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Search, UserPlus, Loader2, User, Truck, Store, UtensilsCrossed } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 export default function NewConversationDialog({ open, onClose, myType, myId, myName, onStart }) {
   const [search, setSearch] = useState("");
@@ -141,6 +142,9 @@ export default function NewConversationDialog({ open, onClose, myType, myId, myN
 
   const [validating, setValidating] = useState(false);
 
+  // Le SDK peut retourner la réponse directement ou enveloppée dans { data: ... }
+  const unwrap = (res) => (res?.data !== undefined ? res.data : res);
+
   const startConversation = async (user) => {
     const participants = [
       { type: myType, id: myId, name: myName },
@@ -151,14 +155,14 @@ export default function NewConversationDialog({ open, onClose, myType, myId, myN
     if (myType !== user.type) {
       setValidating(true);
       try {
-        const res = await base44.functions.invoke('verifierConversationAutorisee', { participants });
-        if (!res?.data?.autorise) {
-          alert(res?.data?.raison || 'Conversation non autorisée — aucune course active ne vous relie.');
+        const res = unwrap(await base44.functions.invoke('verifierConversationAutorisee', { participants }));
+        if (!res?.autorise) {
+          toast.error(res?.raison || 'Conversation non autorisée — aucune course active ne vous relie.');
           setValidating(false);
           return;
         }
       } catch (err) {
-        alert('Erreur de validation. Veuillez réessayer.');
+        toast.error('Erreur de validation. Veuillez réessayer.');
         setValidating(false);
         return;
       }
@@ -178,20 +182,25 @@ export default function NewConversationDialog({ open, onClose, myType, myId, myN
 
     if (found) {
       onStart(found.id);
+      onClose();
     } else {
       // ── Sécurité : création via backend pour résoudre participant_user_ids côté serveur ──
-      const res = await base44.functions.invoke('creerConversationSecurisee', {
-        participants,
-        title: `${myName} ↔ ${user.name}`,
-        group_type: "direct",
-      });
-      if (res?.data?.success && res.data.conversation) {
-        onStart(res.data.conversation.id);
-      } else {
-        alert(res?.data?.error || 'Erreur lors de la création de la conversation');
+      try {
+        const res = unwrap(await base44.functions.invoke('creerConversationSecurisee', {
+          participants,
+          title: `${myName} ↔ ${user.name}`,
+          group_type: "direct",
+        }));
+        if (res?.success && res.conversation) {
+          onStart(res.conversation.id);
+          onClose();
+        } else {
+          toast.error(res?.error || 'Erreur lors de la création de la conversation');
+        }
+      } catch (err) {
+        toast.error('Erreur lors de la création de la conversation');
       }
     }
-    onClose();
   };
 
   return (
