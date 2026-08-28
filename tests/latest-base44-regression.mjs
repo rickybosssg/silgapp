@@ -69,6 +69,12 @@ assert.doesNotMatch(establishment, /paysConfig\.digits/, "EtablissementForm ne d
 assert.match(establishment, /phone_min_length/, "EtablissementForm doit utiliser phone_min_length");
 assert.match(establishment, /phone_max_length/, "EtablissementForm doit utiliser phone_max_length");
 assert.match(establishment, /toast\?\.error/, "Les validations établissement doivent être visibles");
+assert.match(establishment, /value=\{form\.pays_code \|\| ""\}/, "Le sélecteur pays doit refléter exactement l'état React");
+assert.match(establishment, /<option value="" disabled>Sélectionnez votre pays<\/option>/, "Le pays nul doit afficher un placeholder explicite");
+assert.match(establishment, /set\(f => \(\{ \.\.\.f, pays_code: countries\[0\]\.code \}\)\)/, "Le premier pays actif doit initialiser pays_code après chargement");
+assert.match(establishment, /const data = \{ \.\.\.form, partenaire_id: partenaireId, user_email: userEmail \}/, "Le pays sélectionné doit être transmis dans le payload établissement");
+assert.match(establishment, /isPharmacie \? "Pharmacie" : isRestaurant \? "Restaurant" : "Boutique"/, "Le même flux doit couvrir pharmacie, restaurant et boutique");
+assert.doesNotMatch(establishment, /pays_code:\s*["']BF["']/, "EtablissementForm ne doit pas imposer le Burkina Faso");
 
 const hotZones = read("base44/functions/detecterZonesChaudes/entry.ts");
 assert.match(hotZones, /import \{ haversineKm \} from '\.\.\/\.\.\/shared\/geoUtils\.ts'/, "detecterZonesChaudes doit importer haversineKm sous son vrai nom");
