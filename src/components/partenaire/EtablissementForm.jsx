@@ -57,6 +57,13 @@ export default function EtablissementForm({ type, existing, partenaireId, userEm
     });
     return () => { mounted = false; };
   }, [existing?.pays_code]);
+
+  // Garde-fou : si les pays sont chargés mais pays_code encore null,
+  // auto-sélectionner le premier pays actif (évite l'état null avec UI trompeuse)
+  useEffect(() => {
+    if (form.pays_code || !countries || countries.length === 0) return;
+    set(f => ({ ...f, pays_code: countries[0].code }));
+  }, [countries]);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -249,7 +256,8 @@ export default function EtablissementForm({ type, existing, partenaireId, userEm
             <div>
               <Label className="text-xs font-semibold text-gray-600">Pays *</Label>
               <div className="relative mt-1.5">
-                <select value={form.pays_code} onChange={e => set("pays_code", e.target.value)} className="w-full h-12 rounded-xl border border-gray-200 bg-white px-3 pr-8 text-sm font-medium appearance-none cursor-pointer focus:ring-2 focus:ring-purple-200 focus:border-purple-400 outline-none">
+                <select value={form.pays_code || ""} onChange={e => set("pays_code", e.target.value)} className="w-full h-12 rounded-xl border border-gray-200 bg-white px-3 pr-8 text-sm font-medium appearance-none cursor-pointer focus:ring-2 focus:ring-purple-200 focus:border-purple-400 outline-none">
+                  <option value="" disabled>Sélectionnez votre pays</option>
                   {countries.map(p => <option key={p.code} value={p.code}>{p.emoji_flag || ""} {p.nom}</option>)}
                 </select>
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none text-xs">▼</span>
