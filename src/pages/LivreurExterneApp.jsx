@@ -6,6 +6,7 @@ import { AlertTriangle, Check, Truck, X, Wallet, ChevronRight } from "lucide-rea
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { useHeartbeat } from "@/hooks/useHeartbeat";
+import { useAppVersionSync } from "@/hooks/useAppVersionSync";
 import { useGPSNatif } from "@/hooks/useGPSNatif";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
@@ -360,6 +361,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     if (gpsHookActif && !gpsActif) setGpsActif(true);
   }, [gpsHookActif, gpsActif]);
 
+  useAppVersionSync(livreurProfil?.id);
   const { syncHeartbeat } = useHeartbeat({
     user_type: "livreur",
     position: gpsPosition || (livreurProfil?.latitude && livreurProfil?.longitude ? { latitude: livreurProfil.latitude, longitude: livreurProfil.longitude } : null),

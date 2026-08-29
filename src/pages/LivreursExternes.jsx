@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import {
   ArrowLeft, Users, UserCheck, UserX, Phone, Mail, MapPin,
   Ban, CheckCircle2, RefreshCw, Bike, Car, Truck,
-  XCircle, Banknote, Star, Wifi, WifiOff, Power, PowerOff, Send, Search
+  XCircle, Banknote, Star, Wifi, WifiOff, Power, PowerOff, Send, Search, Clock
 } from "lucide-react";
 import CreateLivreurDialog from "@/components/livreurs/CreateLivreurDialog";
 import EmailLivreursModal from "@/components/livreurs/EmailLivreursModal";
@@ -149,6 +149,23 @@ function ProfilLivreurModal({ livreur, courses, onClose, onAction }) {
               <div className="flex items-center gap-2 text-muted-foreground">
                 {vehiculeIcon(livreur.vehicule)}
                 <span className="capitalize">{livreur.vehicule}</span>
+              </div>
+            )}
+            {livreur.app_version_name && (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <span className="text-xs font-mono bg-slate-100 px-1.5 py-0.5 rounded">APK v{livreur.app_version_name}{livreur.app_version_code ? ` (${livreur.app_version_code})` : ""}</span>
+              </div>
+            )}
+            {livreur.last_seen_at && (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Clock className="w-3.5 h-3.5 flex-shrink-0" />
+                <span className="text-xs">Vu: {format(new Date(livreur.last_seen_at), "dd/MM HH:mm", { locale: fr })}</span>
+              </div>
+            )}
+            {livreur.derniere_position_date && (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
+                <span className="text-xs">GPS: {format(new Date(livreur.derniere_position_date), "dd/MM HH:mm", { locale: fr })}</span>
               </div>
             )}
           </div>
@@ -651,6 +668,11 @@ export default function LivreursExternes() {
                     )}
                     {livreur.vehicule && (
                       <span className="flex items-center gap-1">{vehiculeIcon(livreur.vehicule)}{livreur.vehicule}</span>
+                    )}
+                    {livreur.app_version_name && (
+                      <span className="flex items-center gap-1 font-mono text-[10px] text-slate-400">
+                        APK v{livreur.app_version_name}{livreur.app_version_code ? ` (${livreur.app_version_code})` : ""}
+                      </span>
                     )}
                   </div>
 

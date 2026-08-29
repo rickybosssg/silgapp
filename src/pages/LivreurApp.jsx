@@ -6,6 +6,7 @@ import { Truck } from "lucide-react";
 import { toast } from "sonner";
 import { registerPushToken, subscribeToNotifications } from "@/lib/notifications";
 import { usePushTokenRetry } from "@/hooks/usePushTokenRetry";
+import { useAppVersionSync } from "@/hooks/useAppVersionSync";
 import { requestNativeAppPermissions } from "@/lib/nativePermissions";
 import GPSIndicateur from "@/components/livreur/GPSIndicateur";
 import LivreurHeader from "@/components/livreur/LivreurHeader";
@@ -29,6 +30,7 @@ const saveLivreur = (id, data) => base44.functions.invoke('updateLivreur', { id,
  * Plus de sélecteur localStorage, plus de codes livreur
  */
 export default function LivreurApp({ livreurProfil: initialProfil }) {
+  useAppVersionSync(initialProfil?.id);
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("courses");
   const [gpsActif, setGpsActif] = useState(false);
