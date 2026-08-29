@@ -1690,7 +1690,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
                 </p>
                 {(livreurProfil?.montant_du_silga ?? livreurProfil?.encours ?? 0) > 0 && (
                   <p className="text-red-400/60 text-[10px]">
-                    Dû SILGAPP : {(livreurProfil.montant_du_silga ?? livreurProfil.encours ?? 0).toLocaleString()} FCFA
+                    À payer à SILGAPP : {(livreurProfil.montant_du_silga ?? livreurProfil.encours ?? 0).toLocaleString()} FCFA
                   </p>
                 )}
               </div>

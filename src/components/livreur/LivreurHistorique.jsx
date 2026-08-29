@@ -137,11 +137,11 @@ export default function LivreurHistorique({ mesCourses, livreurProfil, isExterne
               </div>
               <div className="bg-orange-50 rounded-lg p-2 border border-orange-200 text-center">
                 <p className="text-xs font-bold text-orange-700">{commissionToday.toLocaleString()} FCFA</p>
-                <p className="text-[10px] text-orange-600 mt-0.5">Commission SILGAPP</p>
+                <p className="text-[10px] text-orange-600 mt-0.5">Commission du jour</p>
               </div>
               <div className="bg-red-50 rounded-lg p-2 border border-red-200 text-center">
                 <p className="text-xs font-bold text-red-700">{montantDuSilga.toLocaleString()} FCFA</p>
-                <p className="text-[10px] text-red-600 mt-0.5">Dû à SILGAPP</p>
+                <p className="text-[10px] text-red-600 mt-0.5">À payer à SILGAPP</p>
               </div>
             </div>
           </div>
