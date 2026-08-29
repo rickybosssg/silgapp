@@ -59,7 +59,48 @@ export async function getLivreursEnAttente(base44, courseId) {
 }
 
 /**
- * Enregistre une notification de dispatch pour un livreur
+ * Vérifie si un livreur possède au moins un token FCM natif exploitable.
+ * Un livreur sans token ne peut pas recevoir de push FCM.
+ */
+async function livreurATokenFCM(base44, livreurId) {
+  if (!livreurId) return false;
+  try {
+    const tokens = await base44.asServiceRole.entities.NotificationToken.filter(
+      { livreur_id: livreurId, actif: true }, undefined, 10
+    );
+    // Un token natif = un token qui ne commence pas par "web_"
+    return (tokens || []).some(t => t.token && !String(t.token).startsWith('web_'));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Met à jour le statut d'une DispatchNotification existante.
+ * Utilisé par envoiNotificationPushBatch pour tracer le résultat FCM réel.
+ *
+ * Ne modifie PAS les notifications déjà en statut terminal (accepte, refuse, expire).
+ */
+export async function mettreAJourStatutPush(base44, courseId, livreurId, nouveauStatut) {
+  try {
+    await base44.asServiceRole.entities.DispatchNotification.updateMany(
+      { course_id: courseId, livreur_id: livreurId, statut: { $in: ['notifie', 'push_tente', 'sans_token'] } },
+      { $set: { statut: nouveauStatut } }
+    );
+  } catch (err) {
+    console.error('[DispatchNotif] Erreur mettreAJourStatutPush:', err.message);
+  }
+}
+
+/**
+ * Enregistre une notification de dispatch pour un livreur.
+ *
+ * FIX TÉLÉMÉTRIE (2026-08-29) :
+ * - Vérifie si le livreur a un token FCM natif exploitable.
+ * - Si aucun token → statut = 'sans_token' (aucun push possible).
+ * - Si token présent → statut = 'notifie' (push sera tenté par envoiNotificationPushBatch).
+ *
+ * Un livreur sans token ne doit JAMAIS être enregistré comme 'notifie'.
  */
 export async function enregistrerNotification(base44, courseId, livreur, vague, options = {}) {
   try {
@@ -73,13 +114,17 @@ export async function enregistrerNotification(base44, courseId, livreur, vague, 
       return existing[0];
     }
 
+    // Vérifier la présence d'un token FCM natif exploitable
+    const hasToken = await livreurATokenFCM(base44, livreur.id);
+    const statut = hasToken ? 'notifie' : 'sans_token';
+
     return await base44.asServiceRole.entities.DispatchNotification.create({
       course_id: courseId,
       livreur_id: livreur.id,
       livreur_user_email: livreur.user_email || null,
       country_code: livreur.country_code || options.country_code || '',
       vague: vague || 1,
-      statut: 'notifie',
+      statut,
       distance_km: livreur.distance != null ? Number(livreur.distance.toFixed(2)) : null,
       gps_age_min: livreur.gpsAgeMin != null ? Number(livreur.gpsAgeMin.toFixed(1)) : null,
       priorite_dispatch: livreur.priorite_dispatch || 0,

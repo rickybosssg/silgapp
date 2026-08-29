@@ -26,13 +26,17 @@
     "statut": {
       "type": "string",
       "enum": [
+        "sans_token",
         "notifie",
+        "push_tente",
+        "push_succes",
+        "push_echec",
         "refuse",
         "expire",
         "accepte"
       ],
       "default": "notifie",
-      "description": "Statut de la notification: notifi\u00e9, refus\u00e9, expir\u00e9 ou accept\u00e9"
+      "description": "Statut de la notification. sans_token = livreur sans token FCM exploitable (aucun push possible). notifie = token pr\u00e9sent, push en cours/planifi\u00e9. push_tente = appel FCM r\u00e9ellement effectu\u00e9. push_succes = FCM a accept\u00e9 l'envoi. push_echec = appel FCM en erreur. refuse/expire/accepte = r\u00e9ponse du livreur ou expiration."
     },
     "distance_km": {
       "type": "number",
