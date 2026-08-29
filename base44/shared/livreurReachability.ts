@@ -12,6 +12,34 @@
 //   - Les comptes test sont exclus via AppConfig TEST_LIVREUR_IDS.
 //
 // NE MODIFIE PAS Livreur.statut — c'est une notion calculée en lecture seule.
+//
+// ═══════════════════════════════════════════════════════════════════════════
+// ⛔ DÉCISION ARCHITECTURALE DÉFINITIVE (2026-08-29) — À CONSERVER
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Suite à l'audit de 169 courses sur 7 jours (auditCalibrationSeuils) :
+//
+//   1. NE PAS intégrer estReellementDisponible() comme filtre d'éligibilité
+//      dans Dispatch V2 (base44/shared/dispatchV2.ts).
+//   2. NE PAS exclure un livreur du dispatch uniquement à cause d'un heartbeat
+//      ou GPS ancien.
+//   3. CONSERVER les règles actuelles de Dispatch V2 — elles sont stables et
+//      validées.
+//   4. UTILISER estReellementDisponible() UNIQUEMENT comme indicateur
+//      opérationnel/statistique/diagnostic (dashboards admin, audits, rapports).
+//   5. CONSERVER la distinction entre statut="disponible" (source de vérité pour
+//      le dispatch) et présence technique temps réel (indicateur de diagnostic).
+//   6. NE JAMAIS modifier automatiquement Livreur.statut sur la seule base d'un
+//      heartbeat/GPS stale.
+//
+// Preuve : même avec un seuil de 6 heures (360 min), la simulation aurait
+// bloqué 4 acceptations réelles et exclu 2 vrais livreurs sur 169 courses.
+// Un livreur peut avoir un heartbeat ancien et quand même être le bon livreur
+// pour une course. Le tri par distance/GPS marginalise naturellement les
+// fantômes sans les exclure artificiellement.
+//
+// ⚠️ TOUTE FUTURE INTÉGRATION DE CE MODULE DANS LE DISPATCH REQUIERT UNE
+//    VALIDATION EXPLICITE DU RESPONSABLE PRODUIT. NE PAS MODIFIER SANS APPROBATION.
 // ═══════════════════════════════════════════════════════════════════════════
 
 const STALE_THRESHOLD_MS = 24 * 60 * 60 * 1000; // 24h
