@@ -128,7 +128,7 @@ export default function ProposedLivreursListV2({ course }) {
 
   // ── Grouper les interactions par statut ──
   const stats = useMemo(() => {
-    const notifie = interactions.filter(n => n.statut === "notifie");
+    const notifie = interactions.filter(n => n.statut === "notifie" || n.statut === "push_succes");
     const refuse = interactions.filter(n => n.statut === "refuse");
     const accepte = interactions.filter(n => n.statut === "accepte");
     const expire = interactions.filter(n => n.statut === "expire");
