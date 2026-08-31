@@ -68,30 +68,66 @@ async function acquireCountryLock(base44, countryCode, ttlSec = DEFAULT_LOCK_TTL
   const ttlMs = ttlSec * 1000;
 
   try {
-    // Lire la config existante
+    // ── APPROCHE COMPARE-AND-SWAP (semi-atomique) ──
+    // Base44 ne supporte pas les transactions ACID ni les contraintes UNIQUE.
+    // On utilise updateMany avec un filtre conditionnel sur l'ancienne valeur :
+    // la BDD garantit que le filtre est évalué au moment de l'update.
+    //
+    // 1. Tenter updateMany({ cle, valeur: oldValue }, { $set: { valeur: now } })
+    //    → Si 1 record modifié, le lock est acquis.
+    //    → Si 0 record modifié, soit le lock est pris, soit le record n'existe pas.
+    //
+    // 2. Si 0 modifié, vérifier si un lock valide existe (lecture).
+    //    → Si lock valide → return false (un autre watchdog le détient).
+    //    → Si aucun record → créer (race possible ici, mais très improbable
+    //      car les watchdogs sont décalés de 2.5 min).
+    //
+    // LIMITATION : Le cas "aucun record + create" n'est PAS atomique.
+    // Deux watchdogs pourraient créer 2 records de lock simultanément.
+    // En pratique, le décalage de 2.5 min entre automations rend ce cas extrêmement
+    // improbable. Le cooldown par pays (15 min) est un second filet de sécurité.
+
+    // Étape 1 : Tenter un compare-and-swap sur un lock expiré (valeur ancienne)
     const existing = await base44.asServiceRole.entities.AppConfig.filter({ cle: lockKey });
     const current = existing?.[0];
 
     if (current) {
       const lockTs = current.valeur ? parseInt(current.valeur, 10) : 0;
-      if (lockTs && (now - lockTs) < ttlMs) {
+      const isExpired = !lockTs || (now - lockTs) >= ttlMs;
+
+      if (!isExpired) {
         // Lock encore valide — un autre watchdog le détient
         return false;
       }
-      // Lock expiré — on le prend (compare-and-swap)
-      await base44.asServiceRole.entities.AppConfig.update(current.id, {
-        valeur: String(now),
-        updated_date: new Date().toISOString(),
-      });
-      return true;
+
+      // Lock expiré — compare-and-swap atomique via updateMany conditionnel
+      const result = await base44.asServiceRole.entities.AppConfig.updateMany(
+        { cle: lockKey, valeur: current.valeur },  // filtre : ancienne valeur exacte
+        { $set: { valeur: String(now) } }
+      );
+
+      // Si au moins 1 record modifié, on a acquis le lock atomiquement
+      if (result && result.modified_count > 0) {
+        return true;
+      }
+
+      // 0 modifié → un autre watchdog vient de le prendre entre notre lecture et notre update
+      return false;
     }
 
-    // Aucun lock — on le crée
-    await base44.asServiceRole.entities.AppConfig.create({
-      cle: lockKey,
-      valeur: String(now),
-    });
-    return true;
+    // Aucun record de lock — création
+    // ⚠️ LIMITATION : cette création n'est PAS atomique. Deux watchdogs pourraient
+    // créer 2 records simultanément. Le cooldown par pays (15 min) mitige ce risque.
+    try {
+      await base44.asServiceRole.entities.AppConfig.create({
+        cle: lockKey,
+        valeur: String(now),
+      });
+      return true;
+    } catch (createErr) {
+      // Si la création échoue (ex: race condition), un autre watchdog a probablement créé le lock
+      return false;
+    }
   } catch (err) {
     console.error(`${LOG_PREFIX} Erreur acquireCountryLock(${countryCode}):`, err?.message || String(err));
     // En cas d'erreur, on NE prend pas le risque d'envoyer un doublon
@@ -431,6 +467,7 @@ export async function gererPushGeneralT10(base44, delayMin = DEFAULT_T10_DELAY_M
       // ── 4f. Envoyer le push via le système existant ──
       let pushResult = null;
       let pushSucces = 0;
+      let pushFailed = false;
       try {
         pushResult = await base44.asServiceRole.functions.invoke('envoiNotificationPushBatch', {
           titre,
@@ -439,12 +476,41 @@ export async function gererPushGeneralT10(base44, delayMin = DEFAULT_T10_DELAY_M
           course_id: null,
           livreur_ids: livreurIds,
         });
-        pushSucces = pushResult?.data?.sent_count || pushResult?.data?.success_count || livreurIds.length;
+        // Vérifier le résultat réel du push
+        pushSucces = pushResult?.data?.sent_count || pushResult?.data?.success_count || 0;
+        // Si 0 push réussi ET qu'il y avait des destinataires, considérer comme échec
+        if (pushSucces === 0 && destinataires.length > 0) {
+          pushFailed = true;
+          console.error(`${LOG_PREFIX} Échec push batch: 0/${destinataires.length} push réussis pour ${countryCode}`);
+        }
       } catch (err) {
         console.error(`${LOG_PREFIX} Erreur envoi push batch:`, err?.message || String(err));
+        pushFailed = true;
       }
 
-      // ── 4g. Marquer les courses comme envoyées ──
+      // ── 4g. Marquer les courses selon le résultat du push ──
+      if (pushFailed) {
+        // ÉCHEC FCM : NE PAS marquer push_general_t10_envoye=true
+        // Les courses pourront être retentées au prochain tick (sous réserve du cooldown).
+        // On ne met PAS à jour le last_sent du pays non plus, car aucun push n'a été envoyé.
+        logEvent(LOG_PUSH_GENERAL_T10_NO_RECIPIENT, {
+          country_code: countryCode,
+          nombre_courses: validCourses.length,
+          nombre_destinataires: destinataires.length,
+          nombre_push_succes: 0,
+          course_ids: validCourses.map(c => c.id),
+        });
+        resultats.push({
+          country_code: countryCode,
+          status: 'fcm_failed',
+          courses: validCourses.length,
+          recipients: destinataires.length,
+          push_succes: 0,
+        });
+        continue;  // Skip le marquage — les courses restent éligibles pour un retry
+      }
+
+      // SUCCÈS FCM : marquer les courses comme ayant réellement participé à un envoi
       for (const course of validCourses) {
         await marquerCourseEnvoyee(base44, course.id, now);
       }
