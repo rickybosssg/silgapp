@@ -1,0 +1,128 @@
+{
+  "name": "LieuSilgapp",
+  "type": "object",
+  "properties": {
+    "nom": {
+      "type": "string",
+      "description": "Nom officiel du lieu ou \u00e9tablissement"
+    },
+    "aliases": {
+      "type": "string",
+      "description": "JSON: tableau des variantes de nom (ex: [\"plastica\", \"plastica home\", \"plastic home\"])"
+    },
+    "categorie": {
+      "type": "string",
+      "enum": [
+        "commerce",
+        "entreprise",
+        "pharmacie",
+        "hotel",
+        "restaurant",
+        "ecole",
+        "administration",
+        "marche",
+        "banque",
+        "clinique",
+        "station_service",
+        "autre"
+      ],
+      "default": "commerce",
+      "description": "Cat\u00e9gorie du lieu"
+    },
+    "adresse": {
+      "type": "string",
+      "description": "Adresse textuelle compl\u00e8te"
+    },
+    "quartier": {
+      "type": "string",
+      "description": "Quartier de rattachement"
+    },
+    "ville": {
+      "type": "string",
+      "description": "Ville"
+    },
+    "country_code": {
+      "type": "string",
+      "description": "Code pays ISO 2 lettres"
+    },
+    "latitude": {
+      "type": "number",
+      "description": "Latitude du lieu"
+    },
+    "longitude": {
+      "type": "number",
+      "description": "Longitude du lieu"
+    },
+    "precision_gps": {
+      "type": "string",
+      "enum": [
+        "exacte",
+        "approximative"
+      ],
+      "default": "exacte",
+      "description": "Pr\u00e9cision du GPS. exacte = positionn\u00e9 sur la carte par l'admin. approximative = GPS du quartier utilis\u00e9 comme fallback. Une position approximative ne doit jamais \u00eatre pr\u00e9sent\u00e9e comme la position exacte de l'\u00e9tablissement."
+    },
+    "source": {
+      "type": "string",
+      "enum": [
+        "admin",
+        "partenaire",
+        "auto_propose"
+      ],
+      "default": "admin",
+      "description": "Origine de la cr\u00e9ation"
+    },
+    "statut": {
+      "type": "string",
+      "enum": [
+        "actif",
+        "en_attente",
+        "supprime"
+      ],
+      "default": "actif",
+      "description": "en_attente = propos\u00e9 par le syst\u00e8me, validation admin requise. Seuls les lieux actifs apparaissent dans la recherche publique."
+    },
+    "nombre_utilisations": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre de fois que ce lieu a \u00e9t\u00e9 s\u00e9lectionn\u00e9 dans une recherche"
+    },
+    "date_derniere_utilisation": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "valide_par": {
+      "type": "string",
+      "description": "Email de l'admin ayant valid\u00e9"
+    },
+    "valide_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "nom",
+    "country_code",
+    "categorie",
+    "latitude",
+    "longitude"
+  ],
+  "rls": {
+    "read": {},
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

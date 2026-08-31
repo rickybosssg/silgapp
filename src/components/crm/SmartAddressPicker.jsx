@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { Star, Clock, ChevronDown, MapPin, X } from "lucide-react";
-import AdminAddressAutocomplete from "@/components/admin/AdminAddressAutocomplete";
+import SmartAddressInput from "@/components/location/SmartAddressInput";
 
 /**
  * SmartAddressPicker — carnet d'adresses intelligent par client.
@@ -151,17 +151,18 @@ export default function SmartAddressPicker({
   return (
     <div className="relative" ref={containerRef}>
       {/* Champ de recherche principal (autocomplétion quartiers + géocodage) */}
-      <AdminAddressAutocomplete
+      <SmartAddressInput
         value={value}
         onChange={onChange}
         onSelect={onSelect}
         countryCode={countryCode}
         placeholder={placeholder}
-        iconColor={iconColor}
         inputClassName={inputClassName}
+        iconClassName={iconColor}
+        enableAddLieu={true}
       >
         {children}
-      </AdminAddressAutocomplete>
+      </SmartAddressInput>
 
       {/* Chips d'adresses du client (favoris + récentes) */}
       {showChips && (
