@@ -215,14 +215,57 @@ async function marquerCourseCouverte(base44, courseId, ts) {
   }
 }
 
+/**
+ * Journalise un événement T+10 à la fois en console.log ET en DispatchLog persistant.
+ * Permet de tracer exactement à quelle étape le flux s'arrête pour chaque course.
+ */
 function logEvent(event, data) {
+  const ts = new Date().toISOString();
   console.log(`${LOG_PREFIX} ${event}`, {
     country_code: data.country_code,
     nombre_courses: data.nombre_courses,
     nombre_destinataires: data.nombre_destinataires,
     nombre_push_succes: data.nombre_push_succes,
-    timestamp: new Date().toISOString(),
+    timestamp: ts,
     ...(data.course_ids ? { course_ids: data.course_ids } : {}),
+    ...(data.step ? { step: data.step } : {}),
+    ...(data.message ? { message: data.message } : {}),
+  });
+
+  // ── Journalisation persistante dans DispatchLog ──
+  try {
+    journaliserDispatch(null, {
+      course_id: data.course_ids?.[0] || '',
+      evenement: event,
+      raison_passage: [
+        `country:${data.country_code || 'ALL'}`,
+        `step:${data.step || event}`,
+        `courses:${data.nombre_courses || 0}`,
+        `destinataires:${data.nombre_destinataires || 0}`,
+        `push_succes:${data.nombre_push_succes || 0}`,
+        ...(data.message ? [`msg:${data.message}`] : []),
+        ...(data.course_ids ? [`ids:${data.course_ids.join(',')}`] : []),
+      ].join(' | '),
+      country_code: data.country_code || '',
+      total_candidats: data.nombre_courses || 0,
+    });
+  } catch (logErr) {
+    console.error(`${LOG_PREFIX} Erreur journalisation persistante:`, logErr?.message);
+  }
+}
+
+/**
+ * Journalise une exception T+10 avec le step exact et le message d'erreur.
+ */
+function logException(base44, step, message, countryCode, courseIds) {
+  logEvent('PUSH_GENERAL_T10_EXCEPTION', {
+    country_code: countryCode || 'ALL',
+    step,
+    message: message || '',
+    course_ids: courseIds || [],
+    nombre_courses: courseIds?.length || 0,
+    nombre_destinataires: 0,
+    nombre_push_succes: 0,
   });
 }
 
@@ -381,8 +424,9 @@ export async function gererPushGeneralT10(base44, delayMin = DEFAULT_T10_DELAY_M
     // ── 4a. Acquérir le lock anti-concurrence ──
     const lockAcquired = await acquireCountryLock(base44, countryCode);
     if (!lockAcquired) {
-      logEvent(LOG_PUSH_GENERAL_T10_ALREADY_HANDLED, {
+      logEvent(LOG_PUSH_GENERAL_T10_LOCK_FAILED, {
         country_code: countryCode,
+        step: 'lock_failed',
         nombre_courses: courses.length,
         nombre_destinataires: 0,
         nombre_push_succes: 0,
@@ -391,6 +435,15 @@ export async function gererPushGeneralT10(base44, delayMin = DEFAULT_T10_DELAY_M
       resultats.push({ country_code: countryCode, status: 'lock_taken', courses: courses.length });
       continue;
     }
+
+    logEvent('PUSH_GENERAL_T10_LOCK_ACQUIRED', {
+      country_code: countryCode,
+      step: 'lock_acquired',
+      nombre_courses: courses.length,
+      nombre_destinataires: 0,
+      nombre_push_succes: 0,
+      course_ids: courses.map(c => c.id),
+    });
 
     try {
       // ── 4b. Vérifier le cooldown global du pays ──
@@ -477,12 +530,25 @@ export async function gererPushGeneralT10(base44, delayMin = DEFAULT_T10_DELAY_M
           livreur_ids: livreurIds,
         });
         // Vérifier le résultat réel du push
-        pushSucces = pushResult?.data?.sent_count || pushResult?.data?.success_count || 0;
+        // ── FIX : envoiNotificationPushBatch retourne { succes, echecs, destinataires } ──
+        // Anciennement on lisait sent_count/success_count qui n'existent pas → toujours 0.
+        pushSucces = pushResult?.data?.succes ?? pushResult?.data?.sent_count ?? pushResult?.data?.success_count ?? 0;
+        const pushEchec = pushResult?.data?.echecs ?? 0;
         // Si 0 push réussi ET qu'il y avait des destinataires, considérer comme échec
         if (pushSucces === 0 && destinataires.length > 0) {
           pushFailed = true;
           console.error(`${LOG_PREFIX} Échec push batch: 0/${destinataires.length} push réussis pour ${countryCode}`);
         }
+
+        logEvent('PUSH_GENERAL_T10_FCM_RESULT', {
+          country_code: countryCode,
+          step: 'fcm_result',
+          nombre_courses: validCourses.length,
+          nombre_destinataires: destinataires.length,
+          nombre_push_succes: pushSucces,
+          course_ids: validCourses.map(c => c.id),
+          message: `push_succes:${pushSucces} | push_echec:${pushEchec} | destinataires:${destinataires.length}`,
+        });
       } catch (err) {
         console.error(`${LOG_PREFIX} Erreur envoi push batch:`, err?.message || String(err));
         pushFailed = true;
