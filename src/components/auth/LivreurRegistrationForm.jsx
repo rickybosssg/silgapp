@@ -136,10 +136,6 @@ export default function LivreurRegistrationForm({ user, onComplete }) {
         validation: "en_attente",
         actif: false,
         statut: "hors_ligne",
-        // ── État comptable initial ──
-        // base_comptable_date et base_comptable_solde_initial sont initialisés
-        // par le backend (createLivreur / initLivreurAuto / safety net verifierEncoursLivreur).
-        // Le frontend ne DOIT PAS gérer la règle comptable.
         montant_du_silga: 0,
         encours: 0,
         credit_surplus: 0,
