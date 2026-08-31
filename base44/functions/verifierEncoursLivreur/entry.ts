@@ -130,27 +130,31 @@ Deno.serve(async (req) => {
 
     const now = new Date().toISOString();
 
-    // ── Double-check locking anti-concurrence ──
-    // Re-lire la course pour vérifier qu'elle n'a pas été comptabilisée
-    // entre le guard initial (ligne 50) et maintenant. Si un appel concurrent
-    // a déjà marqué la course, on skippe — la commission n'est comptée qu'une fois.
-    const freshCourse = await base44.asServiceRole.entities.CourseExterne.get(courseId);
-    if (freshCourse?.encours_comptabilise_at) {
+    // ── Prise de possession atomique (CAS — Compare-And-Set) ──
+    // updateMany avec filtre conditionnel: ne matche QUE si encours_comptabilise_at
+    // est encore null. MongoDB garantit l'atomicité au niveau du document:
+    // une seule requête concurrente obtient updated=1, les autres obtiennent updated=0.
+    //
+    // C'est une véritable opération atomique (pas une simple double-lecture).
+    // Le filtre { id, encours_comptabilise_at: null } garantit que si un autre
+    // appel a déjà écrit entre-temps, ce updateMany ne modifie rien.
+    const claimResult = await base44.asServiceRole.entities.CourseExterne.updateMany(
+      { id: courseId, encours_comptabilise_at: null },
+      { $set: { encours_comptabilise_at: now, encours_comptabilise_montant: commission } }
+    );
+
+    if (!claimResult || claimResult.updated !== 1) {
+      // Un appel concurrent a déjà pris possession de cette course
       return Response.json({
         success: true,
         skipped: true,
-        reason: 'course_deja_comptabilisee_concurrent',
-        encours_comptabilise_at: freshCourse.encours_comptabilise_at,
+        reason: 'course_deja_comptabilisee_cas',
+        encours_comptabilise_at: now,
       });
     }
 
-    // ── Marquage comptable de la course (UNE FOIS) ──
-    // Le marquage se fait AVANT le recalcul pour garantir que la commission
-    // est visible dans le solde au moment du recalcul.
-    await base44.asServiceRole.entities.CourseExterne.update(courseId, {
-      encours_comptabilise_at: now,
-      encours_comptabilise_montant: commission,
-    });
+    // À partir d'ici, nous sommes le SEUL appel à avoir gagné le CAS.
+    // La course est marquée. Le recalcul ci-dessous inclura cette commission.
 
     // ── Recalcul du solde (incluant cette course qui vient d'être marquée) ──
     // soldeCalculator filtre par statut=livree (indépendamment de encours_comptabilise_at),
