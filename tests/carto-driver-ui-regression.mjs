@@ -51,7 +51,7 @@ for (const directory of ["src", "base44"]) {
 assert.doesNotMatch(driverApp, /<LivreurStatutCard/, "La carte de statut redondante ne doit plus être rendue");
 assert.match(driverStats, />Livrées</, "Le nouveau bloc doit afficher les livraisons");
 assert.match(driverStats, />Gains</, "Le nouveau bloc doit afficher les gains");
-assert.match(driverStats, />Dû SILGAPP</, "Le nouveau bloc doit afficher le dû SILGAPP");
+assert.match(driverStats, />À payer à SILGAPP</, "Le nouveau bloc doit afficher le montant à payer à SILGAPP");
 assert.match(driverApp, /montantDuSilga !== 0 \? "text-sm" : "text-xs text-slate-500"/, "Payer SILGAPP doit rester discret lorsque le dû est nul");
 assert.match(realtime, /eligibleCourses\.length/, "L'activité temps réel doit utiliser la source unique des courses éligibles");
 assert.doesNotMatch(realtime, /courses disponibles dans ton rayon/, "Aucun faux rayon ne doit être affiché");

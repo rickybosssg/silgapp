@@ -136,7 +136,6 @@ export default function LivreurRegistrationForm({ user, onComplete }) {
         validation: "en_attente",
         actif: false,
         statut: "hors_ligne",
-        // ── État comptable initial cohérent (source unique de vérité) ──
         montant_du_silga: 0,
         encours: 0,
         credit_surplus: 0,

@@ -64,6 +64,7 @@ export const navItems = [
   { path: "/admin/courses-a-sauver", label: "Courses à sauver", icon: ShieldAlert },
   { path: "/admin/fiabilite-push", label: "Fiabilité Push", icon: Radio },
   { path: "/admin/silga-score", label: "Silga Score", icon: Trophy },
+  { path: "/admin/lieux-silgapp", label: "Lieux SILGAPP", icon: MapPin },
   { path: "/admin/bugs", label: "Suivi des bugs", icon: ShieldAlert },
   { path: "/notifications", label: "Notifications", icon: Bell },
   { path: "/maintenance", label: "Maintenance", icon: Shield },

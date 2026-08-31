@@ -57,6 +57,8 @@ Deno.serve(async (req) => {
         app_active: false,
         last_seen_at: new Date().toISOString(),
         country_code: country_code, // OBLIGATOIRE - rejeté si manquant
+        base_comptable_date: new Date().toISOString(),
+        base_comptable_solde_initial: 0,
       });
     } else {
       livreur = livreur[0];

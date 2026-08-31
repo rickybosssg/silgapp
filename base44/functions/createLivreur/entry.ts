@@ -49,6 +49,8 @@ Deno.serve(async (req) => {
       nombre_avis: 0,
       montant_du_silga: 0,
       credit_surplus: 0,
+      base_comptable_date: new Date().toISOString(),
+      base_comptable_solde_initial: 0,
       statut_paiement: 'paye', // Nouveau livreur = dû 0 → à jour
     });
     console.log(" [createLivreur] Livreur créé:", created.id);

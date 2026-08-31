@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import vm from "node:vm";
+import { filterAndRankLocations } from "../src/lib/locationSearchCore.js";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const read = (file) => readFileSync(join(root, file), "utf8");
@@ -80,6 +81,39 @@ for (const file of ["src/components/location/SmartAddressInput.jsx", "src/compon
   assert.match(read(file), /justSelectedRef/, `${file} doit empêcher la réouverture parasite après sélection`);
 }
 
+const lieuFixture = {
+  id: "qa-plastica",
+  type: "lieu_silgapp",
+  label: "Plastica Home Textiles et Deco",
+  searchText: "Plastica Home Textiles et Deco plastica plastic home",
+  countryCode: "BF",
+  latitude: 12.4136,
+  longitude: -1.4663,
+  precisionGps: "exacte",
+};
+for (const query of ["plastica", "Plastica Home", "plastic home"]) {
+  const matches = filterAndRankLocations([lieuFixture], query);
+  assert.equal(matches[0]?.id, lieuFixture.id, `LieuSilgapp doit retrouver l'alias ${query}`);
+  assert.equal(matches[0]?.latitude, 12.4136, "Le GPS exact LieuSilgapp doit rester intact");
+  assert.equal(matches[0]?.longitude, -1.4663, "Le GPS exact LieuSilgapp doit rester intact");
+}
+
+const locationSearch = read("src/lib/locationSearch.js");
+assert.match(locationSearch, /LieuSilgapp\.filter\(\{ country_code: code, statut: "actif" \}/, "La recherche doit isoler les lieux actifs par pays");
+assert.match(locationSearch, /aliases\.join\(" "\)/, "Les aliases LieuSilgapp doivent participer à la recherche");
+assert.match(locationSearch, /precisionGps: lieu\.precision_gps/, "La précision GPS du lieu doit être transmise");
+
+const smartPicker = read("src/components/crm/SmartAddressPicker.jsx");
+assert.match(smartPicker, /<SmartAddressInput/, "Le formulaire Admin doit utiliser SmartAddressInput");
+assert.match(smartPicker, /enableAddLieu=\{true\}/, "L'Admin doit pouvoir ouvrir l'ajout d'un lieu");
+assert.match(read("src/components/client/CourseStepForm.jsx"), /<SmartAddressInput/g, "Les parcours Client doivent utiliser SmartAddressInput");
+assert.match(read("src/components/partenaire/EtablissementForm.jsx"), /<SmartAddressInput/, "Le Partenaire doit utiliser SmartAddressInput");
+
+const sidebar = read("src/components/layout/Sidebar.jsx");
+assert.match(sidebar, /path: "\/admin\/lieux-silgapp", label: "Lieux SILGAPP"/, "La navigation Admin doit exposer Lieux SILGAPP");
+assert.match(read("src/components/layout/MobileNav.jsx"), /navItems as allNavItems/, "MobileNav doit partager les entrées du Sidebar");
+assert.match(read("src/App.jsx"), /path="\/admin\/lieux-silgapp"/, "La route Admin Lieux SILGAPP doit exister");
+
 const dashboardSource = read("src/pages/DashboardExterne.jsx");
 const idsDeclaration = dashboardSource.indexOf("const livreurIdsEnCourseReelle = useMemo");
 const onlineDeclaration = dashboardSource.indexOf("const livreursEnLigne = useMemo");
@@ -87,4 +121,4 @@ assert.ok(idsDeclaration >= 0, "DashboardExterne doit déclarer livreurIdsEnCour
 assert.ok(onlineDeclaration >= 0, "DashboardExterne doit déclarer livreursEnLigne");
 assert.ok(idsDeclaration < onlineDeclaration, "livreurIdsEnCourseReelle doit être initialisé avant livreursEnLigne pour éviter la TDZ");
 
-console.log("CONTACT_ADDRESS_REGRESSION=PASS contacts=PASS whatsapp=PASS gps=PASS first_tap=PASS coordinates=PASS dashboard_tdz=PASS");
+console.log("CONTACT_ADDRESS_REGRESSION=PASS contacts=PASS whatsapp=PASS gps=PASS first_tap=PASS coordinates=PASS lieu_silgapp=PASS admin_nav=PASS dashboard_tdz=PASS");
