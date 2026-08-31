@@ -12,14 +12,28 @@
 
 /**
  * Récupère les IDs des livreurs déjà notifiés pour une course
- * (statut: notifie, accepte, refuse, expire — tous ceux qui ont été sollicités)
+ * (statut: notifie, accepte, expire — tous ceux qui ont été sollicités)
+ *
+ * ⚠️ Le statut 'refuse' est EXCLU du résultat : un refus est une exclusion
+ * permanente scopée à la course (gérée par getLivreursRefuses), pas une
+ * preuve qu'une vague de diffusion a déjà été créée. L'anti-race check
+ * de publierCourseDansFil (dispatchV2.ts) s'appuie sur cette fonction
+ * pour détecter les doublons de publication — un refus seul ne doit pas
+ * bloquer le redispatch.
+ *
+ * Correctif validé le 2026-08-31 (SG-20260831-544795) :
+ *   - Sépare « déjà publié » (sollicitations) de « livreurs exclus » (refus).
+ *   - getLivreursRefuses() continue de retourner les refus pour l'exclusion.
+ *   - Aucun impact sur Livreur.statut ni sur les règles d'éligibilité.
  */
 export async function getLivreursNotifies(base44, courseId) {
   try {
     const notifs = await base44.asServiceRole.entities.DispatchNotification.filter(
       { course_id: courseId }, '-date_notification', 500
     );
-    return (notifs || []).map(n => n.livreur_id);
+    return (notifs || [])
+      .filter(n => n.statut !== 'refuse')
+      .map(n => n.livreur_id);
   } catch (err) {
     console.error('[DispatchNotif] Erreur getLivreursNotifies:', err.message);
     return [];

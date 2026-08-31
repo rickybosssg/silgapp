@@ -235,14 +235,16 @@ export default async function(req: Request): Promise<Response> {
 
     console.log(`[RELANCE_DISPATCH] Course ${course_id} — nettoyage terminé: ${livreursAExclure.size} livreur(s) exclu(s), anciennes sollicitations supprimées`);
 
-    // ── 4. Déclencher le dispatch (mécanisme V2 existant) ──
-    // ⚠️ Si l'anti-race check de publierCourseDansFil bloque (car les notifs
-    // 'refuse' créées en étape 3 font que getLivreursNotifies() retourne ≥1),
-    // le watchdog (tick de secours 10 min) traitera la course via ANOMALIE 2
-    // ou retry_courses_en_attente.
-    // → Le correctif minimal proposé sur getLivreursNotifies() résoudra ce
-    //   blocage de manière propre et définitive.
-    await base44.asServiceRole.functions.invoke('dispatchExterneAuto', {}).catch((err: any) => {
+    // ── 4. Déclencher le dispatch directement (action='lancer_recherche_auto') ──
+    // Invoque publierCourseDansFil (V2) directement pour cette course.
+    // getLivreursNotifies() exclut désormais le statut 'refuse' → l'anti-race
+    // check ne bloque plus sur les exclusions permanentes créées en étape 3.
+    // → dejaNotifies est vide (seul Judicaël a un 'refuse', désormais filtré)
+    // → la course est publiée dans le fil, Judicaël reste exclu via getLivreursRefuses().
+    await base44.asServiceRole.functions.invoke('dispatchExterneAuto', {
+      action: 'lancer_recherche_auto',
+      course_id,
+    }).catch((err: any) => {
       console.error('[RELANCE_DISPATCH] Erreur dispatchExterneAuto:', err?.message || String(err));
     });
 
