@@ -12,6 +12,52 @@ import { resolveCourseParticipantUserIds } from '../../shared/conversationSecuri
 // 🔖 Redéploiement forcé — 2026-08-14-simplified-3 — rappel T+5min re-notifie les mêmes livreurs libres
 console.log(`[DISPATCH_EXTERNE_AUTO] 🔖 dispatchV2 bundle version: ${DISPATCH_V2_BUNDLE_VERSION}`);
 
+// ═══════════════════════════════════════════════════════════════════════════
+// 🛡️ RETRY AUTH — Protection contre les erreurs d'authentification transitoires
+// ═══════════════════════════════════════════════════════════════════════════
+// Le SDK Base44 peut occasionnellement perdre le contexte service role lors
+// d'invocations chainées (entity automation → functions.invoke). L'erreur
+// "You must be logged in to access this app" est transitoire : un retry avec
+// un client fraîchement recréé résout le problème dans la majorité des cas.
+//
+// LOGIQUE :
+//   1. Exécute l'opération avec le client courant.
+//   2. Si "You must be logged in to access this app" → recrée le client, retry.
+//   3. Maximum 2 retries (3 tentatives au total).
+//   4. Si les retries échouent → l'erreur remonte normalement (alerte conservée).
+//   5. LOG: STEP_FAILED=<stepName> pour identifier l'étape qui échoue.
+// ═══════════════════════════════════════════════════════════════════════════
+
+const AUTH_ERROR_SIGNATURE = 'You must be logged in to access this app';
+const MAX_AUTH_RETRIES = 2;
+const AUTH_RETRY_DELAY_MS = 500;
+
+/**
+ * Wrapper pour les opérations de dispatch critiques.
+ * Si une erreur d'authentification transitoire Base44 survient, recrée le client
+ * et retente l'opération. Les autres erreurs remontent immédiatement.
+ */
+async function withAuthRetry(req: Request, stepName: string, fn: (base44: any) => Promise<any>) {
+  let lastError: any = null;
+  for (let attempt = 0; attempt <= MAX_AUTH_RETRIES; attempt++) {
+    try {
+      const base44 = createClientFromRequest(req);
+      return await fn(base44);
+    } catch (error: any) {
+      lastError = error;
+      const msg = error?.message || String(error);
+      const isAuthError = msg.includes(AUTH_ERROR_SIGNATURE);
+      console.error(`[DISPATCH] STEP_FAILED=${stepName} attempt=${attempt + 1}/${MAX_AUTH_RETRIES + 1} auth_error=${isAuthError} msg="${msg}"`);
+      if (!isAuthError || attempt >= MAX_AUTH_RETRIES) {
+        throw error;
+      }
+      await new Promise(r => setTimeout(r, AUTH_RETRY_DELAY_MS));
+      console.log(`[DISPATCH] 🔄 Retrying ${stepName} with fresh client (attempt ${attempt + 2}/${MAX_AUTH_RETRIES + 1})`);
+    }
+  }
+  throw lastError;
+}
+
 // ============================================================================
 // HANDLER PRINCIPAL
 // ============================================================================
@@ -40,7 +86,7 @@ Deno.serve(async (req) => {
         return Response.json({ error: 'Course introuvable' }, { status: 404 });
       }
       if (!course) return Response.json({ error: 'Course introuvable' }, { status: 404 });
-      const result = await publierCourseDansFil(base44, course);
+      const result = await withAuthRetry(req, 'publierCourseDansFil', (b44: any) => publierCourseDansFil(b44, course));
       return Response.json(result);
     }
 
@@ -113,7 +159,7 @@ Deno.serve(async (req) => {
       // Le premier qui accepte gagne (prioritaire ou non), verrou atomique.
       const v2Enabled = await isV2Enabled(base44);
       if (v2Enabled) {
-        const result = await publierCourseDansFil(base44, course);
+        const result = await withAuthRetry(req, 'publierCourseDansFil_lancerRecherche', (b44: any) => publierCourseDansFil(b44, course));
         return Response.json({ success: true, v2: true, published: true, ...result });
       }
 
@@ -677,7 +723,7 @@ Deno.serve(async (req) => {
 
     // ─── 6. Watchdog — détection et correction d'anomalies (tick de secours 10 min) ──
     if (action === 'watchdog' || action === 'avancer_vagues_expirees') {
-      const result = await runWatchdog(base44, body);
+      const result = await withAuthRetry(req, 'runWatchdog', (b44: any) => runWatchdog(b44, body));
       return Response.json(result);
     }
 
@@ -707,7 +753,7 @@ Deno.serve(async (req) => {
       const resultats = [];
       for (const course of coursesToProcess) {
         try {
-          const result = await lancerDispatchMulti(base44, course.id, [], cachedConfig);
+          const result = await withAuthRetry(req, 'lancerDispatchMulti_retry', (b44: any) => lancerDispatchMulti(b44, course.id, [], cachedConfig));
           resultats.push({ course_id: course.id, ...result });
         } catch (err) {
           console.error(`[DISPATCH] ❌ Erreur retry course ${course.id}:`, err.message);
@@ -957,7 +1003,11 @@ Deno.serve(async (req) => {
     return Response.json({ error: 'Action inconnue' }, { status: 400 });
   } catch (error) {
     const isRateLimit = error.message?.toLowerCase?.().includes('rate limit') || error.message?.toLowerCase?.().includes('rate_limit') || error.message?.toLowerCase?.().includes('traffic volume');
-    console.error(`[DISPATCH] Erreur fatale${isRateLimit ? ' (RATE LIMIT)' : ''}:`, error.message);
+    const isAuthError = error.message?.includes(AUTH_ERROR_SIGNATURE);
+    // 🛡️ Les erreurs auth transitoires ont déjà été retentées par withAuthRetry (2 retries).
+    // Si on arrive ici avec une erreur auth, cela signifie que les retries ont échoué
+    // → c'est une vraie erreur persistante, l'alerte reste justifiée.
+    console.error(`[DISPATCH] STEP_FAILED=dispatchExterneAuto.catch Erreur fatale${isRateLimit ? ' (RATE_LIMIT)' : ''}${isAuthError ? ' (AUTH_EXHAUSTED)' : ''}:`, error.message);
     try {
       const base44 = createClientFromRequest(req);
       // 🛡️ Anti-spam : ne créer une alerte que si aucune alerte récente (< 30 min) n'existe
@@ -970,7 +1020,9 @@ Deno.serve(async (req) => {
       if (!hasRecent) {
         const msg = isRateLimit
           ? `Le moteur de dispatch a atteint la limite d'appels API (rate limit). Cela est transitoire — le prochain tick reprendra automatiquement. Si le problème persiste, contactez le support.`
-          : `Le moteur de dispatch a crashé: ${error.message}. Les courses ne sont plus relancées automatiquement. Intervention requise.`;
+          : isAuthError
+            ? `Le moteur de dispatch a échoué après ${MAX_AUTH_RETRIES + 1} tentatives: ${error.message}. Les courses ne sont plus relancées automatiquement. Intervention requise.`
+            : `Le moteur de dispatch a crashé: ${error.message}. Les courses ne sont plus relancées automatiquement. Intervention requise.`;
         await base44.asServiceRole.entities.Notification.create({
           titre: isRateLimit ? '⚠️ Surcharge API temporaire — dispatch' : '🚨 Erreur fatale — dispatch automatique',
           message: msg,
