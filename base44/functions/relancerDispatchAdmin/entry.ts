@@ -85,26 +85,27 @@ export default async function(req: Request): Promise<Response> {
     //   - Les anciennes sollicitations (notifie, push_succes, etc.) sont supprimées
     //     pour permettre aux autres livreurs d'être reproposés.
     //
-    // PROBLÈME TECHNIQUE :
+    // APPROCHE SCOPÉE À LA COURSE (sans mutation de Livreur.statut) :
+    //   1. Identifier les livreurs à exclure (AnnulationLivreur + refus).
+    //   2. Supprimer TOUTES les anciennes DispatchNotification (retry 3x + fallback).
+    //   3. Créer les DispatchNotification 'refuse' pour les livreurs exclus
+    //      AVANT le dispatch — c'est ce que getLivreursRefuses() utilise pour
+    //      l'exclusion dans publierCourseDansFil.
+    //   4. Déclencher le dispatch (action='lancer_recherche_auto').
+    //
+    // ⚠️ NOTE ARCHITECTURALE :
     //   publierCourseDansFil (Dispatch V2) a un anti-race check qui SKIP la
     //   course si getLivreursNotifies() retourne ≥1 résultat. Or
-    //   getLivreursNotifies retourne TOUS les statuts (y compris 'refuse').
-    //   → Si on crée une notif 'refuse' AVANT le dispatch, l'anti-race check
-    //     bloque le redispatch (la course reste invisible).
+    //   getLivreursNotifies() retourne TOUS les statuts (y compris 'refuse').
+    //   → Une notification 'refuse' seule fait croire à l'anti-race qu'une vague
+    //     de diffusion a déjà été créée, et bloque le redispatch.
     //
-    // SOLUTION (sans modifier Dispatch V2) :
-    //   1. Supprimer TOUTES les anciennes DispatchNotification (sollicitations
-    //      ET refus existants).
-    //   2. Sauvegarder les livreurs à exclure (AnnulationLivreur + refus).
-    //   3. Temporairement rendre ces livreurs inéligibles en mettant leur
-    //      statut à 'hors_ligne' (le filtre Livreur de publierCourseDansFil
-    //      exclut statut != 'disponible').
-    //   4. Déclencher le dispatch directement (action='lancer_recherche_auto').
-    //      → dejaNotifies vide → anti-race check passe.
-    //      → livreurs exclus non dans la liste éligible (statut='hors_ligne').
-    //   5. Après le dispatch, restaurer le statut des livreurs exclus à
-    //      'disponible' ET créer leurs DispatchNotification 'refuse' pour
-    //      les futures vagues.
+    //   Correctif minimal proposé (NON appliqué — en attente de validation) :
+    //   Modifier getLivreursNotifies() dans dispatchNotifications.ts pour
+    //   exclure le statut 'refuse' du résultat. Voir rapport d'audit.
+    //
+    //   En attendant ce correctif, le redispatch s'appuie sur le watchdog
+    //   (tick de secours) qui traitera la course via ANOMALIE 2 ou ANOMALIE 7.
     // ═══════════════════════════════════════════════════════════════════════
 
     // ── 1. Identifier les livreurs à PRÉSERVER (exclusion permanente) ──
@@ -141,7 +142,6 @@ export default async function(req: Request): Promise<Response> {
     }
 
     // ── 2. Supprimer TOUTES les anciennes DispatchNotification ──
-    // (sollicitations ET refus — on recréera les refus après le dispatch)
     let nettoyageReussi = false;
     let derniereErreurNettoyage: string | null = null;
 
@@ -191,64 +191,60 @@ export default async function(req: Request): Promise<Response> {
       }, { status: 500 });
     }
 
-    // ── 3. Temporairement rendre les livreurs exclus inéligibles ──
-    // Le filtre Livreur de publierCourseDansFil exige statut='disponible'.
-    // En passant temporairement à 'hors_ligne', ils n'apparaîtront pas dans
-    // la liste des candidats. On restaurera après le dispatch.
-    const livreursExclusData = new Map<string, { statut: string; user_email: string | null }>();
+    // ── 3. Créer les exclusions permanentes AVANT le dispatch ──
+    // DispatchNotification 'refuse' = ce que getLivreursRefuses() utilise pour
+    // exclure le livreur du dispatch. Scopé à cette course uniquement.
+    // NE MODIFIE PAS Livreur.statut — l'exclusion est purement au niveau
+    // de la DispatchNotification, pas du livreur global.
     if (livreursAExclure.size > 0) {
+      const nowIsoExclusion = new Date().toISOString();
+
+      // Résoudre les user_email pour la RLS
+      const livreurEmails = new Map<string, string | null>();
       const ids = [...livreursAExclure];
       const livreursData = await base44.asServiceRole.entities.Livreur
         .filter({ id: { $in: ids } }, undefined, ids.length)
         .catch(() => []);
       for (const l of livreursData || []) {
-        livreursExclusData.set(l.id, { statut: l.statut || 'disponible', user_email: l.user_email || null });
-        // Temporairement hors_ligne
-        await base44.asServiceRole.entities.Livreur.update(l.id, { statut: 'hors_ligne' })
-          .catch((err: any) => console.error(`[RELANCE_DISPATCH] Erreur statut hors_ligne ${l.id}:`, err?.message || String(err)));
+        livreurEmails.set(l.id, l.user_email || null);
       }
-      console.log(`[RELANCE_DISPATCH] ${livreursExclusData.size} livreur(s) temporairement hors_ligne (exclusion redispatch)`);
+      // Fallback : récupérer depuis les anciennes notifs refuse
+      for (const n of refusNotifs || []) {
+        if (!livreurEmails.has(n.livreur_id) && n.livreur_user_email) {
+          livreurEmails.set(n.livreur_id, n.livreur_user_email);
+        }
+      }
+
+      for (const livreurId of ids) {
+        await base44.asServiceRole.entities.DispatchNotification.create({
+          course_id,
+          livreur_id: livreurId,
+          livreur_user_email: livreurEmails.get(livreurId) || null,
+          country_code: course.country_code || '',
+          vague: 0,
+          statut: 'refuse',
+          date_notification: nowIsoExclusion,
+          date_reponse: nowIsoExclusion,
+          raison_refus: exclusionRaisons.get(livreurId) || 'Annulé par le livreur (préservé par relancerDispatchAdmin)',
+        }).catch((err: any) => {
+          console.error(`[RELANCE_DISPATCH] Erreur création exclusion ${livreurId}:`, err?.message || String(err));
+        });
+      }
+      console.log(`[RELANCE_DISPATCH] 🔒 ${livreursAExclure.size} exclusion(s) permanente(s) créée(s) (DispatchNotification refuse) — sans modifier Livreur.statut`);
     }
 
-    // ── 4. Déclencher le dispatch directement (pas le watchdog) ──
-    // action='lancer_recherche_auto' appelle publierCourseDansFil (V2).
-    // Comme toutes les anciennes notifs sont supprimées, dejaNotifies est vide
-    // → l'anti-race check passe → la course est publiée dans le fil.
-    // Les livreurs exclus sont hors_ligne → non dans la liste éligible.
-    let dispatchResult: any = null;
-    try {
-      dispatchResult = await base44.asServiceRole.functions.invoke('dispatchExterneAuto', {
-        action: 'lancer_recherche_auto',
-        course_id,
-      });
-    } catch (err: any) {
+    console.log(`[RELANCE_DISPATCH] Course ${course_id} — nettoyage terminé: ${livreursAExclure.size} livreur(s) exclu(s), anciennes sollicitations supprimées`);
+
+    // ── 4. Déclencher le dispatch (mécanisme V2 existant) ──
+    // ⚠️ Si l'anti-race check de publierCourseDansFil bloque (car les notifs
+    // 'refuse' créées en étape 3 font que getLivreursNotifies() retourne ≥1),
+    // le watchdog (tick de secours 10 min) traitera la course via ANOMALIE 2
+    // ou retry_courses_en_attente.
+    // → Le correctif minimal proposé sur getLivreursNotifies() résoudra ce
+    //   blocage de manière propre et définitive.
+    await base44.asServiceRole.functions.invoke('dispatchExterneAuto', {}).catch((err: any) => {
       console.error('[RELANCE_DISPATCH] Erreur dispatchExterneAuto:', err?.message || String(err));
-    }
-
-    // ── 5. Restaurer le statut des livreurs exclus + créer leurs notifs 'refuse' ──
-    const nowIso = new Date().toISOString();
-    for (const [livreurId, data] of livreursExclusData) {
-      // Restaurer le statut original
-      await base44.asServiceRole.entities.Livreur.update(livreurId, { statut: data.statut })
-        .catch((err: any) => console.error(`[RELANCE_DISPATCH] Erreur restauration statut ${livreurId}:`, err?.message || String(err)));
-
-      // Créer la DispatchNotification 'refuse' pour les futures vagues
-      await base44.asServiceRole.entities.DispatchNotification.create({
-        course_id,
-        livreur_id: livreurId,
-        livreur_user_email: data.user_email || null,
-        country_code: course.country_code || '',
-        vague: 0,
-        statut: 'refuse',
-        date_notification: nowIso,
-        date_reponse: nowIso,
-        raison_refus: exclusionRaisons.get(livreurId) || 'Annulé par le livreur (préservé par relancerDispatchAdmin)',
-      }).catch((err: any) => {
-        console.error(`[RELANCE_DISPATCH] Erreur recréation exclusion ${livreurId}:`, err?.message || String(err));
-      });
-    }
-
-    console.log(`[RELANCE_DISPATCH] Course ${course_id} — redispatch terminé: ${livreursAExclure.size} livreur(s) exclu(s), statuts restaurés, dispatch result:`, dispatchResult?.success || 'N/A');
+    });
 
     // ── Si mode vague0, libérer le livreur ──
     if (resetMode === 'vague0' && course.livreur_id) {
