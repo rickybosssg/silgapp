@@ -582,12 +582,14 @@ export async function gererPushGeneralT10(base44, delayMin = DEFAULT_T10_DELAY_M
         // ÉCHEC FCM : NE PAS marquer push_general_t10_envoye=true
         // Les courses pourront être retentées au prochain tick (sous réserve du cooldown).
         // On ne met PAS à jour le last_sent du pays non plus, car aucun push n'a été envoyé.
-        logEvent(LOG_PUSH_GENERAL_T10_NO_RECIPIENT, {
+        logEvent('PUSH_GENERAL_T10_FCM_FAILED', {
           country_code: countryCode,
+          step: 'fcm_failed',
           nombre_courses: validCourses.length,
           nombre_destinataires: destinataires.length,
           nombre_push_succes: 0,
           course_ids: validCourses.map(c => c.id),
+          message: `0/${destinataires.length} push réussis`,
         });
         resultats.push({
           country_code: countryCode,
@@ -610,6 +612,7 @@ export async function gererPushGeneralT10(base44, delayMin = DEFAULT_T10_DELAY_M
       // ── 4i. Journaliser ──
       logEvent(LOG_PUSH_GENERAL_T10_SENT, {
         country_code: countryCode,
+        step: 'sent',
         nombre_courses: validCourses.length,
         nombre_destinataires: destinataires.length,
         nombre_push_succes: pushSucces,
