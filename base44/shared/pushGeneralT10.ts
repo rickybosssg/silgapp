@@ -348,302 +348,327 @@ export async function gererPushGeneralT10(base44, delayMin = DEFAULT_T10_DELAY_M
   const delayMs = delayMin * 60 * 1000;
   const cooldownMs = cooldownMin * 60 * 1000;
 
-  // ── 1. Récupérer les courses potentiellement éligibles ──
-  // On prend les courses en recherche_livreur ET disponible_push
-  let coursesCandidates = [];
+  // ── EXCEPTION GUARD : englobe tout le flux pour ne jamais masquer une erreur ──
   try {
-    coursesCandidates = await base44.asServiceRole.entities.CourseExterne.filter({
-      statut: 'recherche_livreur',
-    }, '-created_date', 200);
-  } catch (err) {
-    console.error(`${LOG_PREFIX} Erreur lecture courses:`, err?.message || String(err));
-    return { success: false, error: 'lecture_courses_impossible' };
-  }
-
-  // ── 2. Filtrer les courses éligibles au T+10 ──
-  const coursesEligibles = [];
-  for (const course of coursesCandidates) {
-    // Déjà traitée (envoyé ou couverte récemment)
-    if (course.push_general_t10_envoye === true) {
-      continue;
-    }
-    // Si couvert récemment (< cooldown), skip
-    if (course.push_general_t10_couvert_at) {
-      const couvertAgeMs = now - new Date(course.push_general_t10_couvert_at).getTime();
-      if (couvertAgeMs < cooldownMs) {
-        continue;
-      }
-    }
-
-    // Doit être en diffusion active (disponible_push ou en_attente/propose sans livreur)
-    const validDispatchStatus = ['disponible_push', 'propose', 'en_attente', 'redispatch'];
-    if (!validDispatchStatus.includes(course.dispatch_status)) {
-      continue;
-    }
-
-    // Ne doit pas avoir de livreur assigné
-    if (course.livreur_id || course.accepted_by_livreur_id) {
-      continue;
-    }
-
-    // Calculer l'âge depuis la première diffusion
-    const sollicitationTs = course.heure_sollicitation
-      ? new Date(course.heure_sollicitation).getTime()
-      : new Date(course.created_date).getTime();
-    const ageMs = now - sollicitationTs;
-
-    if (ageMs < delayMs) {
-      continue;
-    }
-
-    coursesEligibles.push(course);
-  }
-
-  if (coursesEligibles.length === 0) {
-    logEvent(LOG_PUSH_GENERAL_T10_NO_COURSE, {
+    logEvent('PUSH_GENERAL_T10_START', {
       country_code: 'ALL',
+      step: 'start',
       nombre_courses: 0,
       nombre_destinataires: 0,
       nombre_push_succes: 0,
     });
-    return { success: true, sent: false, reason: 'no_course' };
-  }
 
-  // ── 3. Grouper par pays ──
-  const coursesParPays = new Map();
-  for (const course of coursesEligibles) {
-    const cc = course.country_code || 'UNKNOWN';
-    if (!coursesParPays.has(cc)) coursesParPays.set(cc, []);
-    coursesParPays.get(cc).push(course);
-  }
+    // ── 1. Récupérer les courses potentiellement éligibles ──
+    // On prend les courses en recherche_livreur ET disponible_push
+    let coursesCandidates = [];
+    try {
+      coursesCandidates = await base44.asServiceRole.entities.CourseExterne.filter({
+        statut: 'recherche_livreur',
+      }, '-created_date', 200);
+    } catch (err) {
+      logException(base44, 'lecture_courses', err?.message || String(err), 'ALL', []);
+      return { success: false, error: 'lecture_courses_impossible' };
+    }
 
-  const resultats = [];
+    // ── 2. Filtrer les courses éligibles au T+10 ──
+    const coursesEligibles = [];
+    for (const course of coursesCandidates) {
+      // Déjà traitée (envoyé ou couverte récemment)
+      if (course.push_general_t10_envoye === true) {
+        continue;
+      }
+      // Si couvert récemment (< cooldown), skip
+      if (course.push_general_t10_couvert_at) {
+        const couvertAgeMs = now - new Date(course.push_general_t10_couvert_at).getTime();
+        if (couvertAgeMs < cooldownMs) {
+          continue;
+        }
+      }
 
-  // ── 4. Pour chaque pays ──
-  for (const [countryCode, courses] of coursesParPays) {
-    // ── 4a. Acquérir le lock anti-concurrence ──
-    const lockAcquired = await acquireCountryLock(base44, countryCode);
-    if (!lockAcquired) {
-      logEvent(LOG_PUSH_GENERAL_T10_LOCK_FAILED, {
+      // Doit être en diffusion active (disponible_push ou en_attente/propose sans livreur)
+      const validDispatchStatus = ['disponible_push', 'propose', 'en_attente', 'redispatch'];
+      if (!validDispatchStatus.includes(course.dispatch_status)) {
+        continue;
+      }
+
+      // Ne doit pas avoir de livreur assigné
+      if (course.livreur_id || course.accepted_by_livreur_id) {
+        continue;
+      }
+
+      // Calculer l'âge depuis la première diffusion (heure_sollicitation en priorité)
+      const sollicitationTs = course.heure_sollicitation
+        ? new Date(course.heure_sollicitation).getTime()
+        : new Date(course.created_date).getTime();
+      const ageMs = now - sollicitationTs;
+
+      if (ageMs < delayMs) {
+        continue;
+      }
+
+      coursesEligibles.push(course);
+    }
+
+    logEvent('PUSH_GENERAL_T10_ELIGIBLE_COURSES', {
+      country_code: 'ALL',
+      step: 'eligible_courses',
+      nombre_courses: coursesEligibles.length,
+      nombre_destinataires: 0,
+      nombre_push_succes: 0,
+      course_ids: coursesEligibles.map(c => c.id),
+    });
+
+    if (coursesEligibles.length === 0) {
+      logEvent(LOG_PUSH_GENERAL_T10_NO_COURSE, {
+        country_code: 'ALL',
+        step: 'no_course',
+        nombre_courses: 0,
+        nombre_destinataires: 0,
+        nombre_push_succes: 0,
+      });
+      return { success: true, sent: false, reason: 'no_course' };
+    }
+
+    // ── 3. Grouper par pays ──
+    const coursesParPays = new Map();
+    for (const course of coursesEligibles) {
+      const cc = course.country_code || 'UNKNOWN';
+      if (!coursesParPays.has(cc)) coursesParPays.set(cc, []);
+      coursesParPays.get(cc).push(course);
+    }
+
+    const resultats = [];
+
+    // ── 4. Pour chaque pays ──
+    for (const [countryCode, courses] of coursesParPays) {
+      // ── 4a. Acquérir le lock anti-concurrence ──
+      const lockAcquired = await acquireCountryLock(base44, countryCode);
+      if (!lockAcquired) {
+        logEvent(LOG_PUSH_GENERAL_T10_ALREADY_HANDLED, {
+          country_code: countryCode,
+          step: 'lock_failed',
+          nombre_courses: courses.length,
+          nombre_destinataires: 0,
+          nombre_push_succes: 0,
+          course_ids: courses.map(c => c.id),
+        });
+        resultats.push({ country_code: countryCode, status: 'lock_taken', courses: courses.length });
+        continue;
+      }
+
+      logEvent('PUSH_GENERAL_T10_LOCK_ACQUIRED', {
         country_code: countryCode,
-        step: 'lock_failed',
+        step: 'lock_acquired',
         nombre_courses: courses.length,
         nombre_destinataires: 0,
         nombre_push_succes: 0,
         course_ids: courses.map(c => c.id),
       });
-      resultats.push({ country_code: countryCode, status: 'lock_taken', courses: courses.length });
-      continue;
-    }
 
-    logEvent('PUSH_GENERAL_T10_LOCK_ACQUIRED', {
-      country_code: countryCode,
-      step: 'lock_acquired',
-      nombre_courses: courses.length,
-      nombre_destinataires: 0,
-      nombre_push_succes: 0,
-      course_ids: courses.map(c => c.id),
-    });
+      try {
+        // ── 4b. Vérifier le cooldown global du pays ──
+        const lastSentTs = await getCountryLastSent(base44, countryCode);
+        const cooldownElapsed = now - lastSentTs;
 
-    try {
-      // ── 4b. Vérifier le cooldown global du pays ──
-      const lastSentTs = await getCountryLastSent(base44, countryCode);
-      const cooldownElapsed = now - lastSentTs;
-
-      if (lastSentTs && cooldownElapsed < cooldownMs) {
-        // Cooldown actif — marquer les courses comme couvertes, pas d'envoi
-        for (const course of courses) {
-          await marquerCourseCouverte(base44, course.id, now);
+        if (lastSentTs && cooldownElapsed < cooldownMs) {
+          // Cooldown actif — marquer les courses comme couvertes, pas d'envoi
+          for (const course of courses) {
+            await marquerCourseCouverte(base44, course.id, now);
+          }
+          logEvent(LOG_PUSH_GENERAL_T10_COOLDOWN, {
+            country_code: countryCode,
+            step: 'cooldown',
+            nombre_courses: courses.length,
+            nombre_destinataires: 0,
+            nombre_push_succes: 0,
+            course_ids: courses.map(c => c.id),
+            message: `last_sent_age_min:${Math.round(cooldownElapsed / 60000)}`,
+          });
+          resultats.push({
+            country_code: countryCode,
+            status: 'cooldown',
+            courses: courses.length,
+            last_sent_age_min: Math.round(cooldownElapsed / 60000),
+          });
+          continue;
         }
-        logEvent(LOG_PUSH_GENERAL_T10_COOLDOWN, {
-          country_code: countryCode,
-          step: 'cooldown',
-          nombre_courses: courses.length,
-          nombre_destinataires: 0,
-          nombre_push_succes: 0,
-          course_ids: courses.map(c => c.id),
-          message: `last_sent_age_min:${Math.round(cooldownElapsed / 60000)}`,
+
+        // ── 4c. Revalider l'état des courses (race condition) ──
+        // Une course a pu être acceptée/annulée entre la lecture initiale et maintenant
+        const courseIds = courses.map(c => c.id);
+        const freshCourses = await base44.asServiceRole.entities.CourseExterne.filter({
+          id: { $in: courseIds },
         });
-        resultats.push({
+        const validCourses = (freshCourses || []).filter(c =>
+          c.statut === 'recherche_livreur' &&
+          !c.livreur_id &&
+          !c.accepted_by_livreur_id &&
+          c.push_general_t10_envoye !== true
+        );
+
+        if (validCourses.length === 0) {
+          logEvent(LOG_PUSH_GENERAL_T10_NO_COURSE, {
+            country_code: countryCode,
+            step: 'no_valid_course_after_revalidation',
+            nombre_courses: 0,
+            nombre_destinataires: 0,
+            nombre_push_succes: 0,
+          });
+          resultats.push({ country_code: countryCode, status: 'no_valid_course' });
+          continue;
+        }
+
+        // ── 4d. Récupérer les destinataires ──
+        const destinataires = await getLivreursDestinataires(base44, countryCode);
+
+        if (destinataires.length === 0) {
+          logEvent(LOG_PUSH_GENERAL_T10_NO_RECIPIENT, {
+            country_code: countryCode,
+            step: 'no_recipient',
+            nombre_courses: validCourses.length,
+            nombre_destinataires: 0,
+            nombre_push_succes: 0,
+            course_ids: validCourses.map(c => c.id),
+          });
+          resultats.push({ country_code: countryCode, status: 'no_recipient', courses: validCourses.length });
+          continue;
+        }
+
+        logEvent('PUSH_GENERAL_T10_RECIPIENTS_FOUND', {
           country_code: countryCode,
-          status: 'cooldown',
-          courses: courses.length,
-          last_sent_age_min: Math.round(cooldownElapsed / 60000),
-        });
-        continue;
-      }
-
-      // ── 4c. Revalider l'état des courses (race condition) ──
-      // Une course a pu être acceptée/annulée entre la lecture initiale et maintenant
-      const courseIds = courses.map(c => c.id);
-      const freshCourses = await base44.asServiceRole.entities.CourseExterne.filter({
-        id: { $in: courseIds },
-      });
-      const validCourses = (freshCourses || []).filter(c =>
-        c.statut === 'recherche_livreur' &&
-        !c.livreur_id &&
-        !c.accepted_by_livreur_id &&
-        c.push_general_t10_envoye !== true
-      );
-
-      if (validCourses.length === 0) {
-        logEvent(LOG_PUSH_GENERAL_T10_NO_COURSE, {
-          country_code: countryCode,
-          step: 'no_valid_course_after_revalidation',
-          nombre_courses: 0,
-          nombre_destinataires: 0,
-          nombre_push_succes: 0,
-        });
-        resultats.push({ country_code: countryCode, status: 'no_valid_course' });
-        continue;
-      }
-
-      // ── 4d. Récupérer les destinataires ──
-      const destinataires = await getLivreursDestinataires(base44, countryCode);
-
-      if (destinataires.length === 0) {
-        logEvent(LOG_PUSH_GENERAL_T10_NO_RECIPIENT, {
-          country_code: countryCode,
-          step: 'no_recipient',
+          step: 'recipients_found',
           nombre_courses: validCourses.length,
-          nombre_destinataires: 0,
+          nombre_destinataires: destinataires.length,
           nombre_push_succes: 0,
           course_ids: validCourses.map(c => c.id),
         });
-        resultats.push({ country_code: countryCode, status: 'no_recipient', courses: validCourses.length });
-        continue;
-      }
 
-      logEvent('PUSH_GENERAL_T10_RECIPIENTS_FOUND', {
-        country_code: countryCode,
-        step: 'recipients_found',
-        nombre_courses: validCourses.length,
-        nombre_destinataires: destinataires.length,
-        nombre_push_succes: 0,
-        course_ids: validCourses.map(c => c.id),
-      });
+        // ── 4e. Construire le message ──
+        const titre = 'COURSES DISPONIBLES';
+        const message = validCourses.length === 1
+          ? 'Des courses sont disponibles sur SILGAPP. Ouvrez l\'application pour les consulter.'
+          : 'Plusieurs courses sont disponibles sur SILGAPP. Ouvrez l\'application pour les consulter.';
 
-      // ── 4e. Construire le message ──
-      const titre = 'COURSES DISPONIBLES';
-      const message = validCourses.length === 1
-        ? 'Des courses sont disponibles sur SILGAPP. Ouvrez l\'application pour les consulter.'
-        : 'Plusieurs courses sont disponibles sur SILGAPP. Ouvrez l\'application pour les consulter.';
+        const livreurIds = destinataires.map(l => l.id);
 
-      const livreurIds = destinataires.map(l => l.id);
-
-      // ── 4f. Envoyer le push via le système existant ──
-      logEvent('PUSH_GENERAL_T10_FCM_START', {
-        country_code: countryCode,
-        step: 'fcm_start',
-        nombre_courses: validCourses.length,
-        nombre_destinataires: destinataires.length,
-        nombre_push_succes: 0,
-        course_ids: validCourses.map(c => c.id),
-      });
-
-      let pushResult = null;
-      let pushSucces = 0;
-      let pushFailed = false;
-      try {
-        pushResult = await base44.asServiceRole.functions.invoke('envoiNotificationPushBatch', {
-          titre,
-          message,
-          type: 'course_proximite',
-          course_id: null,
-          livreur_ids: livreurIds,
+        // ── 4f. Envoyer le push via le système existant ──
+        logEvent('PUSH_GENERAL_T10_FCM_START', {
+          country_code: countryCode,
+          step: 'fcm_start',
+          nombre_courses: validCourses.length,
+          nombre_destinataires: destinataires.length,
+          nombre_push_succes: 0,
+          course_ids: validCourses.map(c => c.id),
         });
-        // Vérifier le résultat réel du push
-        // ── FIX : envoiNotificationPushBatch retourne { succes, echecs, destinataires } ──
-        // Anciennement on lisait sent_count/success_count qui n'existent pas → toujours 0.
-        pushSucces = pushResult?.data?.succes ?? pushResult?.data?.sent_count ?? pushResult?.data?.success_count ?? 0;
-        const pushEchec = pushResult?.data?.echecs ?? 0;
-        // Si 0 push réussi ET qu'il y avait des destinataires, considérer comme échec
-        if (pushSucces === 0 && destinataires.length > 0) {
+
+        let pushResult = null;
+        let pushSucces = 0;
+        let pushFailed = false;
+        try {
+          pushResult = await base44.asServiceRole.functions.invoke('envoiNotificationPushBatch', {
+            titre,
+            message,
+            type: 'course_proximite',
+            course_id: null,
+            livreur_ids: livreurIds,
+          });
+          // ── FIX : envoiNotificationPushBatch retourne { succes, echecs, destinataires } ──
+          // Anciennement on lisait sent_count/success_count qui n'existent pas → toujours 0.
+          pushSucces = pushResult?.data?.succes ?? pushResult?.data?.sent_count ?? pushResult?.data?.success_count ?? 0;
+          const pushEchec = pushResult?.data?.echecs ?? 0;
+          // Si 0 push réussi ET qu'il y avait des destinataires, considérer comme échec
+          if (pushSucces === 0 && destinataires.length > 0) {
+            pushFailed = true;
+            console.error(`${LOG_PREFIX} Échec push batch: 0/${destinataires.length} push réussis pour ${countryCode}`);
+          }
+
+          logEvent('PUSH_GENERAL_T10_FCM_RESULT', {
+            country_code: countryCode,
+            step: 'fcm_result',
+            nombre_courses: validCourses.length,
+            nombre_destinataires: destinataires.length,
+            nombre_push_succes: pushSucces,
+            course_ids: validCourses.map(c => c.id),
+            message: `push_succes:${pushSucces} | push_echec:${pushEchec} | destinataires:${destinataires.length}`,
+          });
+        } catch (err) {
+          console.error(`${LOG_PREFIX} Erreur envoi push batch:`, err?.message || String(err));
           pushFailed = true;
-          console.error(`${LOG_PREFIX} Échec push batch: 0/${destinataires.length} push réussis pour ${countryCode}`);
         }
 
-        logEvent('PUSH_GENERAL_T10_FCM_RESULT', {
+        // ── 4g. Marquer les courses selon le résultat du push ──
+        if (pushFailed) {
+          // ÉCHEC FCM : NE PAS marquer push_general_t10_envoye=true
+          // Les courses pourront être retentées au prochain tick (sous réserve du cooldown).
+          // On ne met PAS à jour le last_sent du pays non plus, car aucun push n'a été envoyé.
+          logEvent('PUSH_GENERAL_T10_FCM_FAILED', {
+            country_code: countryCode,
+            step: 'fcm_failed',
+            nombre_courses: validCourses.length,
+            nombre_destinataires: destinataires.length,
+            nombre_push_succes: 0,
+            course_ids: validCourses.map(c => c.id),
+            message: `0/${destinataires.length} push réussis`,
+          });
+          resultats.push({
+            country_code: countryCode,
+            status: 'fcm_failed',
+            courses: validCourses.length,
+            recipients: destinataires.length,
+            push_succes: 0,
+          });
+          continue;  // Skip le marquage — les courses restent éligibles pour un retry
+        }
+
+        // SUCCÈS FCM : marquer les courses comme ayant réellement participé à un envoi
+        for (const course of validCourses) {
+          await marquerCourseEnvoyee(base44, course.id, now);
+        }
+
+        // ── 4h. Mettre à jour le last_sent du pays ──
+        await setCountryLastSent(base44, countryCode, now);
+
+        // ── 4i. Journaliser ──
+        logEvent(LOG_PUSH_GENERAL_T10_SENT, {
           country_code: countryCode,
-          step: 'fcm_result',
+          step: 'sent',
           nombre_courses: validCourses.length,
           nombre_destinataires: destinataires.length,
           nombre_push_succes: pushSucces,
           course_ids: validCourses.map(c => c.id),
-          message: `push_succes:${pushSucces} | push_echec:${pushEchec} | destinataires:${destinataires.length}`,
         });
-      } catch (err) {
-        console.error(`${LOG_PREFIX} Erreur envoi push batch:`, err?.message || String(err));
-        pushFailed = true;
-      }
 
-      // ── 4g. Marquer les courses selon le résultat du push ──
-      if (pushFailed) {
-        // ÉCHEC FCM : NE PAS marquer push_general_t10_envoye=true
-        // Les courses pourront être retentées au prochain tick (sous réserve du cooldown).
-        // On ne met PAS à jour le last_sent du pays non plus, car aucun push n'a été envoyé.
-        logEvent('PUSH_GENERAL_T10_FCM_FAILED', {
-          country_code: countryCode,
-          step: 'fcm_failed',
-          nombre_courses: validCourses.length,
-          nombre_destinataires: destinataires.length,
-          nombre_push_succes: 0,
-          course_ids: validCourses.map(c => c.id),
-          message: `0/${destinataires.length} push réussis`,
-        });
+        for (const course of validCourses) {
+          journaliserDispatch(base44, {
+            course_id: course.id,
+            evenement: 'push_general_t10_sent',
+            raison_passage: `country:${countryCode} | recipients:${destinataires.length} | push_succes:${pushSucces}`,
+          });
+        }
+
         resultats.push({
           country_code: countryCode,
-          status: 'fcm_failed',
+          status: 'sent',
           courses: validCourses.length,
           recipients: destinataires.length,
-          push_succes: 0,
+          push_succes: pushSucces,
         });
-        continue;  // Skip le marquage — les courses restent éligibles pour un retry
+
+      } finally {
+        // ── 4j. Relâcher le lock ──
+        await releaseCountryLock(base44, countryCode);
       }
-
-      // SUCCÈS FCM : marquer les courses comme ayant réellement participé à un envoi
-      for (const course of validCourses) {
-        await marquerCourseEnvoyee(base44, course.id, now);
-      }
-
-      // ── 4h. Mettre à jour le last_sent du pays ──
-      await setCountryLastSent(base44, countryCode, now);
-
-      // ── 4i. Journaliser ──
-      logEvent(LOG_PUSH_GENERAL_T10_SENT, {
-        country_code: countryCode,
-        step: 'sent',
-        nombre_courses: validCourses.length,
-        nombre_destinataires: destinataires.length,
-        nombre_push_succes: pushSucces,
-        course_ids: validCourses.map(c => c.id),
-      });
-
-      for (const course of validCourses) {
-        journaliserDispatch(base44, {
-          course_id: course.id,
-          evenement: 'push_general_t10_sent',
-          raison_passage: `country:${countryCode} | recipients:${destinataires.length} | push_succes:${pushSucces}`,
-        });
-      }
-
-      resultats.push({
-        country_code: countryCode,
-        status: 'sent',
-        courses: validCourses.length,
-        recipients: destinataires.length,
-        push_succes: pushSucces,
-      });
-
-    } finally {
-      // ── 4j. Relâcher le lock ──
-      await releaseCountryLock(base44, countryCode);
     }
-  }
 
-  return {
-    success: true,
-    sent: resultats.some(r => r.status === 'sent'),
-    details: resultats,
-  };
+    return {
+      success: true,
+      sent: resultats.some(r => r.status === 'sent'),
+      details: resultats,
+    };
+
+  } catch (outerErr) {
+    // ── EXCEPTION GUARD : ne jamais masquer une erreur sans trace persistante ──
+    logException(base44, 'gererPushGeneralT10_outer', outerErr?.message || String(outerErr), 'ALL', []);
+    return { success: false, error: outerErr?.message || 'exception_inconnue' };
+  }
 }
