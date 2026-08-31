@@ -18,6 +18,7 @@ import { getLivreursNotifies } from './dispatchNotifications.ts';
 import { lancerDispatchMulti } from './dispatchEngine.ts';
 import { chargerConfigDispatch, chargerConfigVaguesGPS } from './dispatchConfig.ts';
 import { isV2Enabled, secoursDispatchV2 } from './dispatchV2.ts';
+import { gererPushGeneralT10 } from './pushGeneralT10.ts';
 
 /** Crée une alerte admin si aucune alerte récente n'existe pour la même course. */
 async function createAdminAlert(base44, titre, message, courseId) {
@@ -311,6 +312,21 @@ export async function runWatchdog(base44, body = {}) {
         corrections.push({ course_id: course.id, action: 'secours_v2_rappel_t5min', pushed: result.pushed });
       }
     }
+  }
+
+  // ═══ PUSH GÉNÉRAL T+10 MIN — Rappel aux livreurs inactifs ═══
+  // Si une course reste sans livreur 10 min après sa première diffusion,
+  // envoyer UNE SEULE notification push générale aux livreurs du même pays.
+  // Ce n'est PAS du dispatch : aucune DispatchNotification créée, aucun
+  // statut livreur modifié. C'est un rappel pour faire revenir les livreurs
+  // dans l'app. Voir pushGeneralT10.ts pour le détail complet.
+  //
+  // Anti-doublon : push_general_t10_envoye (par course) + cooldown global par pays.
+  // Anti-concurrence : verrou atomique par pays via AppConfig.
+  try {
+    await gererPushGeneralT10(base44);
+  } catch (err) {
+    console.error('[WATCHDOG] Erreur push général T+10:', err?.message || String(err));
   }
 
   console.log(`[WATCHDOG] 📋 ${anomalies.length} anomalie(s) détectée(s), ${corrections.length} correction(s) appliquée(s)`);
