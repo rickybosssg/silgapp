@@ -62,7 +62,7 @@ export default function LivreurHistorique({ mesCourses, livreurProfil, isExterne
   // Filtrer les courses par période — utiliser heure_livraison pour les livrées, created_date sinon
   const filteredCourses = useMemo(() => {
     return mesCourses.filter(c => {
-      const refDate = new Date(c.heure_livraison || c.updated_date || c.created_date);
+      const refDate = new Date(c.heure_livraison || c.created_date);
       const start = new Date(dateRange.start); start.setHours(0,0,0,0);
       const end = new Date(dateRange.end); end.setHours(23,59,59,999);
       return refDate >= start && refDate <= end;
@@ -70,10 +70,13 @@ export default function LivreurHistorique({ mesCourses, livreurProfil, isExterne
   }, [mesCourses, dateRange]);
 
   // Récapitulatif du jour (toujours aujourd'hui, peu importe le filtre)
+  // ⚠️ Utiliser heure_livraison UNIQUEMENT (pas updated_date) :
+  // une modification administrative ultérieure (ex: backfill, correction prix)
+  // ne doit pas faire réapparaître une ancienne course dans "Aujourd'hui".
   const today = new Date().toDateString();
   const coursesToday = mesCourses.filter(c => {
-    const refDate = new Date(c.heure_livraison || c.updated_date || c.created_date);
-    return refDate.toDateString() === today;
+    if (!c.heure_livraison) return false;
+    return new Date(c.heure_livraison).toDateString() === today;
   });
 
   const livreesToday = coursesToday.filter(c => c.statut === "livree");
@@ -134,11 +137,11 @@ export default function LivreurHistorique({ mesCourses, livreurProfil, isExterne
               </div>
               <div className="bg-orange-50 rounded-lg p-2 border border-orange-200 text-center">
                 <p className="text-xs font-bold text-orange-700">{commissionToday.toLocaleString()} FCFA</p>
-                <p className="text-[10px] text-orange-600 mt-0.5">Commission SILGAPP</p>
+                <p className="text-[10px] text-orange-600 mt-0.5">Commission du jour</p>
               </div>
               <div className="bg-red-50 rounded-lg p-2 border border-red-200 text-center">
                 <p className="text-xs font-bold text-red-700">{montantDuSilga.toLocaleString()} FCFA</p>
-                <p className="text-[10px] text-red-600 mt-0.5">Dû à SILGAPP</p>
+                <p className="text-[10px] text-red-600 mt-0.5">À payer à SILGAPP</p>
               </div>
             </div>
           </div>

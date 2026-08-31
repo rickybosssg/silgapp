@@ -6,6 +6,7 @@ import { AlertTriangle, Check, Truck, X, Wallet, ChevronRight } from "lucide-rea
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { useHeartbeat } from "@/hooks/useHeartbeat";
+import { useAppVersionSync } from "@/hooks/useAppVersionSync";
 import { useGPSNatif } from "@/hooks/useGPSNatif";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
@@ -43,6 +44,7 @@ import {
   ACTIVE_LIVREUR_COURSE_STATUSES,
   isCourseAcceptedByLivreur,
   isCourseAssignedToLivreur,
+  isCourseHistoricallyOwnedByLivreur,
   listIncludesLivreur,
   sameLivreurId,
 } from "@/lib/livreurCourseState";
@@ -93,7 +95,12 @@ function isCourseWaitingForLivreur(course, livreurId) {
 }
 
 function isCourseOwnedByLivreur(course, livreurId) {
-  return isCourseAssignedToLivreur(course, livreurId);
+  // Ownership opérationnel (livreur_id, accepted_by, proposed_by) — pour les courses ACTIVES
+  if (isCourseAssignedToLivreur(course, livreurId)) return true;
+  // Ownership historique (livreur_financier_id) — UNIQUEMENT pour les courses TERMINALES
+  // (livree, annulee). Protège le redispatch : un livreur redispatché ne voit pas
+  // l'ancienne course comme active chez lui.
+  return isCourseHistoricallyOwnedByLivreur(course, livreurId);
 }
 
 function logAcceptationLivreur(event, details = {}) {
@@ -343,6 +350,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     if (gpsHookActif && !gpsActif) setGpsActif(true);
   }, [gpsHookActif, gpsActif]);
 
+  useAppVersionSync(livreurProfil?.id);
   const { syncHeartbeat } = useHeartbeat({
     user_type: "livreur",
     position: gpsPosition || (livreurProfil?.latitude && livreurProfil?.longitude ? { latitude: livreurProfil.latitude, longitude: livreurProfil.longitude } : null),
@@ -638,7 +646,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         return [];
       });
 
-      const [assigned, proposedByLivreur, proposedLivreur, notificationsNouvelleCourse, notificationsCourseAssignee] = await Promise.all([
+      const [assigned, proposedByLivreur, proposedLivreur, historicallyDelivered, notificationsNouvelleCourse, notificationsCourseAssignee] = await Promise.all([
         base44.entities.CourseExterne.filter({ livreur_id: livreurId }, "-updated_date", 50).then((data) => {
           successfulCourseSources += 1;
           return data || [];
@@ -658,6 +666,17 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
           return data || [];
         }).catch((error) => {
           logAcceptationLivreur("query-proposed-livreur-error", { error: error?.message || String(error) });
+          return [];
+        }),
+        // ── Source 5 : courses historiques par livreur_financier_id ──
+        // Récupère les courses livrées dont livreur_id a été vidé (bug nettoyageMatinal)
+        // mais dont livreur_financier_id (immuable) identifie le bon livreur.
+        // isCourseHistoricallyOwnedByLivreur() filtre ensuite par statut terminal.
+        base44.entities.CourseExterne.filter({ livreur_financier_id: livreurId }, "-updated_date", 50).then((data) => {
+          successfulCourseSources += 1;
+          return data || [];
+        }).catch((error) => {
+          logAcceptationLivreur("query-historical-delivered-error", { error: error?.message || String(error) });
           return [];
         }),
         livreurEmail
@@ -688,7 +707,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         ...(allCoursesForLivreur || []),
         ...(assigned || []),
         ...(proposedByLivreur || []),
-        ...(proposedLivreur || [])
+        ...(proposedLivreur || []),
+        ...(historicallyDelivered || [])
       );
 
       const notificationCourseIds = [
@@ -725,6 +745,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         assigned: assigned?.length || 0,
         proposed_by_livreur: proposedByLivreur?.length || 0,
         proposed_livreur: proposedLivreur?.length || 0,
+        historically_delivered: historicallyDelivered?.length || 0,
         notification_courses: notificationCourseIds.length,
         merged: merged.length,
         scoped: scopedCourses.length,
@@ -906,7 +927,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     const todayStr = new Date().toDateString();
     return mesCourses.filter(c =>
       c.statut === "livree" &&
-      new Date(c.heure_livraison || c.updated_date).toDateString() === todayStr
+      c.heure_livraison &&
+      new Date(c.heure_livraison).toDateString() === todayStr
     );
   }, [mesCourses]);
 
@@ -1671,7 +1693,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
                 </p>
                 {(livreurProfil?.montant_du_silga ?? livreurProfil?.encours ?? 0) > 0 && (
                   <p className="text-red-400/60 text-[10px]">
-                    Dû SILGAPP : {(livreurProfil.montant_du_silga ?? livreurProfil.encours ?? 0).toLocaleString()} FCFA
+                    À payer à SILGAPP : {(livreurProfil.montant_du_silga ?? livreurProfil.encours ?? 0).toLocaleString()} FCFA
                   </p>
                 )}
               </div>

@@ -261,6 +261,21 @@
       "default": 0,
       "description": "Derniere phase de secours V2 executee; empeche les notifications repetees"
     },
+    "push_general_t10_envoye": {
+      "type": "boolean",
+      "default": false,
+      "description": "True si la course a reellement participe a un envoi de push general T+10 (pas un cooldown). Distinct de push_general_t10_couvert_at."
+    },
+    "push_general_t10_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date du push general T+10 reellement envoye pour cette course."
+    },
+    "push_general_t10_couvert_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date a laquelle la course a ete couverte par un push general recent du meme pays (cooldown), SANS avoir declenche d'envoi propre. Permet de distinguer les courses ayant benefici d'un rappel de celles ayant participe a un envoi."
+    },
     "dispatch_wave_started_at": {
       "type": "string",
       "format": "date-time",

@@ -1,9 +1,11 @@
 import React, { useEffect, useId, useRef, useState } from "react";
-import { Building2, Loader2, MapPin, Pill, Search, Store, UtensilsCrossed } from "lucide-react";
+import { Building2, Loader2, MapPin, Pill, Plus, Search, Store, UtensilsCrossed } from "lucide-react";
 import {
   getCachedLocationSuggestions,
   searchLocationSuggestions,
+  refreshCountryLocationIndex,
 } from "@/lib/locationSearch";
+import AddLieuDialog from "@/components/location/AddLieuDialog";
 
 const TYPE_META = {
   quartier: { label: "Quartier", icon: MapPin, color: "text-emerald-600 bg-emerald-50" },
@@ -11,6 +13,7 @@ const TYPE_META = {
   restaurant: { label: "Restaurant", icon: UtensilsCrossed, color: "text-rose-600 bg-rose-50" },
   pharmacie: { label: "Pharmacie", icon: Pill, color: "text-blue-800 bg-blue-50" },
   adresse: { label: "Adresse", icon: Building2, color: "text-sky-700 bg-sky-50" },
+  lieu_silgapp: { label: "Lieu", icon: Building2, color: "text-indigo-600 bg-indigo-50" },
 };
 
 export default function SmartAddressInput({
@@ -26,6 +29,10 @@ export default function SmartAddressInput({
   inputClassName = "",
   labelClassName = "",
   autoFocus = false,
+  children,
+  enableAddLieu = false,
+  onLieuAdded,
+  iconClassName = "text-gray-400",
 }) {
   const listboxId = useId();
   const containerRef = useRef(null);
@@ -37,6 +44,7 @@ export default function SmartAddressInput({
   // Sans ce flag, l'useEffect ci-dessous rouvrirait la liste car `value`
   // change suite à la sélection, déclenchant le cache + setOpen(true).
   const justSelectedRef = useRef(false);
+  const [showAddLieu, setShowAddLieu] = useState(false);
 
   useEffect(() => {
     // Si la valeur vient d'être définie par une sélection, ne pas rouvrir la liste.
@@ -118,7 +126,7 @@ export default function SmartAddressInput({
       )}
 
       <div className="relative">
-        <Search className="pointer-events-none absolute left-3.5 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-gray-400" />
+        <Search className={`pointer-events-none absolute left-3.5 top-1/2 z-10 h-4 w-4 -translate-y-1/2 ${iconClassName}`} />
         <input
           value={value}
           onChange={(event) => {
@@ -141,6 +149,7 @@ export default function SmartAddressInput({
         {loading && (
           <Loader2 className="absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-blue-600" />
         )}
+        {children}
       </div>
 
       {hint && <p className="pl-1 text-xs text-gray-500">{hint}</p>}
@@ -188,9 +197,46 @@ export default function SmartAddressInput({
               <p className="mt-1 text-xs text-gray-500">
                 Vous pouvez conserver cette adresse et continuer manuellement.
               </p>
+              {enableAddLieu && (
+                <button
+                  type="button"
+                  onClick={() => setShowAddLieu(true)}
+                  className="mt-2 flex items-center gap-1.5 px-3 py-2 rounded-lg bg-indigo-50 text-indigo-700 text-xs font-semibold hover:bg-indigo-100 transition-all"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Ajouter ce lieu
+                </button>
+              )}
             </div>
           )}
         </div>
+      )}
+
+      {enableAddLieu && (
+        <AddLieuDialog
+          open={showAddLieu}
+          onClose={() => setShowAddLieu(false)}
+          countryCode={countryCode}
+          initialName={value}
+          onCreated={async (lieu) => {
+            setShowAddLieu(false);
+            await refreshCountryLocationIndex(countryCode, true);
+            const item = {
+              id: lieu.id,
+              type: "lieu_silgapp",
+              label: lieu.nom,
+              address: lieu.adresse || lieu.nom,
+              quartier: lieu.quartier || "",
+              ville: lieu.ville || "",
+              latitude: lieu.latitude,
+              longitude: lieu.longitude,
+              precisionGps: lieu.precision_gps,
+              source: "silgapp",
+            };
+            choose(item);
+            onLieuAdded?.(lieu);
+          }}
+        />
       )}
     </div>
   );

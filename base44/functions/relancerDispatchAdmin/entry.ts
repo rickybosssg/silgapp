@@ -75,13 +75,176 @@ export default async function(req: Request): Promise<Response> {
     // ── Mettre à jour la course ──
     await base44.asServiceRole.entities.CourseExterne.update(course_id, resetData);
 
-    // ── Réinitialiser les notifications DispatchNotification ──
-    await base44.asServiceRole.entities.DispatchNotification
-      .deleteMany({ course_id })
-      .catch(() => null);
+    // ═══════════════════════════════════════════════════════════════════════
+    // NETTOYAGE CIBLÉ DES ANCIENNES DISPATCHNOTIFICATION
+    // ═══════════════════════════════════════════════════════════════════════
+    //
+    // RÈGLE MÉTIER :
+    //   - Le livreur ayant ANNULÉ la course doit rester EXCLU du redispatch.
+    //   - Les refus explicites restent exclus.
+    //   - Les anciennes sollicitations (notifie, push_succes, etc.) sont supprimées
+    //     pour permettre aux autres livreurs d'être reproposés.
+    //
+    // APPROCHE SCOPÉE À LA COURSE (sans mutation de Livreur.statut) :
+    //   1. Identifier les livreurs à exclure (AnnulationLivreur + refus).
+    //   2. Supprimer TOUTES les anciennes DispatchNotification (retry 3x + fallback).
+    //   3. Créer les DispatchNotification 'refuse' pour les livreurs exclus
+    //      AVANT le dispatch — c'est ce que getLivreursRefuses() utilise pour
+    //      l'exclusion dans publierCourseDansFil.
+    //   4. Déclencher le dispatch (action='lancer_recherche_auto').
+    //
+    // ⚠️ NOTE ARCHITECTURALE :
+    //   publierCourseDansFil (Dispatch V2) a un anti-race check qui SKIP la
+    //   course si getLivreursNotifies() retourne ≥1 résultat. Or
+    //   getLivreursNotifies() retourne TOUS les statuts (y compris 'refuse').
+    //   → Une notification 'refuse' seule fait croire à l'anti-race qu'une vague
+    //     de diffusion a déjà été créée, et bloque le redispatch.
+    //
+    //   Correctif minimal proposé (NON appliqué — en attente de validation) :
+    //   Modifier getLivreursNotifies() dans dispatchNotifications.ts pour
+    //   exclure le statut 'refuse' du résultat. Voir rapport d'audit.
+    //
+    //   En attendant ce correctif, le redispatch s'appuie sur le watchdog
+    //   (tick de secours) qui traitera la course via ANOMALIE 2 ou ANOMALIE 7.
+    // ═══════════════════════════════════════════════════════════════════════
 
-    // ── Déclencher le dispatch immédiatement (mécanisme V2 existant) ──
-    await base44.asServiceRole.functions.invoke('dispatchExterneAuto', {}).catch((err: any) => {
+    // ── 1. Identifier les livreurs à PRÉSERVER (exclusion permanente) ──
+    const [annulations, refusNotifs] = await Promise.all([
+      base44.asServiceRole.entities.AnnulationLivreur
+        .filter({ course_id }, '-created_date', 50)
+        .catch((err: any) => {
+          console.error('[RELANCE_DISPATCH] Erreur lecture AnnulationLivreur:', err?.message || String(err));
+          return [];
+        }),
+      base44.asServiceRole.entities.DispatchNotification
+        .filter({ course_id, statut: 'refuse' }, '-date_notification', 50)
+        .catch((err: any) => {
+          console.error('[RELANCE_DISPATCH] Erreur lecture DispatchNotification(refuse):', err?.message || String(err));
+          return [];
+        }),
+    ]);
+
+    const livreursAExclure = new Set<string>();
+    const exclusionRaisons = new Map<string, string>();
+    for (const a of annulations || []) {
+      if (a.livreur_id) {
+        livreursAExclure.add(a.livreur_id);
+        exclusionRaisons.set(a.livreur_id, a.motif || 'Annulé par le livreur');
+      }
+    }
+    for (const n of refusNotifs || []) {
+      if (n.livreur_id) {
+        livreursAExclure.add(n.livreur_id);
+        if (!exclusionRaisons.has(n.livreur_id)) {
+          exclusionRaisons.set(n.livreur_id, n.raison_refus || 'Refusé par le livreur');
+        }
+      }
+    }
+
+    // ── 2. Supprimer TOUTES les anciennes DispatchNotification ──
+    let nettoyageReussi = false;
+    let derniereErreurNettoyage: string | null = null;
+
+    for (let attempt = 1; attempt <= 3 && !nettoyageReussi; attempt++) {
+      try {
+        await base44.asServiceRole.entities.DispatchNotification
+          .deleteMany({ course_id });
+        nettoyageReussi = true;
+        console.log(`[RELANCE_DISPATCH] Nettoyage DispatchNotification réussi (attempt ${attempt}) — ${livreursAExclure.size} livreur(s) à exclure`);
+      } catch (err: any) {
+        derniereErreurNettoyage = err?.message || String(err);
+        console.error(`[RELANCE_DISPATCH] Erreur deleteMany attempt ${attempt}/3:`, derniereErreurNettoyage);
+        if (attempt === 3) break;
+        await new Promise(r => setTimeout(r, 500 * attempt));
+      }
+    }
+
+    // ── 2b. Fallback : suppression individuelle si deleteMany a échoué ──
+    if (!nettoyageReussi) {
+      console.warn('[RELANCE_DISPATCH] deleteMany a échoué — fallback suppression individuelle');
+      try {
+        const anciennesNotifs = await base44.asServiceRole.entities.DispatchNotification
+          .filter({ course_id }, '-date_notification', 200);
+        let supprimees = 0;
+        for (const n of anciennesNotifs || []) {
+          try {
+            await base44.asServiceRole.entities.DispatchNotification.delete(n.id);
+            supprimees++;
+          } catch (err: any) {
+            console.error(`[RELANCE_DISPATCH] Fallback: échec suppression notif ${n.id}:`, err?.message || String(err));
+          }
+        }
+        nettoyageReussi = supprimees > 0 || (anciennesNotifs || []).length === 0;
+        console.log(`[RELANCE_DISPATCH] Fallback individuel: ${supprimees}/${anciennesNotifs?.length || 0} supprimées`);
+      } catch (err: any) {
+        console.error('[RELANCE_DISPATCH] Fallback individuel a échoué:', err?.message || String(err));
+      }
+    }
+
+    // ── 2c. Si le nettoyage échoue, NE PAS lancer le redispatch ──
+    if (!nettoyageReussi) {
+      console.error(`[RELANCE_DISPATCH] ABANDON — nettoyage DispatchNotification impossible pour course ${course_id}. Dernière erreur: ${derniereErreurNettoyage}`);
+      return Response.json({
+        error: 'Impossible de réinitialiser les notifications de dispatch. Redispatch annulé pour éviter un blocage (livreurs exclus à tort).',
+        course_id,
+        detail: derniereErreurNettoyage,
+      }, { status: 500 });
+    }
+
+    // ── 3. Créer les exclusions permanentes AVANT le dispatch ──
+    // DispatchNotification 'refuse' = ce que getLivreursRefuses() utilise pour
+    // exclure le livreur du dispatch. Scopé à cette course uniquement.
+    // NE MODIFIE PAS Livreur.statut — l'exclusion est purement au niveau
+    // de la DispatchNotification, pas du livreur global.
+    if (livreursAExclure.size > 0) {
+      const nowIsoExclusion = new Date().toISOString();
+
+      // Résoudre les user_email pour la RLS
+      const livreurEmails = new Map<string, string | null>();
+      const ids = [...livreursAExclure];
+      const livreursData = await base44.asServiceRole.entities.Livreur
+        .filter({ id: { $in: ids } }, undefined, ids.length)
+        .catch(() => []);
+      for (const l of livreursData || []) {
+        livreurEmails.set(l.id, l.user_email || null);
+      }
+      // Fallback : récupérer depuis les anciennes notifs refuse
+      for (const n of refusNotifs || []) {
+        if (!livreurEmails.has(n.livreur_id) && n.livreur_user_email) {
+          livreurEmails.set(n.livreur_id, n.livreur_user_email);
+        }
+      }
+
+      for (const livreurId of ids) {
+        await base44.asServiceRole.entities.DispatchNotification.create({
+          course_id,
+          livreur_id: livreurId,
+          livreur_user_email: livreurEmails.get(livreurId) || null,
+          country_code: course.country_code || '',
+          vague: 0,
+          statut: 'refuse',
+          date_notification: nowIsoExclusion,
+          date_reponse: nowIsoExclusion,
+          raison_refus: exclusionRaisons.get(livreurId) || 'Annulé par le livreur (préservé par relancerDispatchAdmin)',
+        }).catch((err: any) => {
+          console.error(`[RELANCE_DISPATCH] Erreur création exclusion ${livreurId}:`, err?.message || String(err));
+        });
+      }
+      console.log(`[RELANCE_DISPATCH] 🔒 ${livreursAExclure.size} exclusion(s) permanente(s) créée(s) (DispatchNotification refuse) — sans modifier Livreur.statut`);
+    }
+
+    console.log(`[RELANCE_DISPATCH] Course ${course_id} — nettoyage terminé: ${livreursAExclure.size} livreur(s) exclu(s), anciennes sollicitations supprimées`);
+
+    // ── 4. Déclencher le dispatch directement (action='lancer_recherche_auto') ──
+    // Invoque publierCourseDansFil (V2) directement pour cette course.
+    // getLivreursNotifies() exclut désormais le statut 'refuse' → l'anti-race
+    // check ne bloque plus sur les exclusions permanentes créées en étape 3.
+    // → dejaNotifies est vide (seul Judicaël a un 'refuse', désormais filtré)
+    // → la course est publiée dans le fil, Judicaël reste exclu via getLivreursRefuses().
+    await base44.asServiceRole.functions.invoke('dispatchExterneAuto', {
+      action: 'lancer_recherche_auto',
+      course_id,
+    }).catch((err: any) => {
       console.error('[RELANCE_DISPATCH] Erreur dispatchExterneAuto:', err?.message || String(err));
     });
 

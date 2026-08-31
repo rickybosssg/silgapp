@@ -92,7 +92,7 @@ export default function ProposedLivreursList({ course }) {
         // Garder uniquement les notifiés/acceptés de la vague en cours (exclure refusés/expirés)
         const currentWave = course.dispatch_wave || 1;
         const activeNotifs = (notifs || []).filter(n =>
-          (n.statut === 'notifie' || n.statut === 'accepte') && (n.vague || 1) === currentWave
+          (n.statut === 'notifie' || n.statut === 'push_succes' || n.statut === 'accepte') && (n.vague || 1) === currentWave
         );
         const notifiedIds = activeNotifs.map(n => n.livreur_id);
         if (notifiedIds.length === 0) {

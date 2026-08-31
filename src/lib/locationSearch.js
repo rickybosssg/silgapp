@@ -64,6 +64,25 @@ function mapStructure(entity, type, countryCode) {
   };
 }
 
+function mapLieuSilgapp(lieu, countryCode) {
+  let aliases = [];
+  try { aliases = JSON.parse(lieu.aliases || "[]"); } catch { aliases = []; }
+  return {
+    id: lieu.id,
+    type: "lieu_silgapp",
+    label: lieu.nom,
+    address: lieu.adresse || [lieu.quartier, lieu.ville].filter(Boolean).join(", "),
+    quartier: lieu.quartier || "",
+    ville: lieu.ville || "",
+    countryCode,
+    latitude: lieu.latitude ?? null,
+    longitude: lieu.longitude ?? null,
+    precisionGps: lieu.precision_gps || "approximative",
+    searchText: `${lieu.nom || ""} ${aliases.join(" ")} ${lieu.adresse || ""} ${lieu.quartier || ""} ${lieu.ville || ""}`,
+    source: "silgapp",
+  };
+}
+
 function indexCacheKey(countryCode) {
   return `${INDEX_CACHE_PREFIX}:${String(countryCode || "").toUpperCase()}`;
 }
@@ -93,15 +112,17 @@ export async function refreshCountryLocationIndex(countryCode, force = false) {
     return cached;
   }
 
-  const [quartiers, boutiques, restaurants, pharmacies] = await Promise.all([
+  const [quartiers, boutiques, restaurants, pharmacies, lieuxSilgapp] = await Promise.all([
     base44.entities.Quartier.filter({ country_code: code, actif: true }, "nom", 500).catch(() => []),
     base44.entities.Boutique.filter({ pays_code: code, actif: true }, "nom", 300).catch(() => []),
     base44.entities.Restaurant.filter({ pays_code: code, actif: true }, "nom", 300).catch(() => []),
     base44.entities.Pharmacie.filter({ pays_code: code, actif: true }, "nom", 300).catch(() => []),
+    base44.entities.LieuSilgapp.filter({ country_code: code, statut: "actif" }, "nom", 500).catch(() => []),
   ]);
 
   const items = [
     ...quartiers.map((item) => mapQuartier(item, code)),
+    ...lieuxSilgapp.map((item) => mapLieuSilgapp(item, code)),
     ...boutiques.map((item) => mapStructure(item, "boutique", code)),
     ...restaurants.map((item) => mapStructure(item, "restaurant", code)),
     ...pharmacies.map((item) => mapStructure(item, "pharmacie", code)),

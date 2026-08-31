@@ -65,7 +65,7 @@ export default function LivreurStatsBanner({ mesCourses, totalEncaisse, montantD
           }`}>
             {Math.abs(montantDuSilga).toLocaleString()}<span className="text-[10px] font-normal ml-0.5">F</span>
           </p>
-          <p className="text-[10px] text-slate-600 font-semibold mt-1">Dû SILGAPP</p>
+          <p className="text-[10px] text-slate-600 font-semibold mt-1">À payer à SILGAPP</p>
         </div>
       </div>
     );

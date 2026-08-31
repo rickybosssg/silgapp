@@ -107,7 +107,7 @@
     },
     "gps_accuracy": {
       "type": "number",
-      "description": "Pr\u00e9cision GPS en m\u00e8res au moment de la derni\u00e8re position enregistr\u00e9e. Plus c'est bas, plus c'est pr\u00e9cis."
+      "description": "Pr\u00e9cision GPS en m\u00e8tres au moment de la derni\u00e8re position enregistr\u00e9e. Plus c'est bas, plus c'est pr\u00e9cis."
     },
     "courses_du_jour": {
       "type": "number",
@@ -181,6 +181,19 @@
     "last_seen_at": {
       "type": "string",
       "format": "date-time"
+    },
+    "app_version_name": {
+      "type": "string",
+      "description": "VersionName de l'APK install\u00e9 (ex: 1.0.56). Remont\u00e9 automatiquement \u00e0 l'ouverture de l'app via @capacitor/app. Permet de savoir si le livreur utilise un APK contenant les corrections background r\u00e9centes."
+    },
+    "app_version_code": {
+      "type": "number",
+      "description": "VersionCode de l'APK install\u00e9 (ex: 63). Remont\u00e9 automatiquement \u00e0 l'ouverture de l'app via @capacitor/app."
+    },
+    "last_app_version_seen_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date et heure de la derni\u00e8re remont\u00e9e de la version APK. Permet de savoir quand le livreur a ouvert l'app pour la derni\u00e8re fois avec cette version."
     },
     "session_active_id": {
       "type": "string"

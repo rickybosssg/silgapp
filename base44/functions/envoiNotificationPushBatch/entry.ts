@@ -4,6 +4,7 @@ import {
   selectLatestNativeTokens, normalizeCountryCode,
   ANDROID_CHANNEL_ID, ANDROID_CLICK_ACTION, APP_URL,
 } from '../../shared/fcmUtils.ts';
+import { mettreAJourStatutPush } from '../../shared/dispatchNotifications.ts';
 
 const STATUTS_ACTIFS_COURSE = [
   'recherche_livreur', 'livreur_en_route', 'client_contacte', 'en_route_expediteur',
@@ -188,12 +189,26 @@ Deno.serve(async (req) => {
       const tokens = pushableTokensByLivreur.get(livreur.id);
       if (!tokens || tokens.length === 0) {
         livreurIdsWithoutTokens.push(livreur.id);
+        // FIX TÉLÉMÉTRIE : marquer la DispatchNotification comme 'sans_token'
+        // si elle existe encore en statut 'notifie' (le token a pu être supprimé
+        // entre la création de la notification et l'envoi du push).
+        if (course_id) {
+          mettreAJourStatutPush(base44, course_id, livreur.id, 'sans_token').catch(() => null);
+        }
         echecs++;
         continue;
       }
 
       const notifId = notifIdByLivreur.get(livreur.id) || '';
       const dataPayload = { ...dataPayloadBase, livreur_id: String(livreur.id), notification_id: String(notifId) };
+
+      // FIX TÉLÉMÉTRIE : marquer la DispatchNotification comme 'push_tente'
+      if (course_id) {
+        mettreAJourStatutPush(base44, course_id, livreur.id, 'push_tente').catch(() => null);
+      }
+
+      let livreurPushSuccess = false;
+      let livreurPushFailed = false;
 
       for (const tokenItem of tokens) {
         const platform = String(tokenItem.platform || '').toLowerCase();
@@ -245,6 +260,7 @@ Deno.serve(async (req) => {
               fcm_error: JSON.stringify(response.result?.error || {}).slice(0, 300),
             }).catch(() => null);
             echecs++;
+            livreurPushFailed = true;
           } else {
             base44.asServiceRole.entities.NotificationToken.update(tokenItem.id, {
               derniere_utilisation: nowIso,
@@ -254,12 +270,20 @@ Deno.serve(async (req) => {
               fcm_error: null,
             }).catch(() => null);
             succes++;
+            livreurPushSuccess = true;
           }
           sendResults.push({ livreur_id: livreur.id, token_id: tokenItem.id, ok: response.ok, status: response.status });
         } catch (err) {
           echecs++;
+          livreurPushFailed = true;
           sendResults.push({ livreur_id: livreur.id, token_id: tokenItem.id, ok: false, error: err.message });
         }
+      }
+
+      // FIX TÉLÉMÉTRIE : mettre à jour le statut final de la DispatchNotification
+      if (course_id) {
+        const finalStatut = livreurPushSuccess ? 'push_succes' : (livreurPushFailed ? 'push_echec' : 'sans_token');
+        mettreAJourStatutPush(base44, course_id, livreur.id, finalStatut).catch(() => null);
       }
     }
 

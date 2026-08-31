@@ -63,15 +63,15 @@ Deno.serve(async (req) => {
       results.push({ module: 'livrees_dispatch_cleaned', count: livreesNettoyees.modified_count || 0 });
     }
 
-    // ── 3. Courses livrées : effacer livreur_id (déjà livrées, plus besoin) ──
-    const livreesLivreurCleared = await sr.entities.CourseExterne.updateMany(
-      { statut: 'livree', livreur_id: { $ne: '' } },
-      { $set: { livreur_id: '', livreur_telephone: '' } }
-    ).catch((e) => { results.push({ module: 'livrees_livreur', error: e.message }); return null; });
-
-    if (livreesLivreurCleared) {
-      results.push({ module: 'livrees_livreur_cleared', count: livreesLivreurCleared.modified_count || 0 });
-    }
+    // ── 3. SUPPRIMÉ — Ne plus effacer livreur_id sur les courses livrées ──
+    // RATIONNEL : livreur_id est l'identité opérationnelle du livreur qui a
+    // réalisé la livraison. Le vider casse :
+    //   - CourseExterne.filter({ livreur_id }) côté frontend
+    //   - isCourseAssignedToLivreur() dans livreurCourseState.js
+    //   - getAllCoursesForLivreur() côté backend
+    // livreur_financier_id (immuable) reste la source comptable, mais
+    // livreur_id doit aussi être préservé pour l'historique opérationnel.
+    // [CORRECTION BUG Alex Koara — 2026-08-28]
 
     // ── 4. Livreurs orphelins en_course sans course active ──
     const STATUTS_ACTIFS = ['livreur_en_route', 'arrive_prise_en_charge', 'colis_recupere', 'passager_embarque', 'pris_en_charge', 'en_livraison'];
