@@ -145,6 +145,8 @@ export default function LivreurRegistrationForm({ user, onComplete }) {
         note_moyenne: 0,
         nombre_avis: 0,
         bloque_encours: false,
+        base_comptable_date: new Date().toISOString(),
+        base_comptable_solde_initial: 0,
         silga_score: 0,
         silga_score_niveau: "non_calcule",
         silga_score_confiance: "faible",

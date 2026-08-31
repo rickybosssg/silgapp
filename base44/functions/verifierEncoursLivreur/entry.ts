@@ -67,6 +67,41 @@ Deno.serve(async (req) => {
       return Response.json({ success: false, error: 'Livreur introuvable' }, { status: 404 });
     }
 
+    // ── FILET DE SÉCURITÉ — Initialisation base comptable si manquante ──
+    // Un livreur sans base_comptable_date ne peut pas voir ses commissions
+    // dans le solde (soldeCalculator retourne 0). On initialise la base de
+    // manière idempotente AVANT le recalcul, sous conditions de sécurité :
+    //   - credit_surplus == 0
+    //   - base_comptable_solde_initial == 0
+    //   - aucun PaiementSilgapp traité (pas de dette historique à recréer)
+    // Si ces conditions sont réunies, base_comptable_date = created_date est sûr.
+    if (!livreur.base_comptable_date) {
+      const isSafeToInit =
+        (Number(livreur.credit_surplus) || 0) === 0 &&
+        (Number(livreur.base_comptable_solde_initial) || 0) === 0;
+
+      if (isSafeToInit) {
+        const paiementsExistants = await base44.asServiceRole.entities.PaiementSilgapp.filter(
+          { user_id: livreurId, statut: 'traite', type_dette: 'commission_livreur' },
+          undefined, 1
+        ).catch(() => []);
+
+        if (!paiementsExistants || paiementsExistants.length === 0) {
+          const baseDate = livreur.created_date || new Date().toISOString();
+          await base44.asServiceRole.entities.Livreur.update(livreurId, {
+            base_comptable_date: baseDate,
+            base_comptable_solde_initial: 0,
+          });
+          livreur.base_comptable_date = baseDate;
+          console.log(`[ENCOURS] Base comptable initialisée pour livreur ${livreurId}: ${baseDate} (sécurité — aucun paiement, aucun crédit)`);
+        } else {
+          console.warn(`[ENCOURS] ⚠️ Livreur ${livreurId} sans base_comptable_date mais avec paiements traités — initialisation SKIPPED (risque de dette historique)`);
+        }
+      } else {
+        console.warn(`[ENCOURS] ⚠️ Livreur ${livreurId} sans base_comptable_date mais avec credit_surplus ou base_solde — initialisation SKIPPED`);
+      }
+    }
+
     const countryCode = course.country_code || livreur.country_code;
     if (!countryCode) {
       return Response.json({ success: false, error: 'Code pays manquant' }, { status: 400 });
@@ -95,24 +130,39 @@ Deno.serve(async (req) => {
 
     const now = new Date().toISOString();
 
-    // ── Recalculer le solde AVANT de marquer la course ──
-    // Le recalcul doit voir cette commission comme "nouvelle" (encours_comptabilise_at = null)
-    // pour consommer le credit_surplus. Le marquage se fait APRÈS pour garantir l'idempotence.
-    const resultat = await recalculerSoldeLivreur(base44, livreurId);
-    const { solde, seuil, bloque, statut_paiement, devise } = resultat;
+    // ── Double-check locking anti-concurrence ──
+    // Re-lire la course pour vérifier qu'elle n'a pas été comptabilisée
+    // entre le guard initial (ligne 50) et maintenant. Si un appel concurrent
+    // a déjà marqué la course, on skippe — la commission n'est comptée qu'une fois.
+    const freshCourse = await base44.asServiceRole.entities.CourseExterne.get(courseId);
+    if (freshCourse?.encours_comptabilise_at) {
+      return Response.json({
+        success: true,
+        skipped: true,
+        reason: 'course_deja_comptabilisee_concurrent',
+        encours_comptabilise_at: freshCourse.encours_comptabilise_at,
+      });
+    }
 
-    // ── Marquer la course comme comptabilisée (garde d'idempotence) ──
-    // À faire APRÈS le recalcul pour que calculerSoldeLivreur voie la commission comme nouvelle.
+    // ── Marquage comptable de la course (UNE FOIS) ──
+    // Le marquage se fait AVANT le recalcul pour garantir que la commission
+    // est visible dans le solde au moment du recalcul.
     await base44.asServiceRole.entities.CourseExterne.update(courseId, {
       encours_comptabilise_at: now,
       encours_comptabilise_montant: commission,
     });
 
+    // ── Recalcul du solde (incluant cette course qui vient d'être marquée) ──
+    // soldeCalculator filtre par statut=livree (indépendamment de encours_comptabilise_at),
+    // donc la commission de cette course est incluse dans le calcul.
+    const resultat = await recalculerSoldeLivreur(base44, livreurId);
+    const { solde, seuil, bloque, statut_paiement, devise } = resultat;
+
     // ── Réduire le credit_surplus du livreur par le montant de la commission ──
     // credit_surplus est un cap en lecture seule pendant le calcul du solde.
-    // Sa réduction se fait ICI, une seule fois, au moment du marquage de la course.
-    // L'idempotence est garantie par le garde-fou encours_comptabilise_at ci-dessus :
-    // un second appel skippe avant d'atteindre ce point.
+    // Sa réduction se fait ICI, une seule fois, après le recalcul.
+    // L'idempotence est garantie par le double-check locking ci-dessus :
+    // un second appel est skippé avant d'atteindre ce point.
     const creditSurplusActuel = Number(livreur.credit_surplus) || 0;
     if (creditSurplusActuel > 0 && commission > 0) {
       const reductionCredit = Math.min(creditSurplusActuel, commission);
