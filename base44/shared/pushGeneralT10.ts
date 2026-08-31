@@ -457,10 +457,12 @@ export async function gererPushGeneralT10(base44, delayMin = DEFAULT_T10_DELAY_M
         }
         logEvent(LOG_PUSH_GENERAL_T10_COOLDOWN, {
           country_code: countryCode,
+          step: 'cooldown',
           nombre_courses: courses.length,
           nombre_destinataires: 0,
           nombre_push_succes: 0,
           course_ids: courses.map(c => c.id),
+          message: `last_sent_age_min:${Math.round(cooldownElapsed / 60000)}`,
         });
         resultats.push({
           country_code: countryCode,
@@ -487,6 +489,7 @@ export async function gererPushGeneralT10(base44, delayMin = DEFAULT_T10_DELAY_M
       if (validCourses.length === 0) {
         logEvent(LOG_PUSH_GENERAL_T10_NO_COURSE, {
           country_code: countryCode,
+          step: 'no_valid_course_after_revalidation',
           nombre_courses: 0,
           nombre_destinataires: 0,
           nombre_push_succes: 0,
@@ -501,13 +504,24 @@ export async function gererPushGeneralT10(base44, delayMin = DEFAULT_T10_DELAY_M
       if (destinataires.length === 0) {
         logEvent(LOG_PUSH_GENERAL_T10_NO_RECIPIENT, {
           country_code: countryCode,
+          step: 'no_recipient',
           nombre_courses: validCourses.length,
           nombre_destinataires: 0,
           nombre_push_succes: 0,
+          course_ids: validCourses.map(c => c.id),
         });
         resultats.push({ country_code: countryCode, status: 'no_recipient', courses: validCourses.length });
         continue;
       }
+
+      logEvent('PUSH_GENERAL_T10_RECIPIENTS_FOUND', {
+        country_code: countryCode,
+        step: 'recipients_found',
+        nombre_courses: validCourses.length,
+        nombre_destinataires: destinataires.length,
+        nombre_push_succes: 0,
+        course_ids: validCourses.map(c => c.id),
+      });
 
       // ── 4e. Construire le message ──
       const titre = 'COURSES DISPONIBLES';
@@ -518,6 +532,15 @@ export async function gererPushGeneralT10(base44, delayMin = DEFAULT_T10_DELAY_M
       const livreurIds = destinataires.map(l => l.id);
 
       // ── 4f. Envoyer le push via le système existant ──
+      logEvent('PUSH_GENERAL_T10_FCM_START', {
+        country_code: countryCode,
+        step: 'fcm_start',
+        nombre_courses: validCourses.length,
+        nombre_destinataires: destinataires.length,
+        nombre_push_succes: 0,
+        course_ids: validCourses.map(c => c.id),
+      });
+
       let pushResult = null;
       let pushSucces = 0;
       let pushFailed = false;
