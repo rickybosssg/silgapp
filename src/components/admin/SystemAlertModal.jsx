@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { base44 } from "@/api/base44Client";
 import { AlertTriangle, X, AlertCircle } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -6,8 +6,13 @@ import { AnimatePresence, motion } from "framer-motion";
 export default function SystemAlertModal() {
   const [alerts, setAlerts] = useState([]);
   const [current, setCurrent] = useState(0);
+  // 🛡️ Anti-double-clic : empêche les taps multiples pendant le dismiss async
+  const dismissingRef = useRef(false);
+  // 🛡️ Pause du re-fetch pendant le dismiss pour éviter la réinjection de l'alerte
+  const pauseFetchRef = useRef(false);
 
-  const fetchAlerts = async () => {
+  const fetchAlerts = useCallback(async () => {
+    if (pauseFetchRef.current) return;
     try {
       const data = await base44.entities.Notification.filter({
         type: "alerte_critique_dispatch",
@@ -16,34 +21,62 @@ export default function SystemAlertModal() {
       setAlerts(data || []);
       if ((data || []).length === 0) setCurrent(0);
     } catch (_) {}
-  };
+  }, []);
 
   useEffect(() => {
     fetchAlerts();
     const iv = setInterval(fetchAlerts, 15000);
     return () => clearInterval(iv);
-  }, []);
+  }, [fetchAlerts]);
 
-  const handleDismiss = async () => {
-    const alert = alerts[current];
-    if (!alert) return;
+  // ✅ Retrait optimiste IMMÉDIAT + marquage DB en arrière-plan
+  // L'alerte disparaît de l'écran AVANT l'await, empêchant le double-clic.
+  const handleDismiss = useCallback(async (index) => {
+    if (dismissingRef.current) return;
+    dismissingRef.current = true;
+    pauseFetchRef.current = true;
+
+    const alert = alerts[index];
+    if (!alert) {
+      dismissingRef.current = false;
+      pauseFetchRef.current = false;
+      return;
+    }
+
+    // Retrait optimiste immédiat — la modale se ferme MAINTENANT
+    setAlerts(prev => prev.filter((_, i) => i !== index));
+    setCurrent(0);
+
+    // Marquage DB en arrière-plan (non bloquant pour l'UI)
     try {
       await base44.entities.Notification.update(alert.id, { lue: true });
-    } catch (_) {}
-    const remaining = alerts.filter((_, i) => i !== current);
-    setAlerts(remaining);
-    setCurrent(0);
-  };
+    } catch (_) {
+      // Si l'update échoue, l'alerte restera non lue en DB et réapparaîtra au prochain fetch
+      // — c'est acceptable : mieux vaut une alerte persistante qu'une UI qui semble cassée.
+    } finally {
+      dismissingRef.current = false;
+      pauseFetchRef.current = false;
+    }
+  }, [alerts]);
 
-  const handleDismissAll = async () => {
-    for (const a of alerts) {
+  const handleDismissAll = useCallback(async () => {
+    if (dismissingRef.current) return;
+    dismissingRef.current = true;
+    pauseFetchRef.current = true;
+
+    const allAlerts = alerts;
+    setAlerts([]);
+    setCurrent(0);
+
+    for (const a of allAlerts) {
       try {
         await base44.entities.Notification.update(a.id, { lue: true });
       } catch (_) {}
     }
-    setAlerts([]);
-    setCurrent(0);
-  };
+
+    dismissingRef.current = false;
+    pauseFetchRef.current = false;
+  }, [alerts]);
 
   const alert = alerts[current];
 
@@ -77,10 +110,12 @@ export default function SystemAlertModal() {
                     {alerts.length} alerte{alerts.length > 1 ? "s" : ""} critique{alerts.length > 1 ? "s" : ""}
                   </p>
                 </div>
+                {/* ✅ Bouton X — même handler que "J'ai compris", ferme en 1 appui */}
                 <button
                   type="button"
-                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDismiss(); }}
-                  className="w-9 h-9 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition shrink-0"
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDismiss(current); }}
+                  className="w-9 h-9 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition shrink-0 touch-manipulation"
+                  aria-label="Fermer l'alerte"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -143,20 +178,23 @@ export default function SystemAlertModal() {
               )}
 
               {/* Actions */}
+              {/* ✅ Hauteur 56px (h-14) — surface tactile confortable */}
+              {/* ✅ touch-manipulation — élimine le délai 300ms sur Android WebView */}
+              {/* ✅ Flag anti-double-clic via dismissingRef */}
               <div className="flex gap-2 pt-1">
                 {alerts.length > 1 && (
                   <button
                     type="button"
                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDismissAll(); }}
-                    className="flex-1 h-12 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-bold transition"
+                    className="flex-1 h-14 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-bold transition touch-manipulation"
                   >
                     Tout ignorer ({alerts.length})
                   </button>
                 )}
                 <button
                   type="button"
-                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDismiss(); }}
-                  className="flex-1 h-12 rounded-xl bg-gradient-to-br from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white text-sm font-bold transition shadow-md shadow-red-500/20 active:scale-95"
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDismiss(current); }}
+                  className="flex-1 h-14 rounded-xl bg-gradient-to-br from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white text-sm font-bold transition shadow-md shadow-red-500/20 active:scale-95 touch-manipulation"
                 >
                   J'ai compris
                 </button>
