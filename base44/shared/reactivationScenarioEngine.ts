@@ -366,9 +366,33 @@ export async function processPendingScenarios(
   maxProcess: number = 50
 ): Promise<{ j2Sent: number; j5Sent: number; expired: number; errors: number }> {
   const now = Date.now();
+  let errors = 0;
   const activeScenarios = await base44.asServiceRole.entities.ReactivationScenario.filter({
     status: 'active',
   });
+
+  // ── Scénarios expired : vérifier les conversions attribuables ──
+  // Un scénario expired (token perdu) ne doit PLUS recevoir de push, mais sa
+  // conversion peut encore être attribuée si une course a été créée dans la
+  // fenêtre d'attribution (72h après J0).
+  // On les charge séparément, on vérifie les conversions, et on n'envoie
+  // AUCUN push. Si non converti, le scénario reste expired.
+  const expiredScenarios = await base44.asServiceRole.entities.ReactivationScenario.filter({
+    status: 'expired',
+  });
+  const expiredToCheck = expiredScenarios.filter((s: any) => {
+    if (!s.j0_sent_at) return false;
+    const j0Ts = new Date(s.j0_sent_at).getTime();
+    const windowMs = config.attributionWindowHours * 3600000;
+    return now < (j0Ts + windowMs); // Encore dans la fenêtre d'attribution
+  });
+  for (const s of expiredToCheck.slice(0, maxProcess)) {
+    try {
+      await checkScenarioConversion(base44, s, config);
+    } catch {
+      errors++;
+    }
+  }
 
   // Filtrer les scénarios dont le prochain push est dû
   const dueScenarios = activeScenarios.filter((s: any) => {
@@ -383,7 +407,6 @@ export async function processPendingScenarios(
   let j2Sent = 0;
   let j5Sent = 0;
   let expired = 0;
-  let errors = 0;
 
   const toProcess = dueScenarios.slice(0, maxProcess);
 

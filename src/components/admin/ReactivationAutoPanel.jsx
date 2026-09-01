@@ -413,12 +413,13 @@ function ScenarioStatsPanel({ stats }) {
       <p className="text-xs font-black text-slate-800">Scénarios de réactivation</p>
 
       {/* Funnel global */}
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-5 gap-2">
         {[
           { label: 'Total', value: stats.total, color: 'text-slate-900' },
           { label: 'Actifs', value: stats.active, color: 'text-blue-600' },
           { label: 'Convertis', value: stats.converted, color: 'text-green-600' },
           { label: 'Terminés', value: stats.completed, color: 'text-slate-500' },
+          { label: 'Expirés', value: stats.expired, color: 'text-amber-600' },
         ].map((s, i) => (
           <div key={i} className="text-center">
             <p className={`text-lg font-black ${s.color}`}>{s.value}</p>
