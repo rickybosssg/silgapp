@@ -9,41 +9,40 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Non authentifié' }, { status: 401 });
     }
 
-    // Récupérer TOUTES les notifications non lues
-    let allUnread = [];
-    let skip = 0;
-    const limit = 200;
+    // ── Compter les notifications non lues de CET utilisateur uniquement ──
+    // On filtre par destinataire_email pour ne JAMAIS modifier les notifications
+    // d'un autre utilisateur. Le count évite de charger toutes les entités en
+    // mémoire (N+1 éliminé).
+    const unread = await base44.asServiceRole.entities.Notification.filter({
+      lue: false,
+      destinataire_email: user.email,
+    }, '-created_date', 1);
 
-    while (true) {
-      const batch = await base44.asServiceRole.entities.Notification.filter(
-        { lue: false },
-        '-created_date',
-        limit,
-        skip
-      );
-      if (batch.length === 0) break;
-      allUnread = allUnread.concat(batch);
-      skip += limit;
+    const count = unread.length;
+
+    if (count === 0) {
+      return Response.json({
+        success: true,
+        marquees: 0,
+        message: 'Aucune notification non lue',
+      });
     }
 
-    console.log(`[MARQUER LUES] ${allUnread.length} notifications non lues trouvées`);
+    // ── Opération bulk unique : 1 appel au lieu de N ──
+    // Remplace la boucle N+1 (200 updates individuels → 1 updateMany).
+    // Filtre double : lue=false ET destinataire_email=user.email pour
+    // garantir l'isolation par utilisateur.
+    await base44.asServiceRole.entities.Notification.updateMany(
+      { lue: false, destinataire_email: user.email },
+      { $set: { lue: true } }
+    );
 
-    // Marquer toutes comme lues en batch
-    let marquees = 0;
-    const batchSize = 25;
-
-    for (let i = 0; i < allUnread.length; i += batchSize) {
-      const batch = allUnread.slice(i, i + batchSize);
-      await Promise.all(batch.map(n =>
-        base44.asServiceRole.entities.Notification.update(n.id, { lue: true })
-      ));
-      marquees += batch.length;
-    }
+    console.log(`[MARQUER LUES] ${count} notifications marquées comme lues pour ${user.email}`);
 
     return Response.json({
       success: true,
-      marquees: marquees,
-      message: `${marquees} notifications marquées comme lues`,
+      marquees: count,
+      message: `${count} notifications marquées comme lues`,
     });
   } catch (error) {
     console.error('[MARQUER LUES] Erreur:', error);
