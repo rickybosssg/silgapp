@@ -395,6 +395,44 @@ export async function processPendingScenarios(
         continue; // Le scénario a été marqué converted
       }
 
+      // ── CORRECTION : Gestion des control groups (next_push_step === 0) ──
+      // Les control groups ne reçoivent aucun push mais doivent être clôturés
+      // après la fin du cycle J0/J2/J5 + fenêtre d'attribution, pour ne pas
+      // rester 'active' éternellement.
+      if (s.is_control_group && s.next_push_step === 0) {
+        // Date de clôture = création + (J0→J2) + (J2→J5) + fenêtre d'attribution
+        const j0ToJ2Ms = (campaign.push_interval_days || 2) * 86400000;
+        const j2ToJ5Ms = (campaign.push_interval_2_days || 3) * 86400000;
+        const attributionMs = config.attributionWindowHours * 3600000;
+        const closureTs = new Date(s.created_date).getTime() + j0ToJ2Ms + j2ToJ5Ms + attributionMs;
+        if (now >= closureTs) {
+          await base44.asServiceRole.entities.ReactivationScenario.update(s.id, {
+            status: 'completed',
+            next_push_step: -1,
+          });
+          expired++;
+        }
+        continue;
+      }
+
+      // ── Garde-fou anti-retry infini pour les scénarios avec échecs J2/J5 ──
+      // Si le scénario a dépassé la fin du cycle (création + J0→J2 + J2→J5 + attribution)
+      // sans conversion, le marquer comme 'expired' pour arrêter les retries.
+      if (s.next_push_step >= 2) {
+        const j0ToJ2Ms = (campaign.push_interval_days || 2) * 86400000;
+        const j2ToJ5Ms = (campaign.push_interval_2_days || 3) * 86400000;
+        const attributionMs = config.attributionWindowHours * 3600000;
+        const hardDeadlineTs = new Date(s.created_date).getTime() + j0ToJ2Ms + j2ToJ5Ms + attributionMs;
+        if (now >= hardDeadlineTs) {
+          await base44.asServiceRole.entities.ReactivationScenario.update(s.id, {
+            status: 'expired',
+            next_push_step: -1,
+          });
+          expired++;
+          continue;
+        }
+      }
+
       // Récupérer le token FCM actuel
       const tokens = await base44.asServiceRole.entities.NotificationToken.filter({
         user_type: 'client',
@@ -403,9 +441,9 @@ export async function processPendingScenarios(
       });
       const token = tokens[0];
       if (!token || !token.token || String(token.token).startsWith('web_')) {
-        // Token invalide : marquer le scénario comme complété sans envoyer
+        // Token invalide : marquer le scénario comme expiré (échec technique, pas un succès)
         await base44.asServiceRole.entities.ReactivationScenario.update(s.id, {
-          status: 'completed',
+          status: 'expired',
           next_push_step: -1,
         });
         continue;
@@ -439,11 +477,16 @@ export async function processPendingScenarios(
           country_code: s.country_code || '',
         });
 
+        // CORRECTION : next_push_at J5 calculé depuis l'heure PLANIFIÉE de J2,
+        // pas depuis Date.now() (heure réelle d'exécution).
+        // Un retard de traitement de 1 minute à J2 ne doit pas décaler J5 de 6h.
         const intervalMs = (campaign.push_interval_2_days || 3) * 86400000 * testMultiplier;
+        const j2PlannedTs = s.next_push_at ? new Date(s.next_push_at).getTime() : now;
+        const j5PlannedTs = j2PlannedTs + intervalMs;
         await base44.asServiceRole.entities.ReactivationScenario.update(s.id, {
           j2_recipient_id: recipient.id,
           j2_sent_at: result.results[0]?.ok ? now_iso : null,
-          next_push_at: new Date(Date.now() + intervalMs).toISOString(),
+          next_push_at: new Date(j5PlannedTs).toISOString(),
           next_push_step: 5,
         });
         j2Sent++;
@@ -472,14 +515,29 @@ export async function processPendingScenarios(
           country_code: s.country_code || '',
         });
 
-        // Après J+5 : fin du scénario
-        await base44.asServiceRole.entities.ReactivationScenario.update(s.id, {
-          j5_recipient_id: recipient.id,
-          j5_sent_at: result.results[0]?.ok ? now_iso : null,
-          status: 'completed',
-          next_push_step: -1,
-        });
-        j5Sent++;
+        // CORRECTION : ne marquer 'completed' que si le push J5 a réussi.
+        // Si le push échoue, conserver status='active' pour permettre un retry
+        // au prochain cycle (sous réserve du garde-fou d'expiration ci-dessous).
+        if (result.results[0]?.ok) {
+          await base44.asServiceRole.entities.ReactivationScenario.update(s.id, {
+            j5_recipient_id: recipient.id,
+            j5_sent_at: now_iso,
+            status: 'completed',
+            next_push_step: -1,
+          });
+          j5Sent++;
+        } else {
+          // Échec J5 : journaliser précisément, conserver active pour retry.
+          // Le garde-fou d'expiration (ligne ci-dessous) empêche les retries infinis.
+          console.error(`[SCENARIO] Échec push J5 scénario ${s.id}: ${result.results[0]?.error}`);
+          // Réinitialiser next_push_at à maintenant pour un retry au prochain cycle
+          await base44.asServiceRole.entities.ReactivationScenario.update(s.id, {
+            j5_recipient_id: recipient.id,
+            j5_sent_at: null,
+            next_push_at: new Date(now + 3600000).toISOString(), // retry dans 1h
+          });
+          errors++;
+        }
       }
     } catch (err) {
       console.error(`[SCENARIO] Erreur traitement ${s.id}:`, err);
