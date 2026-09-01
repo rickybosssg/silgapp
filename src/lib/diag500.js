@@ -72,7 +72,11 @@ export function init500Diagnostic() {
     try {
       response = await originalFetch.call(this, input, init);
     } catch (err) {
-      // Erreur réseau (pas de réponse du tout)
+      // AbortError volontaire (debounce, navigation, cleanup) — ne pas journaliser
+      if (err?.name === 'AbortError') {
+        throw err;
+      }
+      // Vraie erreur réseau (pas de réponse du tout)
       addEntry({
         type: 'network_error',
         url,
