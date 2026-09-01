@@ -801,14 +801,22 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
               triggerClientContacte();
               const num = normalizePhoneForWhatsapp(contactTel, course.country_code);
               const livreurNomFormate = livreurNom ? livreurNom.trim() : null;
+
+              // ── Prix : source de vérité unique getPrixAffichable ──
+              const prix = getPrixAffichable(course);
+              const devise = getDeviseAffichable(course);
+              const prixLabel = (course.prix_a_confirmer === true || !prix || !Number.isFinite(prix) || prix <= 0)
+                ? "Le prix de la course vous sera confirmé par SILGAPP."
+                : `Prix de la course : ${prix.toLocaleString()} ${devise}.`;
+
               const msg = encodeURIComponent(
                 isDeplacement
-                  ? "Bonjour, je suis votre chauffeur SILGAPP. Je suis en route pour vous prendre en charge."
+                  ? `Bonjour, je suis votre chauffeur SILGAPP. Je suis en route pour vous prendre en charge. ${prixLabel}`
                   : colisRecupere
-                    ? "Bonjour, je suis votre livreur SILGAPP. Je suis en route pour vous livrer votre colis."
+                    ? `Bonjour, je suis votre livreur SILGAPP. Je suis en route pour vous livrer votre colis. ${prixLabel}`
                     : (livreurNomFormate
-                      ? `Bonjour, je suis ${livreurNomFormate}, votre livreur SILGAPP. Je suis en route pour récupérer votre colis. Merci de m'envoyer la localisation du lieu de récupération.`
-                      : "Bonjour, je suis votre livreur SILGAPP. Je suis en route pour récupérer votre colis. Merci de m'envoyer la localisation du lieu de récupération.")
+                      ? `Bonjour, je suis ${livreurNomFormate}, votre livreur SILGAPP. Je suis en route pour récupérer votre colis. ${prixLabel} Merci de m'envoyer la localisation du lieu de récupération.`
+                      : `Bonjour, je suis votre livreur SILGAPP. Je suis en route pour récupérer votre colis. ${prixLabel} Merci de m'envoyer la localisation du lieu de récupération.`)
               );
               const lien = `https://wa.me/${num}?text=${msg}`;
               const popup = window.open(lien, "_blank", "noopener,noreferrer");
