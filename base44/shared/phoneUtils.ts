@@ -19,6 +19,7 @@ export const SILGAPP_COUNTRIES = [
   { code: "GN", dial: "224", len: 9  },
   { code: "NE", dial: "227", len: 8  },
   { code: "GH", dial: "233", len: 9  },
+  { code: "MA", dial: "212", len: 9  },
 ];
 
 /**

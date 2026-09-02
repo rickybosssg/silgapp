@@ -20,6 +20,7 @@ const PAYS_FALLBACK = [
   { code: "TD", nom: "Tchad", emoji_flag: "🇹🇩", ordre: 12 },
   { code: "NG", nom: "Nigeria", emoji_flag: "🇳🇬", ordre: 13 },
   { code: "CA", nom: "Canada", emoji_flag: "🇨🇦", ordre: 14 },
+  { code: "MA", nom: "Maroc", emoji_flag: "🇲🇦", ordre: 15 },
 ];
 
 // Hook pour récupérer les pays actifs — dynamique depuis la BDD avec fallback de secours
