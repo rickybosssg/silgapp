@@ -141,11 +141,15 @@ export default function NewConversationDialog({ open, onClose, myType, myId, myN
   }, [search, open, myType, myId]);
 
   const [validating, setValidating] = useState(false);
+  const [starting, setStarting] = useState(false);
 
   // Le SDK peut retourner la réponse directement ou enveloppée dans { data: ... }
   const unwrap = (res) => (res?.data !== undefined ? res.data : res);
 
   const startConversation = async (user) => {
+    if (starting || validating) return;
+    setStarting(true);
+
     const participants = [
       { type: myType, id: myId, name: myName },
       { type: user.type, id: user.id, name: user.name },
@@ -159,28 +163,38 @@ export default function NewConversationDialog({ open, onClose, myType, myId, myN
         if (!res?.autorise) {
           toast.error(res?.raison || 'Conversation non autorisée — aucune course active ne vous relie.');
           setValidating(false);
+          setStarting(false);
           return;
         }
       } catch (err) {
         toast.error('Erreur de validation. Veuillez réessayer.');
         setValidating(false);
+        setStarting(false);
         return;
       }
       setValidating(false);
     }
 
     // Vérifier si une conversation existe déjà
-    const existing = await base44.entities.Conversation.list();
-    const found = existing.find(c => {
-      try {
-        const parts = JSON.parse(c.participants || "[]");
-        const ids = parts.map(p => `${p.type}:${p.id}`).sort().join(",");
-        const newIds = participants.map(p => `${p.type}:${p.id}`).sort().join(",");
-        return ids === newIds;
-      } catch { return false; }
-    });
+    let found = null;
+    try {
+      const existing = await base44.entities.Conversation.list();
+      found = existing.find(c => {
+        try {
+          const parts = JSON.parse(c.participants || "[]");
+          const ids = parts.map(p => `${p.type}:${p.id}`).sort().join(",");
+          const newIds = participants.map(p => `${p.type}:${p.id}`).sort().join(",");
+          return ids === newIds;
+        } catch { return false; }
+      });
+    } catch (err) {
+      toast.error('Impossible d\'ouvrir la discussion pour le moment. Réessayez.');
+      setStarting(false);
+      return;
+    }
 
     if (found) {
+      setStarting(false);
       onStart(found.id);
       onClose();
     } else {
@@ -192,13 +206,16 @@ export default function NewConversationDialog({ open, onClose, myType, myId, myN
           group_type: "direct",
         }));
         if (res?.success && res.conversation) {
+          setStarting(false);
           onStart(res.conversation.id);
           onClose();
         } else {
           toast.error(res?.error || 'Erreur lors de la création de la conversation');
+          setStarting(false);
         }
       } catch (err) {
         toast.error('Erreur lors de la création de la conversation');
+        setStarting(false);
       }
     }
   };
@@ -265,7 +282,8 @@ export default function NewConversationDialog({ open, onClose, myType, myId, myN
             <button
               key={`${user.type}-${user.id}`}
               onClick={() => startConversation(user)}
-              className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors text-left"
+              disabled={starting || validating}
+              className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <div className={cn(
                 "w-10 h-10 rounded-full flex items-center justify-center text-sm font-black text-white flex-shrink-0 overflow-hidden",
