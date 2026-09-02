@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { ArrowLeft, Globe, Plus, Save, ToggleLeft, ToggleRight, Loader2, MapPin, Percent, DollarSign, Edit3, Store, Utensils, Pill } from "lucide-react";
 import { toast } from "sonner";
+import { invalidateCountryCache } from "@/lib/countryService";
 
 export default function GestionPays() {
   const queryClient = useQueryClient();
@@ -58,6 +59,7 @@ export default function GestionPays() {
       }
     },
     onSuccess: () => {
+      invalidateCountryCache();
       queryClient.invalidateQueries({ queryKey: ["countries-all"] });
       queryClient.invalidateQueries({ queryKey: ["countries-actifs"] });
       setEditingId(null);
@@ -69,6 +71,7 @@ export default function GestionPays() {
   const toggleMutation = useMutation({
     mutationFn: ({ id, actif }) => base44.entities.Country.update(id, { actif }),
     onSuccess: (_, vars) => {
+      invalidateCountryCache();
       queryClient.invalidateQueries({ queryKey: ["countries-all"] });
       queryClient.invalidateQueries({ queryKey: ["countries-actifs"] });
       toast.success(vars.actif ? "Pays activé " : "Pays désactivé");
@@ -104,6 +107,7 @@ export default function GestionPays() {
       return created;
     },
     onSuccess: () => {
+      invalidateCountryCache();
       queryClient.invalidateQueries({ queryKey: ["countries-all"] });
       queryClient.invalidateQueries({ queryKey: ["countries-actifs"] });
       queryClient.invalidateQueries({ queryKey: ["commission-configs-all"] });

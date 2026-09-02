@@ -26,7 +26,7 @@ const PAYS_FALLBACK = [
 // Hook pour récupérer les pays actifs — dynamique depuis la BDD avec fallback de secours
 export function usePaysActifs() {
   const { data: pays = [], isLoading, error } = useQuery({
-    queryKey: ["pays-actifs"],
+    queryKey: ["countries-actifs"],
     queryFn: async () => {
       const result = await base44.entities.Country.filter({ actif: true }, "ordre");
       return Array.isArray(result) && result.length > 0 ? result : PAYS_FALLBACK;
