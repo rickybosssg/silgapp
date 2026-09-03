@@ -201,13 +201,23 @@ const CLIENT_FILTERS = [
   { key: "sans_telephone", label: "Sans téléphone" },
 ];
 
-// Déduplique les profils par telephone_normalized (1 entrée par personne unique)
-function deduplicateByPhone(clients) {
+// Déduplique les profils par identité hybride :
+// PRIORITÉ 1 : telephone_normalized (1 téléphone = 1 personne)
+// PRIORITÉ 2 : user_email (fallback pour clients App sans téléphone)
+function deduplicateHybrid(clients) {
   const seen = new Map();
   for (const c of clients) {
     const phone = (c.telephone_normalized || '').trim();
-    if (!phone) continue;
-    if (!seen.has(phone)) seen.set(phone, c);
+    const email = (c.user_email || '').trim().toLowerCase();
+    let key;
+    if (phone) {
+      key = `phone:${phone}`;
+    } else if (email) {
+      key = `email:${email}`;
+    } else {
+      continue;
+    }
+    if (!seen.has(key)) seen.set(key, c);
   }
   return Array.from(seen.values());
 }
@@ -215,19 +225,19 @@ function deduplicateByPhone(clients) {
 function filterClients(clients, filter) {
   switch (filter) {
     case "jamais_commande":
-      return deduplicateByPhone(clients).filter(c => Number(c.nb_courses_total || 0) === 0);
+      return deduplicateHybrid(clients).filter(c => Number(c.nb_courses_total || 0) === 0);
     case "creee_non_livree":
-      return deduplicateByPhone(clients).filter(c => Number(c.nb_courses_total || 0) > 0);
+      return deduplicateHybrid(clients).filter(c => Number(c.nb_courses_total || 0) > 0);
     case "livres":
-      return deduplicateByPhone(clients).filter(c => Number(c.nb_courses_total || 0) > 0);
+      return deduplicateHybrid(clients).filter(c => Number(c.nb_courses_total || 0) > 0);
     case "app":
-      return deduplicateByPhone(clients).filter(c => !!c.user_email);
+      return deduplicateHybrid(clients).filter(c => !!c.user_email);
     case "crm":
-      return deduplicateByPhone(clients).filter(c => c.cree_via_crm === true);
+      return deduplicateHybrid(clients).filter(c => c.cree_via_crm === true);
     case "sans_telephone":
       return clients.filter(c => !c.telephone_normalized);
     default:
-      return deduplicateByPhone(clients);
+      return deduplicateHybrid(clients);
   }
 }
 
