@@ -36,6 +36,7 @@ import com.google.firebase.messaging.RemoteMessage;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
     private static final String CHANNEL_ID = "silgapp_courses_official_v2";
@@ -51,6 +52,7 @@ public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
     private static final String PREFS_NAME = "silgapp_fcm_prefs";
     private static final String KEY_PENDING_TOKEN = "PENDING_FCM_TOKEN";
     private static final String KEY_LAST_SENT_TOKEN = "LAST_SENT_FCM_TOKEN";
+    private static final String KEY_DEVICE_ID = "SILGAPP_DEVICE_ID";
 
     private static Handler alertHandler;
     private static Runnable alertRunnable;
@@ -198,6 +200,39 @@ public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
                 .putString(KEY_LAST_SENT_TOKEN, token)
                 .apply();
         } catch (Exception ignored) {}
+    }
+
+    /**
+     * Retourne l'identifiant d'installation SILGAPP (UUID stable).
+     *
+     * Généré une seule fois au premier appel, puis conservé en SharedPreferences.
+     * Survit aux redémarrages et mises à jour d'APK.
+     * Détruit uniquement si l'utilisateur efface les données de l'app ou réinstalle.
+     *
+     * Préféré à ANDROID_ID car :
+     *   - ANDROID_ID peut changer sur factory reset (comportement acceptable mais non contrôlé)
+     *   - ANDROID_ID peut être identique entre appareils de certains constructeurs (bug connu < API 26)
+     *   - Un UUID SILGAPP est totalement sous notre contrôle et prévisible
+     *
+     * @return UUID de l'installation, ou null si contexte indisponible
+     */
+    public static String getOrCreateDeviceId(Context context) {
+        if (context == null) return null;
+        try {
+            SharedPreferences prefs = context.getApplicationContext()
+                .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+            String existing = prefs.getString(KEY_DEVICE_ID, null);
+            if (existing != null && !existing.isEmpty()) {
+                return existing;
+            }
+            String newDeviceId = "dev_" + UUID.randomUUID().toString().replace("-", "");
+            prefs.edit().putString(KEY_DEVICE_ID, newDeviceId).apply();
+            android.util.Log.i("SilgappFCM", "getOrCreateDeviceId: nouveau device_id généré (" + newDeviceId + ")");
+            return newDeviceId;
+        } catch (Exception e) {
+            android.util.Log.e("SilgappFCM", "getOrCreateDeviceId: erreur", e);
+            return null;
+        }
     }
 
     @Override

@@ -213,6 +213,23 @@ public class SilgappPushPlugin extends Plugin {
         call.resolve(result);
     }
 
+    /**
+     * Retourne l'identifiant d'installation SILGAPP (UUID stable).
+     *
+     * Généré une seule fois au premier appel, conservé en SharedPreferences.
+     * Survit aux redémarrages et mises à jour d'APK.
+     * Le frontend l'inclut dans enregistrerTokenPush pour identifier l'appareil.
+     *
+     * @return { device_id: string } ou { device_id: null }
+     */
+    @PluginMethod
+    public void getDeviceId(PluginCall call) {
+        String deviceId = SilgappFirebaseMessagingService.getOrCreateDeviceId(getContext());
+        JSObject result = new JSObject();
+        result.put("device_id", deviceId != null ? deviceId : "");
+        call.resolve(result);
+    }
+
     @PluginMethod
     public void getLaunchNotificationData(PluginCall call) {
         JSObject data = getPendingNotificationData(true);

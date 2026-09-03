@@ -14,7 +14,8 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { token, platform, livreur_id, client_id, user_email, user_type } = body;
+    const { token, platform, livreur_id, client_id, user_email, user_type, device_id } = body;
+    const normalizedDeviceId = device_id ? String(device_id).trim() : '';
     console.log('[enregistrerTokenPush] Request received', {
       platform,
       hasToken: !!token,
@@ -24,6 +25,7 @@ Deno.serve(async (req) => {
       client_id: client_id || '',
       user_email: user_email ? String(user_email).trim().toLowerCase() : '',
       user_type: user_type || '',
+      device_id: normalizedDeviceId || '',
     });
 
     if (!token) {
@@ -59,6 +61,7 @@ Deno.serve(async (req) => {
       user_type: resolvedUserType,
       livreur_id: livreur_id || '',
       client_id: client_id || '',
+      device_id: normalizedDeviceId,
       actif: true,
       derniere_utilisation: new Date().toISOString(),
     };
@@ -66,19 +69,26 @@ Deno.serve(async (req) => {
     if (existingTokens.length > 0) {
       await base44.asServiceRole.entities.NotificationToken.update(existingTokens[0].id, payload);
       if (!String(token).startsWith('web_')) {
-        const currentCreatedMs = new Date(existingTokens[0].created_date || Date.now()).getTime();
-        const sameUserTokens = await base44.asServiceRole.entities.NotificationToken.filter({
-          user_email: normalizedEmail,
-          user_type: resolvedUserType,
-          actif: true,
-        });
-        await Promise.all((sameUserTokens || [])
-          .filter(item =>
-            item.id !== existingTokens[0].id &&
-            !String(item.token || '').startsWith('web_') &&
-            new Date(item.created_date || 0).getTime() < currentCreatedMs
-          )
-          .map(item => base44.asServiceRole.entities.NotificationToken.update(item.id, { actif: false })));
+        // ── MULTI-APPAREIL : désactiver uniquement les anciens tokens
+        //    du MÊME user_email ET du MÊME device_id ──
+        // Si device_id est absent (ancien token ou erreur natif),
+        // NE PAS désactiver (compatibilité — évite la désactivation massive).
+        if (normalizedDeviceId) {
+          const currentCreatedMs = new Date(existingTokens[0].created_date || Date.now()).getTime();
+          const sameUserSameDeviceTokens = await base44.asServiceRole.entities.NotificationToken.filter({
+            user_email: normalizedEmail,
+            user_type: resolvedUserType,
+            actif: true,
+          });
+          await Promise.all((sameUserSameDeviceTokens || [])
+            .filter(item =>
+              item.id !== existingTokens[0].id &&
+              !String(item.token || '').startsWith('web_') &&
+              String(item.device_id || '') === normalizedDeviceId &&
+              new Date(item.created_date || 0).getTime() < currentCreatedMs
+            )
+            .map(item => base44.asServiceRole.entities.NotificationToken.update(item.id, { actif: false })));
+        }
 
         // ── COMPTE A/B : un token natif = un compte actif à la fois ──
         // Désactiver tous les tokens actifs portant le MÊME token natif
@@ -100,25 +110,31 @@ Deno.serve(async (req) => {
         platform: normalizedPlatform,
         user_email: normalizedEmail,
         user_type: resolvedUserType,
+        device_id: normalizedDeviceId || '',
       });
       return Response.json({ success: true, action: 'updated', user_email: normalizedEmail, user_type: resolvedUserType });
     }
 
     const created = await base44.asServiceRole.entities.NotificationToken.create(payload);
     if (!String(token).startsWith('web_')) {
-      const currentCreatedMs = new Date(created.created_date || Date.now()).getTime();
-      const sameUserTokens = await base44.asServiceRole.entities.NotificationToken.filter({
-        user_email: normalizedEmail,
-        user_type: resolvedUserType,
-        actif: true,
-      });
-      await Promise.all((sameUserTokens || [])
-        .filter(item =>
-          item.id !== created.id &&
-          !String(item.token || '').startsWith('web_') &&
-          new Date(item.created_date || 0).getTime() < currentCreatedMs
-        )
-        .map(item => base44.asServiceRole.entities.NotificationToken.update(item.id, { actif: false })));
+      // ── MULTI-APPAREIL : désactiver uniquement les anciens tokens
+      //    du MÊME user_email ET du MÊME device_id ──
+      if (normalizedDeviceId) {
+        const currentCreatedMs = new Date(created.created_date || Date.now()).getTime();
+        const sameUserSameDeviceTokens = await base44.asServiceRole.entities.NotificationToken.filter({
+          user_email: normalizedEmail,
+          user_type: resolvedUserType,
+          actif: true,
+        });
+        await Promise.all((sameUserSameDeviceTokens || [])
+          .filter(item =>
+            item.id !== created.id &&
+            !String(item.token || '').startsWith('web_') &&
+            String(item.device_id || '') === normalizedDeviceId &&
+            new Date(item.created_date || 0).getTime() < currentCreatedMs
+          )
+          .map(item => base44.asServiceRole.entities.NotificationToken.update(item.id, { actif: false })));
+      }
 
       // ── COMPTE A/B : un token natif = un compte actif à la fois ──
       const sameTokenDiffUser = await base44.asServiceRole.entities.NotificationToken.filter({
