@@ -79,6 +79,21 @@ Deno.serve(async (req) => {
             new Date(item.created_date || 0).getTime() < currentCreatedMs
           )
           .map(item => base44.asServiceRole.entities.NotificationToken.update(item.id, { actif: false })));
+
+        // ── COMPTE A/B : un token natif = un compte actif à la fois ──
+        // Désactiver tous les tokens actifs portant le MÊME token natif
+        // mais appartenant à un AUTRE user_email (changement de compte).
+        // Ne touche pas les autres appareils du compte A (tokens différents).
+        const sameTokenDiffUser = await base44.asServiceRole.entities.NotificationToken.filter({
+          token,
+          actif: true,
+        });
+        await Promise.all((sameTokenDiffUser || [])
+          .filter(item =>
+            item.id !== existingTokens[0].id &&
+            String(item.user_email || '').toLowerCase() !== normalizedEmail
+          )
+          .map(item => base44.asServiceRole.entities.NotificationToken.update(item.id, { actif: false })));
       }
       console.log('[enregistrerTokenPush] Token updated', {
         id: existingTokens[0].id,
@@ -102,6 +117,18 @@ Deno.serve(async (req) => {
           item.id !== created.id &&
           !String(item.token || '').startsWith('web_') &&
           new Date(item.created_date || 0).getTime() < currentCreatedMs
+        )
+        .map(item => base44.asServiceRole.entities.NotificationToken.update(item.id, { actif: false })));
+
+      // ── COMPTE A/B : un token natif = un compte actif à la fois ──
+      const sameTokenDiffUser = await base44.asServiceRole.entities.NotificationToken.filter({
+        token,
+        actif: true,
+      });
+      await Promise.all((sameTokenDiffUser || [])
+        .filter(item =>
+          item.id !== created.id &&
+          String(item.user_email || '').toLowerCase() !== normalizedEmail
         )
         .map(item => base44.asServiceRole.entities.NotificationToken.update(item.id, { actif: false })));
     }

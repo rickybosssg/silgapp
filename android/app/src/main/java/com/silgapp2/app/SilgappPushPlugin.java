@@ -171,14 +171,12 @@ public class SilgappPushPlugin extends Plugin {
     }
 
     /**
-     * Récupère un token FCM qui aurait été généré par Firebase (via onNewToken)
-     * avant que l'utilisateur ne soit authentifié.
+     * Lit un token FCM en attente (généré par onNewToken) SANS le supprimer.
      *
-     * Le frontend appelle cette méthode au démarrage et après login.
-     * Si un token est en attente, il est retourné puis consommé (supprimé du stockage natif).
-     * Le frontend l'enregistre ensuite via enregistrerTokenPush avec le BON user_email.
+     * Le token reste en SharedPreferences jusqu'à confirmation backend.
+     * Le frontend appelle confirmPendingFcmToken() après succès de enregistrerTokenPush.
      *
-     * @return { token, platform } ou { hasPending: false }
+     * @return { hasPending, token, platform } ou { hasPending: false }
      */
     @PluginMethod
     public void consumePendingFcmToken(PluginCall call) {
@@ -191,6 +189,27 @@ public class SilgappPushPlugin extends Plugin {
         } else {
             result.put("hasPending", false);
         }
+        call.resolve(result);
+    }
+
+    /**
+     * Confirme qu'un token FCM a été enregistré côté backend.
+     *
+     * Supprime PENDING_FCM_TOKEN UNIQUEMENT si le token correspond.
+     * À appeler par le frontend après succès réel de enregistrerTokenPush.
+     *
+     * @param token Le token qui a été enregistré avec succès
+     */
+    @PluginMethod
+    public void confirmPendingFcmToken(PluginCall call) {
+        String token = call.getString("token", "");
+        if (token == null || token.isEmpty()) {
+            call.reject("token requis");
+            return;
+        }
+        SilgappFirebaseMessagingService.confirmPendingTokenSent(getContext(), token);
+        JSObject result = new JSObject();
+        result.put("confirmed", true);
         call.resolve(result);
     }
 

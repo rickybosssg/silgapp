@@ -137,8 +137,13 @@ public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
     }
 
     /**
-     * Récupère le token FCM en attente (consommé par le frontend via le plugin).
-     * Retourne null si aucun token en attente.
+     * Lit le token FCM en attente SANS le supprimer.
+     *
+     * Le token reste dans SharedPreferences tant que le frontend n'a pas confirmé
+     * son enregistrement côté backend via confirmPendingTokenSent().
+     *
+     * Ceci garantit qu'en cas de crash, coupure réseau ou échec backend,
+     * le token n'est pas perdu et peut être retenté au prochain cycle.
      */
     public static String consumePendingToken(Context context) {
         if (context == null) return null;
@@ -146,13 +151,39 @@ public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
             SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
             String token = prefs.getString(KEY_PENDING_TOKEN, null);
             if (token != null && !token.isEmpty()) {
-                prefs.edit().remove(KEY_PENDING_TOKEN).apply();
-                android.util.Log.i("SilgappFCM", "consumePendingToken: token consommé par le frontend");
+                android.util.Log.i("SilgappFCM", "consumePendingToken: token lu (non supprimé, en attente de confirmation backend)");
             }
             return token;
         } catch (Exception e) {
             android.util.Log.e("SilgappFCM", "consumePendingToken: erreur", e);
             return null;
+        }
+    }
+
+    /**
+     * Confirme que le token a été enregistré côté backend et supprime PENDING_FCM_TOKEN.
+     *
+     * Appelée par le frontend (confirmPendingFcmToken) UNIQUEMENT après succès
+     * de enregistrerTokenPush / persistPushToken.
+     *
+     * Ne supprime le token que s'il correspond au token actuellement en attente.
+     * Si le token ne correspond pas (rotation entre-temps), ne fait rien.
+     */
+    public static void confirmPendingTokenSent(Context context, String token) {
+        if (context == null || token == null || token.isEmpty()) return;
+        try {
+            SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+            String pending = prefs.getString(KEY_PENDING_TOKEN, null);
+            if (token.equals(pending)) {
+                prefs.edit().remove(KEY_PENDING_TOKEN).apply();
+                android.util.Log.i("SilgappFCM", "confirmPendingTokenSent: token confirmé et supprimé du pending");
+            } else {
+                android.util.Log.i("SilgappFCM", "confirmPendingTokenSent: token ne correspond pas au pending, ignoré");
+            }
+            // Toujours marquer comme envoyé (anti-doublon onNewToken)
+            prefs.edit().putString(KEY_LAST_SENT_TOKEN, token).apply();
+        } catch (Exception e) {
+            android.util.Log.e("SilgappFCM", "confirmPendingTokenSent: erreur", e);
         }
     }
 

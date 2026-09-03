@@ -595,6 +595,10 @@ async function persistPushToken({ token, platform, livreurId, clientId, currentU
       userEmail: identity.user_email,
       userType: resolvedUserType,
     });
+    // ── Confirmer au natif que le token a été enregistré côté backend ──
+    // Supprime PENDING_FCM_TOKEN uniquement si le backend a réussi.
+    // Si cette ligne n'est pas atteinte (crash, réseau), le token reste en attente.
+    await confirmNativePendingToken(token);
     return result;
   } catch (error) {
     console.warn("[registerPushToken] Backend function failed, using entity fallback:", error?.message);
@@ -604,7 +608,31 @@ async function persistPushToken({ token, platform, livreurId, clientId, currentU
       userEmail: identity.user_email,
       userType: resolvedUserType,
     });
+    // ── Confirmer aussi via le fallback direct (entity create/update) ──
+    await confirmNativePendingToken(token);
     return directResult;
+  }
+}
+
+/**
+ * Confirme au natif qu'un token FCM a été enregistré côté backend.
+ * Supprime PENDING_FCM_TOKEN si le token correspond.
+ * No-op si le plugin natif n'est pas disponible ou si le token ne correspond pas.
+ */
+async function confirmNativePendingToken(token) {
+  if (!token || String(token).startsWith("web_")) return;
+  try {
+    const env = detectEnvironment();
+    if (!env.isNative || env.os !== "android") return;
+    await withNativeTimeout(
+      SilgappPush.confirmPendingFcmToken({ token }),
+      3000,
+      "SilgappPush.confirmPendingFcmToken"
+    );
+    savePushDebug("pending-token-confirmed", { tokenPrefix: token.slice(0, 24) });
+  } catch (err) {
+    // Non-fatal : le token reste en attente et sera retenté au prochain cycle
+    savePushDebug("pending-token-confirm-failed", { error: err?.message });
   }
 }
 
