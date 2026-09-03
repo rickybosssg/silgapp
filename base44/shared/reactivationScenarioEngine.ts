@@ -346,9 +346,12 @@ export async function findEligibleClients(
     }
   }
 
-  // ── Clients déjà dans un scénario actif ou en cooldown ──
+  // ── Clients déjà dans un scénario actif ou en cooldown POUR CETTE CAMPAGNE ──
+  // IMPORTANT : les scénarios des ANCIENNES campagnes ne bloquent PAS la nouvelle
+  // vague. Chaque campagne est évaluée indépendamment (reset contrôlé).
   const activeScenarios = await base44.asServiceRole.entities.ReactivationScenario.filter({
     status: 'active',
+    campaign_id: campaign.id,
   });
   const activeClientIds = new Set(activeScenarios.map((s: any) => s.client_id));
 
@@ -362,6 +365,7 @@ export async function findEligibleClients(
 
   const cooldownScenarios = await base44.asServiceRole.entities.ReactivationScenario.filter({
     status: ['completed', 'expired', 'converted'],
+    campaign_id: campaign.id,
   });
   const now = Date.now();
   const cooldownMs = config.cooldownDays * 86400000;
