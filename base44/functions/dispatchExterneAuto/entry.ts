@@ -31,14 +31,64 @@ console.log(`[DISPATCH_EXTERNE_AUTO] 🔖 dispatchV2 bundle version: ${DISPATCH_
 const AUTH_ERROR_SIGNATURE = 'You must be logged in to access this app';
 const MAX_AUTH_RETRIES = 2;
 const AUTH_RETRY_DELAY_MS = 500;
+const INFRA_RETRY_DELAY_MS = 1000; // Backoff pour erreurs infrastructure transitoires (rate limit, timeout, réseau)
+
+/**
+ * Classification des erreurs infrastructure transitoires.
+ *
+ * Ces erreurs sont SÛRES à retryer car elles sont par nature temporaires :
+ * - Rate limit (HTTP 429, "rate limit", "traffic volume") — quota API temporaire
+ * - Timeout réseau (ETIMEDOUT, ECONNRESET, ECONNREFUSED, "fetch failed")
+ * - Erreurs MongoDB transitoires ("mongodb.net", connectTimeoutMS)
+ *
+ * NE PAS inclure les HTTP 500 génériques — ils peuvent indiquer une erreur
+ * persistante (bug, configuration) qui ne se résoudra pas avec un retry.
+ *
+ * @returns {boolean} true si l'erreur est transitoire et sûre à retryer
+ */
+function isTransientInfrastructureError(error: any): boolean {
+  const msg = (error?.message || String(error)).toLowerCase();
+  return msg.includes('rate limit') ||
+    msg.includes('rate_limit') ||
+    msg.includes('rate limit exceeded') ||
+    msg.includes('traffic volume') ||
+    msg.includes('429') ||
+    msg.includes('timeout') ||
+    msg.includes('etimedout') ||
+    msg.includes('enotfound') ||
+    msg.includes('econnreset') ||
+    msg.includes('econnrefused') ||
+    msg.includes('mongodb.net') ||
+    msg.includes('connecttimeout') ||
+    msg.includes('network error') ||
+    msg.includes('fetch failed');
+}
 
 /**
  * Wrapper pour les opérations de dispatch critiques.
- * Si une erreur d'authentification transitoire Base44 survient, recrée le client
- * et retente l'opération. Les autres erreurs remontent immédiatement.
+ *
+ * Logique de retry à deux niveaux :
+ *
+ * 1. ERREURS AUTH (transitoires Base44) :
+ *    - Recrée le client et retry (jusqu'à MAX_AUTH_RETRIES = 2 retries).
+ *    - Log: STEP_FAILED=<stepName> à chaque échec.
+ *
+ * 2. ERREURS INFRASTRUCTURE TRANSITOIRES (rate limit, timeout, réseau) :
+ *    - Backoff 1000ms puis UNE seule nouvelle tentative.
+ *    - Log: STEP_FAILED=<stepName> à la première erreur.
+ *    - Log: STEP_RECOVERED=<stepName> si la 2e tentative réussit.
+ *    - Si la 2e tentative échoue → l'erreur remonte vers le catch final.
+ *
+ * 3. AUTRES ERREURS (métier, bugs, config) :
+ *    - Aucun retry — remontent immédiatement.
+ *
+ * Maximum total = 2 tentatives pour les erreurs infrastructure.
+ * Les logs ne font JAMAIS échouer le dispatch (best-effort).
  */
 async function withAuthRetry(req: Request, stepName: string, fn: (base44: any) => Promise<any>) {
   let lastError: any = null;
+  let infraRetried = false;
+
   for (let attempt = 0; attempt <= MAX_AUTH_RETRIES; attempt++) {
     try {
       const base44 = createClientFromRequest(req);
@@ -47,13 +97,34 @@ async function withAuthRetry(req: Request, stepName: string, fn: (base44: any) =
       lastError = error;
       const msg = error?.message || String(error);
       const isAuthError = msg.includes(AUTH_ERROR_SIGNATURE);
-      console.error(`[DISPATCH] STEP_FAILED=${stepName} attempt=${attempt + 1}/${MAX_AUTH_RETRIES + 1} auth_error=${isAuthError} msg="${msg}"`);
-      if (!isAuthError || attempt >= MAX_AUTH_RETRIES) {
-        throw error;
+      const isInfra = isTransientInfrastructureError(error);
+
+      console.error(`[DISPATCH] STEP_FAILED=${stepName} attempt=${attempt + 1}/${MAX_AUTH_RETRIES + 1} auth_error=${isAuthError} infra_error=${isInfra} msg="${msg}"`);
+
+      // ── Erreur infrastructure transitoire (rate limit, timeout, réseau) ──
+      // UNE seule retry avec backoff 1000ms
+      if (isInfra && !infraRetried && attempt < MAX_AUTH_RETRIES) {
+        infraRetried = true;
+        await new Promise(r => setTimeout(r, INFRA_RETRY_DELAY_MS));
+        console.log(`[DISPATCH] 🔄 Retrying ${stepName} after infra error (rate limit/timeout) — attempt ${attempt + 2}/${MAX_AUTH_RETRIES + 1}`);
+        continue;
       }
-      await new Promise(r => setTimeout(r, AUTH_RETRY_DELAY_MS));
-      console.log(`[DISPATCH] 🔄 Retrying ${stepName} with fresh client (attempt ${attempt + 2}/${MAX_AUTH_RETRIES + 1})`);
+
+      // ── Erreur auth transitoire — retry avec client frais ──
+      if (isAuthError && !isInfra && attempt < MAX_AUTH_RETRIES) {
+        await new Promise(r => setTimeout(r, AUTH_RETRY_DELAY_MS));
+        console.log(`[DISPATCH] 🔄 Retrying ${stepName} with fresh client (attempt ${attempt + 2}/${MAX_AUTH_RETRIES + 1})`);
+        continue;
+      }
+
+      // ── Autre erreur ou retries épuisés — remonter ──
+      throw error;
     }
+  }
+
+  // Si on arrive ici avec une erreur infra qui a été retryée, c'est que la 2e tentative a échoué
+  if (infraRetried && lastError) {
+    console.error(`[DISPATCH] STEP_FAILED=${stepName} infra_retry_exhausted — erreur persistante après retry`);
   }
   throw lastError;
 }
