@@ -18,6 +18,10 @@
       "type": "string",
       "description": "T\u00e9l\u00e9phone normalis\u00e9 (format international sans + ni espace). Utilis\u00e9 pour l'attribution."
     },
+    "client_user_email": {
+      "type": "string",
+      "description": "Email du compte User li\u00e9 au client. R\u00e9solu c\u00f4t\u00e9 backend. Utilis\u00e9 pour l'attribution hybride (fallback t\u00e9l\u00e9phone)."
+    },
     "country_code": {
       "type": "string",
       "description": "Code pays du client"
@@ -28,9 +32,10 @@
         "vip",
         "regular",
         "occasional",
-        "no_course"
+        "no_course",
+        "creee_non_livree"
       ],
-      "description": "Segment intelligent: vip (5+ courses, inactif), regular (2-4 courses, inactif), occasional (1 course, inactif), no_course (0 course, inscrit)"
+      "description": "Segment: no_course (jamais command\u00e9), creee_non_livree (course cr\u00e9\u00e9e mais jamais livr\u00e9e), occasional (1 course livr\u00e9e), regular (2-4 courses livr\u00e9es), vip (5+ courses livr\u00e9es)"
     },
     "ab_variant": {
       "type": "string",

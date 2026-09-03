@@ -67,8 +67,26 @@ export function calculateLivreurCounters(livreurs, livreurIdsEnCourseReelle = ne
  * @returns {Object} - Compteurs détaillés
  */
 export function calculateClientCounters(clients) {
+  // Déduplication par téléphone normalisé
+  const phoneSet = new Set();
+  for (const c of clients) {
+    const phone = (c.telephone_normalized || '').trim();
+    if (phone) phoneSet.add(phone);
+  }
+
+  const app = clients.filter(c => !!c.user_email).length;
+  const crm = clients.filter(c => c.cree_via_crm === true).length;
+  const avecCourse = clients.filter(c => Number(c.nb_courses_total || 0) > 0).length;
+  const sansCourse = clients.filter(c => Number(c.nb_courses_total || 0) === 0).length;
+
   return {
     total: clients.length,
+    uniques: phoneSet.size || clients.length,
+    app,
+    crm,
+    avecCourse,
+    sansCourse,
+    livres: avecCourse, // nb_courses_total ne compte que les courses livrées
     avecGPS: clients.filter(c => c.latitude && c.longitude).length,
     gpsRecent: clients.filter(c => isClientGPSRecent(c)).length,
     gpsRecents: clients.filter(c => isClientGPSRecent(c)).length, // alias utilisé par NetworkHealthBanner

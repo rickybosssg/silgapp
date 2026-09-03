@@ -132,19 +132,26 @@ export default function QRScannerModal({ course, type, onSuccess, onClose, livre
         };
         setTimeout(() => onSuccess(courseData), 700);
       } else {
-        const message = data?.error || "Ce code ne correspond pas à cette course";
-        setErrorMessage(message);
-        setResult("error");
-        toast.error(message);
-        setTimeout(() => setResult(null), 1600);
+        const backendError = data?.error || "Ce code ne correspond pas à cette course";
+        const blockedReason = data?.blocked_reason;
+        // ── Distinguer les erreurs métier des erreurs de PIN ──
+        // blocked_reason présent = erreur métier (pas un mauvais PIN)
+        if (blockedReason === 'missing_admin_price') {
+          setErrorMessage("Prix de la course non défini. La livraison ne peut pas être finalisée pour le moment. Contactez SILGAPP.");
+          setResult("error_business");
+        } else {
+          setErrorMessage(backendError);
+          setResult("error");
+        }
+        toast.error(blockedReason === 'missing_admin_price' ? "Prix non défini" : backendError);
+        setTimeout(() => setResult(null), 2500);
       }
     } catch (err) {
       console.error("Erreur validation QR:", err);
-      const message = "Validation impossible pour le moment. Vérifiez le réseau puis réessayez : le code reste valable.";
-      setErrorMessage(message);
-      setResult("error");
-      toast.error(message);
-      setTimeout(() => setResult(null), 1600);
+      setErrorMessage("Vérifiez votre connexion puis réessayez.");
+      setResult("error_network");
+      toast.error("Erreur de validation");
+      setTimeout(() => setResult(null), 2500);
     } finally {
       setVerifying(false);
     }
@@ -201,6 +208,26 @@ export default function QRScannerModal({ course, type, onSuccess, onClose, livre
             </div>
             <p className="text-xl font-black text-red-600">Code invalide</p>
             <p className="text-sm text-gray-500">{errorMessage || "Ce code ne correspond pas à cette course"}</p>
+          </div>
+        )}
+
+        {result === "error_business" && (
+          <div className="p-8 text-center space-y-3">
+            <div className="w-20 h-20 rounded-full bg-amber-100 flex items-center justify-center mx-auto">
+              <AlertTriangle className="w-10 h-10 text-amber-600" />
+            </div>
+            <p className="text-xl font-black text-amber-700">Prix non défini</p>
+            <p className="text-sm text-gray-500">{errorMessage}</p>
+          </div>
+        )}
+
+        {result === "error_network" && (
+          <div className="p-8 text-center space-y-3">
+            <div className="w-20 h-20 rounded-full bg-orange-100 flex items-center justify-center mx-auto">
+              <AlertTriangle className="w-10 h-10 text-orange-600" />
+            </div>
+            <p className="text-xl font-black text-orange-700">Erreur de validation</p>
+            <p className="text-sm text-gray-500">{errorMessage}</p>
           </div>
         )}
 

@@ -111,6 +111,16 @@ export function setDefaultCountryCode(code) {
 }
 
 /**
+ * Invalide le cache des pays (mémoire + localStorage).
+ * À appeler après toute mutation sur l'entité Country (création, modification, activation/désactivation).
+ */
+export function invalidateCountryCache() {
+  _countriesCache = null;
+  _countriesCacheExpires = 0;
+  try { localStorage.removeItem(CACHE_KEY); } catch (_) {}
+}
+
+/**
  * Récupère tous les pays actifs depuis le backend.
  * Cache en mémoire (5 min) + localStorage (24h) pour le hors-ligne.
  *

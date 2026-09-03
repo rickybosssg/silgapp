@@ -173,13 +173,13 @@ export default function PubliciteFullscreen({
 
       {/* Vidéo ou Image */}
       {pub.media_url && pub.type_media === "image" && (
-        <div className="flex-1 relative overflow-hidden">
+        <div className="flex-1 relative flex items-center justify-center overflow-hidden">
           <img
             src={pub.media_url}
             alt={pub.titre}
-            className="absolute inset-0 w-full h-full object-cover"
+            className="max-w-full max-h-full object-contain"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none" />
         </div>
       )}
 

@@ -519,7 +519,7 @@ async function showNativeNotification(titre, message, options = {}) {
   }
 }
 
-async function saveTokenDirectly({ token, platform, livreurId, currentUser }) {
+async function saveTokenDirectly({ token, platform, livreurId, currentUser, deviceId }) {
   const identity = resolveNotificationIdentity(livreurId, currentUser);
   const payload = {
     user_email: identity.user_email,
@@ -528,6 +528,7 @@ async function saveTokenDirectly({ token, platform, livreurId, currentUser }) {
     user_type: identity.user_type,
     livreur_id: identity.livreur_id || "",
     client_id: identity.client_id || "",
+    device_id: deviceId || "",
     actif: true,
     derniere_utilisation: new Date().toISOString(),
   };
@@ -542,7 +543,33 @@ async function saveTokenDirectly({ token, platform, livreurId, currentUser }) {
   return { success: true, action: "created-direct", ...payload };
 }
 
-async function cleanupDuplicateNativeTokens({ token, userEmail, userType }) {
+/**
+ * Récupère l'identifiant d'installation SILGAPP depuis le natif.
+ * UUID stable généré côté Java, conservé en SharedPreferences.
+ * Survit aux redémarrages et mises à jour d'APK.
+ * @returns {Promise<string|null>}
+ */
+async function getNativeDeviceId() {
+  try {
+    const env = detectEnvironment();
+    if (!env.isNative || env.os !== "android") return null;
+    const result = await withNativeTimeout(
+      SilgappPush.getDeviceId(),
+      3000,
+      "SilgappPush.getDeviceId"
+    );
+    const deviceId = result?.device_id;
+    if (deviceId && !String(deviceId).startsWith("web_")) {
+      return deviceId;
+    }
+    return null;
+  } catch (err) {
+    savePushDebug("device-id-fetch-failed", { error: err?.message });
+    return null;
+  }
+}
+
+async function cleanupDuplicateNativeTokens({ token, userEmail, userType, deviceId }) {
   const normalizedEmail = String(userEmail || "").trim().toLowerCase();
   if (!normalizedEmail || !token || String(token).startsWith("web_")) return;
 
@@ -559,14 +586,19 @@ async function cleanupDuplicateNativeTokens({ token, userEmail, userType }) {
       ? new Date(currentToken.created_date || Date.now()).getTime()
       : Date.now();
 
-    // Only deactivate tokens that are OLDER than the current one
-    // This prevents race conditions where two simultaneous registrations
-    // deactivate each other
+    // ── MULTI-APPAREIL : ne désactiver que les tokens du MÊME appareil ──
+    // Si device_id est disponible, on filtre par (user_email + device_id).
+    // Les tokens d'autres appareils du même utilisateur sont PRÉSERVÉS.
+    // Si device_id est absent (ancien token), on ne désactive PAS (compatibilité).
     await Promise.all((tokens || [])
       .filter((item) =>
         item.token !== token &&
         !String(item.token || "").startsWith("web_") &&
-        new Date(item.created_date || 0).getTime() < currentCreatedMs
+        new Date(item.created_date || 0).getTime() < currentCreatedMs &&
+        // Ne désactiver que si même device_id (ou pas de device_id sur les deux)
+        (deviceId
+          ? String(item.device_id || "") === String(deviceId)
+          : false)
       )
       .map((item) => base44.entities.NotificationToken.update(item.id, { actif: false })));
   } catch (error) {
@@ -579,6 +611,18 @@ async function persistPushToken({ token, platform, livreurId, clientId, currentU
   // Supporter user_type='client' passé explicitement
   const resolvedUserType = currentUser?.user_type || identity.user_type;
   const resolvedClientId = clientId || identity.client_id || currentUser?.client_id || null;
+
+  // ── Récupérer le device_id natif (UUID stable d'installation) ──
+  let deviceId = null;
+  try {
+    deviceId = await getNativeDeviceId();
+    if (deviceId) {
+      savePushDebug("device-id-resolved", { deviceIdPrefix: deviceId.slice(0, 16) });
+    }
+  } catch (err) {
+    savePushDebug("device-id-error", { error: err?.message });
+  }
+
   const payload = {
     token,
     platform,
@@ -586,6 +630,7 @@ async function persistPushToken({ token, platform, livreurId, clientId, currentU
     client_id: resolvedClientId || '',
     user_email: identity.user_email,
     user_type: resolvedUserType,
+    device_id: deviceId || '',
   };
 
   try {
@@ -595,17 +640,47 @@ async function persistPushToken({ token, platform, livreurId, clientId, currentU
       token,
       userEmail: identity.user_email,
       userType: resolvedUserType,
+      deviceId,
     });
+    // ── Confirmer au natif que le token a été enregistré côté backend ──
+    // Supprime PENDING_FCM_TOKEN uniquement si le backend a réussi.
+    // Si cette ligne n'est pas atteinte (crash, réseau), le token reste en attente.
+    await confirmNativePendingToken(token);
     return result;
   } catch (error) {
     console.warn("[registerPushToken] Backend function failed, using entity fallback:", error?.message);
-    const directResult = await saveTokenDirectly({ token, platform, livreurId: identity.livreur_id, currentUser });
+    const directResult = await saveTokenDirectly({ token, platform, livreurId: identity.livreur_id, currentUser, deviceId });
     await cleanupDuplicateNativeTokens({
       token,
       userEmail: identity.user_email,
       userType: resolvedUserType,
+      deviceId,
     });
+    // ── Confirmer aussi via le fallback direct (entity create/update) ──
+    await confirmNativePendingToken(token);
     return directResult;
+  }
+}
+
+/**
+ * Confirme au natif qu'un token FCM a été enregistré côté backend.
+ * Supprime PENDING_FCM_TOKEN si le token correspond.
+ * No-op si le plugin natif n'est pas disponible ou si le token ne correspond pas.
+ */
+async function confirmNativePendingToken(token) {
+  if (!token || String(token).startsWith("web_")) return;
+  try {
+    const env = detectEnvironment();
+    if (!env.isNative || env.os !== "android") return;
+    await withNativeTimeout(
+      SilgappPush.confirmPendingFcmToken({ token }),
+      3000,
+      "SilgappPush.confirmPendingFcmToken"
+    );
+    savePushDebug("pending-token-confirmed", { tokenPrefix: token.slice(0, 24) });
+  } catch (err) {
+    // Non-fatal : le token reste en attente et sera retenté au prochain cycle
+    savePushDebug("pending-token-confirm-failed", { error: err?.message });
   }
 }
 
@@ -698,6 +773,30 @@ async function ensureNativeRegistrationListeners() {
     savePushDebug("registration-error", error);
     console.error("[registerPushToken] Erreur registration FCM:", error);
   });
+
+  // ── Événement natif : Firebase a généré/renouvelé un token (onNewToken) ──
+  // Le token a déjà été stocké en SharedPreferences par le service natif.
+  // Ici on tente de l'enregistrer immédiatement si un utilisateur est authentifié.
+  try {
+    await SilgappPush.addListener?.("silgapp:fcm-token-refreshed", (event) => {
+      const token = event?.token;
+      if (!token) return;
+      savePushDebug("fcm-token-refreshed", {
+        tokenPrefix: token.slice(0, 24),
+        tokenLength: token.length,
+        platform: event?.platform,
+      });
+      // Le token est déjà en attente dans SharedPreferences.
+      // registerPushToken le consommera au prochain cycle (foreground ou login).
+      // On déclenche une tentative d'enregistrement si un user est déjà connu.
+      if (lastNativeToken !== token) {
+        lastNativeToken = token;
+        lastNativeTokenPlatform = event?.platform || "android";
+      }
+    });
+  } catch (err) {
+    console.warn("[Notifications] silgapp:fcm-token-refreshed listener failed:", err?.message);
+  }
 }
 
 export async function registerPushToken(livreurId = null, currentUser = null) {
@@ -705,6 +804,51 @@ export async function registerPushToken(livreurId = null, currentUser = null) {
   try {
     const env = detectEnvironment();
     savePushDebug("register-start", { env, livreurId, user_type: currentUser?.user_type });
+
+    // ── Consommer un token FCM en attente (généré par onNewToken avant auth) ──
+    // Si Firebase a généré un token pendant que l'utilisateur n'était pas encore
+    // authentifié, onNewToken() l'a conservé dans SharedPreferences.
+    // On le récupère ici pour l'associer au BON utilisateur.
+    if (env.isNative && env.os === "android") {
+      try {
+        const pendingResult = await withNativeTimeout(
+          SilgappPush.consumePendingFcmToken(),
+          3000,
+          "SilgappPush.consumePendingFcmToken"
+        );
+        if (pendingResult?.hasPending && pendingResult?.token) {
+          savePushDebug("pending-fcm-token-consumed", {
+            tokenPrefix: pendingResult.token.slice(0, 24),
+            tokenLength: pendingResult.token.length,
+            platform: pendingResult.platform,
+          });
+
+          // Si on a un utilisateur authentifié, enregistrer le token immédiatement
+          if (currentUser?.email) {
+            try {
+              await persistPushToken({
+                token: pendingResult.token,
+                platform: pendingResult.platform || "android",
+                livreurId,
+                clientId,
+                currentUser,
+              });
+              savePushDebug("pending-fcm-token-persisted", { user_email: currentUser.email });
+            } catch (persistError) {
+              savePushDebug("pending-fcm-token-persist-failed", { error: persistError?.message });
+            }
+          } else {
+            // Pas encore authentifié → le token reste en mémoire JS pour ce cycle
+            // Il sera ré-enregistré au prochain registerPushToken après login
+            lastNativeToken = pendingResult.token;
+            lastNativeTokenPlatform = pendingResult.platform || "android";
+            savePushDebug("pending-fcm-token-deferred", { reason: "no_authenticated_user" });
+          }
+        }
+      } catch (pendingError) {
+        savePushDebug("pending-fcm-token-check-error", { error: pendingError?.message });
+      }
+    }
 
     if (env.isNative && (env.os === "android" || env.os === "ios")) {
       const PushNotifications = getCapacitorPlugin("PushNotifications", "@capacitor/push-notifications");

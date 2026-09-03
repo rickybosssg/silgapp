@@ -480,7 +480,7 @@ export default function MessagesPage({ myType, myId, myName, onBack, initialConv
         myType={myType}
         myId={myId}
         myName={myName}
-        onStart={(convId) => setActiveConvId(convId)}
+        onStart={async (convId) => { await loadConversations(); setActiveConvId(convId); }}
       />
     </div>
   );

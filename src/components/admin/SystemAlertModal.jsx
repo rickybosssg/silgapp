@@ -148,17 +148,57 @@ export default function SystemAlertModal() {
                 );
               })()}
 
-              {/* ── Action requise (instructions système — séparées du motif livreur) ── */}
-              {alert.type === "alerte_critique_dispatch" && (
-                <div className="bg-red-50 border border-red-200 rounded-xl p-3">
-                  <p className="text-[10px] font-bold text-red-700 uppercase tracking-wide mb-1">
-                    Action requise
-                  </p>
-                  <p className="text-sm text-red-900 font-medium leading-relaxed">
-                    Cette course est passée en Redispatch. Elle ne sera pas reproposée automatiquement. Relancez manuellement la recherche d'un livreur si nécessaire (le livreur ayant annulé reste exclu).
-                  </p>
-                </div>
-              )}
+              {/* ── Action requise — SÉPARÉE selon le type d'alerte ── */}
+              {alert.type === "alerte_critique_dispatch" && (() => {
+                const isInfraAlert = (alert.titre || "").includes("Surcharge API") || (alert.message || "").includes("rate limit");
+                const isFatalAlert = (alert.titre || "").includes("Erreur fatale");
+                const hasCourseId = !!alert.course_id;
+
+                if (isInfraAlert) {
+                  // ALERTE INFRASTRUCTURE — problème technique temporaire (rate limit, timeout)
+                  return (
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
+                      <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wide mb-1">
+                        Problème technique temporaire
+                      </p>
+                      <p className="text-sm text-amber-900 font-medium leading-relaxed">
+                        Le moteur de dispatch a temporairement atteint une limite d'appels API. Le prochain cycle reprendra automatiquement. Aucune action métier requise — les courses ne sont pas affectées.
+                      </p>
+                    </div>
+                  );
+                }
+
+                if (isFatalAlert) {
+                  // ALERTE ERREUR FATALE — intervention technique requise
+                  return (
+                    <div className="bg-red-50 border border-red-200 rounded-xl p-3">
+                      <p className="text-[10px] font-bold text-red-700 uppercase tracking-wide mb-1">
+                        Intervention technique requise
+                      </p>
+                      <p className="text-sm text-red-900 font-medium leading-relaxed">
+                        Le moteur de dispatch automatique a rencontré une erreur persistante. Vérifiez les logs et relancez le dispatch si nécessaire.
+                      </p>
+                    </div>
+                  );
+                }
+
+                // ALERTE REDISPATCH — course précise avec livreur ayant annulé
+                if (hasCourseId) {
+                  return (
+                    <div className="bg-red-50 border border-red-200 rounded-xl p-3">
+                      <p className="text-[10px] font-bold text-red-700 uppercase tracking-wide mb-1">
+                        Action requise — Redispatch
+                      </p>
+                      <p className="text-sm text-red-900 font-medium leading-relaxed">
+                        Cette course est passée en Redispatch. Elle ne sera pas reproposée automatiquement. Relancez manuellement la recherche d'un livreur si nécessaire (le livreur ayant annulé reste exclu).
+                      </p>
+                    </div>
+                  );
+                }
+
+                // Alerte générique sans course_id — pas d'action métier spécifique
+                return null;
+              })()}
 
               {alert.course_id && (
                 <div className="bg-gray-50 rounded-xl p-3 text-xs text-gray-500">

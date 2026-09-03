@@ -37,6 +37,10 @@
       "type": "string",
       "description": "ID du client si user_type='client'"
     },
+    "device_id": {
+      "type": "string",
+      "description": "Identifiant stable d'installation SILGAPP (UUID g\u00e9n\u00e9r\u00e9 c\u00f4t\u00e9 natif, conserv\u00e9 en SharedPreferences). Permet de distinguer plusieurs appareils du m\u00eame utilisateur. Un seul token actif par (user_email, device_id). Vide pour les anciens tokens pr\u00e9-migration \u2014 ne jamais inventer."
+    },
     "actif": {
       "type": "boolean",
       "default": true,

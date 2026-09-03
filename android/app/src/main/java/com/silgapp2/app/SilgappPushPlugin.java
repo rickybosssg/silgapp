@@ -158,11 +158,76 @@ public class SilgappPushPlugin extends Plugin {
                 return;
             }
 
+            String token = task.getResult();
+
+            // ── Marquer le token comme envoyé (anti-doublon onNewToken) ──
+            SilgappFirebaseMessagingService.markTokenSent(getContext(), token);
+
             JSObject result = new JSObject();
-            result.put("token", task.getResult());
+            result.put("token", token);
             result.put("platform", "android");
             call.resolve(result);
         });
+    }
+
+    /**
+     * Lit un token FCM en attente (généré par onNewToken) SANS le supprimer.
+     *
+     * Le token reste en SharedPreferences jusqu'à confirmation backend.
+     * Le frontend appelle confirmPendingFcmToken() après succès de enregistrerTokenPush.
+     *
+     * @return { hasPending, token, platform } ou { hasPending: false }
+     */
+    @PluginMethod
+    public void consumePendingFcmToken(PluginCall call) {
+        String token = SilgappFirebaseMessagingService.consumePendingToken(getContext());
+        JSObject result = new JSObject();
+        if (token != null && !token.isEmpty()) {
+            result.put("hasPending", true);
+            result.put("token", token);
+            result.put("platform", "android");
+        } else {
+            result.put("hasPending", false);
+        }
+        call.resolve(result);
+    }
+
+    /**
+     * Confirme qu'un token FCM a été enregistré côté backend.
+     *
+     * Supprime PENDING_FCM_TOKEN UNIQUEMENT si le token correspond.
+     * À appeler par le frontend après succès réel de enregistrerTokenPush.
+     *
+     * @param token Le token qui a été enregistré avec succès
+     */
+    @PluginMethod
+    public void confirmPendingFcmToken(PluginCall call) {
+        String token = call.getString("token", "");
+        if (token == null || token.isEmpty()) {
+            call.reject("token requis");
+            return;
+        }
+        SilgappFirebaseMessagingService.confirmPendingTokenSent(getContext(), token);
+        JSObject result = new JSObject();
+        result.put("confirmed", true);
+        call.resolve(result);
+    }
+
+    /**
+     * Retourne l'identifiant d'installation SILGAPP (UUID stable).
+     *
+     * Généré une seule fois au premier appel, conservé en SharedPreferences.
+     * Survit aux redémarrages et mises à jour d'APK.
+     * Le frontend l'inclut dans enregistrerTokenPush pour identifier l'appareil.
+     *
+     * @return { device_id: string } ou { device_id: null }
+     */
+    @PluginMethod
+    public void getDeviceId(PluginCall call) {
+        String deviceId = SilgappFirebaseMessagingService.getOrCreateDeviceId(getContext());
+        JSObject result = new JSObject();
+        result.put("device_id", deviceId != null ? deviceId : "");
+        call.resolve(result);
     }
 
     @PluginMethod

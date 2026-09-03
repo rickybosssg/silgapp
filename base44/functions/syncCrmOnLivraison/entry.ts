@@ -4,12 +4,23 @@ import { recalculateStatsForCourseContacts } from "../../shared/crmEngine.ts";
 export default async function(req: Request): Promise<Response> {
   try {
     const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
-    if (!user) return Response.json({ error: 'Non autorisé' }, { status: 401 });
-    if (user.role !== 'admin') return Response.json({ error: 'Admin requis' }, { status: 403 });
-
     const body = await req.json();
     const { course_id, course_data, country_code } = body || {};
+
+    if (!course_data || !country_code) {
+      return Response.json({ error: 'course_data et country_code requis' }, { status: 400 });
+    }
+
+    // Auth : skip quand appelé depuis le courseEventOrchestrator (service role)
+    // L'orchestrator est déclenché par les événements entity CourseExterne.
+    try {
+      const user = await base44.auth.me();
+      if (user && user.role !== 'admin') {
+        return Response.json({ error: 'Admin requis' }, { status: 403 });
+      }
+    } catch {
+      // Appel depuis l'orchestrator (service role) — pas de contexte utilisateur
+    }
 
     if (!course_data || !country_code) {
       return Response.json({ error: 'course_data et country_code requis' }, { status: 400 });

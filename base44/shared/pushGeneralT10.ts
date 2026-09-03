@@ -56,100 +56,250 @@ const LOG_PUSH_GENERAL_T10_NO_RECIPIENT = 'PUSH_GENERAL_T10_NO_RECIPIENT';
 const LOG_PUSH_GENERAL_T10_ALREADY_HANDLED = 'PUSH_GENERAL_T10_ALREADY_HANDLED';
 
 /**
+ * Génère un identifiant unique par invocation (owner token du lock).
+ */
+function generateInvocationId() {
+  return `inv_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+/**
  * Tente d'acquérir un verrou anti-concurrence pour un pays donné.
- * Compare-and-swap atomique sur AppConfig : si le lock existant est plus
- * récent que TTL_MS, on ne l'acquiert pas (un autre watchdog le détient).
  *
- * @returns true si le lock est acquis, false sinon.
+ * FORMAT DU LOCK (JSON stringifié dans AppConfig.valeur) :
+ *   { owner: invocation_id, acquired_at: ms, expires_at: ms }
+ *
+ * Le lock est expiré si now >= expires_at. Un lock expiré est récupérable.
+ * Le compare-and-swap utilise updateMany avec filtre sur l'ancienne valeur exacte.
+ *
+ * BUG HISTORIQUE CORRIGÉ : le SDK Base44 retourne { updated: N }, pas
+ * { modified_count: N }. L'ancien code lisait result.modified_count (toujours
+ * undefined) → le CAS échouait silencieusement à chaque tick après le 1er push.
+ *
+ * @returns { acquired: boolean, invocationId: string } — acquired=true si le lock est pris.
  */
 async function acquireCountryLock(base44, countryCode, ttlSec = DEFAULT_LOCK_TTL_SEC) {
   const lockKey = `${LOCK_APPCONFIG_PREFIX}${countryCode}`;
   const now = Date.now();
   const ttlMs = ttlSec * 1000;
+  const invocationId = generateInvocationId();
 
   try {
-    // ── APPROCHE COMPARE-AND-SWAP (semi-atomique) ──
-    // Base44 ne supporte pas les transactions ACID ni les contraintes UNIQUE.
-    // On utilise updateMany avec un filtre conditionnel sur l'ancienne valeur :
-    // la BDD garantit que le filtre est évalué au moment de l'update.
-    //
-    // 1. Tenter updateMany({ cle, valeur: oldValue }, { $set: { valeur: now } })
-    //    → Si 1 record modifié, le lock est acquis.
-    //    → Si 0 record modifié, soit le lock est pris, soit le record n'existe pas.
-    //
-    // 2. Si 0 modifié, vérifier si un lock valide existe (lecture).
-    //    → Si lock valide → return false (un autre watchdog le détient).
-    //    → Si aucun record → créer (race possible ici, mais très improbable
-    //      car les watchdogs sont décalés de 2.5 min).
-    //
-    // LIMITATION : Le cas "aucun record + create" n'est PAS atomique.
-    // Deux watchdogs pourraient créer 2 records de lock simultanément.
-    // En pratique, le décalage de 2.5 min entre automations rend ce cas extrêmement
-    // improbable. Le cooldown par pays (15 min) est un second filet de sécurité.
-
-    // Étape 1 : Tenter un compare-and-swap sur un lock expiré (valeur ancienne)
+    // Étape 1 : Lire le lock existant
     const existing = await base44.asServiceRole.entities.AppConfig.filter({ cle: lockKey });
     const current = existing?.[0];
 
+    // Logging avant tentative (persistant — base44 disponible)
+    logLockAttempt(base44, {
+      country_code: countryCode,
+      lock_key: lockKey,
+      invocation_id: invocationId,
+      existing_value: current?.valeur || 'NONE',
+      existing_id: current?.id || '',
+      now_ms: now,
+      ttl_ms: ttlMs,
+    });
+
     if (current) {
-      const lockTs = current.valeur ? parseInt(current.valeur, 10) : 0;
-      const isExpired = !lockTs || (now - lockTs) >= ttlMs;
+      // Parser le lock existant
+      let lockData = null;
+      try {
+        lockData = current.valeur ? JSON.parse(current.valeur) : null;
+      } catch {
+        // Ancien format (timestamp brut) — backward compatible
+        const oldTs = current.valeur ? parseInt(current.valeur, 10) : 0;
+        if (oldTs > 0) {
+          lockData = { owner: 'legacy', acquired_at: oldTs, expires_at: oldTs + ttlMs };
+        }
+      }
+
+      const expiresAt = lockData?.expires_at || 0;
+      const isExpired = !expiresAt || now >= expiresAt;
+      const ageMs = lockData?.acquired_at ? now - lockData.acquired_at : 0;
+      const existingOwner = lockData?.owner || 'unknown';
 
       if (!isExpired) {
         // Lock encore valide — un autre watchdog le détient
-        return false;
+        logLockRejected(base44, {
+          country_code: countryCode,
+          lock_key: lockKey,
+          invocation_id: invocationId,
+          reason: 'lock_active',
+          existing_owner: existingOwner,
+          existing_timestamp: lockData?.acquired_at || 0,
+          age_ms: ageMs,
+          ttl_ms: ttlMs,
+        });
+        return { acquired: false, invocationId };
       }
 
       // Lock expiré — compare-and-swap atomique via updateMany conditionnel
+      const newLockValue = JSON.stringify({
+        owner: invocationId,
+        acquired_at: now,
+        expires_at: now + ttlMs,
+      });
+
       const result = await base44.asServiceRole.entities.AppConfig.updateMany(
         { cle: lockKey, valeur: current.valeur },  // filtre : ancienne valeur exacte
-        { $set: { valeur: String(now) } }
+        { $set: { valeur: newLockValue } }
       );
 
-      // Si au moins 1 record modifié, on a acquis le lock atomiquement
-      if (result && result.modified_count > 0) {
-        return true;
+      // BUG FIX : le SDK retourne { updated: N }, pas { modified_count: N }
+      if (result && result.updated > 0) {
+        logLockAcquired(base44, {
+          country_code: countryCode,
+          lock_key: lockKey,
+          invocation_id: invocationId,
+          acquired_at: now,
+          expires_at: now + ttlMs,
+          previous_owner: existingOwner,
+        });
+        return { acquired: true, invocationId };
       }
 
       // 0 modifié → un autre watchdog vient de le prendre entre notre lecture et notre update
-      return false;
+      logLockRejected(base44, {
+        country_code: countryCode,
+        lock_key: lockKey,
+        invocation_id: invocationId,
+        reason: 'cas_race_condition',
+        existing_owner: existingOwner,
+        existing_timestamp: lockData?.acquired_at || 0,
+        age_ms: ageMs,
+        ttl_ms: ttlMs,
+      });
+      return { acquired: false, invocationId };
     }
 
     // Aucun record de lock — création
-    // ⚠️ LIMITATION : cette création n'est PAS atomique. Deux watchdogs pourraient
-    // créer 2 records simultanément. Le cooldown par pays (15 min) mitige ce risque.
+    const newLockValue = JSON.stringify({
+      owner: invocationId,
+      acquired_at: now,
+      expires_at: now + ttlMs,
+    });
+
     try {
       await base44.asServiceRole.entities.AppConfig.create({
         cle: lockKey,
-        valeur: String(now),
+        valeur: newLockValue,
       });
-      return true;
+      logLockAcquired(base44, {
+        country_code: countryCode,
+        lock_key: lockKey,
+        invocation_id: invocationId,
+        acquired_at: now,
+        expires_at: now + ttlMs,
+        previous_owner: 'none',
+      });
+      return { acquired: true, invocationId };
     } catch (createErr) {
       // Si la création échoue (ex: race condition), un autre watchdog a probablement créé le lock
-      return false;
+      logLockRejected(base44, {
+        country_code: countryCode,
+        lock_key: lockKey,
+        invocation_id: invocationId,
+        reason: 'create_race_condition',
+        existing_owner: 'unknown',
+        existing_timestamp: 0,
+        age_ms: 0,
+        ttl_ms: ttlMs,
+      });
+      return { acquired: false, invocationId };
     }
   } catch (err) {
     console.error(`${LOG_PREFIX} Erreur acquireCountryLock(${countryCode}):`, err?.message || String(err));
-    // En cas d'erreur, on NE prend pas le risque d'envoyer un doublon
-    return false;
+    logLockRejected(base44, {
+      country_code: countryCode,
+      lock_key: lockKey,
+      invocation_id: invocationId,
+      reason: `exception:${err?.message || 'unknown'}`,
+      existing_owner: 'unknown',
+      existing_timestamp: 0,
+      age_ms: 0,
+      ttl_ms: ttlMs,
+    });
+    return { acquired: false, invocationId };
   }
 }
 
 /**
- * Relâche le verrou d'un pays (optionnel — le TTL suffit, mais on nettoie).
+ * Relâche le verrou d'un pays — OWNER-SAFE.
+ * Ne supprime le lock QUE si owner === invocationId.
+ * Une invocation expirée ne peut PAS libérer le lock d'une nouvelle invocation.
  */
-async function releaseCountryLock(base44, countryCode) {
+async function releaseCountryLock(base44, countryCode, invocationId) {
   const lockKey = `${LOCK_APPCONFIG_PREFIX}${countryCode}`;
   try {
     const existing = await base44.asServiceRole.entities.AppConfig.filter({ cle: lockKey });
-    if (existing?.[0]) {
-      await base44.asServiceRole.entities.AppConfig.update(existing[0].id, {
-        valeur: '0', // libéré
-      });
+    if (!existing?.[0]) return;
+
+    // Parser le lock pour vérifier l'owner
+    let lockData = null;
+    try {
+      lockData = existing[0].valeur ? JSON.parse(existing[0].valeur) : null;
+    } catch {
+      // Ancien format (timestamp brut) — libérer sans vérification owner
     }
-  } catch {
+
+    // Owner-safe : ne libérer QUE si on est le propriétaire
+    // (ou si le lock est dans l'ancien format = pas d'owner)
+    if (lockData && lockData.owner && lockData.owner !== invocationId) {
+      console.log(`${LOG_PREFIX} releaseCountryLock(${countryCode}): SKIP — owner mismatch (lock=${lockData.owner}, invocation=${invocationId})`);
+      return;
+    }
+
+    const releasedValue = JSON.stringify({
+      owner: 'released',
+      acquired_at: 0,
+      expires_at: 0,
+    });
+
+    await base44.asServiceRole.entities.AppConfig.update(existing[0].id, {
+      valeur: releasedValue,
+    });
+  } catch (err) {
+    console.error(`${LOG_PREFIX} Erreur releaseCountryLock(${countryCode}):`, err?.message || String(err));
     // Non bloquant — le TTL expirera de lui-même
   }
+}
+
+/**
+ * Journalise une tentative de lock (avant acquisition).
+ */
+function logLockAttempt(base44, data) {
+  console.log(`${LOG_PREFIX} LOCK_ATTEMPT`, data);
+  journaliserDispatch(base44, {
+    evenement: 'PUSH_GENERAL_T10_LOCK_ATTEMPT',
+    raison_passage: `country:${data.country_code} | lock:${data.lock_key} | inv:${data.invocation_id} | existing:${data.existing_value.substring(0, 80)} | age_ms:${data.now_ms - (parseInt(data.existing_value, 10) || 0)} | ttl_ms:${data.ttl_ms}`,
+    country_code: data.country_code || '',
+    total_candidats: 0,
+  });
+}
+
+/**
+ * Journalise une acquisition réussie de lock.
+ */
+function logLockAcquired(base44, data) {
+  console.log(`${LOG_PREFIX} LOCK_ACQUIRED`, data);
+  journaliserDispatch(base44, {
+    evenement: 'PUSH_GENERAL_T10_LOCK_ACQUIRED',
+    raison_passage: `country:${data.country_code} | lock:${data.lock_key} | inv:${data.invocation_id} | acquired_at:${data.acquired_at} | expires_at:${data.expires_at} | prev_owner:${data.previous_owner}`,
+    country_code: data.country_code || '',
+    total_candidats: 0,
+  });
+}
+
+/**
+ * Journalise un refus de lock (échec d'acquisition).
+ */
+function logLockRejected(base44, data) {
+  console.log(`${LOG_PREFIX} LOCK_REJECTED`, data);
+  journaliserDispatch(base44, {
+    evenement: 'PUSH_GENERAL_T10_LOCK_REJECTED',
+    raison_passage: `country:${data.country_code} | lock:${data.lock_key} | inv:${data.invocation_id} | reason:${data.reason} | existing_owner:${data.existing_owner} | existing_ts:${data.existing_timestamp} | age_ms:${data.age_ms} | ttl_ms:${data.ttl_ms}`,
+    country_code: data.country_code || '',
+    total_candidats: 0,
+  });
 }
 
 /**
@@ -442,8 +592,8 @@ export async function gererPushGeneralT10(base44, delayMin = DEFAULT_T10_DELAY_M
     // ── 4. Pour chaque pays ──
     for (const [countryCode, courses] of coursesParPays) {
       // ── 4a. Acquérir le lock anti-concurrence ──
-      const lockAcquired = await acquireCountryLock(base44, countryCode);
-      if (!lockAcquired) {
+      const lockResult = await acquireCountryLock(base44, countryCode);
+      if (!lockResult.acquired) {
         logEvent(LOG_PUSH_GENERAL_T10_ALREADY_HANDLED, {
           country_code: countryCode,
           step: 'lock_failed',
@@ -456,6 +606,7 @@ export async function gererPushGeneralT10(base44, delayMin = DEFAULT_T10_DELAY_M
         continue;
       }
 
+      const invocationId = lockResult.invocationId;
       logEvent('PUSH_GENERAL_T10_LOCK_ACQUIRED', {
         country_code: countryCode,
         step: 'lock_acquired',
@@ -655,8 +806,8 @@ export async function gererPushGeneralT10(base44, delayMin = DEFAULT_T10_DELAY_M
         });
 
       } finally {
-        // ── 4j. Relâcher le lock ──
-        await releaseCountryLock(base44, countryCode);
+        // ── 4j. Relâcher le lock (owner-safe) ──
+        await releaseCountryLock(base44, countryCode, invocationId);
       }
     }
 
