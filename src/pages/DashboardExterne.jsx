@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { MapPin, Package, Truck, Clock, CheckCircle2, XCircle, TrendingUp, ArrowLeft, Globe, Users, Zap, ChevronRight, Bell, Tag } from "lucide-react";
+import { MapPin, Package, Truck, Clock, CheckCircle2, XCircle, TrendingUp, ArrowLeft, Globe, Users, Zap, ChevronRight, Bell, Tag, Smartphone, UserPlus, UserX } from "lucide-react";
 import { format, isToday } from "date-fns";
 import { fr } from "date-fns/locale";
 import { usePaysActifs } from "@/components/international/CountrySelector.jsx";
@@ -273,7 +273,12 @@ export default function DashboardExterne() {
 
         {/* ── KPI CARDS ───────────────────────────────────── */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-2 lg:gap-3">
-          <KpiCard label="Clients" value={compteursClients.total} icon={Users} color="bg-primary" onClick={() => setStatModal({ type: "clients", data: clients })} />
+          <KpiCard label="Clients uniques" value={compteursClients.uniques} icon={Users} color="bg-primary" onClick={() => setStatModal({ type: "clients", data: clients, initialFilter: "tous" })} />
+          <KpiCard label="App" value={compteursClients.app} icon={Smartphone} color="bg-indigo-500" onClick={() => setStatModal({ type: "clients", data: clients, initialFilter: "app" })} />
+          <KpiCard label="CRM" value={compteursClients.crm} icon={UserPlus} color="bg-purple-500" onClick={() => setStatModal({ type: "clients", data: clients, initialFilter: "crm" })} />
+          <KpiCard label="Avec course" value={compteursClients.avecCourse} icon={Package} color="bg-blue-500" onClick={() => setStatModal({ type: "clients", data: clients, initialFilter: "avec_course" })} />
+          <KpiCard label="Livrés" value={compteursClients.livres} icon={CheckCircle2} color="bg-success" onClick={() => setStatModal({ type: "clients", data: clients, initialFilter: "livres" })} />
+          <KpiCard label="Sans course" value={compteursClients.sansCourse} icon={UserX} color="bg-gray-400" onClick={() => setStatModal({ type: "clients", data: clients, initialFilter: "sans_course" })} />
           <KpiCard label="Courses" value={stats.total} icon={Package} color="bg-primary-dark" />
           <KpiCard label="En cours" value={stats.enCours} icon={Clock} color="bg-warning" onClick={() => setStatModal({ type: "en_traitement", data: coursesEnTraitement })} />
           <KpiCard label="Livrées" value={stats.livrees} icon={CheckCircle2} color="bg-success" onClick={() => setStatModal({ type: "livrees", data: coursesTerminees.filter(c => c.statut === "livree") })} />
