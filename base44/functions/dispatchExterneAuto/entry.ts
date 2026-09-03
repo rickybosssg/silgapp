@@ -88,11 +88,17 @@ function isTransientInfrastructureError(error: any): boolean {
 async function withAuthRetry(req: Request, stepName: string, fn: (base44: any) => Promise<any>) {
   let lastError: any = null;
   let infraRetried = false;
+  let hadInfraError = false;
 
   for (let attempt = 0; attempt <= MAX_AUTH_RETRIES; attempt++) {
     try {
       const base44 = createClientFromRequest(req);
-      return await fn(base44);
+      const result = await fn(base44);
+      // ✅ STEP_RECOVERED : si on a eu une erreur infra avant et que la retry a réussi
+      if (hadInfraError) {
+        console.log(`[DISPATCH] STEP_RECOVERED=${stepName} — retry réussi après erreur infrastructure transitoire`);
+      }
+      return result;
     } catch (error: any) {
       lastError = error;
       const msg = error?.message || String(error);
@@ -105,6 +111,7 @@ async function withAuthRetry(req: Request, stepName: string, fn: (base44: any) =
       // UNE seule retry avec backoff 1000ms
       if (isInfra && !infraRetried && attempt < MAX_AUTH_RETRIES) {
         infraRetried = true;
+        hadInfraError = true;
         await new Promise(r => setTimeout(r, INFRA_RETRY_DELAY_MS));
         console.log(`[DISPATCH] 🔄 Retrying ${stepName} after infra error (rate limit/timeout) — attempt ${attempt + 2}/${MAX_AUTH_RETRIES + 1}`);
         continue;
@@ -1073,21 +1080,27 @@ Deno.serve(async (req) => {
 
     return Response.json({ error: 'Action inconnue' }, { status: 400 });
   } catch (error) {
-    const isRateLimit = error.message?.toLowerCase?.().includes('rate limit') || error.message?.toLowerCase?.().includes('rate_limit') || error.message?.toLowerCase?.().includes('traffic volume');
+    const isRateLimit = isTransientInfrastructureError(error);
     const isAuthError = error.message?.includes(AUTH_ERROR_SIGNATURE);
-    // 🛡️ Les erreurs auth transitoires ont déjà été retentées par withAuthRetry (2 retries).
-    // Si on arrive ici avec une erreur auth, cela signifie que les retries ont échoué
-    // → c'est une vraie erreur persistante, l'alerte reste justifiée.
-    console.error(`[DISPATCH] STEP_FAILED=dispatchExterneAuto.catch Erreur fatale${isRateLimit ? ' (RATE_LIMIT)' : ''}${isAuthError ? ' (AUTH_EXHAUSTED)' : ''}:`, error.message);
+    // 🛡️ Les erreurs auth et infra transitoires ont déjà été retentées par withAuthRetry.
+    // Si on arrive ici, toutes les tentatives autorisées ont échoué.
+    // → L'alerte n'est créée QUE si tous les retries ont échoué (pas de recovery).
+    console.error(`[DISPATCH] STEP_FAILED=dispatchExterneAuto.catch Erreur fatale${isRateLimit ? ' (INFRA_EXHAUSTED)' : ''}${isAuthError ? ' (AUTH_EXHAUSTED)' : ''}:`, error.message);
     try {
       const base44 = createClientFromRequest(req);
-      // 🛡️ Anti-spam : ne créer une alerte que si aucune alerte récente (< 30 min) n'existe
-      // Délai augmenté à 30 min pour les rate limits (transitoires) vs 5 min pour les autres erreurs
+      // 🛡️ Anti-spam atomique : utilise une deduplication_key pour empêcher
+      // la race condition où 2 invocations concurrentes créent chacune une alerte.
+      // La deduplication_key bloque le 2e create si le 1er est déjà en vol.
       const alertWindow = isRateLimit ? 60 * 60 * 1000 : 5 * 60 * 1000;
-      const recentAlerts = await base44.asServiceRole.entities.Notification.filter({
-        type: 'alerte_critique_dispatch', lue: false,
+      const dedupKey = isRateLimit
+        ? `ALERT_INFRA_${new Date().toISOString().slice(0, 13)}` // Heure précise — 1 alerte/heure max
+        : `ALERT_FATAL_${new Date().toISOString().slice(0, 16)}`; // Minute précise — 1 alerte/5min max
+
+      const existingAlert = await base44.asServiceRole.entities.Notification.filter({
+        deduplication_key: dedupKey, lue: false,
       }, '-created_date', 1);
-      const hasRecent = recentAlerts?.[0] && (Date.now() - new Date(recentAlerts[0].created_date).getTime()) < alertWindow;
+
+      const hasRecent = existingAlert?.[0] && (Date.now() - new Date(existingAlert[0].created_date).getTime()) < alertWindow;
       if (!hasRecent) {
         const msg = isRateLimit
           ? `Le moteur de dispatch a atteint la limite d'appels API (rate limit). Cela est transitoire — le prochain tick reprendra automatiquement. Si le problème persiste, contactez le support.`
@@ -1097,7 +1110,9 @@ Deno.serve(async (req) => {
         await base44.asServiceRole.entities.Notification.create({
           titre: isRateLimit ? '⚠️ Surcharge API temporaire — dispatch' : '🚨 Erreur fatale — dispatch automatique',
           message: msg,
-          type: 'alerte_critique_dispatch', lue: false,
+          type: 'alerte_critique_dispatch',
+          lue: false,
+          deduplication_key: dedupKey,
         });
       }
     } catch (_) {}
