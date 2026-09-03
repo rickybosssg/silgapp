@@ -361,7 +361,7 @@ export async function attributeConversions(base44: any): Promise<{ attributed: n
       // Skip si hors fenêtre (campagne expirée)
       if ((now - referenceTime) > windowMs) continue;
 
-      // ── Matching téléphone normalisé (prioritaire) + fallback brut ──
+      // ── Matching HYBRIDE : téléphone (priorité) + fallback user_email ──
       let courses: any[] = [];
       const normalizedPhone = normalizePhone(r.client_telephone, r.country_code || undefined);
       if (normalizedPhone) {
@@ -373,6 +373,13 @@ export async function attributeConversions(base44: any): Promise<{ attributed: n
       if (courses.length === 0 && r.client_telephone) {
         courses = await base44.asServiceRole.entities.CourseExterne.filter(
           { client_telephone: r.client_telephone },
+          "-created_date", 10
+        ).catch(() => []);
+      }
+      // Fallback HYBRIDE : recherche par user_email (clients App sans téléphone)
+      if (courses.length === 0 && r.user_email) {
+        courses = await base44.asServiceRole.entities.CourseExterne.filter(
+          { client_user_email: r.user_email },
           "-created_date", 10
         ).catch(() => []);
       }
