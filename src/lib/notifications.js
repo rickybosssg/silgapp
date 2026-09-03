@@ -697,6 +697,30 @@ async function ensureNativeRegistrationListeners() {
     savePushDebug("registration-error", error);
     console.error("[registerPushToken] Erreur registration FCM:", error);
   });
+
+  // ── Événement natif : Firebase a généré/renouvelé un token (onNewToken) ──
+  // Le token a déjà été stocké en SharedPreferences par le service natif.
+  // Ici on tente de l'enregistrer immédiatement si un utilisateur est authentifié.
+  try {
+    await SilgappPush.addListener?.("silgapp:fcm-token-refreshed", (event) => {
+      const token = event?.token;
+      if (!token) return;
+      savePushDebug("fcm-token-refreshed", {
+        tokenPrefix: token.slice(0, 24),
+        tokenLength: token.length,
+        platform: event?.platform,
+      });
+      // Le token est déjà en attente dans SharedPreferences.
+      // registerPushToken le consommera au prochain cycle (foreground ou login).
+      // On déclenche une tentative d'enregistrement si un user est déjà connu.
+      if (lastNativeToken !== token) {
+        lastNativeToken = token;
+        lastNativeTokenPlatform = event?.platform || "android";
+      }
+    });
+  } catch (err) {
+    console.warn("[Notifications] silgapp:fcm-token-refreshed listener failed:", err?.message);
+  }
 }
 
 export async function registerPushToken(livreurId = null, currentUser = null) {
@@ -704,6 +728,51 @@ export async function registerPushToken(livreurId = null, currentUser = null) {
   try {
     const env = detectEnvironment();
     savePushDebug("register-start", { env, livreurId, user_type: currentUser?.user_type });
+
+    // ── Consommer un token FCM en attente (généré par onNewToken avant auth) ──
+    // Si Firebase a généré un token pendant que l'utilisateur n'était pas encore
+    // authentifié, onNewToken() l'a conservé dans SharedPreferences.
+    // On le récupère ici pour l'associer au BON utilisateur.
+    if (env.isNative && env.os === "android") {
+      try {
+        const pendingResult = await withNativeTimeout(
+          SilgappPush.consumePendingFcmToken(),
+          3000,
+          "SilgappPush.consumePendingFcmToken"
+        );
+        if (pendingResult?.hasPending && pendingResult?.token) {
+          savePushDebug("pending-fcm-token-consumed", {
+            tokenPrefix: pendingResult.token.slice(0, 24),
+            tokenLength: pendingResult.token.length,
+            platform: pendingResult.platform,
+          });
+
+          // Si on a un utilisateur authentifié, enregistrer le token immédiatement
+          if (currentUser?.email) {
+            try {
+              await persistPushToken({
+                token: pendingResult.token,
+                platform: pendingResult.platform || "android",
+                livreurId,
+                clientId,
+                currentUser,
+              });
+              savePushDebug("pending-fcm-token-persisted", { user_email: currentUser.email });
+            } catch (persistError) {
+              savePushDebug("pending-fcm-token-persist-failed", { error: persistError?.message });
+            }
+          } else {
+            // Pas encore authentifié → le token reste en mémoire JS pour ce cycle
+            // Il sera ré-enregistré au prochain registerPushToken après login
+            lastNativeToken = pendingResult.token;
+            lastNativeTokenPlatform = pendingResult.platform || "android";
+            savePushDebug("pending-fcm-token-deferred", { reason: "no_authenticated_user" });
+          }
+        }
+      } catch (pendingError) {
+        savePushDebug("pending-fcm-token-check-error", { error: pendingError?.message });
+      }
+    }
 
     if (env.isNative && (env.os === "android" || env.os === "ios")) {
       const PushNotifications = getCapacitorPlugin("PushNotifications", "@capacitor/push-notifications");

@@ -158,11 +158,40 @@ public class SilgappPushPlugin extends Plugin {
                 return;
             }
 
+            String token = task.getResult();
+
+            // ── Marquer le token comme envoyé (anti-doublon onNewToken) ──
+            SilgappFirebaseMessagingService.markTokenSent(getContext(), token);
+
             JSObject result = new JSObject();
-            result.put("token", task.getResult());
+            result.put("token", token);
             result.put("platform", "android");
             call.resolve(result);
         });
+    }
+
+    /**
+     * Récupère un token FCM qui aurait été généré par Firebase (via onNewToken)
+     * avant que l'utilisateur ne soit authentifié.
+     *
+     * Le frontend appelle cette méthode au démarrage et après login.
+     * Si un token est en attente, il est retourné puis consommé (supprimé du stockage natif).
+     * Le frontend l'enregistre ensuite via enregistrerTokenPush avec le BON user_email.
+     *
+     * @return { token, platform } ou { hasPending: false }
+     */
+    @PluginMethod
+    public void consumePendingFcmToken(PluginCall call) {
+        String token = SilgappFirebaseMessagingService.consumePendingToken(getContext());
+        JSObject result = new JSObject();
+        if (token != null && !token.isEmpty()) {
+            result.put("hasPending", true);
+            result.put("token", token);
+            result.put("platform", "android");
+        } else {
+            result.put("hasPending", false);
+        }
+        call.resolve(result);
     }
 
     @PluginMethod

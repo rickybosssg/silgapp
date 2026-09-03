@@ -7,6 +7,7 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.res.AssetFileDescriptor;
 import android.media.AudioAttributes;
@@ -43,6 +44,14 @@ public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
     private static final long DEFAULT_DURATION_MS = 300000L;
     private static final long DEFAULT_INTERVAL_MS = 5000L;
 
+    // ── Stockage du token FCM en attente d'authentification ──
+    // SharedPreferences isolé pour SILGAPP (sécurisé sur l'appareil, privé).
+    // Clé = PENDING_FCM_TOKEN. Valeur = token Firebase brut.
+    // Vidé dès que le frontend (registerPushToken) l'a consommé et enregistré côté backend.
+    private static final String PREFS_NAME = "silgapp_fcm_prefs";
+    private static final String KEY_PENDING_TOKEN = "PENDING_FCM_TOKEN";
+    private static final String KEY_LAST_SENT_TOKEN = "LAST_SENT_FCM_TOKEN";
+
     private static Handler alertHandler;
     private static Runnable alertRunnable;
     private static long alertEndAtMs = 0L;
@@ -55,6 +64,110 @@ public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
     private static String lastStartedAlertKey = "";
     private static long lastStartedAlertAtMs = 0L;
     private static final long ALERT_RESTART_GUARD_MS = 30000L;
+
+    /**
+     * Appelé par Firebase quand un nouveau token est généré ou renouvelé.
+     *
+     * Cas couverts :
+     *   - Installation propre → nouveau token
+     *   - Mise à jour de l'APK → token potentiellement renouvelé
+     *   - Réinstallation → nouveau token
+     *   - Rotation automatique par Firebase
+     *   - Effacement des données de l'app
+     *
+     * Comportement :
+     *   1. Capture le token brut Firebase.
+     *   2. Le stocke dans SharedPreferences (PENDING_FCM_TOKEN).
+     *   3. Notifie le plugin Capacitor (SilgappPushPlugin) si l'app est active,
+     *      pour que le frontend récupère et enregistre le token immédiatement.
+     *   4. Si l'app n'est pas encore chargée, le token reste en attente ;
+     *      le frontend le consommera au prochain registerPushToken().
+     *
+     * IMPORTANT : onNewToken() peut être appelé AVANT que l'utilisateur soit authentifié.
+     * On n'associe JAMAIS le token à un compte ici. On le conserve uniquement
+     * et laisse le frontend l'associer au BON utilisateur via enregistrerTokenPush.
+     */
+    @Override
+    public void onNewToken(String token) {
+        super.onNewToken(token);
+        if (token == null || token.isEmpty()) return;
+
+        android.util.Log.i("SilgappFCM", "onNewToken appelé (prefix=" + token.substring(0, Math.min(16, token.length())) + ")");
+
+        // ── Stocker dans SharedPreferences (privé, isolé) ──
+        try {
+            SharedPreferences prefs = getApplicationContext()
+                .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+            String lastSent = prefs.getString(KEY_LAST_SENT_TOKEN, null);
+
+            // Si le token est identique au dernier déjà envoyé, ne rien faire (anti-doublon)
+            if (token.equals(lastSent)) {
+                android.util.Log.i("SilgappFCM", "onNewToken: token identique au dernier envoyé, ignoré");
+                return;
+            }
+
+            prefs.edit()
+                .putString(KEY_PENDING_TOKEN, token)
+                .apply();
+
+            android.util.Log.i("SilgappFCM", "onNewToken: token conservé en attente d'authentification");
+        } catch (Exception e) {
+            android.util.Log.e("SilgappFCM", "onNewToken: erreur stockage SharedPreferences", e);
+        }
+
+        // ── Notifier le plugin Capacitor si l'app est active ──
+        // Le frontend consommera le token via registerPushToken() au prochain cycle.
+        try {
+            SilgappPushPlugin plugin = SilgappPushPlugin.getActiveInstance();
+            if (plugin != null) {
+                JSObject eventData = new JSObject();
+                eventData.put("event", "fcm_token_refreshed");
+                eventData.put("token", token);
+                eventData.put("platform", "android");
+                new Handler(Looper.getMainLooper()).post(() -> {
+                    try {
+                        plugin.notifyListeners("silgapp:fcm-token-refreshed", eventData, false);
+                    } catch (Exception ignored) {}
+                });
+                android.util.Log.i("SilgappFCM", "onNewToken: notification plugin envoyée");
+            } else {
+                android.util.Log.i("SilgappFCM", "onNewToken: plugin non actif, token conservé pour consommation différée");
+            }
+        } catch (Exception ignored) {}
+    }
+
+    /**
+     * Récupère le token FCM en attente (consommé par le frontend via le plugin).
+     * Retourne null si aucun token en attente.
+     */
+    public static String consumePendingToken(Context context) {
+        if (context == null) return null;
+        try {
+            SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+            String token = prefs.getString(KEY_PENDING_TOKEN, null);
+            if (token != null && !token.isEmpty()) {
+                prefs.edit().remove(KEY_PENDING_TOKEN).apply();
+                android.util.Log.i("SilgappFCM", "consumePendingToken: token consommé par le frontend");
+            }
+            return token;
+        } catch (Exception e) {
+            android.util.Log.e("SilgappFCM", "consumePendingToken: erreur", e);
+            return null;
+        }
+    }
+
+    /**
+     * Marque un token comme ayant été envoyé au backend (anti-doublon).
+     */
+    public static void markTokenSent(Context context, String token) {
+        if (context == null || token == null || token.isEmpty()) return;
+        try {
+            SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+            prefs.edit()
+                .putString(KEY_LAST_SENT_TOKEN, token)
+                .apply();
+        } catch (Exception ignored) {}
+    }
 
     @Override
     public void onMessageReceived(RemoteMessage remoteMessage) {
