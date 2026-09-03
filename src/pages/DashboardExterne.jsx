@@ -86,6 +86,19 @@ export default function DashboardExterne() {
     staleTime: 45000,
   });
 
+  // ── KPI clients depuis les vraies CourseExterne (source de vérité) ──
+  // nb_courses_total n'est plus la source unique — getClientsStats interroge
+  // directement CourseExterne pour des compteurs exacts.
+  const { data: clientsStats } = useQuery({
+    queryKey: ["clients-stats", effectiveCountry || "all"],
+    queryFn: () => base44.functions.invoke('getClientsStats', { country_code: effectiveCountry }),
+    initialData: { data: { total_clients: 0, clients_uniques: 0, clients_app: 0, clients_crm: 0, jamais_commande: 0, avec_course_creee: 0, avec_course_livree: 0, course_creee_non_livree: 0 } },
+    refetchInterval: 120000,
+    staleTime: 90000,
+    enabled: !!effectiveCountry,
+  });
+  const kpiClients = clientsStats?.data || clientsStats || {};
+
   const coursesFiltrees = courses;
 
   const todayCourses = useMemo(
@@ -273,12 +286,12 @@ export default function DashboardExterne() {
 
         {/* ── KPI CARDS ───────────────────────────────────── */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-2 lg:gap-3">
-          <KpiCard label="Clients uniques" value={compteursClients.uniques} icon={Users} color="bg-primary" onClick={() => setStatModal({ type: "clients", data: clients, initialFilter: "tous" })} />
-          <KpiCard label="App" value={compteursClients.app} icon={Smartphone} color="bg-indigo-500" onClick={() => setStatModal({ type: "clients", data: clients, initialFilter: "app" })} />
-          <KpiCard label="CRM" value={compteursClients.crm} icon={UserPlus} color="bg-purple-500" onClick={() => setStatModal({ type: "clients", data: clients, initialFilter: "crm" })} />
-          <KpiCard label="Avec course" value={compteursClients.avecCourse} icon={Package} color="bg-blue-500" onClick={() => setStatModal({ type: "clients", data: clients, initialFilter: "avec_course" })} />
-          <KpiCard label="Livrés" value={compteursClients.livres} icon={CheckCircle2} color="bg-success" onClick={() => setStatModal({ type: "clients", data: clients, initialFilter: "livres" })} />
-          <KpiCard label="Sans course" value={compteursClients.sansCourse} icon={UserX} color="bg-gray-400" onClick={() => setStatModal({ type: "clients", data: clients, initialFilter: "sans_course" })} />
+          <KpiCard label="Clients uniques" value={kpiClients.clients_uniques ?? 0} icon={Users} color="bg-primary" onClick={() => setStatModal({ type: "clients", data: clients, initialFilter: "tous" })} />
+          <KpiCard label="App" value={kpiClients.clients_app ?? 0} icon={Smartphone} color="bg-indigo-500" onClick={() => setStatModal({ type: "clients", data: clients, initialFilter: "app" })} />
+          <KpiCard label="CRM" value={kpiClients.clients_crm ?? 0} icon={UserPlus} color="bg-purple-500" onClick={() => setStatModal({ type: "clients", data: clients, initialFilter: "crm" })} />
+          <KpiCard label="Avec course" value={kpiClients.avec_course_creee ?? 0} icon={Package} color="bg-blue-500" onClick={() => setStatModal({ type: "clients", data: clients, initialFilter: "avec_course" })} />
+          <KpiCard label="Livrés" value={kpiClients.avec_course_livree ?? 0} icon={CheckCircle2} color="bg-success" onClick={() => setStatModal({ type: "clients", data: clients, initialFilter: "livres" })} />
+          <KpiCard label="Sans course" value={kpiClients.jamais_commande ?? 0} icon={UserX} color="bg-gray-400" onClick={() => setStatModal({ type: "clients", data: clients, initialFilter: "sans_course" })} />
           <KpiCard label="Courses" value={stats.total} icon={Package} color="bg-primary-dark" />
           <KpiCard label="En cours" value={stats.enCours} icon={Clock} color="bg-warning" onClick={() => setStatModal({ type: "en_traitement", data: coursesEnTraitement })} />
           <KpiCard label="Livrées" value={stats.livrees} icon={CheckCircle2} color="bg-success" onClick={() => setStatModal({ type: "livrees", data: coursesTerminees.filter(c => c.statut === "livree") })} />

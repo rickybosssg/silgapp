@@ -160,6 +160,18 @@ Deno.serve(async (req) => {
       await fireInvoke('verifierEncoursLivreur', { event, data, old_data });
     }
 
+    // ── 4b. Synchronisation CRM client (si statut → livrée) ──
+    // Recalcule nb_courses_total, montant_total_depense, statut_crm, etc.
+    // pour les 3 contacts de la course (client, expéditeur, destinataire).
+    // Idempotent : peut être appelé N fois sans double-comptage.
+    if (statutChanged && newStatut === 'livree') {
+      await fireInvoke('syncCrmOnLivraison', {
+        course_id: courseId,
+        course_data: course,
+        country_code: course.country_code,
+      });
+    }
+
     // ── 5. Valider prime code promo (si statut → livrée) ──
     if (statutChanged && newStatut === 'livree') {
       await fireInvoke('validerPrimePromo', { event, data, old_data });

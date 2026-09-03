@@ -203,19 +203,58 @@ export async function upsertClientsFromCourseContacts(
   return results;
 }
 
+// ── Calcule les stats d'un client à partir d'une liste de courses LIVRÉES ──
+// Pure function — pas de requête API. Utilisée par recalculateClientStats ET le backfill bulk.
+// SEMANTIQUE : ne compte QUE les courses où le client est le DEMANDEUR (client_phone_normalized).
+// Les expéditeurs et destinataires ne sont PAS comptés comme "ayant commandé".
+export function computeClientStatsFromCourses(client: any, deliveredCourses: any[]): any {
+  const nbCourses = deliveredCourses.length;
+  const nbAdminCourses = deliveredCourses.filter((c) => c.source === "admin").length;
+  const montant = deliveredCourses.reduce(
+    (sum, c) => sum + (c.prix_final || c.prix_estimate || 0), 0
+  );
+
+  const lastCourse = deliveredCourses.length > 0
+    ? deliveredCourses.sort((a, b) => new Date(b.created_date).getTime() - new Date(a.created_date).getTime())[0]
+    : null;
+
+  const quartierCount: Record<string, number> = {};
+  for (const c of deliveredCourses) {
+    if (c.quartier_depart) quartierCount[c.quartier_depart] = (quartierCount[c.quartier_depart] || 0) + 1;
+    if (c.quartier_arrivee) quartierCount[c.quartier_arrivee] = (quartierCount[c.quartier_arrivee] || 0) + 1;
+  }
+  const quartiers = Object.entries(quartierCount)
+    .map(([quartier, count]) => ({ quartier, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10);
+
+  return {
+    nb_courses_total: nbCourses,
+    nb_courses_admin: nbAdminCourses,
+    montant_total_depense: montant,
+    derniere_course_date: lastCourse?.created_date || client.derniere_course_date,
+    dernier_quartier_depart: lastCourse?.quartier_depart || client.dernier_quartier_depart,
+    dernier_quartier_arrivee: lastCourse?.quartier_arrivee || client.dernier_quartier_arrivee,
+    quartiers_utilises: JSON.stringify(quartiers),
+  };
+}
+
 // ── Recalcule les statistiques d'un client à partir des courses LIVRÉES ──
 // Idempotent : peut être appelé N fois, le résultat est toujours le même
+// SEMANTIQUE : ne compte QUE les courses où le client est le DEMANDEUR
+// (client_phone_normalized ou client_user_email). Les expéditeurs et destinataires
+// ne sont PAS comptés comme "ayant commandé".
 export async function recalculateClientStats(base44: any, telephone_normalized: string) {
   if (!telephone_normalized || telephone_normalized.length < 8) return null;
 
   const client = await findClientByNormalizedPhone(base44, telephone_normalized);
   if (!client) return null;
 
-  // Récupère toutes les courses livrées où ce numéro apparaît
+  // Récupère les courses livrées où ce client est le DEMANDEUR
   const courses: any[] = [];
   const seenIds = new Set<string>();
 
-  // Recherche par client_phone_normalized
+  // Recherche par client_phone_normalized (le vrai demandeur)
   try {
     const r1 = await base44.asServiceRole.entities.CourseExterne.filter(
       { statut: "livree", client_phone_normalized: telephone_normalized },
@@ -226,65 +265,31 @@ export async function recalculateClientStats(base44: any, telephone_normalized: 
     }
   } catch {}
 
-  // Recherche par expediteur_phone_normalized
-  try {
-    const r2 = await base44.asServiceRole.entities.CourseExterne.filter(
-      { statut: "livree", expediteur_phone_normalized: telephone_normalized },
-      "-created_date", 500
-    );
-    for (const c of r2 || []) {
-      if (!seenIds.has(c.id)) { seenIds.add(c.id); courses.push(c); }
-    }
-  } catch {}
-
-  // Recherche par destinataire_phone_normalized
-  try {
-    const r3 = await base44.asServiceRole.entities.CourseExterne.filter(
-      { statut: "livree", destinataire_phone_normalized: telephone_normalized },
-      "-created_date", 500
-    );
-    for (const c of r3 || []) {
-      if (!seenIds.has(c.id)) { seenIds.add(c.id); courses.push(c); }
-    }
-  } catch {}
-
-  const nbCourses = courses.length;
-  const nbAdminCourses = courses.filter((c) => c.source === "admin").length;
-  const montant = courses.reduce(
-    (sum, c) => sum + (c.prix_final || c.prix_estimate || 0), 0
-  );
-
-  const lastCourse = courses.length > 0
-    ? courses.sort((a, b) => new Date(b.created_date).getTime() - new Date(a.created_date).getTime())[0]
-    : null;
-
-  // Quartiers (courses livrées uniquement)
-  const quartierCount: Record<string, number> = {};
-  for (const c of courses) {
-    if (c.quartier_depart) quartierCount[c.quartier_depart] = (quartierCount[c.quartier_depart] || 0) + 1;
-    if (c.quartier_arrivee) quartierCount[c.quartier_arrivee] = (quartierCount[c.quartier_arrivee] || 0) + 1;
+  // Recherche par client_user_email (si le client a un compte User)
+  if (client.user_email) {
+    try {
+      const r2 = await base44.asServiceRole.entities.CourseExterne.filter(
+        { statut: "livree", client_user_email: client.user_email },
+        "-created_date", 500
+      );
+      for (const c of r2 || []) {
+        if (!seenIds.has(c.id)) { seenIds.add(c.id); courses.push(c); }
+      }
+    } catch {}
   }
-  const quartiers = Object.entries(quartierCount)
-    .map(([quartier, count]) => ({ quartier, count }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 10);
+
+  const stats = computeClientStatsFromCourses(client, courses);
 
   const thresholds = await getVipThresholds(base44);
   const statut = computeStatutCrm(
-    nbCourses,
-    montant,
-    lastCourse?.created_date || client.derniere_course_date,
+    stats.nb_courses_total,
+    stats.montant_total_depense,
+    stats.derniere_course_date,
     thresholds
   );
 
   return await base44.asServiceRole.entities.ClientExterne.update(client.id, {
-    nb_courses_total: nbCourses,
-    nb_courses_admin: nbAdminCourses,
-    montant_total_depense: montant,
-    derniere_course_date: lastCourse?.created_date || client.derniere_course_date,
-    dernier_quartier_depart: lastCourse?.quartier_depart || client.dernier_quartier_depart,
-    dernier_quartier_arrivee: lastCourse?.quartier_arrivee || client.dernier_quartier_arrivee,
-    quartiers_utilises: JSON.stringify(quartiers),
+    ...stats,
     statut_crm: statut,
   });
 }
