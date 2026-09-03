@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { MapPin, Package, Truck, Clock, CheckCircle2, XCircle, TrendingUp, ArrowLeft, Globe, Users, Zap, ChevronRight, Bell, Tag, Smartphone, UserPlus, UserX } from "lucide-react";
+import { MapPin, Package, Truck, Clock, CheckCircle2, XCircle, TrendingUp, ArrowLeft, Globe, Users, Zap, ChevronRight, Bell, Tag, Smartphone, UserPlus, UserX, PhoneOff } from "lucide-react";
 import { format, isToday } from "date-fns";
 import { fr } from "date-fns/locale";
 import { usePaysActifs } from "@/components/international/CountrySelector.jsx";
@@ -92,7 +92,7 @@ export default function DashboardExterne() {
   const { data: clientsStats } = useQuery({
     queryKey: ["clients-stats", effectiveCountry || "all"],
     queryFn: () => base44.functions.invoke('getClientsStats', { country_code: effectiveCountry }),
-    initialData: { data: { total_clients: 0, clients_uniques: 0, clients_app: 0, clients_crm: 0, jamais_commande: 0, avec_course_creee: 0, avec_course_livree: 0, course_creee_non_livree: 0 } },
+    initialData: { data: { personnes_uniques: 0, jamais_commande: 0, creee_non_livree: 0, au_moins_une_livree: 0, clients_app_uniques: 0, clients_crm_uniques: 0, profils_sans_telephone: 0, doublons_ecartes: 0 } },
     refetchInterval: 120000,
     staleTime: 90000,
     enabled: !!effectiveCountry,
@@ -286,12 +286,13 @@ export default function DashboardExterne() {
 
         {/* ── KPI CARDS ───────────────────────────────────── */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-2 lg:gap-3">
-          <KpiCard label="Clients uniques" value={kpiClients.clients_uniques ?? 0} icon={Users} color="bg-primary" onClick={() => setStatModal({ type: "clients", data: clients, initialFilter: "tous" })} />
-          <KpiCard label="App" value={kpiClients.clients_app ?? 0} icon={Smartphone} color="bg-indigo-500" onClick={() => setStatModal({ type: "clients", data: clients, initialFilter: "app" })} />
-          <KpiCard label="CRM" value={kpiClients.clients_crm ?? 0} icon={UserPlus} color="bg-purple-500" onClick={() => setStatModal({ type: "clients", data: clients, initialFilter: "crm" })} />
-          <KpiCard label="Avec course" value={kpiClients.avec_course_creee ?? 0} icon={Package} color="bg-blue-500" onClick={() => setStatModal({ type: "clients", data: clients, initialFilter: "avec_course" })} />
-          <KpiCard label="Livrés" value={kpiClients.avec_course_livree ?? 0} icon={CheckCircle2} color="bg-success" onClick={() => setStatModal({ type: "clients", data: clients, initialFilter: "livres" })} />
-          <KpiCard label="Sans course" value={kpiClients.jamais_commande ?? 0} icon={UserX} color="bg-gray-400" onClick={() => setStatModal({ type: "clients", data: clients, initialFilter: "sans_course" })} />
+          <KpiCard label="Personnes uniques" value={kpiClients.personnes_uniques ?? 0} icon={Users} color="bg-primary" onClick={() => setStatModal({ type: "clients", data: clients, initialFilter: "tous" })} />
+          <KpiCard label="Jamais commandé" value={kpiClients.jamais_commande ?? 0} icon={UserX} color="bg-gray-400" onClick={() => setStatModal({ type: "clients", data: clients, initialFilter: "jamais_commande" })} />
+          <KpiCard label="Créée non livrée" value={kpiClients.creee_non_livree ?? 0} icon={Clock} color="bg-warning" onClick={() => setStatModal({ type: "clients", data: clients, initialFilter: "creee_non_livree" })} />
+          <KpiCard label="Livré" value={kpiClients.au_moins_une_livree ?? 0} icon={CheckCircle2} color="bg-success" onClick={() => setStatModal({ type: "clients", data: clients, initialFilter: "livres" })} />
+          <KpiCard label="App" value={kpiClients.clients_app_uniques ?? 0} icon={Smartphone} color="bg-indigo-500" onClick={() => setStatModal({ type: "clients", data: clients, initialFilter: "app" })} />
+          <KpiCard label="CRM" value={kpiClients.clients_crm_uniques ?? 0} icon={UserPlus} color="bg-purple-500" onClick={() => setStatModal({ type: "clients", data: clients, initialFilter: "crm" })} />
+          <KpiCard label="Sans téléphone" value={kpiClients.profils_sans_telephone ?? 0} icon={PhoneOff} color="bg-gray-300" onClick={() => setStatModal({ type: "clients", data: clients, initialFilter: "sans_telephone" })} />
           <KpiCard label="Courses" value={stats.total} icon={Package} color="bg-primary-dark" />
           <KpiCard label="En cours" value={stats.enCours} icon={Clock} color="bg-warning" onClick={() => setStatModal({ type: "en_traitement", data: coursesEnTraitement })} />
           <KpiCard label="Livrées" value={stats.livrees} icon={CheckCircle2} color="bg-success" onClick={() => setStatModal({ type: "livrees", data: coursesTerminees.filter(c => c.statut === "livree") })} />

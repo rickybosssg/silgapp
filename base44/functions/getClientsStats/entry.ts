@@ -2,15 +2,14 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 import { preloadDialCodes } from '../../shared/crmEngine.ts';
 
 // ═══════════════════════════════════════════════════════════════════════════
-// getClientsStats — KPI clients BULK depuis les vraies CourseExterne
+// getClientsStats — KPI clients BULK par PERSONNE UNIQUE
 // ═══════════════════════════════════════════════════════════════════════════
 //
-// Source de vérité : CourseExterne (pas nb_courses_total)
-// Matching : client_phone_normalized ↔ ClientExterne.telephone_normalized
-//            client_user_email ↔ ClientExterne.user_email
+// Déduplication par telephone_normalized (1 téléphone = 1 personne unique).
+// Les profils sans téléphone sont comptés séparément (qualité de la base).
 //
-// SEMANTIQUE : "A commandé" = le client est le DEMANDEUR de la course.
-// Les expéditeurs et destinataires ne sont PAS comptés comme "ayant commandé".
+// SEMANTIQUE : "A commandé" = le client est le DEMANDEUR de la course
+// (client_phone_normalized ou client_user_email).
 //
 // Opérations API : ~4-6 (load clients paginated + load courses paginated)
 // Aucun N+1.
@@ -42,7 +41,7 @@ export default async function(req: Request): Promise<Response> {
       clients.push(...(batch || []));
       if (!batch || batch.length < limit) break;
       skip += limit;
-      if (skip > 2000) break; // safety
+      if (skip > 2000) break;
     }
 
     // ── 2. Charger toutes les CourseExterne du pays (paginé) ──
@@ -58,15 +57,12 @@ export default async function(req: Request): Promise<Response> {
       courses.push(...(batch || []));
       if (!batch || batch.length < limit) break;
       skip += limit;
-      if (skip > 5000) break; // safety
+      if (skip > 5000) break;
     }
 
-    // ── 3. Construire les maps en mémoire ──
-    // Map: telephone_normalized → [courses où cette personne est le DEMANDEUR]
+    // ── 3. Construire les maps course → phone / email ──
     const phoneToCourses = new Map<string, any[]>();
-    // Map: user_email → [courses où cette personne est le DEMANDEUR]
     const emailToCourses = new Map<string, any[]>();
-
     for (const c of courses) {
       const phone = (c.client_phone_normalized || '').trim();
       if (phone) {
@@ -80,60 +76,113 @@ export default async function(req: Request): Promise<Response> {
       }
     }
 
-    // ── 4. Calculer les KPI ──
-    const phoneSet = new Set<string>();
-    let app = 0;
-    let crm = 0;
-    let jamaisCommande = 0;
-    let avecCourseCreee = 0;
-    let avecCourseLivree = 0;
-    let courseCreeeNonLivree = 0;
+    // ── 4. Construire les PERSONNES UNIQUES par téléphone ──
+    const uniquePersons = new Map<string, {
+      phone: string;
+      emails: Set<string>;
+      hasApp: boolean;
+      hasCrm: boolean;
+      profiles: any[];
+    }>();
+
+    let profilsSansTelephone = 0;
 
     for (const c of clients) {
       const phone = (c.telephone_normalized || '').trim();
-      if (phone) phoneSet.add(phone);
+      if (!phone) {
+        profilsSansTelephone++;
+        continue;
+      }
+      if (!uniquePersons.has(phone)) {
+        uniquePersons.set(phone, {
+          phone,
+          emails: new Set(),
+          hasApp: false,
+          hasCrm: false,
+          profiles: [],
+        });
+      }
+      const entry = uniquePersons.get(phone);
+      entry.profiles.push(c);
+      if (c.user_email) {
+        entry.emails.add(c.user_email.trim().toLowerCase());
+        entry.hasApp = true;
+      }
+      if (c.cree_via_crm === true) entry.hasCrm = true;
+    }
 
-      if (c.user_email) app++;
-      if (c.cree_via_crm === true) crm++;
+    // ── 5. Calculer les KPI par PERSONNE UNIQUE ──
+    let jamaisCommande = 0;
+    let creeeNonLivree = 0;
+    let auMoinsUneLivree = 0;
+    let appUniques = 0;
+    let crmUniques = 0;
+    let appSansCourse = 0;
+    let crmSansCourse = 0;
 
-      // Trouver les courses où ce client est le DEMANDEUR
-      const byPhone = phone ? (phoneToCourses.get(phone) || []) : [];
-      const byEmail = c.user_email ? (emailToCourses.get(c.user_email.toLowerCase()) || []) : [];
-
-      // Dédupliquer par course.id
+    for (const [phone, entry] of uniquePersons) {
+      // Trouver les courses de cette personne (phone + email)
       const seenIds = new Set<string>();
       const clientCourses: any[] = [];
-      for (const course of [...byPhone, ...byEmail]) {
-        if (!seenIds.has(course.id)) {
-          seenIds.add(course.id);
-          clientCourses.push(course);
+      for (const course of (phoneToCourses.get(phone) || [])) {
+        if (!seenIds.has(course.id)) { seenIds.add(course.id); clientCourses.push(course); }
+      }
+      for (const email of entry.emails) {
+        for (const course of (emailToCourses.get(email) || [])) {
+          if (!seenIds.has(course.id)) { seenIds.add(course.id); clientCourses.push(course); }
         }
       }
 
-      if (clientCourses.length === 0) {
+      const hasLivree = clientCourses.some(c => c.statut === 'livree');
+      const hasCreee = clientCourses.length > 0;
+
+      if (!hasCreee) {
         jamaisCommande++;
+      } else if (hasLivree) {
+        auMoinsUneLivree++;
       } else {
-        avecCourseCreee++;
-        const hasLivree = clientCourses.some(c => c.statut === 'livree');
-        if (hasLivree) {
-          avecCourseLivree++;
-        } else {
-          courseCreeeNonLivree++;
-        }
+        creeeNonLivree++;
+      }
+
+      if (entry.hasApp) {
+        appUniques++;
+        if (!hasCreee) appSansCourse++;
+      }
+      if (entry.hasCrm) {
+        crmUniques++;
+        if (!hasCreee) crmSansCourse++;
       }
     }
+
+    const uniqueTotal = uniquePersons.size;
+    const doublonsEcarts = clients.length - profilsSansTelephone - uniqueTotal;
 
     return Response.json({
       success: true,
       country_code,
-      total_clients: clients.length,
-      clients_uniques: phoneSet.size,
-      clients_app: app,
-      clients_crm: crm,
+      // ── KPI par PERSONNE UNIQUE ──
+      personnes_uniques: uniqueTotal,
       jamais_commande: jamaisCommande,
-      avec_course_creee: avecCourseCreee,
-      avec_course_livree: avecCourseLivree,
-      course_creee_non_livree: courseCreeeNonLivree,
+      creee_non_livree: creeeNonLivree,
+      au_moins_une_livree: auMoinsUneLivree,
+      // ── App / CRM uniques ──
+      clients_app_uniques: appUniques,
+      clients_crm_uniques: crmUniques,
+      clients_app_sans_course: appSansCourse,
+      clients_crm_sans_course: crmSansCourse,
+      // ── Qualité de la base ──
+      total_profiles: clients.length,
+      profils_sans_telephone: profilsSansTelephone,
+      doublons_ecartes: doublonsEcarts,
+      // ── Legacy (pour compatibilité dashboard existant) ──
+      total_clients: clients.length,
+      clients_uniques: uniqueTotal,
+      clients_app: appUniques,
+      clients_crm: crmUniques,
+      avec_course_creee: creeeNonLivree + auMoinsUneLivree,
+      avec_course_livree: auMoinsUneLivree,
+      course_creee_non_livree: creeeNonLivree,
+      // ── Technique ──
       total_courses_loaded: courses.length,
       api_calls: Math.ceil(clients.length / limit) + Math.ceil(courses.length / limit),
     });

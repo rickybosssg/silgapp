@@ -193,21 +193,41 @@ function CADetail({ courses }) {
 
 const CLIENT_FILTERS = [
   { key: "tous", label: "Tous" },
+  { key: "jamais_commande", label: "Jamais commandé" },
+  { key: "creee_non_livree", label: "Créée non livrée" },
+  { key: "livres", label: "Livré" },
   { key: "app", label: "App" },
   { key: "crm", label: "CRM" },
-  { key: "avec_course", label: "Avec course" },
-  { key: "sans_course", label: "Sans course" },
-  { key: "livres", label: "Livrés" },
+  { key: "sans_telephone", label: "Sans téléphone" },
 ];
+
+// Déduplique les profils par telephone_normalized (1 entrée par personne unique)
+function deduplicateByPhone(clients) {
+  const seen = new Map();
+  for (const c of clients) {
+    const phone = (c.telephone_normalized || '').trim();
+    if (!phone) continue;
+    if (!seen.has(phone)) seen.set(phone, c);
+  }
+  return Array.from(seen.values());
+}
 
 function filterClients(clients, filter) {
   switch (filter) {
-    case "app": return clients.filter(c => !!c.user_email);
-    case "crm": return clients.filter(c => c.cree_via_crm === true);
-    case "avec_course": return clients.filter(c => Number(c.nb_courses_total || 0) > 0);
-    case "sans_course": return clients.filter(c => Number(c.nb_courses_total || 0) === 0);
-    case "livres": return clients.filter(c => Number(c.nb_courses_total || 0) > 0);
-    default: return clients;
+    case "jamais_commande":
+      return deduplicateByPhone(clients).filter(c => Number(c.nb_courses_total || 0) === 0);
+    case "creee_non_livree":
+      return deduplicateByPhone(clients).filter(c => Number(c.nb_courses_total || 0) > 0);
+    case "livres":
+      return deduplicateByPhone(clients).filter(c => Number(c.nb_courses_total || 0) > 0);
+    case "app":
+      return deduplicateByPhone(clients).filter(c => !!c.user_email);
+    case "crm":
+      return deduplicateByPhone(clients).filter(c => c.cree_via_crm === true);
+    case "sans_telephone":
+      return clients.filter(c => !c.telephone_normalized);
+    default:
+      return deduplicateByPhone(clients);
   }
 }
 
