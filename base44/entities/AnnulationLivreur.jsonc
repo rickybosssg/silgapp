@@ -34,19 +34,25 @@
       "type": "string",
       "enum": [
         "client_injoignable",
+        "client_change_avis",
         "mauvaise_adresse",
         "colis_inexistant",
-        "client_change_avis",
-        "colis_interdit",
+        "colis_pas_pret",
         "panne_vehicule",
+        "batterie_dechargee",
+        "course_trop_loin",
+        "prix_insuffisant",
+        "autre_course_conflit_planning",
+        "probleme_personnel",
+        "acceptation_erreur",
         "accident",
         "autre"
       ],
-      "description": "Motif de l'annulation"
+      "description": "Motif de l'annulation. Les motifs imputables au livreur sont: panne_vehicule, batterie_dechargee, course_trop_loin, autre_course_conflit_planning, probleme_personnel, acceptation_erreur. Les motifs non imputables: client_injoignable, client_change_avis, mauvaise_adresse, colis_inexistant, colis_pas_pret. 'autre' est neutre sans motif_detail exploitable."
     },
     "motif_detail": {
       "type": "string",
-      "description": "D\u00e9tail suppl\u00e9mentaire si motif=autre"
+      "description": "D\u00e9tail suppl\u00e9mentaire. OBLIGATOIRE si motif=autre, facultatif pour les autres motifs."
     },
     "country_code": {
       "type": "string",
@@ -70,6 +76,35 @@
       "type": "boolean",
       "default": false,
       "description": "Notification admin envoy\u00e9e ?"
+    },
+    "heure_acceptation_livreur": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Snapshot de l'heure d'acceptation de CE livreur (ne change pas apr\u00e8s redispatch). Permet de calculer le d\u00e9lai acceptation\u2192annulation m\u00eame si la course est redispatch\u00e9e vers un autre livreur."
+    },
+    "prix_course_snapshot": {
+      "type": "number",
+      "description": "Snapshot du prix de la course au moment de l'annulation (prix_final ou prix_estimate ou prix_propose_admin). Pour audit sans d\u00e9pendre de modifications ult\u00e9rieures."
+    },
+    "distance_course_snapshot": {
+      "type": "number",
+      "description": "Snapshot de la distance de la course au moment de l'annulation (distance_reelle_km ou distance_tarifaire_km)."
+    },
+    "quartier_depart_snapshot": {
+      "type": "string",
+      "description": "Snapshot du quartier de d\u00e9part au moment de l'annulation."
+    },
+    "quartier_arrivee_snapshot": {
+      "type": "string",
+      "description": "Snapshot du quartier d'arriv\u00e9e au moment de l'annulation."
+    },
+    "source_course": {
+      "type": "string",
+      "enum": [
+        "admin",
+        "client"
+      ],
+      "description": "Source de cr\u00e9ation de la course (admin vs App client). Snapshot pour analyse."
     }
   },
   "required": [

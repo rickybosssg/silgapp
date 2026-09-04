@@ -2,14 +2,22 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
 
 const MOTIFS_VALIDES = [
   "client_injoignable",
+  "client_change_avis",
   "mauvaise_adresse",
   "colis_inexistant",
-  "client_change_avis",
+  "colis_pas_pret",
+  "panne_vehicule",
+  "batterie_dechargee",
+  "course_trop_loin",
+  "prix_insuffisant",
+  "autre_course_conflit_planning",
+  "probleme_personnel",
+  "acceptation_erreur",
+  "accident",
+  "autre",
+  // ── Compatibilité anciens motifs ──
   "colis_interdit",
   "désaccord_prix",
-  "panne_vehicule",
-  "accident",
-  "autre"
 ];
 
 Deno.serve(async (req) => {
@@ -23,12 +31,12 @@ Deno.serve(async (req) => {
       return Response.json({ error: "course_id requis" }, { status: 400 });
     }
 
-    // ── Validation : motif_detail OBLIGATOIRE pour les annulations livreur ──
-    // Sans cette explication, l'admin ne peut pas comprendre le motif réel.
+    // ── Validation : motif_detail OBLIGATOIRE uniquement pour motif=autre ──
+    // Pour les autres motifs, motif_detail est facultatif.
     if (source === "livreur") {
-      if (!motif_detail || !String(motif_detail).trim()) {
+      if (motif === "autre" && (!motif_detail || !String(motif_detail).trim())) {
         return Response.json({
-          error: "Le détail du motif est obligatoire pour annuler la course",
+          error: "Le détail du motif est obligatoire pour le motif 'Autre'",
           field: "motif_detail",
         }, { status: 400 });
       }
@@ -188,9 +196,12 @@ Deno.serve(async (req) => {
         console.log(`[ANNULATION] ${notifsNouvelleCourse.length} notifications 'nouvelle_course' archivées pour course ${course_id}`);
       }
 
-      // ── Historique d'annulation ──────────────────────────────────
+      // ── Historique d'annulation avec snapshot ──────────────────────
+      // Snapshot de l'heure d'acceptation de CE livreur — ne change pas après redispatch.
       if (motif && livreurId) {
         const livreurPourLog = await asService.entities.Livreur.get(livreurId).catch(() => null);
+        const prixSnapshot = course.prix_final || course.prix_estimate || course.prix_propose_admin || course.prix_propose_client || null;
+        const distanceSnapshot = course.distance_reelle_km || course.distance_tarifaire_km || null;
         await asService.entities.AnnulationLivreur.create({
           livreur_id: livreurId,
           livreur_nom: livreurPourLog ? `${livreurPourLog.prenom || ""} ${livreurPourLog.nom || ""}`.trim() : (course.livreur_nom || ""),
@@ -205,7 +216,52 @@ Deno.serve(async (req) => {
           date_annulation: now,
           course_redispatch: true,
           admin_notifie: true,
+          // ── Snapshots pour audit (Phase 1 anti-annulation) ──
+          heure_acceptation_livreur: course.heure_acceptation || null,
+          prix_course_snapshot: prixSnapshot,
+          distance_course_snapshot: distanceSnapshot,
+          quartier_depart_snapshot: course.quartier_depart || "",
+          quartier_arrivee_snapshot: course.quartier_arrivee || "",
+          source_course: course.source || null,
         }).catch(() => null);
+
+        // ── Alerte admin : 3 annulations sur 7 jours (anti-spam) ──
+        try {
+          const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+          const recentAnnulations = await asService.entities.AnnulationLivreur.filter({
+            livreur_id: livreurId,
+          }, "-date_annulation", 50);
+          const count7j = (recentAnnulations || []).filter(
+            (a) => a.date_annulation && new Date(a.date_annulation) >= new Date(sevenDaysAgo)
+          ).length;
+
+          if (count7j >= 3) {
+            // Anti-spam : ne créer l'alerte que si aucune alerte similaire n'existe déjà pour ce livreur sur 24h
+            const deduplicationKey = `LIVREUR_FIABILITE_3_7J_${livreurId}`;
+            const existingAlert = await asService.entities.AdminInboxItem.filter({
+              deduplication_key: deduplicationKey,
+              status: "unread",
+            }).catch(() => []);
+
+            if (!existingAlert || existingAlert.length === 0) {
+              await asService.entities.AdminInboxItem.create({
+                type: "system",
+                priority: "P1",
+                title: "⚠️ Fiabilité livreur",
+                body: `${livreurPourLog ? `${livreurPourLog.prenom || ""} ${livreurPourLog.nom || ""}`.trim() : course.livreur_nom || "Livreur"} a annulé ${count7j} courses sur les 7 derniers jours. Vérification recommandée.`,
+                source_entity: "AnnulationLivreur",
+                source_id: livreurId,
+                livreur_id: livreurId,
+                country_code: course.country_code || "",
+                action_url: `/admin/livreurs`,
+                status: "unread",
+                deduplication_key: deduplicationKey,
+              }).catch(() => null);
+            }
+          }
+        } catch (alertErr) {
+          console.error("[ANNULATION] Erreur alerte fiabilité:", alertErr?.message);
+        }
       }
 
       // ── Notification admin (modal — alerte_critique_dispatch pour déclencher le SystemAlertModal) ──
