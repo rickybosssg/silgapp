@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Star, Phone, MapPin, Package, Calendar, TrendingUp, Clock, Pencil, Save, X } from "lucide-react";
+import { Star, Phone, MapPin, Package, Calendar, TrendingUp, Clock, Pencil, Save, X, MessageCircle, Ban } from "lucide-react";
 import { normalizePhone } from "@/lib/crmUtils";
+import { cn } from "@/lib/utils";
 
 const STATUT_COLORS = {
   actif: "bg-green-100 text-green-700 border-green-300",
@@ -24,13 +25,97 @@ const TYPE_COLIS_LABELS = {
   document: "Document", nourriture: "Nourriture", autre: "Autre",
 };
 
-export default function ClientFicheDialog({ open, onClose, client: initialClient }) {
+export default function ClientFicheDialog({ open, onClose, client: initialClient, prospection: initialProspection }) {
   const [client, setClient] = useState(initialClient);
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(false);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editForm, setEditForm] = useState({ nom: "", prenom: "", statut_crm: "nouveau", notes_admin: "", roles: [] });
+
+  // ── Pipeline prospection ──
+  const [prospection, setProspection] = useState(initialProspection);
+  const [pipelineSaving, setPipelineSaving] = useState(false);
+
+  useEffect(() => {
+    if (initialProspection !== undefined) setProspection(initialProspection);
+  }, [initialProspection]);
+
+  const PIPELINE_OPTIONS = [
+    { key: "a_contacter", label: "À contacter" },
+    { key: "contacte", label: "Contacté" },
+    { key: "interesse", label: "Intéressé" },
+    { key: "a_relancer", label: "À relancer" },
+    { key: "app_installee", label: "App installée" },
+    { key: "converti", label: "Converti" },
+    { key: "pas_interesse", label: "Pas intéressé" },
+    { key: "ne_plus_contacter", label: "Ne plus contacter" },
+  ];
+
+  const TYPE_OPTIONS = [
+    { key: "particulier", label: "Particulier" },
+    { key: "commerce", label: "Commerce" },
+    { key: "restaurant", label: "Restaurant" },
+    { key: "entreprise", label: "Entreprise" },
+    { key: "autre", label: "Autre" },
+  ];
+
+  const updatePipeline = async (updates) => {
+    if (!client?.id) return;
+    setPipelineSaving(true);
+    try {
+      const now = new Date().toISOString();
+      if (prospection) {
+        const updated = await base44.entities.CrmProspection.update(prospection.id, {
+          ...updates,
+          dernier_contact_at: updates.pipeline_status ? now : prospection.dernier_contact_at,
+          nb_contacts: updates.pipeline_status ? (prospection.nb_contacts || 0) + 1 : prospection.nb_contacts,
+        });
+        setProspection(updated);
+      } else {
+        const created = await base44.entities.CrmProspection.create({
+          client_id: client.id,
+          client_nom: `${client.prenom || ""} ${client.nom || ""}`.trim(),
+          client_telephone: client.telephone || "",
+          client_phone_normalized: client.telephone_normalized || "",
+          country_code: client.country_code || "",
+          pipeline_status: updates.pipeline_status || "a_contacter",
+          crm_type: updates.crm_type || "particulier",
+          origine: "crm",
+          dernier_contact_at: updates.pipeline_status ? now : null,
+          nb_contacts: updates.pipeline_status ? 1 : 0,
+        });
+        setProspection(created);
+      }
+    } catch (err) {
+      console.error("Erreur pipeline:", err);
+    } finally {
+      setPipelineSaving(false);
+    }
+  };
+
+  // ── Lien WhatsApp (manuel — n'envoie pas automatiquement) ──
+  const waPhone = (() => {
+    if (!client) return null;
+    let num = String(client.telephone || "").replace(/\D/g, "");
+    if (!num) return null;
+    // Normalisation simple: si commence par 0, remplacer par indicatif pays
+    const dialMap = { BF: "226", CI: "225", TG: "228", BJ: "229", SN: "221", ML: "223", GN: "224", NE: "227", GH: "233", MA: "212" };
+    const dial = dialMap[client.country_code] || "";
+    if (num.startsWith("0")) num = dial + num.slice(1);
+    else if (dial && num.length <= 9) num = dial + num;
+    return num;
+  })();
+
+  const isPro = prospection?.crm_type === "commerce" || prospection?.crm_type === "restaurant" || prospection?.crm_type === "entreprise";
+  const waMessage = isPro
+    ? "Bonjour 👋\nVous avez déjà utilisé SILGAPP pour vos livraisons.\nAvec l'application SILGAPP, vous pouvez demander directement un livreur pour livrer vos clients.\nVous continuez à vendre, SILGAPP s'occupe de la livraison."
+    : "Bonjour 👋\nVous avez déjà utilisé le service de livraison SILGAPP.\nVous pouvez maintenant faire directement vos demandes de livraison depuis l'application SILGAPP, sans passer par notre équipe.\nC'est simple, rapide et vous permet de suivre votre livraison.";
+  const waLink = waPhone ? `https://wa.me/${waPhone}?text=${encodeURIComponent(waMessage)}` : null;
+
+  // ── Indicateur App CORRIGÉ ──
+  // "App installée" = a un compte User (user_email). Pas basé sur app_active/last_seen_at.
+  const hasAppAccount = !!(client?.user_email);
 
   useEffect(() => {
     if (initialClient) setClient(initialClient);
@@ -270,6 +355,111 @@ export default function ClientFicheDialog({ open, onClose, client: initialClient
             <div className="bg-yellow-50 rounded-xl p-3 border border-yellow-200">
               <p className="text-[10px] font-bold text-yellow-600 uppercase tracking-wide mb-1">Notes admin</p>
               <p className="text-sm text-gray-700">{client.notes_admin}</p>
+            </div>
+          )}
+
+          {/* ── Indicateur App CORRIGÉ ── */}
+          {!editing && (
+            <div className={hasAppAccount ? "bg-purple-50 rounded-xl p-3 border border-purple-200" : "bg-gray-50 rounded-xl p-3 border border-gray-200"}>
+              <p className="text-[10px] font-bold uppercase tracking-wide mb-1" style={{ color: hasAppAccount ? "#7c3aed" : "#6b7280" }}>
+                Compte application
+              </p>
+              {hasAppAccount ? (
+                <p className="text-sm font-bold text-purple-700">App installée</p>
+              ) : (
+                <p className="text-sm font-bold text-gray-500">Pas de compte App — CRM uniquement</p>
+              )}
+              {client.last_seen_at && (
+                <p className="text-[10px] text-gray-400 mt-0.5">
+                  Dernière activité: {new Date(client.last_seen_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* ── Pipeline prospection ── */}
+          {!editing && (
+            <div className="bg-blue-50 rounded-xl p-3 border border-blue-200 space-y-3">
+              <p className="text-[10px] font-bold text-blue-600 uppercase tracking-wide">Pipeline prospection</p>
+
+              {/* Statut pipeline */}
+              <div>
+                <p className="text-[10px] text-gray-500 mb-1">Statut</p>
+                <div className="flex flex-wrap gap-1">
+                  {PIPELINE_OPTIONS.map(opt => (
+                    <button
+                      key={opt.key}
+                      onClick={() => updatePipeline({ pipeline_status: opt.key })}
+                      disabled={pipelineSaving}
+                      className={cn(
+                        "px-2 py-1 rounded-lg text-[10px] font-semibold transition-all disabled:opacity-50",
+                        (prospection?.pipeline_status || "a_contacter") === opt.key
+                          ? "bg-blue-500 text-white shadow-sm"
+                          : "bg-white text-gray-500 border border-gray-200 hover:bg-gray-50"
+                      )}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Type CRM */}
+              <div>
+                <p className="text-[10px] text-gray-500 mb-1">Type CRM</p>
+                <div className="flex flex-wrap gap-1">
+                  {TYPE_OPTIONS.map(opt => (
+                    <button
+                      key={opt.key}
+                      onClick={() => updatePipeline({ crm_type: opt.key })}
+                      disabled={pipelineSaving}
+                      className={cn(
+                        "px-2 py-1 rounded-lg text-[10px] font-semibold transition-all disabled:opacity-50",
+                        (prospection?.crm_type || "particulier") === opt.key
+                          ? "bg-purple-500 text-white shadow-sm"
+                          : "bg-white text-gray-500 border border-gray-200 hover:bg-gray-50"
+                      )}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Infos prospection */}
+              {prospection && (
+                <div className="flex flex-wrap gap-2 text-[10px]">
+                  {prospection.dernier_contact_at && (
+                    <span className="text-gray-500">
+                      Dernier contact: {new Date(prospection.dernier_contact_at).toLocaleDateString("fr-FR")}
+                    </span>
+                  )}
+                  <span className="text-gray-500">Contacts: {prospection.nb_contacts || 0}</span>
+                  {prospection.prochaine_relance_at && (
+                    <span className="text-amber-600 font-semibold">
+                      Relance: {new Date(prospection.prochaine_relance_at).toLocaleDateString("fr-FR")}
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* Bouton WhatsApp — ouvre WhatsApp, n'envoie PAS automatiquement */}
+              {waLink && (prospection?.pipeline_status !== "ne_plus_contacter") && (
+                <a
+                  href={waLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full h-11 rounded-xl bg-[#25D366] text-white font-bold text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  Contacter sur WhatsApp
+                </a>
+              )}
+              {prospection?.pipeline_status === "ne_plus_contacter" && (
+                <div className="w-full h-11 rounded-xl bg-red-50 border border-red-200 text-red-600 font-bold text-sm flex items-center justify-center gap-2">
+                  <Ban className="w-4 h-4" /> Ne plus contacter
+                </div>
+              )}
             </div>
           )}
 

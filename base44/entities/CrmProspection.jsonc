@@ -1,0 +1,134 @@
+{
+  "name": "CrmProspection",
+  "type": "object",
+  "properties": {
+    "client_id": {
+      "type": "string",
+      "description": "ID du ClientExterne li\u00e9"
+    },
+    "client_nom": {
+      "type": "string",
+      "description": "Nom du client (snapshot pour affichage rapide)"
+    },
+    "client_telephone": {
+      "type": "string",
+      "description": "T\u00e9l\u00e9phone du client (snapshot)"
+    },
+    "client_phone_normalized": {
+      "type": "string",
+      "description": "T\u00e9l\u00e9phone normalis\u00e9 (snapshot). Utilis\u00e9 pour le rapprochement CRM \u2192 App."
+    },
+    "client_user_email": {
+      "type": "string",
+      "description": "Email du compte User li\u00e9 au client (snapshot). R\u00e9solu c\u00f4t\u00e9 backend."
+    },
+    "country_code": {
+      "type": "string",
+      "description": "Code pays ISO 2 lettres"
+    },
+    "pipeline_status": {
+      "type": "string",
+      "enum": [
+        "a_contacter",
+        "contacte",
+        "interesse",
+        "a_relancer",
+        "app_installee",
+        "converti",
+        "pas_interesse",
+        "ne_plus_contacter"
+      ],
+      "default": "a_contacter",
+      "description": "Statut de prospection: a_contacter=nouveau prospect, contacte=WhatsApp envoy\u00e9, interesse=manifeste int\u00e9r\u00eat, a_relancer=\u00e0 recontacter, app_installee=App install\u00e9e apr\u00e8s prospection, converti=premi\u00e8re commande App effectu\u00e9e, pas_interesse=non int\u00e9ress\u00e9, ne_plus_contacter=exclu d\u00e9finitivement"
+    },
+    "crm_type": {
+      "type": "string",
+      "enum": [
+        "particulier",
+        "commerce",
+        "restaurant",
+        "entreprise",
+        "autre"
+      ],
+      "default": "particulier",
+      "description": "Type de CRM: particulier, commerce, restaurant, entreprise, autre. Saisi par l'admin."
+    },
+    "priorite": {
+      "type": "number",
+      "default": 3,
+      "description": "Priorit\u00e9 commerciale: 1=tr\u00e8s prioritaire (2+ courses, pas App), 2=prioritaire (1 course), 3=normal (0 course)"
+    },
+    "dernier_contact_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date du dernier contact (WhatsApp, appel, etc.)"
+    },
+    "prochaine_relance_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date de la prochaine relance pr\u00e9vue"
+    },
+    "nb_contacts": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre de tentatives de contact effectu\u00e9es"
+    },
+    "canal_utilise": {
+      "type": "string",
+      "description": "Dernier canal utilis\u00e9 (whatsapp, appel, sms_manuel)"
+    },
+    "notes_prospection": {
+      "type": "string",
+      "description": "Notes de prospection (admin)"
+    },
+    "conversion_app_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date \u00e0 laquelle le CRM a install\u00e9 l'App (rapprochement par t\u00e9l\u00e9phone normalis\u00e9)"
+    },
+    "premiere_commande_app_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date de la premi\u00e8re commande effectu\u00e9e directement via l'App (source=client, pas admin)"
+    },
+    "origine": {
+      "type": "string",
+      "default": "crm",
+      "description": "Origine du prospect. Toujours 'crm' \u2014 conserv\u00e9 m\u00eame apr\u00e8s conversion."
+    },
+    "campaign_id": {
+      "type": "string",
+      "description": "ID de la campagne de prospection WhatsApp assist\u00e9e (optionnel)"
+    },
+    "campaign_name": {
+      "type": "string",
+      "description": "Nom de la campagne de prospection (snapshot pour affichage)"
+    }
+  },
+  "required": [
+    "client_id",
+    "pipeline_status"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
