@@ -427,7 +427,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
       toast.error("Veuillez sélectionner un motif");
       return;
     }
-    if (!motifAnnulationDetail.trim()) {
+    if (motifAnnulationLivreur === "autre" && !motifAnnulationDetail.trim()) {
       toast.error("Veuillez décrire le motif de l'annulation");
       return;
     }
@@ -560,21 +560,32 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                   className="w-full h-12 rounded-xl border-2 border-gray-200 px-3 text-sm font-medium text-gray-800 bg-white focus:border-red-400 focus:outline-none"
                 >
                   <option value="" disabled>Sélectionnez un motif...</option>
-                  <option value="client_injoignable">Client injoignable</option>
-                  <option value="mauvaise_adresse">Mauvaise adresse</option>
-                  <option value="colis_inexistant">Colis inexistant</option>
-                  <option value="client_change_avis">Client a changé d'avis</option>
-                  <option value="colis_interdit">Colis interdit</option>
-                  <option value="désaccord_prix">Désaccord sur le prix</option>
-                  <option value="panne_vehicule">Panne du véhicule</option>
-                  <option value="accident">Accident</option>
+                  <optgroup label="Problème client (non imputable)">
+                    <option value="client_injoignable">Client injoignable</option>
+                    <option value="client_change_avis">Client a changé d'avis</option>
+                    <option value="mauvaise_adresse">Mauvaise adresse</option>
+                    <option value="colis_inexistant">Colis inexistant</option>
+                    <option value="colis_pas_pret">Colis pas prêt</option>
+                  </optgroup>
+                  <optgroup label="Problème livreur (imputable)">
+                    <option value="panne_vehicule">Panne du véhicule</option>
+                    <option value="batterie_dechargee">Batterie déchargée</option>
+                    <option value="course_trop_loin">Course trop loin</option>
+                    <option value="autre_course_conflit_planning">Conflit de planning</option>
+                    <option value="probleme_personnel">Problème personnel</option>
+                    <option value="acceptation_erreur">Acceptation par erreur</option>
+                    <option value="accident">Accident</option>
+                  </optgroup>
+                  <option value="prix_insuffisant">Prix insuffisant</option>
                   <option value="autre">Autre</option>
                 </select>
               </div>
               {motifAnnulationLivreur && (
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-gray-600">
-                    Décrivez le motif de l'annulation{" "}
+                    {motifAnnulationLivreur === "autre"
+                      ? "Décrivez le motif de l'annulation (obligatoire) "
+                      : "Précisions (facultatif) "}
                     <span className="text-gray-400 font-normal">(envoyé à l'admin)</span>
                   </label>
                   <textarea
@@ -611,7 +622,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
               <button
                 className="h-12 rounded-2xl bg-red-500 hover:bg-red-600 text-white font-bold text-sm disabled:opacity-50"
                 onClick={handleAnnulerCourseLivreur}
-                disabled={!motifAnnulationLivreur || !motifAnnulationDetail.trim() || isPending}
+                disabled={!motifAnnulationLivreur || (motifAnnulationLivreur === "autre" && !motifAnnulationDetail.trim()) || isPending}
               >
                 Annuler la course
               </button>

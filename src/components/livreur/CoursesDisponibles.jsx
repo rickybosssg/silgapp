@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { startUrgentCourseAlert, stopUrgentCourseAlert } from "@/lib/livreurUrgentAlert";
 import { getPrixAffichable } from "@/utils/getPrixAffichable";
 import { useCoursesDisponibles } from "@/hooks/useCoursesDisponibles";
+import AcceptConfirmationModal from "./AcceptConfirmationModal";
 
 function calculerDistance(lat1, lng1, lat2, lng2) {
   if ([lat1, lng1, lat2, lng2].some(value => value == null || Number.isNaN(Number(value)))) return null;
@@ -40,6 +41,7 @@ function persistDismissedCourse(courseId) {
 export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onNewCourse }) {
   const queryClient = useQueryClient();
   const [acceptingId, setAcceptingId] = useState(null);
+  const [pendingAcceptCourse, setPendingAcceptCourse] = useState(null);
   const knownCourseIdsRef = useRef(new Set());
   const courseFeedInitializedRef = useRef(false);
 
@@ -127,7 +129,15 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
     });
   }, [eligibleCourses, livreurLat, livreurLng]);
 
-  const handleAccept = async (course) => {
+  // Ouvre le modal de confirmation AVANT l'acceptation réelle
+  const handleAcceptClick = (course) => {
+    if (!course?.id || !livreurId) return;
+    setPendingAcceptCourse(course);
+  };
+
+  // Acceptation réelle — déclenchée par le bouton "Confirmer" du modal
+  const handleAcceptConfirm = async () => {
+    const course = pendingAcceptCourse;
     if (!course?.id || !livreurId) return;
     setAcceptingId(course.id);
     try {
@@ -158,6 +168,7 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
       toast.error("Erreur réseau lors de l'acceptation");
     } finally {
       setAcceptingId(null);
+      setPendingAcceptCourse(null);
     }
   };
 
@@ -313,7 +324,7 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
           <div className="grid grid-cols-[1fr_52px] gap-2.5 border-t border-slate-100 bg-muted p-3">
             <button
               type="button"
-              onClick={() => handleAccept(course)}
+              onClick={() => handleAcceptClick(course)}
               disabled={acceptingId === course.id}
               className="h-12 rounded-lg bg-primary text-sm font-bold text-white shadow-[0_6px_14px_rgba(0,122,255,0.2)] transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 flex items-center justify-center gap-2"
             >
@@ -339,6 +350,15 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
           </div>
         </div>
       ))}
+      {/* Modal de confirmation d'acceptation (Phase 1 anti-annulation) */}
+      {pendingAcceptCourse && (
+        <AcceptConfirmationModal
+          course={pendingAcceptCourse}
+          onConfirm={handleAcceptConfirm}
+          onCancel={() => setPendingAcceptCourse(null)}
+          loading={acceptingId === pendingAcceptCourse.id}
+        />
+      )}
     </div>
   );
 }

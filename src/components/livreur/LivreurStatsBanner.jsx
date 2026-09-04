@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { TrendingUp, Package, CheckCircle, AlertCircle } from "lucide-react";
 import { base44 } from "@/api/base44Client";
+import LivreurFiabiliteCard from "./LivreurFiabiliteCard";
 
-export default function LivreurStatsBanner({ mesCourses, totalEncaisse, montantDuSilga, isExterne = false }) {
+export default function LivreurStatsBanner({ mesCourses, totalEncaisse, montantDuSilga, isExterne = false, livreur }) {
   const today = new Date().toDateString();
   const livreesToday = mesCourses.filter(c =>
     c.statut === "livree" && new Date(c.heure_livraison || c.updated_date).toDateString() === today
@@ -43,7 +44,7 @@ export default function LivreurStatsBanner({ mesCourses, totalEncaisse, montantD
 
   if (isExterne) {
     return (
-      <div className="grid grid-cols-3 gap-2.5">
+      <div className="grid grid-cols-4 gap-2.5">
         {/* Livrées */}
         <div className="bg-white rounded-2xl p-3 shadow-[0_8px_24px_rgba(15,23,42,0.06)] border border-black/5 text-center">
           <p className="text-2xl font-black text-success leading-none">{livreesToday.length}</p>
@@ -67,13 +68,15 @@ export default function LivreurStatsBanner({ mesCourses, totalEncaisse, montantD
           </p>
           <p className="text-[10px] text-slate-600 font-semibold mt-1">À payer à SILGAPP</p>
         </div>
+        {/* Score de fiabilité (Phase 1 anti-annulation) */}
+        <LivreurFiabiliteCard livreur={livreur || (mesCourses?.[0] ? { id: mesCourses[0].livreur_id } : null)} compact />
       </div>
     );
   }
 
   const coursesLivrees = livreesToday.length;
   return (
-    <div className="grid grid-cols-3 gap-3">
+    <div className="grid grid-cols-4 gap-3">
       <div className="bg-card rounded-2xl p-3 shadow-sm border border-border text-center">
         <div className="w-8 h-8 rounded-xl bg-sky-500/10 flex items-center justify-center mx-auto mb-1.5">
           <Package className="w-4 h-4 text-sky-400" />
@@ -97,6 +100,8 @@ export default function LivreurStatsBanner({ mesCourses, totalEncaisse, montantD
         </p>
         <p className="text-[10px] text-muted-foreground font-medium">Encaissé</p>
       </div>
+      {/* Score de fiabilité (Phase 1 anti-annulation) */}
+      <LivreurFiabiliteCard livreur={livreur || (mesCourses?.[0] ? { id: mesCourses[0].livreur_id } : null)} compact />
     </div>
   );
 }
