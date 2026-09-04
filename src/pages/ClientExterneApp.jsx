@@ -16,7 +16,7 @@ import {
   MapPin, Navigation, MessageCircle, User, Package,
   Clock, ChevronRight, TrendingUp, Loader2, ArrowLeft, RefreshCw, Wallet,
   Store, UtensilsCrossed, Bell, Pill, Inbox, Car, Headphones, ShieldCheck,
-  Zap, CheckCircle2
+  Zap, CheckCircle2, RotateCcw
 } from "lucide-react";
 import LivreurRatingDialog from "@/components/client/LivreurRatingDialog";
 import CourseAnnuleeRelanceDialog from "@/components/client/CourseAnnuleeRelanceDialog";
@@ -37,6 +37,7 @@ import SuiviBarreFlottante from "@/components/client/SuiviBarreFlottante";
 import RechercheLivreurScreen from "@/components/client/RechercheLivreurScreen";
 import SuiviCourseFullscreen from "@/components/client/SuiviCourseFullscreen";
 import EcranFinCourse from "@/components/client/EcranFinCourse";
+import QuickOrderPanel from "@/components/client/QuickOrderPanel";
 import { isLibre } from "@/lib/dispatchRules";
 import { haversineKm as haversineDistance } from "@/lib/priceEstimate";
 
@@ -1120,94 +1121,105 @@ export default function ClientExterneApp() {
                 </div>
               </div>
 
-              {/* ── ACTIONS PRINCIPALES ───────────── */}
-              <div className="grid grid-cols-2 gap-3">
+              {/* ── TRAJETS FRÉQUENTS — Phase 3 : commande en 1 tap ── */}
+              <QuickOrderPanel
+                clientProfil={clientProfil}
+                position={position}
+                user={userId ? { id: userId } : null}
+              />
+
+              {/* ── ACTIONS PRINCIPALES — 3 actions prioritaires ── */}
+              <div className="space-y-3">
+                {/* 1. COMMANDER — action principale */}
                 <button
-                  className="group relative overflow-hidden rounded-2xl bg-white border border-black/5 shadow-[0_8px_24px_rgba(15,23,42,0.07)] p-5 text-left active:scale-[0.97] transition-all hover:shadow-md"
+                  className="w-full flex items-center gap-4 rounded-2xl bg-[#007aff] p-5 shadow-[0_12px_30px_rgba(0,122,255,0.25)] active:scale-[0.98] transition-all text-left"
                   onClick={() => navigate("/client/course/expedier", { state: { position, clientProfil } })}
                 >
-                  <div className="w-12 h-12 rounded-2xl bg-[#007aff] flex items-center justify-center shadow-sm mb-2 group-hover:scale-105 transition-transform">
-                    <Package className="w-5 h-5 text-white" />
+                  <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center flex-shrink-0">
+                    <Package className="w-7 h-7 text-white" />
                   </div>
-                  <p className="font-black text-gray-900 text-xs">Expédier</p>
-                  <p className="text-[10px] text-gray-500 mt-0.5">Envoyer un colis</p>
+                  <div className="flex-1">
+                    <p className="text-lg font-black text-white">Commander</p>
+                    <p className="text-sm text-white/80">Envoyer un colis ou expédier</p>
+                  </div>
+                  <ChevronRight className="w-6 h-6 text-white/70" />
                 </button>
 
+                {/* 2. REFAIRE — historique */}
                 <button
-                  className="group relative overflow-hidden rounded-2xl bg-white border border-black/5 shadow-[0_8px_24px_rgba(15,23,42,0.07)] p-5 text-left active:scale-[0.97] transition-all hover:shadow-md"
+                  className="w-full flex items-center gap-4 rounded-2xl bg-white border border-black/5 shadow-[0_8px_24px_rgba(15,23,42,0.07)] p-5 active:scale-[0.98] transition-all text-left hover:shadow-md"
+                  onClick={() => navigate("/client/suivi")}
+                >
+                  <div className="w-14 h-14 rounded-2xl bg-green-50 flex items-center justify-center flex-shrink-0">
+                    <RotateCcw className="w-7 h-7 text-green-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-lg font-black text-gray-900">Refaire</p>
+                    <p className="text-sm text-gray-500">Reprendre une ancienne course</p>
+                  </div>
+                  <ChevronRight className="w-6 h-6 text-gray-400" />
+                </button>
+
+                {/* 3. SUIVRE — course en cours */}
+                {coursesActives.length > 0 && (
+                  <button
+                    className="w-full flex items-center gap-4 rounded-2xl bg-white border border-black/5 shadow-[0_8px_24px_rgba(15,23,42,0.07)] p-5 active:scale-[0.98] transition-all text-left hover:shadow-md"
+                    onClick={() => navigate("/client/suivi")}
+                  >
+                    <div className="w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center flex-shrink-0">
+                      <Navigation className="w-7 h-7 text-blue-600" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-lg font-black text-gray-900">Suivre</p>
+                      <p className="text-sm text-gray-500">
+                        {coursesActives.length} course{coursesActives.length > 1 ? "s" : ""} en cours
+                      </p>
+                    </div>
+                    <div className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse" />
+                  </button>
+                )}
+              </div>
+
+              {/* ── ACTIONS SECONDAIRES — accessibles mais moins proéminentes ── */}
+              <div className="grid grid-cols-4 gap-2">
+                <button
+                  className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-white border border-black/5 shadow-sm active:scale-95 transition-all"
                   onClick={() => navigate("/client/course/recevoir", { state: { position, clientProfil } })}
                 >
-                  <div className="w-12 h-12 rounded-2xl bg-[#30b85a] flex items-center justify-center shadow-sm mb-2 group-hover:scale-105 transition-transform">
+                  <div className="w-10 h-10 rounded-xl bg-[#30b85a] flex items-center justify-center">
                     <Inbox className="w-5 h-5 text-white" />
                   </div>
-                  <p className="font-black text-gray-900 text-xs">Recevoir</p>
-                  <p className="text-[10px] text-gray-500 mt-0.5">Attendre un colis</p>
+                  <span className="text-[10px] font-semibold text-gray-600">Recevoir</span>
                 </button>
 
                 <button
-                  className="group relative overflow-hidden rounded-2xl bg-white border border-black/5 shadow-[0_8px_24px_rgba(15,23,42,0.07)] p-5 text-left active:scale-[0.97] transition-all hover:shadow-md"
+                  className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-white border border-black/5 shadow-sm active:scale-95 transition-all"
                   onClick={() => navigate("/client/course/deplacement", { state: { position, clientProfil } })}
                 >
-                  <div className="w-12 h-12 rounded-2xl bg-[#5ac8fa] flex items-center justify-center shadow-sm mb-2 group-hover:scale-105 transition-transform">
+                  <div className="w-10 h-10 rounded-xl bg-[#5ac8fa] flex items-center justify-center">
                     <Car className="w-5 h-5 text-white" />
                   </div>
-                  <p className="font-black text-gray-900 text-xs">Déplacement</p>
-                  <p className="text-[10px] text-gray-500 mt-0.5">Transport personne</p>
+                  <span className="text-[10px] font-semibold text-gray-600">Déplacement</span>
                 </button>
 
                 <button
-                  className="group relative overflow-hidden rounded-2xl bg-white border border-black/5 shadow-[0_8px_24px_rgba(15,23,42,0.07)] p-5 text-left active:scale-[0.97] transition-all hover:shadow-md"
-                  onClick={() => setShowMessages(true)}
-                >
-                  <div className="w-12 h-12 rounded-2xl bg-[#af52de] flex items-center justify-center shadow-sm mb-2 group-hover:scale-105 transition-transform">
-                    <MessageCircle className="w-5 h-5 text-white" />
-                  </div>
-                  <p className="font-black text-gray-900 text-xs">Messages</p>
-                  <p className="text-[10px] text-gray-500 mt-0.5">Discuter avec clients / livreurs</p>
-                </button>
-
-                <button
-                  className="group relative overflow-hidden rounded-2xl bg-white border border-black/5 shadow-[0_8px_24px_rgba(15,23,42,0.07)] p-5 text-left active:scale-[0.97] transition-all hover:shadow-md"
-                  onClick={() => navigate("/payer-silgapp")}
-                >
-                  <div className="w-12 h-12 rounded-2xl bg-[#007aff] flex items-center justify-center shadow-sm mb-2 group-hover:scale-105 transition-transform">
-                    <Wallet className="w-5 h-5 text-white" />
-                  </div>
-                  <p className="font-black text-gray-900 text-xs">Payer SILGAPP</p>
-                  <p className="text-[10px] text-gray-500 mt-0.5">Regler vos frais</p>
-                </button>
-
-                <button
-                  className="group relative overflow-hidden rounded-2xl bg-white border border-black/5 shadow-[0_8px_24px_rgba(15,23,42,0.07)] p-5 text-left active:scale-[0.97] transition-all hover:shadow-md"
+                  className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-white border border-black/5 shadow-sm active:scale-95 transition-all"
                   onClick={() => navigate("/client/boutiques")}
                 >
-                  <div className="w-12 h-12 rounded-2xl bg-[#5856d6] flex items-center justify-center shadow-sm mb-2 group-hover:scale-105 transition-transform">
+                  <div className="w-10 h-10 rounded-xl bg-[#5856d6] flex items-center justify-center">
                     <Store className="w-5 h-5 text-white" />
                   </div>
-                  <p className="font-black text-gray-900 text-xs">Boutiques</p>
-                  <p className="text-[10px] text-gray-500 mt-0.5">Commander en boutique</p>
+                  <span className="text-[10px] font-semibold text-gray-600">Boutiques</span>
                 </button>
 
                 <button
-                  className="group relative overflow-hidden rounded-2xl bg-white border border-black/5 shadow-[0_8px_24px_rgba(15,23,42,0.07)] p-5 text-left active:scale-[0.97] transition-all hover:shadow-md"
+                  className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-white border border-black/5 shadow-sm active:scale-95 transition-all"
                   onClick={() => navigate("/client/restaurants")}
                 >
-                  <div className="w-12 h-12 rounded-2xl bg-[#ff9500] flex items-center justify-center shadow-sm mb-2 group-hover:scale-105 transition-transform">
+                  <div className="w-10 h-10 rounded-xl bg-[#ff9500] flex items-center justify-center">
                     <UtensilsCrossed className="w-5 h-5 text-white" />
                   </div>
-                  <p className="font-black text-gray-900 text-xs">Restaurants</p>
-                  <p className="text-[10px] text-gray-500 mt-0.5">Commander à manger</p>
-                </button>
-
-                <button
-                  className="group relative overflow-hidden rounded-2xl bg-white border border-black/5 shadow-[0_8px_24px_rgba(15,23,42,0.07)] p-5 text-left active:scale-[0.97] transition-all hover:shadow-md"
-                  onClick={() => navigate("/client/pharmacies")}
-                >
-                  <div className="w-12 h-12 rounded-2xl bg-[#00a86b] flex items-center justify-center shadow-sm mb-2 group-hover:scale-105 transition-transform">
-                    <Pill className="w-5 h-5 text-white" />
-                  </div>
-                  <p className="font-black text-gray-900 text-xs">Pharmacies</p>
-                  <p className="text-[10px] text-gray-500 mt-0.5">Discuter & commander</p>
+                  <span className="text-[10px] font-semibold text-gray-600">Restaurants</span>
                 </button>
               </div>
 
