@@ -9,6 +9,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Star, Phone, MapPin, Package, Calendar, TrendingUp, Clock, Pencil, Save, X, MessageCircle, Ban } from "lucide-react";
 import { normalizePhone } from "@/lib/crmUtils";
+import { normalizePhoneForWhatsapp } from "@/lib/courseContact";
+import { buildPipelineUpdatePayload, buildPipelineCreatePayload } from "@/lib/crmProspection";
 import { cn } from "@/lib/utils";
 
 const STATUT_COLORS = {
@@ -64,27 +66,14 @@ export default function ClientFicheDialog({ open, onClose, client: initialClient
     if (!client?.id) return;
     setPipelineSaving(true);
     try {
-      const now = new Date().toISOString();
+      const newStatus = updates.pipeline_status || "a_contacter";
       if (prospection) {
-        const updated = await base44.entities.CrmProspection.update(prospection.id, {
-          ...updates,
-          dernier_contact_at: updates.pipeline_status ? now : prospection.dernier_contact_at,
-          nb_contacts: updates.pipeline_status ? (prospection.nb_contacts || 0) + 1 : prospection.nb_contacts,
-        });
+        const payload = buildPipelineUpdatePayload(prospection, newStatus, updates);
+        const updated = await base44.entities.CrmProspection.update(prospection.id, payload);
         setProspection(updated);
       } else {
-        const created = await base44.entities.CrmProspection.create({
-          client_id: client.id,
-          client_nom: `${client.prenom || ""} ${client.nom || ""}`.trim(),
-          client_telephone: client.telephone || "",
-          client_phone_normalized: client.telephone_normalized || "",
-          country_code: client.country_code || "",
-          pipeline_status: updates.pipeline_status || "a_contacter",
-          crm_type: updates.crm_type || "particulier",
-          origine: "crm",
-          dernier_contact_at: updates.pipeline_status ? now : null,
-          nb_contacts: updates.pipeline_status ? 1 : 0,
-        });
+        const payload = buildPipelineCreatePayload(client, newStatus, updates);
+        const created = await base44.entities.CrmProspection.create(payload);
         setProspection(created);
       }
     } catch (err) {
@@ -95,17 +84,8 @@ export default function ClientFicheDialog({ open, onClose, client: initialClient
   };
 
   // ── Lien WhatsApp (manuel — n'envoie pas automatiquement) ──
-  const waPhone = (() => {
-    if (!client) return null;
-    let num = String(client.telephone || "").replace(/\D/g, "");
-    if (!num) return null;
-    // Normalisation simple: si commence par 0, remplacer par indicatif pays
-    const dialMap = { BF: "226", CI: "225", TG: "228", BJ: "229", SN: "221", ML: "223", GN: "224", NE: "227", GH: "233", MA: "212" };
-    const dial = dialMap[client.country_code] || "";
-    if (num.startsWith("0")) num = dial + num.slice(1);
-    else if (dial && num.length <= 9) num = dial + num;
-    return num;
-  })();
+  // Utilise le helper officiel normalizePhoneForWhatsapp (source de vérité unique, tous pays)
+  const waPhone = client ? normalizePhoneForWhatsapp(client.telephone, client.country_code) : "";
 
   const isPro = prospection?.crm_type === "commerce" || prospection?.crm_type === "restaurant" || prospection?.crm_type === "entreprise";
   const waMessage = isPro

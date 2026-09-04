@@ -5,6 +5,7 @@ import { MessageCircle, Check, X, Clock, ChevronRight, Loader2, Ban, RotateCw, S
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { normalizePhoneForWhatsapp } from "@/lib/courseContact";
+import { buildPipelineUpdatePayload, buildPipelineCreatePayload } from "@/lib/crmProspection";
 
 const PIPELINE_STATUSES = [
   { key: "a_contacter", label: "À contacter", color: "bg-blue-50 text-blue-700 border-blue-200" },
@@ -71,32 +72,15 @@ export default function CrmProspectionPanel({ prospections, clients, onRefresh }
     setUpdating(true);
     try {
       const existing = prospections.find(p => p.client_id === clientId);
-      const now = new Date().toISOString();
-      const relanceDate = status === "a_relancer" ? new Date(Date.now() + 7 * 86400000).toISOString() : null;
 
       if (existing) {
-        await base44.entities.CrmProspection.update(existing.id, {
-          pipeline_status: status,
-          dernier_contact_at: now,
-          nb_contacts: (existing.nb_contacts || 0) + 1,
-          canal_utilise: canal,
-          prochaine_relance_at: relanceDate,
-        });
+        const payload = buildPipelineUpdatePayload(existing, status, { canal_utilise: canal });
+        await base44.entities.CrmProspection.update(existing.id, payload);
       } else {
         const client = clientMap.get(clientId);
-        await base44.entities.CrmProspection.create({
-          client_id: clientId,
-          client_nom: client ? `${client.prenom || ""} ${client.nom || ""}`.trim() : "",
-          client_telephone: client?.telephone || "",
-          client_phone_normalized: client?.telephone_normalized || "",
-          country_code: client?.country_code || "",
-          pipeline_status: status,
-          dernier_contact_at: now,
-          nb_contacts: 1,
-          canal_utilise: canal,
-          prochaine_relance_at: relanceDate,
-          origine: "crm",
-        });
+        if (!client) throw new Error("Client introuvable");
+        const payload = buildPipelineCreatePayload(client, status, { canal_utilise: canal });
+        await base44.entities.CrmProspection.create(payload);
       }
 
       queryClient.invalidateQueries({ queryKey: ["crm-prospections"] });
