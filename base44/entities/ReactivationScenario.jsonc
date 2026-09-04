@@ -33,9 +33,15 @@
         "regular",
         "occasional",
         "no_course",
-        "creee_non_livree"
+        "creee_non_livree",
+        "first_course_delivered"
       ],
-      "description": "Segment: no_course (jamais command\u00e9), creee_non_livree (course cr\u00e9\u00e9e mais jamais livr\u00e9e), occasional (1 course livr\u00e9e), regular (2-4 courses livr\u00e9es), vip (5+ courses livr\u00e9es)"
+      "description": "Segment: no_course (jamais command\u00e9), creee_non_livree (course cr\u00e9\u00e9e mais jamais livr\u00e9e), occasional (1 course livr\u00e9e inactif), regular (2-4 courses livr\u00e9es), vip (5+ courses livr\u00e9es), first_course_delivered (exactement 1 course livr\u00e9e, rappels J+1/J+3/J+7 depuis la livraison)"
+    },
+    "reference_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date de r\u00e9f\u00e9rence pour le calcul des rappels. Pour first_course_delivered: date de livraison de la premi\u00e8re course. J+1/J+3/J+7 calcul\u00e9s depuis cette date. Null pour les autres segments (utilisent j0_sent_at)."
     },
     "ab_variant": {
       "type": "string",
@@ -55,40 +61,43 @@
         "expired"
       ],
       "default": "active",
-      "description": "Statut du sc\u00e9nario: active=en cours, converted=course cr\u00e9\u00e9e, completed=tous les pushes envoy\u00e9s sans conversion, expired=J+5 d\u00e9pass\u00e9 sans conversion"
+      "description": "Statut du sc\u00e9nario: active=en cours, converted=course cr\u00e9\u00e9e, completed=tous les pushes envoy\u00e9s sans conversion, expired=J+5/J+7 d\u00e9pass\u00e9 sans conversion"
     },
     "j0_recipient_id": {
       "type": "string",
-      "description": "ID du ReactivationCampaignRecipient pour le push J0"
+      "description": "ID du ReactivationCampaignRecipient pour le push J0 (ou J+1 pour first_course_delivered)"
     },
     "j0_sent_at": {
       "type": "string",
-      "format": "date-time"
+      "format": "date-time",
+      "description": "Date d'envoi du push J0 (ou J+1 pour first_course_delivered)"
     },
     "j2_recipient_id": {
       "type": "string",
-      "description": "ID du ReactivationCampaignRecipient pour le push J+2"
+      "description": "ID du ReactivationCampaignRecipient pour le push J+2 (ou J+3 pour first_course_delivered)"
     },
     "j2_sent_at": {
       "type": "string",
-      "format": "date-time"
+      "format": "date-time",
+      "description": "Date d'envoi du push J+2 (ou J+3 pour first_course_delivered)"
     },
     "j5_recipient_id": {
       "type": "string",
-      "description": "ID du ReactivationCampaignRecipient pour le push J+5"
+      "description": "ID du ReactivationCampaignRecipient pour le push J+5 (ou J+7 pour first_course_delivered)"
     },
     "j5_sent_at": {
       "type": "string",
-      "format": "date-time"
+      "format": "date-time",
+      "description": "Date d'envoi du push J+5 (ou J+7 pour first_course_delivered)"
     },
     "next_push_at": {
       "type": "string",
       "format": "date-time",
-      "description": "Date pr\u00e9vue du prochain push (J0, J+2 ou J+5)"
+      "description": "Date pr\u00e9vue du prochain push (J0, J+2, J+5 ou J+1, J+3, J+7 pour first_course_delivered)"
     },
     "next_push_step": {
       "type": "number",
-      "description": "Prochaine \u00e9tape: 0=J0, 2=J+2, 5=J+5. -1=termin\u00e9"
+      "description": "Prochaine \u00e9tape: 0=J0, 2=J+2, 5=J+5. Pour first_course_delivered: 1=J+1, 3=J+3, 7=J+7. -1=termin\u00e9"
     },
     "converted_at": {
       "type": "string",

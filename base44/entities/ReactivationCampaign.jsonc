@@ -120,7 +120,7 @@
     "net_result": {
       "type": "number",
       "default": 0,
-      "description": "R\u00e9sultat net = commission g\u00e9n\u00e9r\u00e9e - co\u00f9t promotionnel"
+      "description": "R\u00e9sultat net = commission g\u00e9n\u00e9r\u00e9e - co\u00fbt promotionnel"
     },
     "is_ab_test": {
       "type": "boolean",
@@ -159,7 +159,7 @@
     "is_automatic": {
       "type": "boolean",
       "default": false,
-      "description": "True si la campagne est g\u00e9r\u00e9e par le moteur automatique J0/J+2/J+5. Les campagnes manuelles restent is_automatic=false."
+      "description": "True si la campagne est g\u00e9r\u00e9e par le moteur automatique J0/J+2/J+5 ou J+1/J+3/J+7 (first_course_delivered). Les campagnes manuelles restent is_automatic=false."
     },
     "scenario_paused": {
       "type": "boolean",
@@ -182,10 +182,11 @@
         "regular",
         "occasional",
         "no_course",
+        "first_course_delivered",
         "all"
       ],
       "default": "all",
-      "description": "Segment intelligent pour le moteur auto: vip (5+ courses inactif), regular (2-4 courses inactif), occasional (1 course inactif), no_course (0 course inscrit), all (tous \u00e9ligibles)"
+      "description": "Segment intelligent pour le moteur auto: vip (5+ courses inactif), regular (2-4 courses inactif), occasional (1 course inactif), no_course (0 course inscrit), first_course_delivered (exactement 1 course livr\u00e9e, rappels J+1/J+3/J+7 depuis la livraison), all (tous \u00e9ligibles)"
     },
     "j0_message_a": {
       "type": "string",
@@ -214,12 +215,12 @@
     "push_interval_days": {
       "type": "number",
       "default": 2,
-      "description": "D\u00e9lai en jours entre J0 et J+2"
+      "description": "D\u00e9lai en jours entre J0 et J+2 (ou J+1 et J+3 pour first_course_delivered)"
     },
     "push_interval_2_days": {
       "type": "number",
       "default": 3,
-      "description": "D\u00e9lai en jours entre J+2 et J+5"
+      "description": "D\u00e9lai en jours entre J+2 et J+5 (ou J+3 et J+7 pour first_course_delivered)"
     },
     "cooldown_days": {
       "type": "number",

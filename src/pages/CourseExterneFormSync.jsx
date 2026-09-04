@@ -51,6 +51,7 @@ export default function CourseExterneFormSync() {
   const typeCourse = location.pathname.includes("expedier") ? "expedier" : location.pathname.includes("deplacement") ? "deplacement" : "recevoir";
   const position = location.state?.position || JSON.parse(localStorage.getItem("client_gps_position") || "null");
   const clientProfil = location.state?.clientProfil;
+  const prefillCourse = location.state?.prefillCourse;
   // Coords sauvegardées en DB — utilisées comme fallback si getCurrentPosition timeout
   const savedLat = clientProfil?.latitude || position?.latitude || null;
   const savedLng = clientProfil?.longitude || position?.longitude || null;
@@ -85,37 +86,65 @@ export default function CourseExterneFormSync() {
   const clientGpsLng = position?.longitude || null;
   const clientAdresse = clientProfil?.quartier || "";
 
-  const initialData = draft || {
-    type_course: typeCourse,
-    client_nom: clientProfil?.nom || "",
-    client_telephone: clientProfil?.telephone || "",
-    expediteur_nom: "",
-    expediteur_telephone: "",
-    destinataire_nom: "",
-    destinataire_telephone: "",
-    type_colis: "petit_colis",
-    adresse_depart: "",
-    adresse_arrivee: "",
-    quartier_depart: "",
-    quartier_arrivee: "",
-    destination_inconnue: false,
-    notes: "",
-    date_souhaitee: "",
-    mode_immediat: true,
-    // Pour "recevoir" : départ = chez l'expéditeur (à saisir), arrivée = position client (auto)
-    gps_depart_lat: null,
-    gps_depart_lng: null,
-    gps_arrivee_lat: typeCourse === "recevoir" ? clientGpsLat : null,
-    gps_arrivee_lng: typeCourse === "recevoir" ? clientGpsLng : null,
-    recuperationGPS: false,
-    livraisonGPS: typeCourse === "recevoir" && !!clientGpsLat,
-    // Champs GPS expéditeur (pour "recevoir") - IMPORTANT : persister entre étapes
-    expediteur_gps_available: false,
-    expediteur_gps_lat: null,
-    expediteur_gps_lng: null,
-    // Prix proposé par le client (pré-rempli avec l'estimation GPS)
-    prix_propose: 0,
-  };
+  const initialData = prefillCourse
+    ? {
+        type_course: typeCourse,
+        client_nom: clientProfil?.nom || "",
+        client_telephone: clientProfil?.telephone || "",
+        expediteur_nom: prefillCourse.expediteur_nom || "",
+        expediteur_telephone: prefillCourse.expediteur_telephone || "",
+        destinataire_nom: prefillCourse.destinataire_nom || "",
+        destinataire_telephone: prefillCourse.destinataire_telephone || "",
+        type_colis: prefillCourse.type_colis || "petit_colis",
+        adresse_depart: prefillCourse.adresse_depart || "",
+        adresse_arrivee: prefillCourse.adresse_arrivee || "",
+        quartier_depart: prefillCourse.quartier_depart || "",
+        quartier_arrivee: prefillCourse.quartier_arrivee || "",
+        ville_depart: prefillCourse.ville_depart || "",
+        ville_arrivee: prefillCourse.ville_arrivee || "",
+        destination_inconnue: prefillCourse.destination_inconnue || false,
+        notes: "",
+        date_souhaitee: "",
+        mode_immediat: true,
+        gps_depart_lat: prefillCourse.gps_depart_lat || null,
+        gps_depart_lng: prefillCourse.gps_depart_lng || null,
+        gps_arrivee_lat: prefillCourse.gps_arrivee_lat || (typeCourse === "recevoir" ? clientGpsLat : null),
+        gps_arrivee_lng: prefillCourse.gps_arrivee_lng || (typeCourse === "recevoir" ? clientGpsLng : null),
+        recuperationGPS: false,
+        livraisonGPS: typeCourse === "recevoir" && !!clientGpsLat,
+        expediteur_gps_available: false,
+        expediteur_gps_lat: null,
+        expediteur_gps_lng: null,
+        prix_propose: 0,
+      }
+    : (draft || {
+        type_course: typeCourse,
+        client_nom: clientProfil?.nom || "",
+        client_telephone: clientProfil?.telephone || "",
+        expediteur_nom: "",
+        expediteur_telephone: "",
+        destinataire_nom: "",
+        destinataire_telephone: "",
+        type_colis: "petit_colis",
+        adresse_depart: "",
+        adresse_arrivee: "",
+        quartier_depart: "",
+        quartier_arrivee: "",
+        destination_inconnue: false,
+        notes: "",
+        date_souhaitee: "",
+        mode_immediat: true,
+        gps_depart_lat: null,
+        gps_depart_lng: null,
+        gps_arrivee_lat: typeCourse === "recevoir" ? clientGpsLat : null,
+        gps_arrivee_lng: typeCourse === "recevoir" ? clientGpsLng : null,
+        recuperationGPS: false,
+        livraisonGPS: typeCourse === "recevoir" && !!clientGpsLat,
+        expediteur_gps_available: false,
+        expediteur_gps_lat: null,
+        expediteur_gps_lng: null,
+        prix_propose: 0,
+      });
 
   const [formData, setFormData] = useState(initialData);
 

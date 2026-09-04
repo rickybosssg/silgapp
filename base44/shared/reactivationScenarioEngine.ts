@@ -78,6 +78,14 @@ export const SEGMENT_MESSAGES: Record<string, { j0: string; j2: string; j5: stri
     j2_title: "Besoin d'un livreur ?",
     j5_title: "Une livraison à faire ?",
   },
+  first_course_delivered: {
+    j0: "Merci d'avoir utilisé SILGAPP 👋 Une nouvelle livraison à faire ? Lancez votre course directement dans SILGAPP.",
+    j2: "Besoin d'une livraison ? SILGAPP peut rechercher un livreur pour vous.",
+    j5: "Un colis à envoyer ou récupérer ? SILGAPP est disponible pour votre prochaine livraison.",
+    j0_title: "Merci pour votre confiance",
+    j2_title: "Besoin d'une livraison ?",
+    j5_title: "SILGAPP est disponible",
+  },
 };
 
 // ── Récupérer le message par segment + étape + variante ──
@@ -100,7 +108,7 @@ export function getSegmentMessage(
 
 // ── Segmentation intelligente ──────────────────────────────────────────────
 
-export type SmartSegment = 'vip' | 'regular' | 'occasional' | 'no_course';
+export type SmartSegment = 'vip' | 'regular' | 'occasional' | 'no_course' | 'first_course_delivered';
 
 /**
  * Calcule le segment intelligent à partir du nombre de courses LIVRÉES.
@@ -221,13 +229,14 @@ export function computeSmartSegment(client: any): SmartSegment {
   return computeSmartSegmentFromCount(nb);
 }
 
-export const SEGMENT_PRIORITY: SmartSegment[] = ['vip', 'regular', 'occasional', 'no_course'];
+export const SEGMENT_PRIORITY: SmartSegment[] = ['vip', 'regular', 'occasional', 'first_course_delivered', 'no_course'];
 
 export const SEGMENT_LABELS: Record<SmartSegment, string> = {
   vip: 'VIP (5+ courses)',
   regular: 'Régulier (2-4 courses)',
-  occasional: 'Occasionnel (1 course)',
+  occasional: 'Occasionnel (1 course inactif)',
   no_course: 'Inscrit sans course',
+  first_course_delivered: '1ère course livrée (J+1/J+3/J+7)',
 };
 
 // ── Configuration depuis AppConfig ─────────────────────────────────────────
@@ -297,6 +306,7 @@ export interface EligibleClient {
   client: any;
   token: any | null;
   segment: SmartSegment;
+  referenceDate?: string; // Pour first_course_delivered: date de livraison de la 1ère course
 }
 
 export async function findEligibleClients(
@@ -420,6 +430,7 @@ export async function findEligibleClients(
 
     // ── Détermination du segment A/B/C ──
     let segment: SmartSegment;
+    let referenceDate: string | undefined;
     if (total === 0) {
       segment = 'no_course'; // Segment A
     } else if (delivered === 0) {
@@ -428,15 +439,40 @@ export async function findEligibleClients(
       segment = computeSmartSegmentFromCount(delivered); // Segment C (occasional/regular/vip)
     }
 
+    // ── Détection first_course_delivered : exactement 1 course livrée, pas de course active ──
+    // Rappels J+1/J+3/J+7 depuis la date de livraison (pas J0/J+2/J+5)
+    if (delivered === 1) {
+      const clientCourses = (c.telephone_normalized ? (phoneToCourses.get(c.telephone_normalized.trim()) || []) : [])
+        .concat((c.user_email || '').trim().toLowerCase() ? (emailToCourses.get((c.user_email || '').trim().toLowerCase()) || []) : []);
+      const seenIds = new Set<string>();
+      const deduped = clientCourses.filter(c2 => { if (seenIds.has(c2.id)) return false; seenIds.add(c2.id); return true; });
+
+      // Vérifier qu'aucune course n'est active (en cours)
+      const activeStatuses = new Set(['nouvelle', 'en_attente', 'programmee', 'recherche_livreur', 'livreur_en_route', 'client_contacto', 'en_route_expediteur', 'arrive_prise_en_charge', 'colis_recupere', 'passager_embarque', 'pris_en_charge', 'en_livraison', 'arrivee']);
+      const hasActiveCourse = deduped.some(c2 => activeStatuses.has(c2.statut));
+      if (!hasActiveCourse) {
+        // Trouver la date de livraison de la 1ère (et unique) course livrée
+        const deliveredCourse = deduped.find(c2 => c2.statut === 'livree');
+        const deliveryDate = deliveredCourse?.heure_livraison || deliveredCourse?.colis_livre_at || null;
+        if (deliveryDate) {
+          segment = 'first_course_delivered';
+          referenceDate = deliveryDate;
+        }
+      }
+    }
+
     // Filtre par smart_segment si défini
     if (campaign.smart_segment && campaign.smart_segment !== 'all' && segment !== campaign.smart_segment) continue;
 
     // ── Inactivité : basée sur la VRAIE dernière course (CourseExterne) ──
-    const inactiveDays = lastCourseDate === 0 ? 9999 : (now2 - lastCourseDate) / 86400000;
-    if (inactiveDays < (campaign.inactive_days_min || 30)) continue;
+    // Pour first_course_delivered : pas de filtre d'inactivité (le point de départ est la livraison)
+    if (segment !== 'first_course_delivered') {
+      const inactiveDays = lastCourseDate === 0 ? 9999 : (now2 - lastCourseDate) / 86400000;
+      if (inactiveDays < (campaign.inactive_days_min || 30)) continue;
+    }
 
     seenPersonKeys.add(personKey);
-    eligible.push({ client: c, token, segment });
+    eligible.push({ client: c, token, segment, referenceDate });
   }
 
   // Trier par priorité de segment (no_course d'abord pour premières conversions)
@@ -459,17 +495,27 @@ export async function createScenario(
   campaign: any,
   eligible: EligibleClient
 ): Promise<any | null> {
-  const { client, token, segment } = eligible;
+  const { client, token, segment, referenceDate } = eligible;
 
   // A/B variant persistant (hash déterministe par client_id)
   const abVariant = hashClientId(client.id) % 2 === 0 ? 'A' : 'B';
 
-  // Groupe contrôle (pourcentage configurable)
-  const controlPct = campaign.control_group_pct || 0;
+  // Groupe contrôle (pourcentage configurable) — 15% par défaut pour first_course_delivered
+  const controlPct = segment === 'first_course_delivered'
+    ? (campaign.control_group_pct > 0 ? campaign.control_group_pct : 15)
+    : (campaign.control_group_pct || 0);
   const isControl = controlPct > 0 && (hashClientId(client.id) % 100) < controlPct;
 
   const now = new Date().toISOString();
   const cooldownExpiresAt = new Date(Date.now() + config.cooldownDays * 86400000).toISOString();
+
+  // ── first_course_delivered : J+1 planifié depuis la date de livraison ──
+  // Pas de J0 immédiat. Le premier push est J+1 (1 jour après la livraison).
+  const isFirstCourse = segment === 'first_course_delivered';
+  const refDate = referenceDate || now;
+  const j1PlannedTs = new Date(refDate).getTime() + 1 * 86400000; // J+1
+  const nextPushAt = isFirstCourse ? new Date(j1PlannedTs).toISOString() : now;
+  const nextPushStep = isFirstCourse ? 1 : 0;
 
   const scenario = await base44.asServiceRole.entities.ReactivationScenario.create({
     campaign_id: campaign.id,
@@ -479,14 +525,33 @@ export async function createScenario(
     client_user_email: client.user_email || '',
     country_code: client.country_code || '',
     segment,
+    reference_date: isFirstCourse ? refDate : null,
     ab_variant: abVariant,
     is_control_group: isControl,
     status: 'active',
-    next_push_at: now,
-    next_push_step: 0,
+    next_push_at: nextPushAt,
+    next_push_step: nextPushStep,
     cooldown_expires_at: cooldownExpiresAt,
     test_mode: config.testMode,
   });
+
+  // ── first_course_delivered : PAS de push immédiat (J+1 est planifié) ──
+  if (isFirstCourse) {
+    // Groupe contrôle : créer un recipient marqué control (pas de push)
+    if (isControl) {
+      await base44.asServiceRole.entities.ReactivationCampaignRecipient.create({
+        campaign_id: campaign.id,
+        client_id: client.id,
+        client_telephone: client.telephone || '',
+        user_email: client.user_email || '',
+        is_control_group: true,
+        ab_variant: abVariant,
+        status: 'control',
+        country_code: client.country_code || '',
+      });
+    }
+    return scenario;
+  }
 
   // Envoyer J0 (sauf groupe contrôle) — message par SEGMENT
   if (!isControl && token?.token) {
@@ -598,30 +663,55 @@ export async function processPendingScenarios(
         continue; // Le scénario a été marqué converted
       }
 
-      // ── CORRECTION : Gestion des control groups (next_push_step === 0) ──
+      // ── CORRECTION : Gestion des control groups ──
       // Les control groups ne reçoivent aucun push mais doivent être clôturés
-      // après la fin du cycle J0/J2/J5 + fenêtre d'attribution, pour ne pas
-      // rester 'active' éternellement.
-      if (s.is_control_group && s.next_push_step === 0) {
-        // Date de clôture = création + (J0→J2) + (J2→J5) + fenêtre d'attribution
-        const j0ToJ2Ms = (campaign.push_interval_days || 2) * 86400000;
-        const j2ToJ5Ms = (campaign.push_interval_2_days || 3) * 86400000;
-        const attributionMs = config.attributionWindowHours * 3600000;
-        const closureTs = new Date(s.created_date).getTime() + j0ToJ2Ms + j2ToJ5Ms + attributionMs;
-        if (now >= closureTs) {
-          await base44.asServiceRole.entities.ReactivationScenario.update(s.id, {
-            status: 'completed',
-            next_push_step: -1,
-          });
-          expired++;
+      // après la fin du cycle + fenêtre d'attribution, pour ne pas rester 'active'.
+      if (s.is_control_group && (s.next_push_step === 0 || s.next_push_step === 1)) {
+        if (s.next_push_step === 0) {
+          // Cycle J0/J+2/J+5
+          const j0ToJ2Ms = (campaign.push_interval_days || 2) * 86400000;
+          const j2ToJ5Ms = (campaign.push_interval_2_days || 3) * 86400000;
+          const attributionMs = config.attributionWindowHours * 3600000;
+          const closureTs = new Date(s.created_date).getTime() + j0ToJ2Ms + j2ToJ5Ms + attributionMs;
+          if (now >= closureTs) {
+            await base44.asServiceRole.entities.ReactivationScenario.update(s.id, {
+              status: 'completed',
+              next_push_step: -1,
+            });
+            expired++;
+          }
+        } else {
+          // Cycle J+1/J+3/J+7 (first_course_delivered)
+          const refTs = s.reference_date ? new Date(s.reference_date).getTime() : new Date(s.created_date).getTime();
+          const closureTs = refTs + 7 * 86400000 + config.attributionWindowHours * 3600000;
+          if (now >= closureTs) {
+            await base44.asServiceRole.entities.ReactivationScenario.update(s.id, {
+              status: 'completed',
+              next_push_step: -1,
+            });
+            expired++;
+          }
         }
         continue;
       }
 
-      // ── Garde-fou anti-retry infini pour les scénarios avec échecs J2/J5 ──
-      // Si le scénario a dépassé la fin du cycle (création + J0→J2 + J2→J5 + attribution)
-      // sans conversion, le marquer comme 'expired' pour arrêter les retries.
-      if (s.next_push_step >= 2) {
+      // ── Garde-fou anti-retry infini pour les scénarios avec échecs J2/J5/J3/J7 ──
+      // Si le scénario a dépassé la fin du cycle sans conversion, le marquer 'expired'.
+      // first_course_delivered : cycle J+1/J+3/J+7 depuis reference_date
+      if (s.segment === 'first_course_delivered' && (s.next_push_step === 3 || s.next_push_step === 7)) {
+        const refTs = s.reference_date ? new Date(s.reference_date).getTime() : new Date(s.created_date).getTime();
+        const hardDeadlineTs = refTs + 7 * 86400000 + config.attributionWindowHours * 3600000;
+        if (now >= hardDeadlineTs) {
+          await base44.asServiceRole.entities.ReactivationScenario.update(s.id, {
+            status: 'expired',
+            next_push_step: -1,
+          });
+          expired++;
+          continue;
+        }
+      }
+      // Segments standards : cycle J0/J+2/J+5
+      if (s.segment !== 'first_course_delivered' && s.next_push_step >= 2) {
         const j0ToJ2Ms = (campaign.push_interval_days || 2) * 86400000;
         const j2ToJ5Ms = (campaign.push_interval_2_days || 3) * 86400000;
         const attributionMs = config.attributionWindowHours * 3600000;
@@ -655,7 +745,113 @@ export async function processPendingScenarios(
       const abVariant = s.ab_variant || 'A';
       const now_iso = new Date().toISOString();
 
-      if (s.next_push_step === 2) {
+      // ── first_course_delivered : J+1, J+3, J+7 (depuis reference_date) ──
+      if (s.next_push_step === 1) {
+        // ── J+1 ──
+        const { title: j1Title, message: j1Message } = getSegmentMessage(s.segment, 'j0', abVariant as 'A' | 'B', config);
+        const result = await sendReactivationPush(
+          [{ token: token.token, recipient_id: s.id }],
+          j1Title,
+          j1Message,
+          s.campaign_id
+        );
+        const recipient = await base44.asServiceRole.entities.ReactivationCampaignRecipient.create({
+          campaign_id: s.campaign_id,
+          client_id: s.client_id,
+          client_telephone: s.client_telephone || '',
+          user_email: token.user_email || '',
+          push_token: token.token,
+          push_token_id: token.id || '',
+          is_control_group: false,
+          ab_variant: abVariant,
+          status: result.results[0]?.ok ? 'sent' : 'failed',
+          sent_at: result.results[0]?.ok ? now_iso : null,
+          fcm_error: result.results[0]?.ok ? null : (result.results[0]?.error || null),
+          country_code: s.country_code || '',
+        });
+        // J+3 planifié depuis reference_date + 3 jours
+        const refTs = s.reference_date ? new Date(s.reference_date).getTime() : now;
+        const j3PlannedTs = refTs + 3 * 86400000;
+        await base44.asServiceRole.entities.ReactivationScenario.update(s.id, {
+          j0_recipient_id: recipient.id,
+          j0_sent_at: result.results[0]?.ok ? now_iso : null,
+          next_push_at: new Date(j3PlannedTs).toISOString(),
+          next_push_step: 3,
+        });
+        j2Sent++;
+      } else if (s.next_push_step === 3) {
+        // ── J+3 ──
+        const { title: j3Title, message: j3Message } = getSegmentMessage(s.segment, 'j2', abVariant as 'A' | 'B', config);
+        const result = await sendReactivationPush(
+          [{ token: token.token, recipient_id: s.id }],
+          j3Title,
+          j3Message,
+          s.campaign_id
+        );
+        const recipient = await base44.asServiceRole.entities.ReactivationCampaignRecipient.create({
+          campaign_id: s.campaign_id,
+          client_id: s.client_id,
+          client_telephone: s.client_telephone || '',
+          user_email: token.user_email || '',
+          push_token: token.token,
+          push_token_id: token.id || '',
+          is_control_group: false,
+          ab_variant: abVariant,
+          status: result.results[0]?.ok ? 'sent' : 'failed',
+          sent_at: result.results[0]?.ok ? now_iso : null,
+          fcm_error: result.results[0]?.ok ? null : (result.results[0]?.error || null),
+          country_code: s.country_code || '',
+        });
+        // J+7 planifié depuis reference_date + 7 jours
+        const refTs = s.reference_date ? new Date(s.reference_date).getTime() : now;
+        const j7PlannedTs = refTs + 7 * 86400000;
+        await base44.asServiceRole.entities.ReactivationScenario.update(s.id, {
+          j2_recipient_id: recipient.id,
+          j2_sent_at: result.results[0]?.ok ? now_iso : null,
+          next_push_at: new Date(j7PlannedTs).toISOString(),
+          next_push_step: 7,
+        });
+        j2Sent++;
+      } else if (s.next_push_step === 7) {
+        // ── J+7 ──
+        const { title: j7Title, message: j7Message } = getSegmentMessage(s.segment, 'j5', abVariant as 'A' | 'B', config);
+        const result = await sendReactivationPush(
+          [{ token: token.token, recipient_id: s.id }],
+          j7Title,
+          j7Message,
+          s.campaign_id
+        );
+        const recipient = await base44.asServiceRole.entities.ReactivationCampaignRecipient.create({
+          campaign_id: s.campaign_id,
+          client_id: s.client_id,
+          client_telephone: s.client_telephone || '',
+          user_email: token.user_email || '',
+          push_token: token.token,
+          push_token_id: token.id || '',
+          is_control_group: false,
+          ab_variant: abVariant,
+          status: result.results[0]?.ok ? 'sent' : 'failed',
+          sent_at: result.results[0]?.ok ? now_iso : null,
+          fcm_error: result.results[0]?.ok ? null : (result.results[0]?.error || null),
+          country_code: s.country_code || '',
+        });
+        if (result.results[0]?.ok) {
+          await base44.asServiceRole.entities.ReactivationScenario.update(s.id, {
+            j5_recipient_id: recipient.id,
+            j5_sent_at: now_iso,
+            status: 'completed',
+            next_push_step: -1,
+          });
+          j5Sent++;
+        } else {
+          await base44.asServiceRole.entities.ReactivationScenario.update(s.id, {
+            j5_recipient_id: recipient.id,
+            j5_sent_at: null,
+            next_push_at: new Date(now + 3600000).toISOString(),
+          });
+          errors++;
+        }
+      } else if (s.next_push_step === 2) {
         // ── J+2 — message par SEGMENT ──
         const { title: j2Title, message: j2Message } = getSegmentMessage(s.segment, 'j2', abVariant as 'A' | 'B', config);
         const result = await sendReactivationPush(

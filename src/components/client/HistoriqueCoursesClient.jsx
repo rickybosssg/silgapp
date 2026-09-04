@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import {
@@ -8,6 +9,7 @@ import {
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { getCourseStatusLabel, getCourseStatusColor } from "@/lib/courseStatuses";
+import RefaireCourseButton from "./RefaireCourseButton";
 
 const TYPE_COLIS_ICONS = {
   petit_colis: "",
@@ -18,92 +20,105 @@ const TYPE_COLIS_ICONS = {
   autre: "",
 };
 
-function CourseHistoriqueCard({ course, fraisAnnulation, onSelect }) {
+function CourseHistoriqueCard({ course, fraisAnnulation, onSelect, onRefaireCourse }) {
   const isTerminee = course.statut === "livree";
   const isAnnulee = course.statut === "annulee";
   const frais = fraisAnnulation?.find(f => f.course_id === course.id);
 
   return (
-    <button
-      onClick={() => onSelect(course.id)}
-      className="w-full text-left active:scale-[0.99] transition-transform"
-    >
-      <Card className={`p-4 border-2 transition-colors hover:border-primary/30 ${
-        isTerminee ? "border-green-100" :
-        isAnnulee ? "border-red-100" :
-        "border-gray-100"
-      }`}>
-        <div className="flex items-start justify-between gap-2 mb-3">
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            <span className="text-xl flex-shrink-0">{TYPE_COLIS_ICONS[course.type_colis] || ""}</span>
-            <div className="min-w-0">
-              <p className="text-xs font-bold text-gray-500 uppercase">
-                {course.type_course === "expedier" ? "Expédition" : "Réception"}
-              </p>
-              <p className="text-sm font-black text-gray-900 truncate">
-                {course.adresse_depart || "—"} → {course.adresse_arrivee || "—"}
-              </p>
+    <div className="w-full">
+      <div
+        onClick={() => onSelect(course.id)}
+        className="w-full text-left active:scale-[0.99] transition-transform cursor-pointer"
+      >
+        <Card className={`p-4 border-2 transition-colors hover:border-primary/30 ${
+          isTerminee ? "border-green-100" :
+          isAnnulee ? "border-red-100" :
+          "border-gray-100"
+        }`}>
+          <div className="flex items-start justify-between gap-2 mb-3">
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <span className="text-xl flex-shrink-0">{TYPE_COLIS_ICONS[course.type_colis] || ""}</span>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-gray-500 uppercase">
+                  {course.type_course === "expedier" ? "Expédition" : course.type_course === "deplacement" ? "Déplacement" : "Réception"}
+                </p>
+                <p className="text-sm font-black text-gray-900 truncate">
+                  {course.adresse_depart || "—"} → {course.adresse_arrivee || "—"}
+                </p>
+              </div>
+            </div>
+            <Badge className={`text-xs flex-shrink-0 ${getCourseStatusColor(course.statut)}`}>
+              {getCourseStatusLabel(course.statut)}
+            </Badge>
+          </div>
+
+          <div className="flex items-center justify-between text-xs text-gray-500">
+            <div className="flex items-center gap-3">
+              {course.livreur_nom && (
+                <span className="flex items-center gap-1">
+                  <Truck className="w-3 h-3" />
+                  {course.livreur_nom}
+                </span>
+              )}
+              {course.created_date && (
+                <span className="flex items-center gap-1">
+                  <Clock className="w-3 h-3" />
+                  {format(new Date(course.created_date), "dd/MM HH:mm", { locale: fr })}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {isTerminee && (
+                (() => {
+                  const isPrixManuel = course.pricing_mode === "manual"
+                    && course.manual_price_status === "accepted"
+                    && course.manual_price > 0;
+                  const prix = isPrixManuel
+                    ? Number(course.manual_price)
+                    : (course.prix_final || 0);
+                  return prix > 0 ? (
+                    <span className="font-bold text-green-700">
+                      {prix.toLocaleString()} {course.devise || "F"}
+                    </span>
+                  ) : null;
+                })()
+              )}
+              {isTerminee && course.note_livreur && (
+                <span className="flex items-center gap-0.5 text-yellow-600 font-bold">
+                  <Star className="w-3 h-3 fill-yellow-400" />
+                  {course.note_livreur}/5
+                </span>
+              )}
+              {frais && frais.statut_paiement === "impaye" && (
+                <span className="flex items-center gap-1 bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-bold text-xs">
+                  <AlertTriangle className="w-3 h-3" />
+                  {frais.montant || 250} {course.devise || "F"} dû
+                </span>
+              )}
+              <ChevronRight className="w-4 h-4 text-gray-500" />
             </div>
           </div>
-          <Badge className={`text-xs flex-shrink-0 ${getCourseStatusColor(course.statut)}`}>
-            {getCourseStatusLabel(course.statut)}
-          </Badge>
+        </Card>
+      </div>
+      {isTerminee && (
+        <div className="mt-2">
+          <RefaireCourseButton course={course} onNavigate={onRefaireCourse} />
         </div>
-
-        <div className="flex items-center justify-between text-xs text-gray-500">
-          <div className="flex items-center gap-3">
-            {course.livreur_nom && (
-              <span className="flex items-center gap-1">
-                <Truck className="w-3 h-3" />
-                {course.livreur_nom}
-              </span>
-            )}
-            {course.created_date && (
-              <span className="flex items-center gap-1">
-                <Clock className="w-3 h-3" />
-                {format(new Date(course.created_date), "dd/MM HH:mm", { locale: fr })}
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            {isTerminee && (
-              (() => {
-                // Prix manuel accepté = priorité absolue
-                const isPrixManuel = course.pricing_mode === "manual"
-                  && course.manual_price_status === "accepted"
-                  && course.manual_price > 0;
-                const prix = isPrixManuel
-                  ? Number(course.manual_price)
-                  : (course.prix_final || 0);
-                return prix > 0 ? (
-                  <span className="font-bold text-green-700">
-                    {prix.toLocaleString()} {course.devise || "F"}
-                  </span>
-                ) : null;
-              })()
-            )}
-            {isTerminee && course.note_livreur && (
-              <span className="flex items-center gap-0.5 text-yellow-600 font-bold">
-                <Star className="w-3 h-3 fill-yellow-400" />
-                {course.note_livreur}/5
-              </span>
-            )}
-            {frais && frais.statut_paiement === "impaye" && (
-              <span className="flex items-center gap-1 bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-bold text-xs">
-                <AlertTriangle className="w-3 h-3" />
-                {frais.montant || 250} {course.devise || "F"} dû
-              </span>
-            )}
-            <ChevronRight className="w-4 h-4 text-gray-500" />
-          </div>
-        </div>
-      </Card>
-    </button>
+      )}
+    </div>
   );
 }
 
-export default function HistoriqueCoursesClient({ courses = [], fraisAnnulation = [], onSelectCourse }) {
+export default function HistoriqueCoursesClient({ courses = [], fraisAnnulation = [], onSelectCourse, clientProfil, position }) {
+  const navigate = useNavigate();
   const [filtre, setFiltre] = useState("tout");
+
+  const handleRefaireCourse = (route, state) => {
+    // Effacer le brouillon existant pour démarrer depuis les données pré-remplies
+    try { localStorage.removeItem("silgapp_course_draft"); localStorage.removeItem("silgapp_course_step"); } catch {}
+    navigate(route, { state });
+  };
 
   const filtrees = courses.filter(c => {
     if (filtre === "livrees") return c.statut === "livree";
@@ -187,6 +202,7 @@ export default function HistoriqueCoursesClient({ courses = [], fraisAnnulation 
             course={course}
             fraisAnnulation={fraisAnnulation}
             onSelect={onSelectCourse}
+            onRefaireCourse={handleRefaireCourse}
           />
         ))}
       </div>
