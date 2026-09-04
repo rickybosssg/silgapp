@@ -116,6 +116,7 @@ const CoursesARisque = lazy(() => import('./pages/CoursesARisque.jsx'));
 const FiabilitePush = lazy(() => import('./pages/FiabilitePush.jsx'));
 const SilgaScore = lazy(() => import('./pages/SilgaScore.jsx'));
 const LieuxSilgappPanel = lazy(() => import('./pages/LieuxSilgappPanel.jsx'));
+const HabitRemindersPage = lazy(() => import('./pages/HabitRemindersPage.jsx'));
 import Diag500Panel from './components/admin/Diag500Panel.jsx';
 
 function AnimatedRoutes({ children }) {
@@ -440,6 +441,7 @@ function AppContent() {
           <Route path="/admin/fiabilite-push" element={<AnimatedRoutes><FiabilitePush /></AnimatedRoutes>} />
           <Route path="/admin/silga-score" element={<AnimatedRoutes><SilgaScore /></AnimatedRoutes>} />
           <Route path="/admin/lieux-silgapp" element={<AnimatedRoutes><LieuxSilgappPanel /></AnimatedRoutes>} />
+          <Route path="/admin/rappels-habitude" element={<AnimatedRoutes><HabitRemindersPage /></AnimatedRoutes>} />
           <Route path="/admin/messages" element={<AnimatedRoutes><AdminMessages /></AnimatedRoutes>} />
           <Route path="/admin/whatsapp" element={<AnimatedRoutes><WhatsAppAdmin /></AnimatedRoutes>} />
           <Route path="/admin/venus" element={<AnimatedRoutes><VenusAdminCenter /></AnimatedRoutes>} />
