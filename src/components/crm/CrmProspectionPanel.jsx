@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { normalizePhoneForWhatsapp } from "@/lib/courseContact";
 import { buildPipelineUpdatePayload, buildPipelineCreatePayload } from "@/lib/crmProspection";
+import { buildPilotWhatsAppLink, PILOT_WAVES } from "@/lib/crmPilotMessage";
 
 const PIPELINE_STATUSES = [
   { key: "a_contacter", label: "À contacter", color: "bg-blue-50 text-blue-700 border-blue-200" },
@@ -18,18 +19,24 @@ const PIPELINE_STATUSES = [
   { key: "ne_plus_contacter", label: "Ne plus contacter", color: "bg-red-50 text-red-700 border-red-200" },
 ];
 
-const MESSAGE_PARTICULIER = "Bonjour 👋\nVous avez déjà utilisé le service de livraison SILGAPP.\nVous pouvez maintenant faire directement vos demandes de livraison depuis l'application SILGAPP, sans passer par notre équipe.\nC'est simple, rapide et vous permet de suivre votre livraison.";
-
-const MESSAGE_PRO = "Bonjour 👋\nVous avez déjà utilisé SILGAPP pour vos livraisons.\nAvec l'application SILGAPP, vous pouvez demander directement un livreur pour livrer vos clients.\nVous continuez à vendre, SILGAPP s'occupe de la livraison.";
-
 export default function CrmProspectionPanel({ prospections, clients, onRefresh }) {
   const queryClient = useQueryClient();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [updating, setUpdating] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [showQueue, setShowQueue] = useState(false);
+  const [activeWave, setActiveWave] = useState(null); // null = tous, "pilote_v1_a" = V1-A, etc.
 
-  // File de prospection = prospects sélectionnés avec pipeline_status = a_contacter
+  // Prospects filtrés par vague pilote (V1-A, V1-B, ou tous)
+  const waveFilteredProspects = useMemo(() => {
+    return prospections.filter(p => {
+      if (p.pipeline_status && p.pipeline_status !== "a_contacter") return false;
+      if (activeWave && p.campaign_id !== activeWave) return false;
+      return true;
+    });
+  }, [prospections, activeWave]);
+
+  // File de prospection = prospects sélectionnés
   const queue = useMemo(() => {
     return prospections.filter(p => selectedIds.has(p.client_id));
   }, [prospections, selectedIds]);
@@ -60,12 +67,10 @@ export default function CrmProspectionPanel({ prospections, clients, onRefresh }
     setShowQueue(true);
   };
 
-  const buildWhatsAppLink = (client, prospect) => {
+  const buildWhatsAppLink = (client) => {
     const phone = normalizePhoneForWhatsapp(client?.telephone, client?.country_code);
     if (!phone) return null;
-    const msg = prospect?.crm_type === "commerce" || prospect?.crm_type === "restaurant" || prospect?.crm_type === "entreprise"
-      ? MESSAGE_PRO : MESSAGE_PARTICULIER;
-    return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
+    return buildPilotWhatsAppLink(phone);
   };
 
   const updatePipeline = async (clientId, status, canal = "whatsapp") => {
@@ -245,9 +250,34 @@ export default function CrmProspectionPanel({ prospections, clients, onRefresh }
         l'admin appuie sur "Envoyer" dans WhatsApp pour chaque prospect.
       </p>
 
+      {/* Sélecteur de vague pilote */}
+      <div className="flex gap-1.5">
+        <button
+          onClick={() => setActiveWave(null)}
+          className={cn(
+            "px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all",
+            !activeWave ? "bg-slate-700 text-white" : "bg-slate-100 text-slate-500"
+          )}
+        >
+          Tous
+        </button>
+        {PILOT_WAVES.map(wave => (
+          <button
+            key={wave.id}
+            onClick={() => setActiveWave(wave.id)}
+            className={cn(
+              "px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all",
+              activeWave === wave.id ? "bg-green-600 text-white" : "bg-slate-100 text-slate-500"
+            )}
+          >
+            {wave.label}
+          </button>
+        ))}
+      </div>
+
       {/* Liste des prospects sélectionnables */}
       <div className="max-h-60 overflow-y-auto space-y-1">
-        {prospections.filter(p => p.pipeline_status === "a_contacter" || !p.pipeline_status).slice(0, 50).map(p => {
+        {waveFilteredProspects.slice(0, 50).map(p => {
           const client = clientMap.get(p.client_id);
           if (!client) return null;
           const isSelected = selectedIds.has(p.client_id);

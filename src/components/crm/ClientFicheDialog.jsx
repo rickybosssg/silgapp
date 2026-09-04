@@ -11,6 +11,7 @@ import { Star, Phone, MapPin, Package, Calendar, TrendingUp, Clock, Pencil, Save
 import { normalizePhone } from "@/lib/crmUtils";
 import { normalizePhoneForWhatsapp } from "@/lib/courseContact";
 import { buildPipelineUpdatePayload, buildPipelineCreatePayload } from "@/lib/crmProspection";
+import { buildPilotWhatsAppLink } from "@/lib/crmPilotMessage";
 import { cn } from "@/lib/utils";
 
 const STATUT_COLORS = {
@@ -86,12 +87,7 @@ export default function ClientFicheDialog({ open, onClose, client: initialClient
   // ── Lien WhatsApp (manuel — n'envoie pas automatiquement) ──
   // Utilise le helper officiel normalizePhoneForWhatsapp (source de vérité unique, tous pays)
   const waPhone = client ? normalizePhoneForWhatsapp(client.telephone, client.country_code) : "";
-
-  const isPro = prospection?.crm_type === "commerce" || prospection?.crm_type === "restaurant" || prospection?.crm_type === "entreprise";
-  const waMessage = isPro
-    ? "Bonjour 👋\nVous avez déjà utilisé SILGAPP pour vos livraisons.\nAvec l'application SILGAPP, vous pouvez demander directement un livreur pour livrer vos clients.\nVous continuez à vendre, SILGAPP s'occupe de la livraison."
-    : "Bonjour 👋\nVous avez déjà utilisé le service de livraison SILGAPP.\nVous pouvez maintenant faire directement vos demandes de livraison depuis l'application SILGAPP, sans passer par notre équipe.\nC'est simple, rapide et vous permet de suivre votre livraison.";
-  const waLink = waPhone ? `https://wa.me/${waPhone}?text=${encodeURIComponent(waMessage)}` : null;
+  const waLink = waPhone ? buildPilotWhatsAppLink(waPhone) : null;
 
   // ── Indicateur App CORRIGÉ ──
   // "App installée" = a un compte User (user_email). Pas basé sur app_active/last_seen_at.
