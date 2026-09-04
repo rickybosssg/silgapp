@@ -178,18 +178,6 @@ Deno.serve(async (req) => {
       // ── DELIVERY validé ──
       const now = new Date().toISOString();
 
-      // ── Garde anti-anomalie : une course source=client ne doit JAMAIS être
-      //    bloquée par pricing_mode=admin_manuel si prix_propose_admin est absent.
-      //    Cette incohérence peut résulter d'un ancien bug ou d'une modification
-      //    de données partielle. On corrige vers 'automatic' (même logique que
-      //    calculPrixCourseExterne) pour permettre la finalisation de la livraison.
-      if (course.source === 'client' && course.pricing_mode === 'admin_manuel' &&
-          (!course.prix_propose_admin || Number(course.prix_propose_admin) <= 0)) {
-        console.warn('[validateQRCode] Course source=client avec pricing_mode=admin_manuel sans prix_propose_admin (anomalie) — correction vers automatic');
-        await base44.asServiceRole.entities.CourseExterne.update(course_id, { pricing_mode: 'automatic' }).catch(() => {});
-        course.pricing_mode = 'automatic';
-      }
-
       // COURSE ADMIN : pas de calcul de prix automatique
       // Le prix est saisi par le livreur dans l'app après scan/PIN livraison.
       // Ne PAS mettre le livreur disponible — il doit d'abord saisir le montant.

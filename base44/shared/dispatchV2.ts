@@ -33,7 +33,7 @@
 import { waitUntil } from 'base44:runtime';
 import { STATUTS_ACTIFS_COURSE, STATUTS_TERMINAUX_COURSE, calculerDistance, chargerConfigPays } from './dispatchConstants.ts';
 import { dispatchLog, reponseDejaPrise, generateToken, generatePIN, journaliserDispatch } from './dispatchUtils.ts';
-import { enregistrerNotification, enregistrerNotificationsBulk, enregistrerInboxNotificationsBulk, getLivreursNotifies, getLivreursRefuses, marquerAccepte } from './dispatchNotifications.ts';
+import { enregistrerNotification, getLivreursNotifies, getLivreursRefuses, marquerAccepte } from './dispatchNotifications.ts';
 import { chargerConfigDispatch } from './dispatchConfig.ts';
 import { resolveCourseParticipantUserIds } from './conversationSecurity.ts';
 
@@ -102,17 +102,35 @@ async function notifierLivreursEligiblesV2(base44: any, course: any, options: an
     candidats = candidats.filter((l: any) => Number(l.priorite_dispatch || 0) > 0);
   }
 
-  // 📦 Enregistrer les DispatchNotifications en bulk (1 filter + 1 filter + 1 bulkCreate)
-  // Remplace l'ancien Promise.allSettled(candidats.map(... enregistrerNotification ...))
-  // qui générait 3 appels API par livreur (filter + livreurATokenFCM + create).
-  const dnResult = await enregistrerNotificationsBulk(base44, course.id, candidats, 0, { country_code: course.country_code });
-  dispatchLog(`[V2] 📦 DispatchNotifications bulk: ${dnResult.created} créées pour ${candidats.length} candidat(s)`);
+  // Enregistrer les DispatchNotifications (bulk) pour le suivi dispatch
+  await Promise.allSettled(
+    candidats.map((livreur: any) => enregistrerNotification(base44, course.id, livreur, 0, { country_code: course.country_code }))
+  );
 
-  // 📦 Créer les notifications inbox en bulk (1 filter + 1 bulkCreate)
+  // ── Créer les notifications utilisateur (inbox) ──
   // Idempotence via deduplication_key = COURSE_DISPATCH_<courseId>_<livreurId>
-  // Un retry du même événement est bloqué par comparaison en mémoire.
-  const inboxResult = await enregistrerInboxNotificationsBulk(base44, course, candidats);
-  dispatchLog(`[V2] 📦 Inbox notifications bulk: ${inboxResult.created} créées pour ${candidats.length} candidat(s)`);
+  // Deux événements différents (dispatch vs rappel vs attribution) utilisent des
+  // clés différentes. Un retry du même événement est bloqué.
+  await Promise.allSettled(
+    candidats.map((livreur: any) => {
+      if (!livreur.user_email) return Promise.resolve();
+      const dedupKey = `COURSE_DISPATCH_${course.id}_${livreur.id}`;
+      return base44.asServiceRole.entities.Notification.filter({
+        deduplication_key: dedupKey,
+      }).then((existing: any) => {
+        if (existing && existing.length > 0) return; // déjà notifié — pas de doublon
+        return base44.asServiceRole.entities.Notification.create({
+          titre: 'Nouvelle course SILGAPP',
+          message: `${course.quartier_depart || course.adresse_depart || 'Départ'} → ${course.quartier_arrivee || course.adresse_arrivee || 'destination'}`,
+          type: 'nouvelle_course',
+          course_id: course.id,
+          destinataire_email: livreur.user_email,
+          deduplication_key: dedupKey,
+          lue: false,
+        });
+      }).catch(() => {});
+    })
+  );
 
   // 📤 Envoi push batch : 1 seule invocation backend pour tous les livreurs prioritaires
   if (candidats.length > 0) {

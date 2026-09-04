@@ -31,107 +31,29 @@ console.log(`[DISPATCH_EXTERNE_AUTO] 🔖 dispatchV2 bundle version: ${DISPATCH_
 const AUTH_ERROR_SIGNATURE = 'You must be logged in to access this app';
 const MAX_AUTH_RETRIES = 2;
 const AUTH_RETRY_DELAY_MS = 500;
-const INFRA_RETRY_DELAY_MS = 1000; // Backoff pour erreurs infrastructure transitoires (rate limit, timeout, réseau)
-
-/**
- * Classification des erreurs infrastructure transitoires.
- *
- * Ces erreurs sont SÛRES à retryer car elles sont par nature temporaires :
- * - Rate limit (HTTP 429, "rate limit", "traffic volume") — quota API temporaire
- * - Timeout réseau (ETIMEDOUT, ECONNRESET, ECONNREFUSED, "fetch failed")
- * - Erreurs MongoDB transitoires ("mongodb.net", connectTimeoutMS)
- *
- * NE PAS inclure les HTTP 500 génériques — ils peuvent indiquer une erreur
- * persistante (bug, configuration) qui ne se résoudra pas avec un retry.
- *
- * @returns {boolean} true si l'erreur est transitoire et sûre à retryer
- */
-function isTransientInfrastructureError(error: any): boolean {
-  const msg = (error?.message || String(error)).toLowerCase();
-  return msg.includes('rate limit') ||
-    msg.includes('rate_limit') ||
-    msg.includes('rate limit exceeded') ||
-    msg.includes('traffic volume') ||
-    msg.includes('429') ||
-    msg.includes('timeout') ||
-    msg.includes('etimedout') ||
-    msg.includes('enotfound') ||
-    msg.includes('econnreset') ||
-    msg.includes('econnrefused') ||
-    msg.includes('mongodb.net') ||
-    msg.includes('connecttimeout') ||
-    msg.includes('network error') ||
-    msg.includes('fetch failed');
-}
 
 /**
  * Wrapper pour les opérations de dispatch critiques.
- *
- * Logique de retry à deux niveaux :
- *
- * 1. ERREURS AUTH (transitoires Base44) :
- *    - Recrée le client et retry (jusqu'à MAX_AUTH_RETRIES = 2 retries).
- *    - Log: STEP_FAILED=<stepName> à chaque échec.
- *
- * 2. ERREURS INFRASTRUCTURE TRANSITOIRES (rate limit, timeout, réseau) :
- *    - Backoff 1000ms puis UNE seule nouvelle tentative.
- *    - Log: STEP_FAILED=<stepName> à la première erreur.
- *    - Log: STEP_RECOVERED=<stepName> si la 2e tentative réussit.
- *    - Si la 2e tentative échoue → l'erreur remonte vers le catch final.
- *
- * 3. AUTRES ERREURS (métier, bugs, config) :
- *    - Aucun retry — remontent immédiatement.
- *
- * Maximum total = 2 tentatives pour les erreurs infrastructure.
- * Les logs ne font JAMAIS échouer le dispatch (best-effort).
+ * Si une erreur d'authentification transitoire Base44 survient, recrée le client
+ * et retente l'opération. Les autres erreurs remontent immédiatement.
  */
 async function withAuthRetry(req: Request, stepName: string, fn: (base44: any) => Promise<any>) {
   let lastError: any = null;
-  let infraRetried = false;
-  let hadInfraError = false;
-
   for (let attempt = 0; attempt <= MAX_AUTH_RETRIES; attempt++) {
     try {
       const base44 = createClientFromRequest(req);
-      const result = await fn(base44);
-      // ✅ STEP_RECOVERED : si on a eu une erreur infra avant et que la retry a réussi
-      if (hadInfraError) {
-        console.log(`[DISPATCH] STEP_RECOVERED=${stepName} — retry réussi après erreur infrastructure transitoire`);
-      }
-      return result;
+      return await fn(base44);
     } catch (error: any) {
       lastError = error;
       const msg = error?.message || String(error);
       const isAuthError = msg.includes(AUTH_ERROR_SIGNATURE);
-      const isInfra = isTransientInfrastructureError(error);
-
-      console.error(`[DISPATCH] STEP_FAILED=${stepName} attempt=${attempt + 1}/${MAX_AUTH_RETRIES + 1} auth_error=${isAuthError} infra_error=${isInfra} msg="${msg}"`);
-
-      // ── Erreur infrastructure transitoire (rate limit, timeout, réseau) ──
-      // UNE seule retry avec backoff 1000ms
-      if (isInfra && !infraRetried && attempt < MAX_AUTH_RETRIES) {
-        infraRetried = true;
-        hadInfraError = true;
-        await new Promise(r => setTimeout(r, INFRA_RETRY_DELAY_MS));
-        console.log(`[DISPATCH] 🔄 Retrying ${stepName} after infra error (rate limit/timeout) — attempt ${attempt + 2}/${MAX_AUTH_RETRIES + 1}`);
-        continue;
+      console.error(`[DISPATCH] STEP_FAILED=${stepName} attempt=${attempt + 1}/${MAX_AUTH_RETRIES + 1} auth_error=${isAuthError} msg="${msg}"`);
+      if (!isAuthError || attempt >= MAX_AUTH_RETRIES) {
+        throw error;
       }
-
-      // ── Erreur auth transitoire — retry avec client frais ──
-      if (isAuthError && !isInfra && attempt < MAX_AUTH_RETRIES) {
-        await new Promise(r => setTimeout(r, AUTH_RETRY_DELAY_MS));
-        console.log(`[DISPATCH] 🔄 Retrying ${stepName} with fresh client (attempt ${attempt + 2}/${MAX_AUTH_RETRIES + 1})`);
-        continue;
-      }
-
-      // ── Autre erreur ou retries épuisés — remonter ──
-      throw error;
+      await new Promise(r => setTimeout(r, AUTH_RETRY_DELAY_MS));
+      console.log(`[DISPATCH] 🔄 Retrying ${stepName} with fresh client (attempt ${attempt + 2}/${MAX_AUTH_RETRIES + 1})`);
     }
-  }
-
-  // Si on arrive ici avec une erreur infra qui a été retryée, c'est que la 2e tentative a échoué
-  if (infraRetried && lastError) {
-    console.error(`[DISPATCH] STEP_FAILED=${stepName} infra_retry_exhausted — erreur persistante après retry`);
   }
   throw lastError;
 }
@@ -1080,27 +1002,21 @@ Deno.serve(async (req) => {
 
     return Response.json({ error: 'Action inconnue' }, { status: 400 });
   } catch (error) {
-    const isRateLimit = isTransientInfrastructureError(error);
+    const isRateLimit = error.message?.toLowerCase?.().includes('rate limit') || error.message?.toLowerCase?.().includes('rate_limit') || error.message?.toLowerCase?.().includes('traffic volume');
     const isAuthError = error.message?.includes(AUTH_ERROR_SIGNATURE);
-    // 🛡️ Les erreurs auth et infra transitoires ont déjà été retentées par withAuthRetry.
-    // Si on arrive ici, toutes les tentatives autorisées ont échoué.
-    // → L'alerte n'est créée QUE si tous les retries ont échoué (pas de recovery).
-    console.error(`[DISPATCH] STEP_FAILED=dispatchExterneAuto.catch Erreur fatale${isRateLimit ? ' (INFRA_EXHAUSTED)' : ''}${isAuthError ? ' (AUTH_EXHAUSTED)' : ''}:`, error.message);
+    // 🛡️ Les erreurs auth transitoires ont déjà été retentées par withAuthRetry (2 retries).
+    // Si on arrive ici avec une erreur auth, cela signifie que les retries ont échoué
+    // → c'est une vraie erreur persistante, l'alerte reste justifiée.
+    console.error(`[DISPATCH] STEP_FAILED=dispatchExterneAuto.catch Erreur fatale${isRateLimit ? ' (RATE_LIMIT)' : ''}${isAuthError ? ' (AUTH_EXHAUSTED)' : ''}:`, error.message);
     try {
       const base44 = createClientFromRequest(req);
-      // 🛡️ Anti-spam atomique : utilise une deduplication_key pour empêcher
-      // la race condition où 2 invocations concurrentes créent chacune une alerte.
-      // La deduplication_key bloque le 2e create si le 1er est déjà en vol.
+      // 🛡️ Anti-spam : ne créer une alerte que si aucune alerte récente (< 30 min) n'existe
+      // Délai augmenté à 30 min pour les rate limits (transitoires) vs 5 min pour les autres erreurs
       const alertWindow = isRateLimit ? 60 * 60 * 1000 : 5 * 60 * 1000;
-      const dedupKey = isRateLimit
-        ? `ALERT_INFRA_${new Date().toISOString().slice(0, 13)}` // Heure précise — 1 alerte/heure max
-        : `ALERT_FATAL_${new Date().toISOString().slice(0, 16)}`; // Minute précise — 1 alerte/5min max
-
-      const existingAlert = await base44.asServiceRole.entities.Notification.filter({
-        deduplication_key: dedupKey, lue: false,
+      const recentAlerts = await base44.asServiceRole.entities.Notification.filter({
+        type: 'alerte_critique_dispatch', lue: false,
       }, '-created_date', 1);
-
-      const hasRecent = existingAlert?.[0] && (Date.now() - new Date(existingAlert[0].created_date).getTime()) < alertWindow;
+      const hasRecent = recentAlerts?.[0] && (Date.now() - new Date(recentAlerts[0].created_date).getTime()) < alertWindow;
       if (!hasRecent) {
         const msg = isRateLimit
           ? `Le moteur de dispatch a atteint la limite d'appels API (rate limit). Cela est transitoire — le prochain tick reprendra automatiquement. Si le problème persiste, contactez le support.`
@@ -1110,9 +1026,7 @@ Deno.serve(async (req) => {
         await base44.asServiceRole.entities.Notification.create({
           titre: isRateLimit ? '⚠️ Surcharge API temporaire — dispatch' : '🚨 Erreur fatale — dispatch automatique',
           message: msg,
-          type: 'alerte_critique_dispatch',
-          lue: false,
-          deduplication_key: dedupKey,
+          type: 'alerte_critique_dispatch', lue: false,
         });
       }
     } catch (_) {}

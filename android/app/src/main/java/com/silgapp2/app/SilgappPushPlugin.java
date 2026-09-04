@@ -114,6 +114,10 @@ public class SilgappPushPlugin extends Plugin {
         notifyListeners("silgapp:notification-tapped", data, true);
     }
 
+    public void emitFcmTokenRefreshed(JSObject data) {
+        notifyListeners("silgapp:fcm-token-refreshed", data, false);
+    }
+
     @PluginMethod
     public void checkNotificationPermission(PluginCall call) {
         JSObject result = new JSObject();
