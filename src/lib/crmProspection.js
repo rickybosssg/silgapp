@@ -11,8 +11,11 @@
 
 const RELANCE_DELAI_JOURS = 7;
 
-// Statuts qui représentent une vraie tentative de contact commercial
-const STATUTS_CONTACT = new Set(["contacte", "a_relancer"]);
+// Statuts qui représentent une vraie tentative de contact commercial.
+// "a_relancer" n'incrément pas : c'est un indicateur de relance planifiée,
+// pas un contact effectué. L'incrément se fait quand l'admin passe à "contacte"
+// après avoir réellement recontacté le prospect.
+const STATUTS_CONTACT = new Set(["contacte"]);
 
 /**
  * Construit le payload de mise à jour pour CrmProspection.update().
