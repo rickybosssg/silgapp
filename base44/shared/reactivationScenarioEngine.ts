@@ -971,7 +971,13 @@ export async function checkScenarioConversion(
   if (scenario.status === 'converted') return true;
   if (!scenario.client_phone_normalized && !scenario.client_telephone && !scenario.client_user_email) return false;
 
-  const referenceTime = scenario.j0_sent_at ? new Date(scenario.j0_sent_at).getTime() : Date.now();
+  // ── Référence de conversion ──
+  // first_course_delivered : reference_date (date de livraison de la 1re course).
+  // Toute nouvelle course créée APRÈS cette date = reprise d'activité = arrêt immédiat.
+  // Autres segments : j0_sent_at (comportement historique inchangé).
+  const referenceTime = scenario.segment === 'first_course_delivered'
+    ? (scenario.reference_date ? new Date(scenario.reference_date).getTime() : Date.now())
+    : (scenario.j0_sent_at ? new Date(scenario.j0_sent_at).getTime() : Date.now());
   const windowMs = config.attributionWindowHours * 3600000;
   const now = Date.now();
 
