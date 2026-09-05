@@ -1,11 +1,10 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
-import { Search, Users, ArrowLeft, Phone, MessageCircle, Flame, Zap, Ban, Loader2 } from "lucide-react";
+import { Search, Users, ArrowLeft, Phone, MessageCircle, Ban, Loader2 } from "lucide-react";
 import ClientFicheDialog from "@/components/crm/ClientFicheDialog";
 import CrmConversionDashboard from "@/components/crm/CrmConversionDashboard";
 import CrmProspectionPanel from "@/components/crm/CrmProspectionPanel";

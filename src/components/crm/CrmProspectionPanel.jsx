@@ -1,7 +1,7 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { MessageCircle, Check, X, Clock, ChevronRight, Loader2, Ban, RotateCw, Smartphone } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { MessageCircle, Check, X, Ban, RotateCw, Smartphone } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { normalizePhoneForWhatsapp } from "@/lib/courseContact";

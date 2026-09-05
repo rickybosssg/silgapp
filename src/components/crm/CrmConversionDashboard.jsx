@@ -1,6 +1,4 @@
-import React, { useState, useMemo } from "react";
-import { base44 } from "@/api/base44Client";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import React from "react";
 import { Users, Smartphone, MessageCircle, CheckCircle2, XCircle, Clock, TrendingUp, Zap, Ban } from "lucide-react";
 import { cn } from "@/lib/utils";
 
