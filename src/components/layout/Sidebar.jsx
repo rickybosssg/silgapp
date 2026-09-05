@@ -62,6 +62,7 @@ export const navItems = [
   { path: "/admin/neo", label: "NEO – Moteur d'amélioration", icon: Sparkles },
   { path: "/admin/reactivation-clients", label: "Réactivation Clients", icon: Bell },
   { path: "/admin/rappels-habitude", label: "Rappels Habitude", icon: Activity },
+  { path: "/admin/clients-autonomiser", label: "Clients à autonomiser", icon: Users },
   { path: "/admin/bugs", label: "Suivi des bugs", icon: ShieldAlert },
   { path: "/admin/courses-a-sauver", label: "Courses à sauver", icon: ShieldAlert },
   { path: "/admin/fiabilite-push", label: "Fiabilité Push", icon: Radio },

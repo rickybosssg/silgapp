@@ -38,6 +38,7 @@ import RechercheLivreurScreen from "@/components/client/RechercheLivreurScreen";
 import SuiviCourseFullscreen from "@/components/client/SuiviCourseFullscreen";
 import EcranFinCourse from "@/components/client/EcranFinCourse";
 import QuickOrderPanel from "@/components/client/QuickOrderPanel";
+import QuickOrderProPanel from "@/components/client/QuickOrderProPanel";
 import { isLibre } from "@/lib/dispatchRules";
 import { haversineKm as haversineDistance } from "@/lib/priceEstimate";
 
@@ -1120,6 +1121,13 @@ export default function ClientExterneApp() {
                   )}
                 </div>
               </div>
+
+              {/* ── COMMANDE RAPIDE PRO — Phase 5 : départ habituel + destinataires récents ── */}
+              <QuickOrderProPanel
+                clientProfil={clientProfil}
+                position={position}
+                user={userId ? { id: userId } : null}
+              />
 
               {/* ── TRAJETS FRÉQUENTS — Phase 3 : commande en 1 tap ── */}
               <QuickOrderPanel
