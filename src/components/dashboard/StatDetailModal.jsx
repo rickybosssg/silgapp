@@ -17,6 +17,16 @@ function isAppOuverte(entity) {
   return (Date.now() - new Date(entity.last_seen_at).getTime()) < 3 * 60 * 1000;
 }
 
+// ── Indicateur App CORRIGÉ ──
+// "App ouverte" = app_active AND last_seen_at < 3 min (l'app est actuellement ouverte)
+// "App installée" = a un compte User (user_email) mais app pas ouverte maintenant
+// "Pas d'app" = pas de compte User — CRM uniquement
+function getAppStatus(entity) {
+  if (isAppOuverte(entity)) return "ouverte";
+  if (entity.user_email) return "installee";
+  return "aucune";
+}
+
 function statutBadge(statut) {
   const map = {
     nouvelle: { label: "Nouvelle", className: "bg-gray-100 text-gray-700" },
@@ -38,7 +48,7 @@ function ClientsList({ clients }) {
   return (
     <div className="space-y-2">
       {clients.map(c => {
-        const appOuverte = isAppOuverte(c);
+        const appStatus = getAppStatus(c);
         const zone = c.quartier || (c.latitude ? "Ouagadougou" : "Zone inconnue");
         const lastGps = timeAgo(c.derniere_position_date || c.last_seen_at || c.updated_date);
         const dateInscription = c.created_date ? format(new Date(c.created_date), "d MMM yyyy", { locale: fr }) : null;
@@ -64,8 +74,12 @@ function ClientsList({ clients }) {
                   <p className="text-xs text-muted-foreground mt-0.5"> Inscrit le {dateInscription}</p>
                 )}
               </div>
-              <span className={`text-xs font-semibold flex items-center gap-1 flex-shrink-0 ${appOuverte ? "text-green-600" : "text-gray-400"}`}>
-                {appOuverte ? <><Wifi className="w-3 h-3" /> App ouverte</> : <><WifiOff className="w-3 h-3" /> App fermée</>}
+              <span className={`text-xs font-semibold flex items-center gap-1 flex-shrink-0 ${
+                appStatus === "ouverte" ? "text-green-600" : appStatus === "installee" ? "text-purple-600" : "text-gray-400"
+              }`}>
+                {appStatus === "ouverte" ? <><Wifi className="w-3 h-3" /> App ouverte</>
+                  : appStatus === "installee" ? <><Wifi className="w-3 h-3" /> App installée</>
+                  : <><WifiOff className="w-3 h-3" /> Pas d'app</>}
               </span>
             </div>
           </div>

@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Truck, Phone, MapPin, Calendar, Clock, CheckCircle2, XCircle, Banknote } from "lucide-react";
 import LivreurPhotoUploader from "@/components/livreur/LivreurPhotoUploader";
+import LivreurFiabiliteCard from "@/components/livreur/LivreurFiabiliteCard";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";
@@ -95,6 +96,9 @@ export default function LivreurDetailDialog({ livreur, open, onClose }) {
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* Score de fiabilité (Phase 1 anti-annulation) */}
+          <LivreurFiabiliteCard livreur={livreur} />
+
           {/* Info livreur */}
           <Card>
             <CardHeader className="pb-2">

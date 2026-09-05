@@ -1,0 +1,146 @@
+{
+  "name": "HabitReminder",
+  "type": "object",
+  "properties": {
+    "client_id": {
+      "type": "string",
+      "description": "ID du ClientExterne cibl\u00e9"
+    },
+    "client_telephone": {
+      "type": "string",
+      "description": "T\u00e9l\u00e9phone du client (snapshot)"
+    },
+    "client_phone_normalized": {
+      "type": "string",
+      "description": "T\u00e9l\u00e9phone normalis\u00e9 (pour recherche et anti-spam)"
+    },
+    "client_user_email": {
+      "type": "string",
+      "description": "Email du compte User li\u00e9. R\u00e9solu c\u00f4t\u00e9 backend."
+    },
+    "country_code": {
+      "type": "string",
+      "description": "Code pays ISO 2 lettres"
+    },
+    "segment": {
+      "type": "string",
+      "enum": [
+        "nouveau",
+        "en_developpement",
+        "regulier",
+        "tres_regulier"
+      ],
+      "description": "Segment de fr\u00e9quence au moment du rappel"
+    },
+    "habit_type": {
+      "type": "string",
+      "enum": [
+        "tranche_horaire",
+        "jour",
+        "trajet",
+        "combine"
+      ],
+      "description": "Type d'habitude d\u00e9tect\u00e9e ayant d\u00e9clench\u00e9 le rappel"
+    },
+    "habit_detail": {
+      "type": "string",
+      "description": "JSON: d\u00e9tail de l'habitude (ex: {tranche: 'matin', ratio: 0.67, occurrences: 4})"
+    },
+    "habit_occurrences": {
+      "type": "number",
+      "description": "Nombre d'occurrences confirmant l'habitude"
+    },
+    "habit_ratio": {
+      "type": "number",
+      "description": "Ratio de l'habitude (occurrences / total courses)"
+    },
+    "is_control_group": {
+      "type": "boolean",
+      "default": false,
+      "description": "True si le client est dans le groupe contr\u00f4le (aucun push envoy\u00e9)"
+    },
+    "push_token": {
+      "type": "string",
+      "description": "Token FCM utilis\u00e9 pour l'envoi"
+    },
+    "push_token_id": {
+      "type": "string",
+      "description": "ID du NotificationToken utilis\u00e9"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "sent",
+        "failed",
+        "control",
+        "converted",
+        "skipped_already_ordered",
+        "skipped_recent_reminder",
+        "skipped_no_fcm"
+      ],
+      "default": "pending",
+      "description": "Statut du rappel. pending=en attente, sent=push envoy\u00e9, failed=\u00e9chec FCM, control=groupe contr\u00f4le, converted=course cr\u00e9\u00e9e apr\u00e8s rappel, skipped_*=rappel ignor\u00e9 pour raison valide"
+    },
+    "sent_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date d'envoi du push"
+    },
+    "converted_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date de cr\u00e9ation de course apr\u00e8s le rappel"
+    },
+    "course_id": {
+      "type": "string",
+      "description": "ID de la CourseExterne cr\u00e9\u00e9e apr\u00e8s le rappel"
+    },
+    "revenue": {
+      "type": "number",
+      "default": 0,
+      "description": "CA g\u00e9n\u00e9r\u00e9 par la course attribu\u00e9e"
+    },
+    "commission": {
+      "type": "number",
+      "default": 0,
+      "description": "Commission SILGAPP g\u00e9n\u00e9r\u00e9e"
+    },
+    "fcm_error": {
+      "type": "string",
+      "description": "Erreur FCM si \u00e9chec d'envoi"
+    },
+    "campaign_batch_id": {
+      "type": "string",
+      "description": "ID du batch d'ex\u00e9cution (pour grouper les rappels d'une m\u00eame session)"
+    }
+  },
+  "required": [
+    "client_id",
+    "segment",
+    "habit_type",
+    "status"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

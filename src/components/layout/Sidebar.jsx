@@ -2,8 +2,8 @@ import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { clearPersistedToken } from "@/lib/authPersistence";
 import { 
-  LayoutDashboard, MapPin, Plus, Truck, BarChart3, Bell, 
-  Package, TrendingUp, ChevronLeft, ChevronRight, LogOut, Wallet, Shield, Globe, Settings, MessageCircle, Users, Megaphone, ChevronDown, Check, UserCheck, ShieldAlert, Store, UtensilsCrossed, Pill, PieChart, Sparkles, Brain, FlaskConical, Cpu, Crown, Zap, Coins, Radio, Trophy
+  LayoutDashboard, MapPin, Plus, Truck, BarChart3, Bell,
+  Package, TrendingUp, ChevronLeft, ChevronRight, LogOut, Wallet, Shield, Globe, Settings, MessageCircle, Users, Megaphone, ChevronDown, Check, UserCheck, ShieldAlert, Store, UtensilsCrossed, Pill, PieChart, Sparkles, Brain, FlaskConical, Cpu, Crown, Zap, Coins, Radio, Trophy, Activity
 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { cn } from "@/lib/utils";
@@ -61,6 +61,8 @@ export const navItems = [
   { path: "/admin/pharmacies", label: "Pharmacies", icon: Pill },
   { path: "/admin/commandes-partenaires", label: "Commandes Partenaires", icon: Package },
   { path: "/admin/neo", label: "NEO – Moteur d'amélioration", icon: Sparkles },
+  { path: "/admin/rappels-habitude", label: "Rappels Habitude", icon: Activity },
+  { path: "/admin/clients-autonomiser", label: "Clients à autonomiser", icon: Users },
   { path: "/admin/courses-a-sauver", label: "Courses à sauver", icon: ShieldAlert },
   { path: "/admin/fiabilite-push", label: "Fiabilité Push", icon: Radio },
   { path: "/admin/silga-score", label: "Silga Score", icon: Trophy },

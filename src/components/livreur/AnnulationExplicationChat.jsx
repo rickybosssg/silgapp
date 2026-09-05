@@ -5,13 +5,20 @@ import { cn } from "@/lib/utils";
 
 const MOTIF_LABELS = {
   client_injoignable: "Client injoignable",
+  client_change_avis: "Client a changé d'avis",
   mauvaise_adresse: "Mauvaise adresse",
   colis_inexistant: "Colis inexistant",
-  client_change_avis: "Client a changé d'avis",
+  colis_pas_pret: "Colis pas prêt",
+  panne_vehicule: "Panne de véhicule",
+  batterie_dechargee: "Batterie déchargée",
+  course_trop_loin: "Course trop loin",
+  prix_insuffisant: "Prix insuffisant",
+  autre_course_conflit_planning: "Conflit de planning",
+  probleme_personnel: "Problème personnel",
+  acceptation_erreur: "Acceptation par erreur",
+  accident: "Accident",
   colis_interdit: "Colis interdit",
   désaccord_prix: "Désaccord sur le prix",
-  panne_vehicule: "Panne de véhicule",
-  accident: "Accident",
   autre: "Autre",
 };
 
