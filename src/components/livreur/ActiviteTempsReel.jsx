@@ -146,7 +146,7 @@ export default function ActiviteTempsReel({ livreurProfil, mesCourses = [], isEx
             <p className="text-xl font-black text-slate-700 leading-none">
               {hasGPS ? nearbyDriversCount : "—"}
             </p>
-            <p className="text-[10px] text-slate-500 mt-1">Livreurs dispo</p>
+            <p className="text-[9px] text-slate-500 mt-1 leading-tight">Autres livreurs à proximité</p>
           </div>
         </div>
 
