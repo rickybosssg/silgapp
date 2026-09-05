@@ -4,6 +4,7 @@ import { base44 } from "@/api/base44Client";
 import { useCoursesDisponibles } from "@/hooks/useCoursesDisponibles";
 import { MapPin, Sparkles, Loader2, Flame } from "lucide-react";
 import { haversineKm } from "@/lib/priceEstimate";
+import { hasValidGPS } from "@/lib/dispatchRules";
 
 /**
  * ActiviteTempsReel — remplace l'ancienne carte sombre "RECHERCHE ACTIVE".
@@ -70,7 +71,7 @@ export default function ActiviteTempsReel({ livreurProfil, mesCourses = [], isEx
         100
       );
       const others = (all || []).filter(
-        (d) => d.id !== livreurId && typeof d.latitude === "number" && typeof d.longitude === "number"
+        (d) => d.id !== livreurId && hasValidGPS(d)
       );
       return others.filter((d) => {
         const dist = haversineKm(latitude, longitude, d.latitude, d.longitude);
