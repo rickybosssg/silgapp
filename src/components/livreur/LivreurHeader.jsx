@@ -215,8 +215,9 @@ export default function LivreurHeader({
                 {clientsEnLigne ?? "-"}
               </p>
               <p className="text-[10px] text-white/75 leading-tight mt-0.5">
-                {clientsEnLigne === 1 ? "client en ligne" : "clients en ligne"}
+                {clientsEnLigne === 1 ? "client actif" : "clients actifs"}
               </p>
+              <p className="text-[8px] text-white/50 leading-tight mt-0.5">5 dernières min</p>
             </div>
           </div>
 
@@ -236,7 +237,7 @@ export default function LivreurHeader({
                 {coursesEnAttente ?? "-"}
               </p>
               <p className="text-[10px] text-white/75 leading-tight mt-0.5">
-                {coursesEnAttente === 1 ? "course en attente" : "courses en attente"}
+                {coursesEnAttente === 1 ? "nouvelle course" : "nouvelles courses"}
               </p>
             </div>
           </div>

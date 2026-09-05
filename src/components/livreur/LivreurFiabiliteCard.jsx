@@ -106,11 +106,10 @@ export default function LivreurFiabiliteCard({ livreur, compact = false }) {
         <div className="flex items-center justify-center gap-1 mb-0.5">
           <ShieldCheck className="w-3.5 h-3.5 text-slate-500" />
         </div>
-        <p className={`text-2xl font-black leading-none ${scoreColor}`}>{fiabilite.score}</p>
-        <p className="text-[9px] text-slate-600 font-semibold mt-1">{fiabilite.niveau_label}</p>
-        {fiabilite.is_provisoire && (
-          <p className="text-[8px] text-slate-400 mt-0.5">Provisoire</p>
-        )}
+        <p className={`text-lg font-black leading-none ${scoreColor}`}>Fiabilité : {fiabilite.score}/100</p>
+        <p className="text-[9px] text-slate-600 font-semibold mt-1">
+          {fiabilite.niveau_label}{fiabilite.is_provisoire ? " — Provisoire" : ""}
+        </p>
       </div>
     );
   }

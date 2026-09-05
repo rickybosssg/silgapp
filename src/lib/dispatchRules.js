@@ -184,12 +184,12 @@ export function isEligibleCarte(livreur) {
   return isON(livreur) && !!(livreur.latitude && livreur.longitude);
 }
 
-/** Client éligible carte = app active au premier plan + GPS récent */
+/** Client éligible carte = app active au premier plan + GPS présent + récent */
 export function isClientEligibleCarte(client) {
   if (client.actif === false) return false;
   if (client.app_active !== true) return false;
   if (!client.latitude || !client.longitude) return false;
-  return true;
+  return isClientGPSRecent(client);
 }
 
 /** Client avec GPS (quel que soit l'âge) */

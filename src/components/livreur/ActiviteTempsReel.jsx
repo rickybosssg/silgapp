@@ -4,6 +4,7 @@ import { base44 } from "@/api/base44Client";
 import { useCoursesDisponibles } from "@/hooks/useCoursesDisponibles";
 import { MapPin, Sparkles, Loader2, Flame } from "lucide-react";
 import { haversineKm } from "@/lib/priceEstimate";
+import { hasValidGPS } from "@/lib/dispatchRules";
 
 /**
  * ActiviteTempsReel — remplace l'ancienne carte sombre "RECHERCHE ACTIVE".
@@ -69,7 +70,7 @@ export default function ActiviteTempsReel({ livreurProfil, isExterne = false }) 
         100
       );
       const others = (all || []).filter(
-        (d) => d.id !== livreurId && typeof d.latitude === "number" && typeof d.longitude === "number"
+        (d) => d.id !== livreurId && hasValidGPS(d)
       );
       return others.filter((d) => {
         const dist = haversineKm(latitude, longitude, d.latitude, d.longitude);
@@ -145,7 +146,7 @@ export default function ActiviteTempsReel({ livreurProfil, isExterne = false }) 
             <p className="text-xl font-black text-slate-700 leading-none">
               {hasGPS ? nearbyDriversCount : "—"}
             </p>
-            <p className="text-[10px] text-slate-500 mt-1">Livreurs dispo</p>
+            <p className="text-[9px] text-slate-500 mt-1 leading-tight">Autres livreurs à proximité</p>
           </div>
         </div>
 
