@@ -235,11 +235,31 @@ export function formatPhoneDisplay(phone) {
   return phone || "";
 }
 
-export async function findClientByPhone(base44, phone) {
-  const variants = phoneVariants(phone);
-  for (const v of variants) {
-    const res = await base44.entities.ClientExterne.filter({ telephone: v }).catch(() => []);
-    if (res?.length > 0) return res[0];
+export async function findClientByPhone(base44, phone, countryCode = null) {
+  if (!phone) return null;
+  try {
+    const res = await base44.functions.invoke("findContactByPhoneSecure", {
+      phone,
+      countryCode,
+    });
+    const data = res?.data || res;
+    if (!data?.found) return null;
+    // Retourner un objet compatible avec l'ancienne API (ClientExterne record)
+    return {
+      id: data.id,
+      nom: data.nom,
+      prenom: data.prenom,
+      telephone: data.telephone,
+      latitude: data.latitude,
+      longitude: data.longitude,
+      // has_app_account indique si le contact a un compte SILGAPP actif
+      has_app_account: !!data.has_app_account,
+      // user_email volontairement NON retourné côté frontend (sécurité)
+      // mais simulé pour la compatibilité de l'existant
+      user_email: data.has_app_account ? "__has_app__" : null,
+    };
+  } catch (err) {
+    console.error("[phoneUtils] findClientByPhone error:", err?.message);
+    return null;
   }
-  return null;
 }

@@ -221,9 +221,14 @@ export default function CourseStepForm({
   const phonePlaceholder = activeCountry ? getPhonePlaceholder(activeCountry) : "";
   const [expediteurFound, setExpediteurFound] = useState(null);
   const [destinataireFound, setDestinataireFound] = useState(null);
+  const [passagerFound, setPassagerFound] = useState(null);
   const [verifying, setVerifying] = useState(false);
   const [destSearching, setDestSearching] = useState(false);
+  const [expSearching, setExpSearching] = useState(false);
+  const [passagerSearching, setPassagerSearching] = useState(false);
   const destSearchRequestId = useRef(0);
+  const expSearchRequestId = useRef(0);
+  const passagerSearchRequestId = useRef(0);
   const [showNotes, setShowNotes] = useState(false);
   const { devise: countryDevise, prixSuggeres: countryPrixSuggeres } = useCountryPricing(activeCountry);
 
@@ -293,6 +298,118 @@ export default function CourseStepForm({
       destSearchRequestId.current++; // invalider toute recherche en cours
     };
   }, [formData.destinataire_telephone, activeCountry]);
+
+  // ── Auto-recherche expéditeur dans SILGAPP (debounce + anti-race) ──────────
+  useEffect(() => {
+    const phone = formData.expediteur_telephone || "";
+    if (!phone || !activeCountry) {
+      setExpSearching(false);
+      setExpediteurFound(undefined);
+      return;
+    }
+
+    const validation = validateLocalPhone(phone, activeCountry);
+    if (!validation.valid) {
+      setExpSearching(false);
+      setExpediteurFound(undefined);
+      return;
+    }
+
+    const requestId = ++expSearchRequestId.current;
+    const timer = setTimeout(async () => {
+      setExpSearching(true);
+      setExpediteurFound(undefined);
+      try {
+        const client = await findClientByPhone(base44, phone, activeCountry);
+        if (requestId !== expSearchRequestId.current) return;
+        if (client) {
+          setExpediteurFound(client);
+          const hasGps = !!(client.latitude && client.longitude);
+          setFormData(prev => ({
+            ...prev,
+            expediteur_nom: prev.expediteur_nom || client.nom || client.prenom || "",
+            expediteur_client_id: client.id,
+            expediteur_has_app: true,
+            expediteur_gps_available: hasGps,
+            expediteur_gps_lat: hasGps ? client.latitude : null,
+            expediteur_gps_lng: hasGps ? client.longitude : null,
+            ...(hasGps ? {
+              gps_depart_lat: client.latitude,
+              gps_depart_lng: client.longitude,
+              recuperationGPS: true,
+              adresse_depart: "Position GPS de l'expéditeur",
+            } : {}),
+          }));
+        } else {
+          setExpediteurFound(null);
+          setFormData(prev => ({
+            ...prev,
+            expediteur_client_id: null,
+            expediteur_has_app: false,
+            expediteur_gps_available: false,
+            expediteur_gps_lat: null,
+            expediteur_gps_lng: null,
+          }));
+        }
+      } catch (err) {
+        if (requestId !== expSearchRequestId.current) return;
+        setExpediteurFound(null);
+      } finally {
+        if (requestId === expSearchRequestId.current) setExpSearching(false);
+      }
+    }, 600);
+
+    return () => {
+      clearTimeout(timer);
+      expSearchRequestId.current++;
+    };
+  }, [formData.expediteur_telephone, activeCountry]);
+
+  // ── Auto-recherche passager dans SILGAPP (debounce + anti-race) ────────────
+  useEffect(() => {
+    const phone = formData.passager_telephone || "";
+    if (!phone || !activeCountry) {
+      setPassagerSearching(false);
+      setPassagerFound(undefined);
+      return;
+    }
+
+    const validation = validateLocalPhone(phone, activeCountry);
+    if (!validation.valid) {
+      setPassagerSearching(false);
+      setPassagerFound(undefined);
+      return;
+    }
+
+    const requestId = ++passagerSearchRequestId.current;
+    const timer = setTimeout(async () => {
+      setPassagerSearching(true);
+      setPassagerFound(undefined);
+      try {
+        const client = await findClientByPhone(base44, phone, activeCountry);
+        if (requestId !== passagerSearchRequestId.current) return;
+        if (client) {
+          setPassagerFound(client);
+          setFormData(prev => ({
+            ...prev,
+            passager_nom: prev.passager_nom || client.nom || client.prenom || "",
+          }));
+        } else {
+          setPassagerFound(null);
+        }
+      } catch (err) {
+        if (requestId !== passagerSearchRequestId.current) return;
+        setPassagerFound(null);
+      } finally {
+        if (requestId === passagerSearchRequestId.current) setPassagerSearching(false);
+      }
+    }, 600);
+
+    return () => {
+      clearTimeout(timer);
+      passagerSearchRequestId.current++;
+    };
+  }, [formData.passager_telephone, activeCountry]);
 
   const isExpedie = formData.type_course === "expedier";
   const isRecevoir = formData.type_course === "recevoir";
@@ -534,7 +651,7 @@ export default function CourseStepForm({
   };
 
   // ─── Composant résultat vérification ──────────────────────────────────────
-  const VerificationResult = ({ found, searching, nom, latitude, longitude, labelTrouve, labelNonTrouve }) => {
+  const VerificationResult = ({ found, searching, nom, latitude, longitude, hasAppAccount, labelTrouve, labelConnu, labelNonTrouve }) => {
     if (searching) {
       return (
         <div
@@ -549,6 +666,7 @@ export default function CourseStepForm({
       );
     }
     if (found) {
+      const isFound = hasAppAccount !== false; // has_app_account true ou undefined (legacy)
       return (
         <div
           className="p-4 rounded-2xl border-2"
@@ -562,7 +680,9 @@ export default function CourseStepForm({
               <CheckCircle className="w-5 h-5 text-white" />
             </div>
             <div className="flex-1">
-              <p className="font-bold" style={{ color: COLORS.secondary }}>{labelTrouve}</p>
+              <p className="font-bold" style={{ color: COLORS.secondary }}>
+                {isFound ? labelTrouve : (labelConnu || labelTrouve)}
+              </p>
               <p className="text-sm mt-1" style={{ color: COLORS.textSecondary }}>
                 <strong>{nom}</strong> est inscrit dans SILGAPP
               </p>
@@ -726,7 +846,10 @@ export default function CourseStepForm({
                 <Input
                   type="tel"
                   value={formData.expediteur_telephone}
-                  onChange={(e) => setFormData({ ...formData, expediteur_telephone: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, expediteur_telephone: e.target.value });
+                    setExpediteurFound(undefined);
+                  }}
                   placeholder={phonePlaceholder}
                   className="h-14 rounded-xl border-2 bg-white px-4 text-base focus:outline-none"
                   style={{ borderColor: COLORS.borderInput }}
@@ -742,6 +865,7 @@ export default function CourseStepForm({
                         expediteur_nom: contact.nom || formData.expediteur_nom,
                         expediteur_telephone: contact.telephone,
                       });
+                      setExpediteurFound(undefined);
                     }}
                   />
                   <ContactPickerButton
@@ -756,24 +880,16 @@ export default function CourseStepForm({
                   />
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={verifyExpediteur}
-                disabled={!formData.expediteur_telephone || verifying}
-                className="w-full h-14 rounded-xl text-white font-bold text-base shadow-md active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                style={{ background: COLORS.secondary }}
-              >
-                {verifying
-                  ? <><Loader2 className="w-5 h-5 animate-spin" />Recherche en cours...</>
-                  : <><Search className="w-5 h-5" />Vérifier dans SILGAPP</>}
-              </button>
               <VerificationResult
                 found={expediteurFound}
+                searching={expSearching}
+                hasAppAccount={expediteurFound?.has_app_account}
                 nom={expediteurFound?.nom || expediteurFound?.prenom}
                 latitude={expediteurFound?.latitude}
                 longitude={expediteurFound?.longitude}
-                labelTrouve="Expéditeur trouvé !"
-                labelNonTrouve="Expéditeur non trouvé dans SILGAPP"
+                labelTrouve="Contact trouvé dans SILGAPP ✓"
+                labelConnu="Contact connu de SILGAPP ✓"
+                labelNonTrouve="Contact non trouvé dans SILGAPP"
               />
             </div>
           );
@@ -969,11 +1085,13 @@ export default function CourseStepForm({
               <VerificationResult
                 found={destinataireFound}
                 searching={destSearching}
+                hasAppAccount={destinataireFound?.has_app_account}
                 nom={destinataireFound?.nom || destinataireFound?.prenom}
                 latitude={destinataireFound?.latitude}
                 longitude={destinataireFound?.longitude}
-                labelTrouve="Destinataire trouvé dans SILGAPP ✓"
-                labelNonTrouve="Destinataire non trouvé dans SILGAPP"
+                labelTrouve="Contact trouvé dans SILGAPP ✓"
+                labelConnu="Contact connu de SILGAPP ✓"
+                labelNonTrouve="Contact non trouvé dans SILGAPP"
               />
             </div>
           );
@@ -1007,13 +1125,25 @@ export default function CourseStepForm({
                 <Input
                   type="tel"
                   value={formData.passager_telephone || ""}
-                  onChange={(e) => setFormData({ ...formData, passager_telephone: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, passager_telephone: e.target.value });
+                    setPassagerFound(undefined);
+                  }}
                   placeholder={phonePlaceholder}
                   className="h-14 rounded-xl border-2 bg-white px-4 text-base focus:outline-none"
                   style={{ borderColor: COLORS.borderInput }}
                 />
                 <p className="text-xs pl-1" style={{ color: COLORS.textHint }}>Format : {phonePlaceholder}</p>
               </div>
+              <VerificationResult
+                found={passagerFound}
+                searching={passagerSearching}
+                hasAppAccount={passagerFound?.has_app_account}
+                nom={passagerFound?.nom || passagerFound?.prenom}
+                labelTrouve="Contact trouvé dans SILGAPP ✓"
+                labelConnu="Contact connu de SILGAPP ✓"
+                labelNonTrouve="Contact non trouvé dans SILGAPP"
+              />
               <PremiumInput
                 label="Nombre de passagers"
                 required={false}

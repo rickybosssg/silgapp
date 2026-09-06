@@ -3,20 +3,7 @@ import { Capacitor } from "@capacitor/core";
 import { BookUser, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { pickNativeContact } from "@/lib/nativeAndroid";
-
-const INDICATIFS = {
-  BF: "226", CI: "225", TG: "228", BJ: "229",
-  SN: "221", ML: "223", GN: "224", NE: "227",
-};
-
-function normaliserNumero(numero, countryCode = "") {
-  if (!numero) return "";
-  let n = String(numero).replace(/[\s\-().]/g, "").replace(/^\+/, "");
-  const indicatif = INDICATIFS[countryCode] || "";
-  if (n.startsWith("00" + indicatif)) n = n.slice(2);
-  if (/^\d{8}$/.test(n)) n = indicatif + n;
-  return n.startsWith("+") ? n : "+" + n;
-}
+import { normalizePhone } from "@/lib/phoneUtils";
 
 export default function ContactPickerButton({ onSelect, countryCode = "", label }) {
   const [loading, setLoading] = useState(false);
@@ -30,12 +17,13 @@ export default function ContactPickerButton({ onSelect, countryCode = "", label 
       }
 
       const contact = await pickNativeContact();
-      const telephone = normaliserNumero(contact?.telephone || contact?.phone, countryCode);
-      if (!telephone || telephone === "+") {
+      const rawPhone = contact?.telephone || contact?.phone || "";
+      const normalized = normalizePhone(rawPhone, countryCode);
+      if (!normalized) {
         toast.info("Ce contact n'a pas de numero de telephone.");
         return;
       }
-      onSelect({ nom: contact?.nom || contact?.name || "Contact", telephone });
+      onSelect({ nom: contact?.nom || contact?.name || "Contact", telephone: normalized });
     } catch (err) {
       const msg = err?.message || String(err);
       if (!/annule/i.test(msg)) {
