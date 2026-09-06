@@ -15,7 +15,7 @@ import { calculerPrixApproximatif } from "@/lib/priceEstimate";
 import { isPaysTarificationGrandOuaga, calculerTarifGrandOuagaAsync } from "@/lib/tarifGrandOuaga";
 import CarnetAdresses from "@/components/client/CarnetAdresses";
 import ContactPickerButton from "@/components/client/ContactPickerButton";
-import { SILGAPP_COUNTRIES, phoneVariants } from "@/lib/phoneUtils";
+import { SILGAPP_COUNTRIES, phoneVariants, validateLocalPhone, findClientByPhone } from "@/lib/phoneUtils";
 import NombreColisSelector from "@/components/multi-colis/NombreColisSelector";
 import MultiColisFormStep from "@/components/multi-colis/MultiColisFormStep";
 import SmartAddressInput from "@/components/location/SmartAddressInput";
@@ -222,8 +222,77 @@ export default function CourseStepForm({
   const [expediteurFound, setExpediteurFound] = useState(null);
   const [destinataireFound, setDestinataireFound] = useState(null);
   const [verifying, setVerifying] = useState(false);
+  const [destSearching, setDestSearching] = useState(false);
+  const destSearchRequestId = useRef(0);
   const [showNotes, setShowNotes] = useState(false);
   const { devise: countryDevise, prixSuggeres: countryPrixSuggeres } = useCountryPricing(activeCountry);
+
+  // ── Auto-recherche destinataire dans SILGAPP (debounce + anti-race) ──────────
+  // Déclenche automatiquement la recherche quand le numéro est valide pour le pays.
+  // Aucune recherche tant que le numéro est incomplet. Annule les recherches obsolètes.
+  useEffect(() => {
+    const phone = formData.destinataire_telephone || "";
+    if (!phone || !activeCountry) {
+      setDestSearching(false);
+      setDestinataireFound(undefined);
+      return;
+    }
+
+    const validation = validateLocalPhone(phone, activeCountry);
+    if (!validation.valid) {
+      setDestSearching(false);
+      setDestinataireFound(undefined);
+      return;
+    }
+
+    const requestId = ++destSearchRequestId.current;
+    const timer = setTimeout(async () => {
+      setDestSearching(true);
+      setDestinataireFound(undefined);
+      try {
+        const client = await findClientByPhone(base44, phone);
+        if (requestId !== destSearchRequestId.current) return; // race condition
+        if (client) {
+          setDestinataireFound(client);
+          const hasGps = !!(client.latitude && client.longitude);
+          setFormData(prev => ({
+            ...prev,
+            destinataire_nom: prev.destinataire_nom || client.nom || client.prenom || "",
+            destinataire_client_id: client.id,
+            recipient_has_app: true,
+            ...(hasGps ? {
+              gps_arrivee_lat: client.latitude,
+              gps_arrivee_lng: client.longitude,
+              livraisonGPS: true,
+              adresse_arrivee: "Position GPS du destinataire",
+            } : {}),
+          }));
+          try {
+            await base44.functions.invoke("notifyClientSync", {
+              course_id: "pending", destinataire_id: client.id, notification_type: "preparation_reception"
+            });
+          } catch (_) {}
+        } else {
+          setDestinataireFound(null);
+          setFormData(prev => ({
+            ...prev,
+            destinataire_client_id: null,
+            recipient_has_app: false,
+          }));
+        }
+      } catch (err) {
+        if (requestId !== destSearchRequestId.current) return;
+        setDestinataireFound(null);
+      } finally {
+        if (requestId === destSearchRequestId.current) setDestSearching(false);
+      }
+    }, 600);
+
+    return () => {
+      clearTimeout(timer);
+      destSearchRequestId.current++; // invalider toute recherche en cours
+    };
+  }, [formData.destinataire_telephone, activeCountry]);
 
   const isExpedie = formData.type_course === "expedier";
   const isRecevoir = formData.type_course === "recevoir";
@@ -465,7 +534,20 @@ export default function CourseStepForm({
   };
 
   // ─── Composant résultat vérification ──────────────────────────────────────
-  const VerificationResult = ({ found, nom, latitude, longitude, labelTrouve, labelNonTrouve }) => {
+  const VerificationResult = ({ found, searching, nom, latitude, longitude, labelTrouve, labelNonTrouve }) => {
+    if (searching) {
+      return (
+        <div
+          className="p-4 rounded-2xl border-2"
+          style={{ background: COLORS.bgSection, borderColor: COLORS.border }}
+        >
+          <div className="flex items-center gap-3">
+            <Loader2 className="w-5 h-5 animate-spin" style={{ color: COLORS.textSecondary }} />
+            <p className="font-semibold text-sm" style={{ color: COLORS.textSecondary }}>Recherche dans SILGAPP…</p>
+          </div>
+        </div>
+      );
+    }
     if (found) {
       return (
         <div
@@ -884,23 +966,13 @@ export default function CourseStepForm({
                   />
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={verifyDestinataire}
-                disabled={!formData.destinataire_telephone || verifying}
-                className="w-full h-14 rounded-xl text-white font-bold text-base shadow-md active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                style={{ background: COLORS.secondary }}
-              >
-                {verifying
-                  ? <><Loader2 className="w-5 h-5 animate-spin" />Recherche en cours...</>
-                  : <><Search className="w-5 h-5" />Vérifier dans SILGAPP</>}
-              </button>
               <VerificationResult
                 found={destinataireFound}
+                searching={destSearching}
                 nom={destinataireFound?.nom || destinataireFound?.prenom}
                 latitude={destinataireFound?.latitude}
                 longitude={destinataireFound?.longitude}
-                labelTrouve="Destinataire trouvé !"
+                labelTrouve="Destinataire trouvé dans SILGAPP ✓"
                 labelNonTrouve="Destinataire non trouvé dans SILGAPP"
               />
             </div>
