@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -315,6 +315,7 @@ export default function CourseExterneFormSync() {
     },
   };
   const queryClient = useQueryClient();
+  const submitRequestIdRef = useRef(null);
   const createMutation = useMutation({
     mutationFn: async (data) => {
       let finalData = { ...data };
@@ -329,30 +330,6 @@ export default function CourseExterneFormSync() {
         created_date: new Date().toISOString(),
       };
       queryClient.setQueryData(['courses-externes-client'], (old) => [...(old || []), tempCourse]);
-
-      // ─── ANTI-DOUBLON RENFORCÉ ────────────────────────────────────────────
-      // Critères larges : même client + même type, créée < 3 min (peu importe l'adresse)
-      const now = Date.now();
-      try {
-        const coursesRecentes = await base44.entities.CourseExterne.filter(
-          { client_telephone: finalData.client_telephone, type_course: finalData.type_course },
-          "-created_date",
-          5
-        );
-        const doublon = (coursesRecentes || []).find(course => {
-          const age = now - new Date(course.created_date).getTime();
-          return age < 3 * 60 * 1000 && !["livree", "annulee"].includes(course.statut);
-        });
-        if (doublon) {
-          const secs = Math.round((now - new Date(doublon.created_date).getTime()) / 1000);
-          // Retirer le brouillon temporaire en cas d'erreur
-          queryClient.setQueryData(['courses-externes-client'], (old) => (old || []).filter(c => c.id !== tempId));
-          throw new Error(`Course déjà créée il y a ${secs}s. Patientez avant de réessayer.`);
-        }
-      } catch (err) {
-        if (err.message?.includes('Course déjà créée')) throw err;
-        // Ignorer les autres erreurs réseau (ne pas bloquer la création)
-      }
 
       // Lookup destinataire (pour "expedier") — lie si inscrit
       if (!finalData.destinataire_client_id && finalData.destinataire_telephone) {
@@ -464,6 +441,7 @@ export default function CourseExterneFormSync() {
         (old || []).filter(c => c.id !== `temp_${Date.now()}`).concat(response)
       );
       setIsSubmitting(false);
+      submitRequestIdRef.current = null;
       localStorage.removeItem(STORAGE_KEY);
       localStorage.removeItem(STEP_KEY);
       queryClient.invalidateQueries({ queryKey: ['courses-externes-client'] });
@@ -803,8 +781,11 @@ export default function CourseExterneFormSync() {
       prix_propose_client: formData.prix_propose
     });
 
+    if (!submitRequestIdRef.current) {
+      submitRequestIdRef.current = crypto.randomUUID();
+    }
     createMutation.mutate({
-      request_id: crypto.randomUUID(),
+      request_id: submitRequestIdRef.current,
       country_code: courseCountryCode,
       client_nom: finalClientNom,
       client_telephone: finalClientTel,
