@@ -47,15 +47,17 @@ export default async function(req) {
     // pour bypasser le RLS (sinon un client ne peut trouver que ses propres enregistrements)
     let foundClient = null;
 
+    const allMatches = [];
+    const seenIds = new Set();
     for (const v of variants) {
-      if (foundClient) break;
       try {
         const results = await base44.asServiceRole.entities.ClientExterne.filter({
           telephone: v
         });
         if (results && results.length > 0) {
-          foundClient = results[0];
-          break;
+          for (const r of results) {
+            if (!seenIds.has(r.id)) { seenIds.add(r.id); allMatches.push(r); }
+          }
         }
       } catch (_) {}
       // Aussi chercher avec le format normalisé (telephone_normalized)
@@ -66,11 +68,16 @@ export default async function(req) {
             telephone_normalized: normalized
           });
           if (results && results.length > 0) {
-            foundClient = results[0];
-            break;
+            for (const r of results) {
+              if (!seenIds.has(r.id)) { seenIds.add(r.id); allMatches.push(r); }
+            }
           }
         }
       } catch (_) {}
+    }
+    // Priorité : préférer le client avec un compte SILGAPP (user_email renseigné)
+    if (allMatches.length > 0) {
+      foundClient = allMatches.find(m => !!(m.user_email && m.user_email.trim())) || allMatches[0];
     }
 
     if (!foundClient) {

@@ -1,16 +1,16 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   MapPin, Navigation, User, Package, ChevronDown, ChevronUp,
-  CheckCircle, Loader2, Search
+  CheckCircle, Loader2
 } from "lucide-react";
 import ContactPickerButton from "@/components/client/ContactPickerButton";
 import CarnetAdresses from "@/components/client/CarnetAdresses";
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
-import { phoneVariants } from "@/lib/phoneUtils";
+import { findClientByPhone, validateLocalPhone } from "@/lib/phoneUtils";
 
 const TYPE_COLIS_OPTIONS = [
   { value: "petit_colis", label: "Petit", icon: "", desc: "< 2 kg" },
@@ -33,52 +33,70 @@ export default function ColisDestinataireForm({
   savedLng,
 }) {
   const [expanded, setExpanded] = useState(true);
-  const [verifying, setVerifying] = useState(false);
+  const [searching, setSearching] = useState(false);
   const [destinataireFound, setDestinataireFound] = useState(undefined);
   const [gpsLoading, setGpsLoading] = useState(false);
+  const searchRequestId = useRef(0);
 
   const uid = LETTER_IDS[index] || String(index + 1);
   const label = `Colis ${uid}`;
 
   const update = (field, value) => onChange(index, field, value);
 
-  // Vérification SILGAPP
-  const verifyDestinataire = async () => {
-    const phone = (colisData.destinataire_telephone || "").replace(/\D/g, "");
-    if (phone.length < 8) { toast.error("Numéro invalide"); return; }
-    setVerifying(true);
-    try {
-      const variants = phoneVariants(phone);
-      let clients = [];
-      for (const v of variants) {
-        const found = await base44.entities.ClientExterne.filter({ telephone: v, actif: true }).catch(() => []);
-        if (found?.length > 0) { clients = found; break; }
-      }
-      if (clients.length > 0) {
-        const client = clients[0];
-        setDestinataireFound(client);
-        const hasGps = !!(client.latitude && client.longitude);
-        update("destinataire_nom", colisData.destinataire_nom || client.nom || client.prenom || "");
-        update("destinataire_client_id", client.id);
-        update("recipient_has_app", true);
-        if (hasGps) {
-          update("gps_livraison_lat", client.latitude);
-          update("gps_livraison_lng", client.longitude);
-          update("adresse_livraison", colisData.adresse_livraison || "Position GPS du destinataire");
-        }
-        toast.success(` ${client.nom || client.prenom} trouvé dans SILGAPP !`);
-      } else {
-        setDestinataireFound(null);
-        update("destinataire_client_id", null);
-        update("recipient_has_app", false);
-        toast.info("ℹ Destinataire non trouvé dans SILGAPP");
-      }
-    } catch (_) {
-      toast.error("Erreur lors de la vérification");
-    } finally {
-      setVerifying(false);
+  // ── Auto-recherche destinataire (debounce 600ms + anti-race) ──────────
+  // Remplace l'ancien bouton "Vérifier dans SILGAPP" par une recherche
+  // automatique sécurisée via findContactByPhoneSecure (backend, RLS-safe).
+  useEffect(() => {
+    const phone = colisData.destinataire_telephone || "";
+    if (!phone) {
+      setSearching(false);
+      setDestinataireFound(undefined);
+      return;
     }
-  };
+
+    const validation = validateLocalPhone(phone, countryCode);
+    if (!validation.valid) {
+      setSearching(false);
+      setDestinataireFound(undefined);
+      return;
+    }
+
+    const requestId = ++searchRequestId.current;
+    const timer = setTimeout(async () => {
+      setSearching(true);
+      setDestinataireFound(undefined);
+      try {
+        const client = await findClientByPhone(base44, phone, countryCode);
+        if (requestId !== searchRequestId.current) return; // race condition
+        if (client) {
+          setDestinataireFound(client);
+          update("destinataire_nom", colisData.destinataire_nom || client.nom || client.prenom || "");
+          update("destinataire_client_id", client.id);
+          update("recipient_has_app", true);
+          const hasGps = !!(client.latitude && client.longitude);
+          if (hasGps) {
+            update("gps_livraison_lat", client.latitude);
+            update("gps_livraison_lng", client.longitude);
+            update("adresse_livraison", colisData.adresse_livraison || "Position GPS du destinataire");
+          }
+        } else {
+          setDestinataireFound(null);
+          update("destinataire_client_id", null);
+          update("recipient_has_app", false);
+        }
+      } catch (err) {
+        if (requestId !== searchRequestId.current) return;
+        setDestinataireFound(null);
+      } finally {
+        if (requestId === searchRequestId.current) setSearching(false);
+      }
+    }, 600);
+
+    return () => {
+      clearTimeout(timer);
+      searchRequestId.current++;
+    };
+  }, [colisData.destinataire_telephone, countryCode]);
 
   // GPS pour ce colis
   const handleGetGPS = () => {
@@ -200,26 +218,22 @@ export default function ColisDestinataireForm({
                 }}
               />
             </div>
-            {/* Vérification SILGAPP */}
-            <button
-              type="button"
-              onClick={verifyDestinataire}
-              disabled={!colisData.destinataire_telephone || verifying}
-              className="w-full h-10 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 text-white font-semibold text-xs shadow active:scale-[0.98] transition-all disabled:opacity-40 flex items-center justify-center gap-1.5"
-            >
-              {verifying
-                ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />Recherche...</>
-                : <><Search className="w-3.5 h-3.5" />Vérifier dans SILGAPP</>}
-            </button>
+            {/* Résultat de recherche automatique */}
+            {searching && (
+              <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-xs text-blue-700 font-semibold flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Recherche dans SILGAPP...
+              </div>
+            )}
             {destinataireFound && (
               <div className="p-3 rounded-xl bg-green-50 border border-green-200 text-xs text-green-800 font-semibold flex items-center gap-2">
                 <CheckCircle className="w-4 h-4 text-green-600" />
-                {destinataireFound.nom || destinataireFound.prenom} est inscrit dans SILGAPP
+                {destinataireFound.nom || destinataireFound.prenom} trouvé dans SILGAPP ✓
               </div>
             )}
             {destinataireFound === null && (
               <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-700 font-semibold">
-                ℹ Non inscrit — la course fonctionnera quand même
+                ℹ Contact non trouvé dans SILGAPP — la course reste possible
               </div>
             )}
           </div>

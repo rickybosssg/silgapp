@@ -15,7 +15,7 @@ import { calculerPrixApproximatif } from "@/lib/priceEstimate";
 import { isPaysTarificationGrandOuaga, calculerTarifGrandOuagaAsync } from "@/lib/tarifGrandOuaga";
 import CarnetAdresses from "@/components/client/CarnetAdresses";
 import ContactPickerButton from "@/components/client/ContactPickerButton";
-import { SILGAPP_COUNTRIES, phoneVariants, validateLocalPhone, findClientByPhone } from "@/lib/phoneUtils";
+import { SILGAPP_COUNTRIES, validateLocalPhone, findClientByPhone } from "@/lib/phoneUtils";
 import NombreColisSelector from "@/components/multi-colis/NombreColisSelector";
 import MultiColisFormStep from "@/components/multi-colis/MultiColisFormStep";
 import SmartAddressInput from "@/components/location/SmartAddressInput";
@@ -55,17 +55,6 @@ function getPhonePlaceholder(countryCode) {
   const xs = "X".repeat(c.len).replace(/(.{2})/g, "$1 ").trim();
   return `+${c.dial} ${xs}`;
 }
-function normalizeForSearch(phone, countryCode) {
-  const raw = (phone || "").replace(/\D/g, "");
-  if (!raw) return phone || "";
-  const c = SILGAPP_COUNTRIES.find(x => x.code === countryCode);
-  if (!c) return raw;
-  if (raw.startsWith(c.dial) && raw.length === c.dial.length + c.len) return "+" + raw;
-  if (raw.length === c.len) return "+" + c.dial + raw;
-  if (raw.startsWith("0") && raw.length === c.len + 1) return "+" + c.dial + raw.slice(1);
-  return "+" + raw;
-}
-
 const STORAGE_KEY = "silgapp_course_draft";
 
 // ─── Composant icône d'étape ──────────────────────────────────────────────────
@@ -222,7 +211,7 @@ export default function CourseStepForm({
   const [expediteurFound, setExpediteurFound] = useState(null);
   const [destinataireFound, setDestinataireFound] = useState(null);
   const [passagerFound, setPassagerFound] = useState(null);
-  const [verifying, setVerifying] = useState(false);
+
   const [destSearching, setDestSearching] = useState(false);
   const [expSearching, setExpSearching] = useState(false);
   const [passagerSearching, setPassagerSearching] = useState(false);
@@ -533,122 +522,6 @@ export default function CourseStepForm({
       console.error("Erreur sauvegarde brouillon:", err);
     }
   }, [formDataStr]);
-
-  // ─── Vérification expéditeur ───────────────────────────────────────────────
-  const verifyExpediteur = async () => {
-    const phone = formData.expediteur_telephone?.replace(/\D/g, "") || "";
-    if (phone.length < 8) { toast.error("Numéro de téléphone invalide"); return; }
-    setVerifying(true);
-    try {
-      const normalized = normalizeForSearch(phone, activeCountry);
-      const variants = phoneVariants(phone);
-      let clients = await base44.entities.ClientExterne.filter({ telephone: normalized, actif: true });
-      if (!clients || clients.length === 0) {
-        for (const v of variants) {
-          clients = await base44.entities.ClientExterne.filter({ telephone: v, actif: true }).catch(() => []);
-          if (clients?.length > 0) break;
-        }
-      }
-      if (clients && clients.length > 0) {
-        const client = clients[0];
-        setExpediteurFound(client);
-        const hasGps = !!(client.latitude && client.longitude);
-        setFormData(prev => ({
-          ...prev,
-          expediteur_nom: prev.expediteur_nom || client.nom || client.prenom || "",
-          expediteur_client_id: client.id,
-          expediteur_has_app: true,
-          expediteur_gps_available: hasGps,
-          expediteur_gps_lat: hasGps ? client.latitude : null,
-          expediteur_gps_lng: hasGps ? client.longitude : null,
-          ...(hasGps ? {
-            gps_depart_lat: client.latitude,
-            gps_depart_lng: client.longitude,
-            recuperationGPS: true,
-            adresse_depart: "Position GPS de l'expéditeur",
-          } : {}),
-        }));
-        toast.success(`${client.nom || client.prenom} trouvé dans SILGAPP !`);
-        if (hasGps) toast.success("Position GPS de l'expéditeur disponible !");
-        try {
-          await base44.functions.invoke("notifyClientSync", {
-            course_id: "pending", expediteur_id: client.id, notification_type: "preparation_expedition"
-          });
-        } catch (_) {}
-      } else {
-        setExpediteurFound(null);
-        setFormData(prev => ({
-          ...prev,
-          expediteur_client_id: null,
-          expediteur_has_app: false,
-          expediteur_gps_available: false,
-          expediteur_gps_lat: null,
-          expediteur_gps_lng: null,
-        }));
-        toast.info("Expéditeur non trouvé dans SILGAPP - flux standard activé");
-      }
-    } catch (err) {
-      toast.error("Erreur lors de la vérification");
-      setExpediteurFound(null);
-    } finally {
-      setVerifying(false);
-    }
-  };
-
-  // ─── Vérification destinataire ─────────────────────────────────────────────
-  const verifyDestinataire = async () => {
-    const phone = formData.destinataire_telephone?.replace(/\D/g, "") || "";
-    if (phone.length < 8) { toast.error("Numéro de téléphone invalide"); return; }
-    setVerifying(true);
-    try {
-      const normalized = normalizeForSearch(phone, activeCountry);
-      const variants = phoneVariants(phone);
-      let clients = await base44.entities.ClientExterne.filter({ telephone: normalized, actif: true });
-      if (!clients || clients.length === 0) {
-        for (const v of variants) {
-          clients = await base44.entities.ClientExterne.filter({ telephone: v, actif: true }).catch(() => []);
-          if (clients?.length > 0) break;
-        }
-      }
-      if (clients && clients.length > 0) {
-        const client = clients[0];
-        setDestinataireFound(client);
-        const hasGps = !!(client.latitude && client.longitude);
-        setFormData(prev => ({
-          ...prev,
-          destinataire_nom: prev.destinataire_nom || client.nom || client.prenom || "",
-          destinataire_client_id: client.id,
-          recipient_has_app: true,
-          ...(hasGps ? {
-            gps_arrivee_lat: client.latitude,
-            gps_arrivee_lng: client.longitude,
-            livraisonGPS: true,
-            adresse_arrivee: "Position GPS du destinataire",
-          } : {}),
-        }));
-        toast.success(`${client.nom || client.prenom} trouvé dans SILGAPP !`);
-        if (hasGps) toast.success("Position GPS du destinataire disponible !");
-        try {
-          await base44.functions.invoke("notifyClientSync", {
-            course_id: "pending", destinataire_id: client.id, notification_type: "preparation_reception"
-          });
-        } catch (_) {}
-      } else {
-        setDestinataireFound(null);
-        setFormData(prev => ({
-          ...prev,
-          destinataire_client_id: null,
-          recipient_has_app: false,
-        }));
-        toast.info("Destinataire non trouvé dans SILGAPP - flux standard activé");
-      }
-    } catch (err) {
-      toast.error("Erreur lors de la vérification");
-      setDestinataireFound(null);
-    } finally {
-      setVerifying(false);
-    }
-  };
 
   // ─── Composant résultat vérification ──────────────────────────────────────
   const VerificationResult = ({ found, searching, nom, latitude, longitude, hasAppAccount, labelTrouve, labelConnu, labelNonTrouve }) => {
