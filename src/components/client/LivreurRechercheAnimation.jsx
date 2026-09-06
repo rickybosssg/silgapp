@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Truck, MapPin, Package, User, CheckCircle2, Loader2, Navigation, XCircle, RefreshCw } from "lucide-react";
 import AnnulerCourseDialog from "./AnnulerCourseDialog";
 import PrixManuelInlineCard from "./PrixManuelInlineCard";
+import { Plus, Eye } from "lucide-react";
 
 const typeColisLabels = {
   petit_colis: "Petit colis",
@@ -30,6 +31,16 @@ export default function LivreurRechercheAnimation({ course, onRelancer }) {
   const [showAnnulerDialog, setShowAnnulerDialog] = useState(false);
   const [currentMessage, setCurrentMessage] = useState(0);
   const [aucunLivreur, setAucunLivreur] = useState(false);
+
+  const handleAjouterAutre = () => {
+    // Réinitialiser le brouillon pour une nouvelle course fraîche
+    try {
+      localStorage.removeItem("silgapp_course_draft");
+      localStorage.removeItem("silgapp_course_step");
+    } catch {}
+    const route = `/client/course/${course?.type_course || "expedier"}`;
+    navigate(route, { replace: true });
+  };
 
   // Rotation des messages
   useEffect(() => {
@@ -205,14 +216,31 @@ export default function LivreurRechercheAnimation({ course, onRelancer }) {
             </div>
           </Card>
 
-          <Button
-            variant="outline"
-            className="w-full border-red-300 text-red-600 hover:bg-red-50"
-            onClick={() => setShowAnnulerDialog(true)}
-          >
-            <XCircle className="w-4 h-4 mr-2" />
-            Annuler la course
-          </Button>
+          <div className="space-y-2">
+            <Button
+              className="w-full bg-primary text-white hover:bg-primary/90"
+              onClick={() => navigate("/client/suivi")}
+            >
+              <Eye className="w-4 h-4 mr-2" />
+              Suivre ma course
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full border-primary/30 text-primary hover:bg-primary/5"
+              onClick={handleAjouterAutre}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Ajouter une autre livraison
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full border-red-300 text-red-600 hover:bg-red-50"
+              onClick={() => setShowAnnulerDialog(true)}
+            >
+              <XCircle className="w-4 h-4 mr-2" />
+              Annuler la course
+            </Button>
+          </div>
         </div>
 
         <div className="text-center">

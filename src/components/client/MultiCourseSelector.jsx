@@ -31,6 +31,11 @@ const STATUT_COLORS = {
 };
 
 export default function MultiCourseSelector({ courses, onSelect, onClose }) {
+  // Compteurs par statut
+  const nbRecherche = courses.filter(c => c.statut === "recherche_livreur" || c.statut === "nouvelle" || c.statut === "en_attente").length;
+  const nbEnCours = courses.filter(c => ["livreur_en_route", "en_route_expediteur", "arrive_prise_en_charge", "pris_en_charge", "en_livraison", "colis_recupere"].includes(c.statut)).length;
+  const nbLivrees = courses.filter(c => c.statut === "livree").length;
+
   return (
     <div className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center">
       <div className="w-full max-w-lg max-h-[80vh] bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col">
@@ -42,7 +47,7 @@ export default function MultiCourseSelector({ courses, onSelect, onClose }) {
             </div>
             <div>
               <h2 className="font-black text-gray-900 text-sm">
-                {courses.length} courses en cours
+                Mes livraisons
               </h2>
               <p className="text-[11px] text-gray-500">Sélectionnez une course à suivre</p>
             </div>
@@ -53,6 +58,24 @@ export default function MultiCourseSelector({ courses, onSelect, onClose }) {
           >
             <X className="w-4 h-4" />
           </button>
+        </div>
+
+        {/* Compteurs par statut */}
+        <div className="px-4 py-3 bg-gray-50 border-b border-gray-100 flex gap-2">
+          <div className="flex-1 text-center">
+            <p className="text-lg font-black text-orange-600">{nbRecherche}</p>
+            <p className="text-[9px] font-bold text-gray-500 uppercase">En recherche</p>
+          </div>
+          <div className="w-px bg-gray-200" />
+          <div className="flex-1 text-center">
+            <p className="text-lg font-black text-blue-600">{nbEnCours}</p>
+            <p className="text-[9px] font-bold text-gray-500 uppercase">En cours</p>
+          </div>
+          <div className="w-px bg-gray-200" />
+          <div className="flex-1 text-center">
+            <p className="text-lg font-black text-green-600">{nbLivrees}</p>
+            <p className="text-[9px] font-bold text-gray-500 uppercase">Livrées</p>
+          </div>
         </div>
 
         {/* Liste des courses */}

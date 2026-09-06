@@ -460,12 +460,26 @@ export default function CourseExterneFormSync() {
       const cid = clientProfil?.id;
       const ctel = clientProfil?.telephone;
       if (formData.type_course === "expedier") {
-        sauvegarderContactDB(cid, ctel, formData.destinataire_nom, formData.destinataire_telephone, "destinataire").catch(() => {});
+        const adrData = formData.adresse_arrivee ? {
+          adresse: formData.adresse_arrivee,
+          quartier: formData.quartier_arrivee || null,
+          ville: formData.ville_arrivee || null,
+          latitude: formData.gps_arrivee_lat || null,
+          longitude: formData.gps_arrivee_lng || null,
+        } : null;
+        sauvegarderContactDB(cid, ctel, formData.destinataire_nom, formData.destinataire_telephone, "destinataire", adrData).catch(() => {});
         if (!formData.destinataire_client_id && formData.destinataire_telephone) {
           setInvitationModal({ telephone: formData.destinataire_telephone, nom: formData.destinataire_nom });
         } else { setCourseCreated(true); }
       } else if (formData.type_course === "recevoir") {
-        sauvegarderContactDB(cid, ctel, formData.expediteur_nom, formData.expediteur_telephone, "expediteur").catch(() => {});
+        const adrData = formData.adresse_depart ? {
+          adresse: formData.adresse_depart,
+          quartier: formData.quartier_depart || null,
+          ville: formData.ville_depart || null,
+          latitude: formData.gps_depart_lat || null,
+          longitude: formData.gps_depart_lng || null,
+        } : null;
+        sauvegarderContactDB(cid, ctel, formData.expediteur_nom, formData.expediteur_telephone, "expediteur", adrData).catch(() => {});
         if (!formData.expediteur_client_id && formData.expediteur_telephone) {
           setInvitationModal({ telephone: formData.expediteur_telephone, nom: formData.expediteur_nom });
         } else { setCourseCreated(true); }
