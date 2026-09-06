@@ -135,17 +135,18 @@ Deno.serve(async (req) => {
         }
       }
 
-      // ── ANNULATION LIVREUR : course mise en "redispatch" (pause administrative) ──
-      // Le dispatch n'est PAS relancé automatiquement. La course reste en statut
-      // "redispatch" tant que l'admin ne la repasse pas manuellement en "recherche_livreur".
+      // ── ANNULATION LIVREUR : comportement différencié selon l'origine de la course ──
+      // Course source="client" → redispatch automatique (dispatch_status="en_attente" + relance)
+      // Course source="admin"  → redispatch manuel (dispatch_status="redispatch", admin relance)
       // Le livreur qui a annulé est EXCLU définitivement de cette course précise
       // (dispatch_refused_ids) mais reste disponible pour les autres courses.
+      const isCourseClient = course.source === 'client';
       let refusedIds = [];
       try { refusedIds = JSON.parse(course.dispatch_refused_ids || '[]'); } catch {}
       if (livreurId && !refusedIds.includes(livreurId)) refusedIds.push(livreurId);
       const resetData = {
         statut: "en_attente",
-        dispatch_status: "redispatch",
+        dispatch_status: isCourseClient ? "en_attente" : "redispatch",
         dispatch_wave: 0,
         livreur_id: null,
         livreur_nom: "",
@@ -331,7 +332,23 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Course mise en attente — aucun dispatch automatique. L'admin doit la relancer manuellement.
+      // ── Redispatch automatique pour les courses créées par le client ──
+      // La course est en dispatch_status="en_attente" (pas "redispatch") pour que
+      // publierCourseDansFil (V2) l'accepte via sa garde $nin.
+      if (isCourseClient) {
+        try {
+          await base44.asServiceRole.functions.invoke('dispatchExterneAuto', {
+            action: 'lancer_recherche_auto',
+            course_id,
+          });
+          console.log(`[ANNULATION] Redispatch automatique déclenché pour course client ${course_id}`);
+        } catch (dispatchErr) {
+          console.error(`[ANNULATION] Erreur redispatch auto course client ${course_id}:`, dispatchErr?.message);
+        }
+      } else {
+        // Course admin — dispatch manuel conservé. L'admin doit la relancer manuellement.
+        console.log(`[ANNULATION] Course admin ${course_id} — redispatch manuel (source=admin)`);
+      }
 
     } else {
       // ── ANNULATION CLIENT OU ADMIN : course définitivement annulée ──
