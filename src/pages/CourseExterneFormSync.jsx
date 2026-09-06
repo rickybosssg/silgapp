@@ -316,6 +316,7 @@ export default function CourseExterneFormSync() {
   };
   const queryClient = useQueryClient();
   const submitRequestIdRef = useRef(null);
+  const submitSignatureRef = useRef(null);
   const createMutation = useMutation({
     mutationFn: async (data) => {
       let finalData = { ...data };
@@ -442,6 +443,7 @@ export default function CourseExterneFormSync() {
       );
       setIsSubmitting(false);
       submitRequestIdRef.current = null;
+      submitSignatureRef.current = null;
       localStorage.removeItem(STORAGE_KEY);
       localStorage.removeItem(STEP_KEY);
       queryClient.invalidateQueries({ queryKey: ['courses-externes-client'] });
@@ -781,8 +783,21 @@ export default function CourseExterneFormSync() {
       prix_propose_client: formData.prix_propose
     });
 
-    if (!submitRequestIdRef.current) {
+    const _submissionSignature = JSON.stringify({
+      tc: formData.type_course,
+      ad: formData.adresse_depart,
+      aa: adresseArriveeFinale,
+      et: expediteurTel,
+      dt: destinataireTelFinal,
+      dn: destinataireNomFinal,
+      pp: isMulti ? 0 : (formData.prix_propose || prixEstime),
+      ds: formData.date_souhaitee,
+      pt: isDeplacement ? (formData.passager_telephone || "") : "",
+      im: isMulti,
+    });
+    if (!submitRequestIdRef.current || submitSignatureRef.current !== _submissionSignature) {
       submitRequestIdRef.current = crypto.randomUUID();
+      submitSignatureRef.current = _submissionSignature;
     }
     createMutation.mutate({
       request_id: submitRequestIdRef.current,
