@@ -12,6 +12,23 @@ export async function sauvegarderContactDB(clientId, clientTelephone, nom, telep
   if (!clientId || !telephone?.trim()) return;
   try {
     const telNormalized = telephone.replace(/\s/g, "");
+    // Sauvegarde parallèle sécurisée de l'adresse ClientAddress (client_user_email résolu backend)
+    if (adresseData?.adresse) {
+      const addressRole = type === "expediteur" ? "pickup" : "delivery";
+      base44.functions.invoke("upsertClientAddressSecure", {
+        clientId,
+        phoneNormalized: clientTelephone?.replace(/\s/g, "") || null,
+        role: addressRole,
+        addressData: {
+          adresse: adresseData.adresse,
+          quartier: adresseData.quartier || null,
+          ville: adresseData.ville || null,
+          latitude: adresseData.latitude || null,
+          longitude: adresseData.longitude || null,
+        },
+        countryCode: adresseData.countryCode || null,
+      }).catch(() => {});
+    }
     // Chercher si ce contact existe déjà pour ce client
     const existants = await base44.entities.ContactCarnet.filter({
       client_id: clientId,

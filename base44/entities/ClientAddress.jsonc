@@ -10,6 +10,10 @@
       "type": "string",
       "description": "T\u00e9l\u00e9phone normalis\u00e9 du client (pour recherche rapide sans jointure)"
     },
+    "client_user_email": {
+      "type": "string",
+      "description": "Email du compte User li\u00e9 au client propri\u00e9taire. R\u00e9solu c\u00f4t\u00e9 backend UNIQUEMENT (jamais fourni par le frontend). Permet la RLS read pour que le client voie ses propres adresses. Null pour les adresses historiques cr\u00e9\u00e9es par admin (visibles uniquement aux admins)."
+    },
     "role": {
       "type": "string",
       "enum": [
@@ -64,5 +68,55 @@
     "client_id",
     "role",
     "adresse"
-  ]
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "data.client_user_email": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "create": {
+      "$or": [
+        {
+          "data.client_user_email": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "data.client_user_email": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "data.client_user_email": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
 }
