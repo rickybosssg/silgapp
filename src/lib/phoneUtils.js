@@ -41,6 +41,7 @@ export async function loadCountryPhoneConfigs() {
         max_len: maxLen,
         name: c.nom,
         flag: c.emoji_flag || "",
+        phone_pattern: c.phone_pattern || null,
       };
     }).filter(c => c.code && c.dial);
 
@@ -156,6 +157,19 @@ export function validateLocalPhone(phone, countryCode = "") {
   }
   if (len > max) {
     return { valid: false, error: `Trop long (${len}/${max} chiffres maximum)`, length: len, min, max };
+  }
+  // ── Si phone_pattern est défini, valider le format du numéro local ──
+  // Permet de rejeter les numéros historiquement corrompus (ex: "02267282" en BF)
+  // sans casser les pays qui n'ont pas de pattern (fallback longueur uniquement).
+  if (country.phone_pattern) {
+    try {
+      const pattern = new RegExp(country.phone_pattern);
+      if (!pattern.test(local)) {
+        return { valid: false, error: "Format de numéro invalide", length: len, min, max };
+      }
+    } catch (e) {
+      // Regex invalide — ignorer la validation par pattern
+    }
   }
   return { valid: true, error: null, length: len, min, max };
 }
