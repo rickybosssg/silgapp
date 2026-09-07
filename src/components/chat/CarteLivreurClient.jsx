@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { MapPin, Loader2 } from "lucide-react";
 import { CARTO_TILE_URL, CARTO_TILE_CONFIG } from "@/lib/cartTiles";
@@ -6,10 +6,13 @@ import { CARTO_TILE_URL, CARTO_TILE_CONFIG } from "@/lib/cartTiles";
 export default function CarteLivreurClient({ livreurLat, livreurLng, livreurNom, departLat, departLng, arriveeLat, arriveeLng, statut }) {
   const [mapLoaded, setMapLoaded] = useState(false);
   const [mapError, setMapError] = useState(false);
+  const mapRef = useRef(null);
+  const markerRef = useRef(null);
 
   const isVersRecup = statut === "livreur_en_route";
   const isVersLivraison = ["colis_recupere", "en_livraison"].includes(statut);
 
+  // ── Charger Leaflet dès que les coordonnées sont disponibles ──
   useEffect(() => {
     if (!livreurLat || !livreurLng) return;
 
@@ -37,8 +40,9 @@ export default function CarteLivreurClient({ livreurLat, livreurLng, livreurNom,
     };
     loadLeaflet();
     return () => { cancelled = true; };
-  }, []);
+  }, [livreurLat, livreurLng]);
 
+  // ── Initialiser la carte UNE SEULE FOIS, puis mettre à jour le marker ──
   useEffect(() => {
     if (!mapLoaded || !livreurLat || !livreurLng) return;
 
@@ -48,18 +52,7 @@ export default function CarteLivreurClient({ livreurLat, livreurLng, livreurNom,
     const L = window.L;
     if (!L) return;
 
-    // Détruire l'ancienne carte si elle existe (évite le flicker sur Android)
-    if (container._leaflet_map) {
-      container._leaflet_map.remove();
-      container._leaflet_map = null;
-    }
-
-    const map = L.map(container, { zoomControl: false, attributionControl: true }).setView([livreurLat, livreurLng], 14);
-    container._leaflet_map = map;
-    L.control.zoom({ position: 'topleft' }).addTo(map);
-    L.tileLayer(CARTO_TILE_URL, CARTO_TILE_CONFIG).addTo(map);
-
-    // Marqueur livreur (position live) — bonhomme sur scooter, design moderne
+    // Marqueur livreur
     const livreurIcon = L.divIcon({
       html: '<div style="position:relative;width:44px;height:44px;">' +
         '<div style="position:absolute;inset:0;border-radius:50%;background:rgba(220,38,38,0.2);animation:pulse 2s infinite;"></div>' +
@@ -78,39 +71,65 @@ export default function CarteLivreurClient({ livreurLat, livreurLng, livreurNom,
       iconAnchor: [22, 22],
       className: 'livreur-marker-anim',
     });
-    L.marker([livreurLat, livreurLng], { icon: livreurIcon }).addTo(map).bindPopup(`<div style="font-weight:bold;font-size:13px">${livreurNom || 'Livreur'}<div><div style="font-size:11px;color:#666">Position en temps réel</div>`);
 
-    // Départ — point bleu
-    if (departLat && departLng) {
-      const departIcon = L.divIcon({
-        html: '<div style="width:20px;height:20px;border-radius:50%;background:#3b82f6;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);"></div>',
-        iconSize: [20, 20],
-        iconAnchor: [10, 10],
-      });
-      L.marker([departLat, departLng], { icon: departIcon }).addTo(map).bindPopup('<b>Point de récupération</b>');
+    // Si la carte n'existe pas encore, la créer
+    if (!mapRef.current || !container._leaflet_map) {
+      // Détruire l'ancienne carte si elle existe
+      if (container._leaflet_map) {
+        container._leaflet_map.remove();
+        container._leaflet_map = null;
+      }
+
+      const map = L.map(container, { zoomControl: false, attributionControl: true }).setView([livreurLat, livreurLng], 14);
+      container._leaflet_map = map;
+      L.control.zoom({ position: 'topleft' }).addTo(map);
+      L.tileLayer(CARTO_TILE_URL, CARTO_TILE_CONFIG).addTo(map);
+
+      // Créer le marker livreur
+      markerRef.current = L.marker([livreurLat, livreurLng], { icon: livreurIcon }).addTo(map)
+        .bindPopup(`<div style="font-weight:bold;font-size:13px">${livreurNom || 'Livreur'}<div><div style="font-size:11px;color:#666">Position en temps réel</div>`);
+      mapRef.current = map;
+
+      // Départ — point bleu
+      if (departLat && departLng) {
+        const departIcon = L.divIcon({
+          html: '<div style="width:20px;height:20px;border-radius:50%;background:#3b82f6;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);"></div>',
+          iconSize: [20, 20],
+          iconAnchor: [10, 10],
+        });
+        L.marker([departLat, departLng], { icon: departIcon }).addTo(map).bindPopup('<b>Point de récupération</b>');
+      }
+
+      // Arrivée — point rouge
+      if (arriveeLat && arriveeLng) {
+        const arriveeIcon = L.divIcon({
+          html: '<div style="width:20px;height:20px;border-radius:50%;background:#ef4444;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);"></div>',
+          iconSize: [20, 20],
+          iconAnchor: [10, 10],
+        });
+        L.marker([arriveeLat, arriveeLng], { icon: arriveeIcon }).addTo(map).bindPopup('<b>Point de livraison</b>');
+      }
+
+      // Ajuster le zoom pour voir tous les points
+      const bounds = [[livreurLat, livreurLng]];
+      if (departLat && departLng) bounds.push([departLat, departLng]);
+      if (arriveeLat && arriveeLng) bounds.push([arriveeLat, arriveeLng]);
+      if (bounds.length > 1) map.fitBounds(bounds, { padding: [30, 30] });
+    } else {
+      // La carte existe déjà — mettre à jour uniquement le marker
+      const map = mapRef.current;
+      if (markerRef.current) {
+        markerRef.current.setLatLng([livreurLat, livreurLng]);
+      } else {
+        markerRef.current = L.marker([livreurLat, livreurLng], { icon: livreurIcon }).addTo(map)
+          .bindPopup(`<div style="font-weight:bold;font-size:13px">${livreurNom || 'Livreur'}<div><div style="font-size:11px;color:#666">Position en temps réel</div>`);
+      }
     }
-
-    // Arrivée — point rouge
-    if (arriveeLat && arriveeLng) {
-      const arriveeIcon = L.divIcon({
-        html: '<div style="width:20px;height:20px;border-radius:50%;background:#ef4444;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);"></div>',
-        iconSize: [20, 20],
-        iconAnchor: [10, 10],
-      });
-      L.marker([arriveeLat, arriveeLng], { icon: arriveeIcon }).addTo(map).bindPopup('<b>Point de livraison</b>');
-    }
-
-    // Ajuster le zoom pour voir tous les points
-    const bounds = [[livreurLat, livreurLng]];
-    if (departLat && departLng) bounds.push([departLat, departLng]);
-    if (arriveeLat && arriveeLng) bounds.push([arriveeLat, arriveeLng]);
-    if (bounds.length > 1) map.fitBounds(bounds, { padding: [30, 30] });
 
     return () => {
-      map.remove();
-      if (container._leaflet_map) container._leaflet_map = null;
+      // Ne pas détruire la carte au cleanup — elle est réutilisée
     };
-  }, [mapLoaded, livreurLat, livreurLng]);
+  }, [mapLoaded, livreurLat, livreurLng, livreurNom, departLat, departLng, arriveeLat, arriveeLng]);
 
   if (mapError) return null;
 

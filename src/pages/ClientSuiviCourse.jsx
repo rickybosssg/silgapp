@@ -177,25 +177,22 @@ export default function ClientSuiviCourse() {
       [...(byCreator || []), ...(byDest || []), ...(byExpediteur || [])].forEach(c => map.set(c.id, c));
       const courses = [...map.values()].sort((a, b) => new Date(b.updated_date) - new Date(a.updated_date));
 
-      // CORRECTION CRITIQUE : Enrichir avec GPS TEMPS RÉEL du livreur (poll 2s)
-      const livreurIds = [...new Set(courses.filter(c => c.livreur_id && !["livree", "annulee"].includes(c.statut)).map(c => c.livreur_id))];
-      if (livreurIds.length > 0) {
-        const livreursData = await Promise.all(
-          livreurIds.map(id => base44.entities.Livreur.filter({ id }).then(r => r?.[0]).catch(() => null))
+      // CORRECTION : Récupérer le GPS du livreur via fonction backend sécurisée
+      // (RLS Livreur empêche le client de lire directement l'entité Livreur)
+      const activeCoursesWithLivreur = courses.filter(c => c.livreur_id && !["livree", "annulee"].includes(c.statut));
+      if (activeCoursesWithLivreur.length > 0) {
+        const gpsResults = await Promise.all(
+          activeCoursesWithLivreur.map(c =>
+            base44.functions.invoke('getLivreurGPSForCourse', { courseId: c.id })
+              .then(res => res?.data || res)
+              .catch(() => null)
+          )
         );
-        const livreurMap = {};
-        livreursData.forEach(l => { if (l) livreurMap[l.id] = l; });
+        const gpsMap = {};
+        gpsResults.forEach(g => { if (g && g.livreur_id) gpsMap[g.livreur_id] = g; });
         return courses.map(c => {
-          if (!c.livreur_id || !livreurMap[c.livreur_id]) return c;
-          const l = livreurMap[c.livreur_id];
-          return {
-            ...c,
-            livreur_photo_url: l.photo_url || c.livreur_photo_url || null,
-            livreur_note_moyenne: l.note_moyenne || 0,
-            livreur_nombre_avis: l.nombre_avis || 0,
-            livreur_vehicule: l.vehicule || l.type_vehicule || c.livreur_vehicule || null,
-            _livreur: l, // GPS temps réel ici
-          };
+          if (!c.livreur_id || !gpsMap[c.livreur_id]) return c;
+          return { ...c, _livreur: gpsMap[c.livreur_id] };
         });
       }
       return courses;
@@ -514,7 +511,7 @@ export default function ClientSuiviCourse() {
         )}
 
         {/* 🗺️ Carte live du livreur */}
-        {["livreur_en_route", "colis_recupere", "en_livraison"].includes(maCourse.statut) && (() => {
+        {["livreur_en_route", "en_route_expediteur", "colis_recupere", "en_livraison"].includes(maCourse.statut) && (() => {
           const l = maCourse._livreur;
           const isVersRecup = maCourse.statut === "livreur_en_route";
           return (
