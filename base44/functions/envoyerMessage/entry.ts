@@ -164,9 +164,10 @@ Deno.serve(async (req) => {
           const livreur = await base44.asServiceRole.entities.Livreur.get(c.livreur_id).catch(() => null);
           if (livreur) courseParticipants.push({ type: 'livreur', id: livreur.id });
         }
-        const clientId = c?.expediteur_client_id || c?.destinataire_client_id;
-        if (clientId) {
-          const client = await base44.asServiceRole.entities.ClientExterne.get(clientId).catch(() => null);
+        // ── Résoudre l'expéditeur ET le destinataire séparément (fix: || ne prenait qu'un seul) ──
+        const clientIds = [c?.expediteur_client_id, c?.destinataire_client_id].filter(Boolean);
+        for (const cid of clientIds) {
+          const client = await base44.asServiceRole.entities.ClientExterne.get(cid).catch(() => null);
           if (client) courseParticipants.push({ type: 'client', id: client.id });
         }
         const admins = await base44.asServiceRole.entities.User.filter({ role: 'admin' });
