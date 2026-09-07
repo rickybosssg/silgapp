@@ -128,7 +128,9 @@ assert.match(courseActiveCardSource, /value="autre"/, "le motif Autre doit etre 
 assert.match(courseActiveCardSource, /motif_detail:\s*motifAnnulationDetail\.trim\(\)/, "le detail du motif doit etre transmis au backend");
 assert.match(annulationBackendSource, /source === "livreur"[\s\S]*motif_detail/, "le backend doit valider le detail fourni par le livreur");
 assert.match(annulationBackendSource, /dispatch_refused_ids:\s*JSON\.stringify\(refusedIds\)/, "le livreur doit etre exclu uniquement de la course annulee");
-assert.match(annulationBackendSource, /statut:\s*"en_attente"[\s\S]*dispatch_status:\s*"en_attente"/, "une annulation livreur doit suspendre la course jusqu'a l'action admin");
+assert.match(annulationBackendSource, /const isCourseClient = course\.source === 'client'/, "l'origine client ou admin doit piloter le redispatch");
+assert.match(annulationBackendSource, /dispatch_status:\s*isCourseClient \? "en_attente" : "redispatch"/, "une course client repart en recherche et une course admin attend la relance manuelle");
+assert.match(annulationBackendSource, /if \(isCourseClient\)[\s\S]*dispatchExterneAuto[\s\S]*action:\s*'lancer_recherche_auto'/, "une course client doit etre redispatchee automatiquement");
 assert.match(annulationBackendSource, /manual_hors_ligne === true \? "hors_ligne" : "disponible"/, "le livreur doit etre libere sans annuler son choix hors ligne");
 assert.match(annulationBackendSource, /ANNULATION CLIENT OU ADMIN[\s\S]*statut:\s*"annulee"[\s\S]*dispatch_status:\s*"expire"/, "une annulation client doit etre terminale et ne jamais rester en attente");
 assert.doesNotMatch(annulationBackendSource, /ANNULATION CLIENT OU ADMIN[\s\S]*statut:\s*"en_attente"/, "le chemin client ne doit jamais remettre la course en attente");

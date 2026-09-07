@@ -3,10 +3,12 @@ import { Package, Search, X } from "lucide-react";
 
 /**
  * Modal affiche quand un livreur annule une course.
- * Informe le client que nous recherchons un nouveau livreur.
- * Le dispatch est automatiquement relance cote backend.
+ * Adapte le message selon l'origine de la course :
+ * - source "client" : redispatch automatique, message rassurant
+ * - source "admin"  : redispatch manuel, message d'attente équipe
  */
 export default function LivreurAnnulationDialog({ course, motifLabel, onFermer }) {
+  const isCourseClient = course?.source === 'client';
   return (
     <div
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
@@ -41,15 +43,31 @@ export default function LivreurAnnulationDialog({ course, motifLabel, onFermer }
         </div>
 
         <div className="px-6 py-5 text-center">
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-            <p className="text-sm font-bold text-gray-800">
-              Nous recherchons un nouveau livreur...
-            </p>
-          </div>
-          <p className="text-xs text-gray-500 leading-relaxed">
-            Vous serez notifie des qu'un livreur accepte votre course. Aucune action de votre part n'est necessaire.
-          </p>
+          {isCourseClient ? (
+            <>
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                <p className="text-sm font-bold text-gray-800">
+                  SILGAPP recherche automatiquement un nouveau livreur...
+                </p>
+              </div>
+              <p className="text-xs text-gray-500 leading-relaxed">
+                Votre livreur a annulé la course. Aucune action de votre part n'est nécessaire — vous serez notifié dès qu'un livreur accepte.
+              </p>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <div className="w-2 h-2 bg-amber-500 rounded-full animate-pulse" />
+                <p className="text-sm font-bold text-gray-800">
+                  Votre demande est en attente de traitement par notre équipe...
+                </p>
+              </div>
+              <p className="text-xs text-gray-500 leading-relaxed">
+                Votre livreur a annulé la course. Notre équipe va traiter votre demande dans les plus brefs délais.
+              </p>
+            </>
+          )}
         </div>
 
         <div className="p-5 pt-0">

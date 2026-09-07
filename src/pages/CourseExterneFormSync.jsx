@@ -91,6 +91,26 @@ export default function CourseExterneFormSync() {
   const clientGpsLng = position?.longitude || null;
   const clientAdresse = clientProfil?.quartier || "";
 
+  const freshData = {
+    type_course: typeCourse,
+    client_nom: clientProfil?.nom || "",
+    client_telephone: clientProfil?.telephone || "",
+    expediteur_nom: "", expediteur_telephone: "",
+    destinataire_nom: "", destinataire_telephone: "",
+    type_colis: "petit_colis",
+    adresse_depart: "", adresse_arrivee: "",
+    quartier_depart: "", quartier_arrivee: "",
+    destination_inconnue: false,
+    notes: "", date_souhaitee: "", mode_immediat: true,
+    gps_depart_lat: null, gps_depart_lng: null,
+    gps_arrivee_lat: typeCourse === "recevoir" ? clientGpsLat : null,
+    gps_arrivee_lng: typeCourse === "recevoir" ? clientGpsLng : null,
+    recuperationGPS: false,
+    livraisonGPS: typeCourse === "recevoir" && !!clientGpsLat,
+    expediteur_gps_available: false,
+    expediteur_gps_lat: null, expediteur_gps_lng: null,
+    prix_propose: 0,
+  };
   const initialData = prefillCourse
     ? {
         type_course: typeCourse,
@@ -122,34 +142,7 @@ export default function CourseExterneFormSync() {
         expediteur_gps_lng: null,
         prix_propose: 0,
       }
-    : (draft || {
-        type_course: typeCourse,
-        client_nom: clientProfil?.nom || "",
-        client_telephone: clientProfil?.telephone || "",
-        expediteur_nom: "",
-        expediteur_telephone: "",
-        destinataire_nom: "",
-        destinataire_telephone: "",
-        type_colis: "petit_colis",
-        adresse_depart: "",
-        adresse_arrivee: "",
-        quartier_depart: "",
-        quartier_arrivee: "",
-        destination_inconnue: false,
-        notes: "",
-        date_souhaitee: "",
-        mode_immediat: true,
-        gps_depart_lat: null,
-        gps_depart_lng: null,
-        gps_arrivee_lat: typeCourse === "recevoir" ? clientGpsLat : null,
-        gps_arrivee_lng: typeCourse === "recevoir" ? clientGpsLng : null,
-        recuperationGPS: false,
-        livraisonGPS: typeCourse === "recevoir" && !!clientGpsLat,
-        expediteur_gps_available: false,
-        expediteur_gps_lat: null,
-        expediteur_gps_lng: null,
-        prix_propose: 0,
-      });
+    : (draft || freshData);
 
   const [formData, setFormData] = useState(initialData);
 
@@ -328,6 +321,8 @@ export default function CourseExterneFormSync() {
     setIsSubmitting(false);
   };
 
+  const submitRequestIdRef = useRef(null);
+  const submitSignatureRef = useRef(null);
   const createMutation = useMutation({
     mutationFn: async (data) => {
       let finalData = { ...data };
@@ -342,30 +337,6 @@ export default function CourseExterneFormSync() {
         created_date: new Date().toISOString(),
       };
       queryClient.setQueryData(['courses-externes-client'], (old) => [...(old || []), tempCourse]);
-
-      // ─── ANTI-DOUBLON RENFORCÉ ────────────────────────────────────────────
-      // Critères larges : même client + même type, créée < 3 min (peu importe l'adresse)
-      const now = Date.now();
-      try {
-        const coursesRecentes = await base44.entities.CourseExterne.filter(
-          { client_telephone: finalData.client_telephone, type_course: finalData.type_course },
-          "-created_date",
-          5
-        );
-        const doublon = (coursesRecentes || []).find(course => {
-          const age = now - new Date(course.created_date).getTime();
-          return age < 3 * 60 * 1000 && !["livree", "annulee"].includes(course.statut);
-        });
-        if (doublon) {
-          const secs = Math.round((now - new Date(doublon.created_date).getTime()) / 1000);
-          // Retirer le brouillon temporaire en cas d'erreur
-          queryClient.setQueryData(['courses-externes-client'], (old) => (old || []).filter(c => c.id !== tempId));
-          throw new Error(`Course déjà créée il y a ${secs}s. Patientez avant de réessayer.`);
-        }
-      } catch (err) {
-        if (err.message?.includes('Course déjà créée')) throw err;
-        // Ignorer les autres erreurs réseau (ne pas bloquer la création)
-      }
 
       // Lookup destinataire (pour "expedier") — lie si inscrit
       if (!finalData.destinataire_client_id && finalData.destinataire_telephone) {
@@ -421,13 +392,14 @@ export default function CourseExterneFormSync() {
       });
       // Safety: SDK peut wrapper la réponse dans { data: { ... } }
       const course = createResult?.data?.course || createResult?.course;
+      const isIdempotentReplay = createResult?.data?.idempotent === true || createResult?.idempotent === true;
 
       if (!course?.id) {
         throw new Error("Réponse invalide du serveur — course non créée");
       }
 
       // ── Créer les sous-colis si mode multi-colis (fire-and-forget) ──
-      if (finalData.is_multi_colis && finalData._colisData?.length > 1) {
+      if (!isIdempotentReplay && finalData.is_multi_colis && finalData._colisData?.length > 1) {
         Promise.all(finalData._colisData.map((c) =>
           base44.entities.ColisExterne.create({
             course_id: course.id,
@@ -455,8 +427,10 @@ export default function CourseExterneFormSync() {
       // ── Fire-and-forget : notifications et dispatch en arrière-plan ──
       // Le client ne doit PAS attendre la fin du dispatch pour voir sa confirmation.
       // La création de la course et la recherche du livreur sont deux étapes distinctes.
-      base44.functions.invoke("notifyClientSync", { course_id: course.id }).catch(() => null);
-      if (!formData.date_souhaitee) {
+      if (!isIdempotentReplay) {
+        base44.functions.invoke("notifyClientSync", { course_id: course.id }).catch(() => null);
+      }
+      if (!isIdempotentReplay && !formData.date_souhaitee) {
         base44.functions.invoke("dispatchExterneAuto", {
           action: "lancer_recherche_auto",
           course_id: course.id
@@ -477,6 +451,8 @@ export default function CourseExterneFormSync() {
         (old || []).filter(c => !c.id?.startsWith('temp_')).concat(response)
       );
       resetSubmission();
+      submitRequestIdRef.current = null;
+      submitSignatureRef.current = null;
       localStorage.removeItem(STORAGE_KEY);
       localStorage.removeItem(STEP_KEY);
       queryClient.invalidateQueries({ queryKey: ['courses-externes-client'] });
@@ -493,12 +469,26 @@ export default function CourseExterneFormSync() {
       const cid = clientProfil?.id;
       const ctel = clientProfil?.telephone;
       if (formData.type_course === "expedier") {
-        sauvegarderContactDB(cid, ctel, formData.destinataire_nom, formData.destinataire_telephone, "destinataire").catch(() => {});
+        const adrData = formData.adresse_arrivee ? {
+          adresse: formData.adresse_arrivee,
+          quartier: formData.quartier_arrivee || null,
+          ville: formData.ville_arrivee || null,
+          latitude: formData.gps_arrivee_lat || null,
+          longitude: formData.gps_arrivee_lng || null,
+        } : null;
+        sauvegarderContactDB(cid, ctel, formData.destinataire_nom, formData.destinataire_telephone, "destinataire", adrData).catch(() => {});
         if (!formData.destinataire_client_id && formData.destinataire_telephone) {
           setInvitationModal({ telephone: formData.destinataire_telephone, nom: formData.destinataire_nom });
         } else { setCourseCreated(true); }
       } else if (formData.type_course === "recevoir") {
-        sauvegarderContactDB(cid, ctel, formData.expediteur_nom, formData.expediteur_telephone, "expediteur").catch(() => {});
+        const adrData = formData.adresse_depart ? {
+          adresse: formData.adresse_depart,
+          quartier: formData.quartier_depart || null,
+          ville: formData.ville_depart || null,
+          latitude: formData.gps_depart_lat || null,
+          longitude: formData.gps_depart_lng || null,
+        } : null;
+        sauvegarderContactDB(cid, ctel, formData.expediteur_nom, formData.expediteur_telephone, "expediteur", adrData).catch(() => {});
         if (!formData.expediteur_client_id && formData.expediteur_telephone) {
           setInvitationModal({ telephone: formData.expediteur_telephone, nom: formData.expediteur_nom });
         } else { setCourseCreated(true); }
@@ -818,8 +808,27 @@ export default function CourseExterneFormSync() {
       prix_propose_client: formData.prix_propose
     });
 
+    const _submissionSignature = JSON.stringify({
+      form: formData,
+      colis: isMulti ? colis : null,
+      country_code: courseCountryCode,
+      tc: formData.type_course,
+      ad: formData.adresse_depart,
+      aa: adresseArriveeFinale,
+      et: expediteurTel,
+      dt: destinataireTelFinal,
+      dn: destinataireNomFinal,
+      pp: isMulti ? 0 : (formData.prix_propose || prixEstime),
+      ds: formData.date_souhaitee,
+      pt: isDeplacement ? (formData.passager_telephone || "") : "",
+      im: isMulti,
+    });
+    if (!submitRequestIdRef.current || submitSignatureRef.current !== _submissionSignature) {
+      submitRequestIdRef.current = crypto.randomUUID();
+      submitSignatureRef.current = _submissionSignature;
+    }
     createMutation.mutate({
-      request_id: crypto.randomUUID(),
+      request_id: submitRequestIdRef.current,
       country_code: courseCountryCode,
       client_nom: finalClientNom,
       client_telephone: finalClientTel,
@@ -873,6 +882,20 @@ export default function CourseExterneFormSync() {
     });
   };
 
+  const handleAjouterAutre = () => {
+    resetSubmission();
+    submitRequestIdRef.current = null;
+    submitSignatureRef.current = null;
+    setCourseCreated(false);
+    setCreatedCourse(null);
+    setInvitationModal(null);
+    setCurrentStep(0);
+    setFormData(freshData);
+    setColis(createColisDefaults(1));
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(STEP_KEY);
+  };
+
   const handleNext = () => setCurrentStep((prev) => prev + 1);
   const handleBack = () => setCurrentStep((prev) => prev - 1);
   const handleGoToStep = (targetStep) => setCurrentStep(targetStep);
@@ -884,14 +907,14 @@ export default function CourseExterneFormSync() {
   };
 
   if (courseCreated && createdCourse) {
-    return <LivreurRechercheAnimation course={createdCourse} />;
+    return <LivreurRechercheAnimation course={createdCourse} onAjouterAutre={handleAjouterAutre} />;
   }
 
   // Modal invitation WhatsApp — affiché après création réussie si contact hors SILGAPP
   if (invitationModal && createdCourse) {
     return (
       <>
-        <LivreurRechercheAnimation course={createdCourse} />
+        <LivreurRechercheAnimation course={createdCourse} onAjouterAutre={handleAjouterAutre} />
         <InvitationWhatsAppModal
           telephone={invitationModal.telephone}
           nomContact={invitationModal.nom}

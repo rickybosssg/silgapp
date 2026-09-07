@@ -139,17 +139,18 @@ Deno.serve(async (req) => {
         }
       }
 
-      // ── ANNULATION LIVREUR : course mise en attente administrative ──
-      // Le dispatch n'est PAS relancé automatiquement. La course reste en statut
-      // "en_attente" tant que l'admin ne la repasse pas manuellement en recherche.
+      // ── ANNULATION LIVREUR : comportement différencié selon l'origine de la course ──
+      // Course source="client" → redispatch automatique (dispatch_status="en_attente" + relance)
+      // Course source="admin"  → redispatch manuel (dispatch_status="redispatch", admin relance)
       // Le livreur qui a annulé est EXCLU définitivement de cette course précise
       // (dispatch_refused_ids) mais reste disponible pour les autres courses.
+      const isCourseClient = course.source === 'client';
       let refusedIds = [];
       try { refusedIds = JSON.parse(course.dispatch_refused_ids || '[]'); } catch {}
       if (livreurId && !refusedIds.includes(livreurId)) refusedIds.push(livreurId);
       const resetData = {
         statut: "en_attente",
-        dispatch_status: "en_attente",
+        dispatch_status: isCourseClient ? "en_attente" : "redispatch",
         dispatch_wave: 0,
         livreur_id: null,
         livreur_nom: "",
@@ -273,7 +274,9 @@ Deno.serve(async (req) => {
       // Les instructions système (redispatch) sont affichées séparément côté frontend
       // (SystemAlertModal) en tant que bloc statique, jamais concaténées au motif.
       await asService.entities.Notification.create({
-        titre: "⏸ Course annulée par le livreur — redispatch requis",
+        titre: isCourseClient
+          ? "⏸ Course client annulée par le livreur — recherche relancée"
+          : "⏸ Course admin annulée par le livreur — redispatch requis",
         message: `Le livreur ${course.livreur_nom || "?"} a annulé la course #${course_id.slice(-8)} (${course.adresse_depart || "?"} → ${course.adresse_arrivee || "?"}). Motif: ${motif || "non spécifié"}. ${motif_detail ? `Détail: ${motif_detail}` : "Aucun détail fourni par le livreur."}`,
         type: "alerte_critique_dispatch",
         course_id,
@@ -307,7 +310,9 @@ Deno.serve(async (req) => {
 
         await asService.entities.Notification.create({
           titre: "⏸ Votre course est en attente",
-          message: `Votre livreur a annulé la course (motif: ${motifLabel}). Votre demande est en attente — un nouveau livreur vous sera assigné après validation de notre équipe.`,
+          message: isCourseClient
+            ? `Votre livreur a annulé la course (motif: ${motifLabel}). La recherche d'un nouveau livreur a été relancée automatiquement.`
+            : `Votre livreur a annulé la course (motif: ${motifLabel}). Votre demande est en attente de relance par notre équipe.`,
           type: "course_modifiee",
           course_id,
           destinataire_email: clientEmail,
@@ -316,7 +321,9 @@ Deno.serve(async (req) => {
 
         await base44.asServiceRole.functions.invoke('envoiNotificationPush', {
           titre: "⏸ Votre course est en attente",
-          message: `Votre livreur a annulé (motif: ${motifLabel}). Votre demande est en attente de validation par notre équipe.`,
+          message: isCourseClient
+            ? `Votre livreur a annulé (motif: ${motifLabel}). La recherche d'un nouveau livreur a été relancée automatiquement.`
+            : `Votre livreur a annulé (motif: ${motifLabel}). Votre demande est en attente de relance par notre équipe.`,
           type: "course_modifiee",
           destinataire_email: clientEmail,
           user_type: "client",
@@ -335,7 +342,23 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Course mise en attente — aucun dispatch automatique. L'admin doit la relancer manuellement.
+      // ── Redispatch automatique pour les courses créées par le client ──
+      // La course est en dispatch_status="en_attente" (pas "redispatch") pour que
+      // publierCourseDansFil (V2) l'accepte via sa garde $nin.
+      if (isCourseClient) {
+        try {
+          await base44.asServiceRole.functions.invoke('dispatchExterneAuto', {
+            action: 'lancer_recherche_auto',
+            course_id,
+          });
+          console.log(`[ANNULATION] Redispatch automatique déclenché pour course client ${course_id}`);
+        } catch (dispatchErr) {
+          console.error(`[ANNULATION] Erreur redispatch auto course client ${course_id}:`, dispatchErr?.message);
+        }
+      } else {
+        // Course admin — dispatch manuel conservé. L'admin doit la relancer manuellement.
+        console.log(`[ANNULATION] Course admin ${course_id} — redispatch manuel (source=admin)`);
+      }
 
     } else {
       // ── ANNULATION CLIENT OU ADMIN : course définitivement annulée ──

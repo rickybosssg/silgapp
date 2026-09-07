@@ -37,6 +37,7 @@ import SuiviBarreFlottante from "@/components/client/SuiviBarreFlottante";
 import RechercheLivreurScreen from "@/components/client/RechercheLivreurScreen";
 import SuiviCourseFullscreen from "@/components/client/SuiviCourseFullscreen";
 import EcranFinCourse from "@/components/client/EcranFinCourse";
+import MultiCourseSelector from "@/components/client/MultiCourseSelector";
 import QuickOrderPanel from "@/components/client/QuickOrderPanel";
 import QuickOrderProPanel from "@/components/client/QuickOrderProPanel";
 import { isLibre } from "@/lib/dispatchRules";
@@ -94,6 +95,7 @@ export default function ClientExterneApp() {
   const [showRecherche, setShowRecherche] = useState(false);
   const [showSuiviFullscreen, setShowSuiviFullscreen] = useState(false);
   const [showAcceptanceAnim, setShowAcceptanceAnim] = useState(false);
+  const [showMultiCourseSelector, setShowMultiCourseSelector] = useState(false);
   const lastRechercheCourseId = useRef(null);
   const prevHadRecherche = useRef(false);
 
@@ -978,47 +980,82 @@ export default function ClientExterneApp() {
     <div className="min-h-screen bg-[#f5f5f7] text-[#1d1d1f]">
       <PullToRefreshIndicator pulling={pulling} refreshing={refreshing} />
 
-      {/* ── COURSES ACTIVES — bannière flottante ─────── */}
-      {coursesActives.length > 0 && (
-        <div className="fixed top-3 left-3 right-3 z-50 space-y-2">
-          {coursesActives.map((course) => (
-            <div
-              key={course.id}
-              className="bg-[#1f2429]/95 backdrop-blur-md rounded-2xl shadow-xl border border-[#00a86b]/20 overflow-hidden cursor-pointer active:scale-[0.98] transition-transform"
-              onClick={() => navigate("/client/suivi", { state: { course_id: course.id } })}
-            >
-              <div className="h-1 bg-gradient-to-r from-[#00a86b] to-red-500 w-full" />
-              <div className="p-3 flex items-center gap-3">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-black text-[#00a86b]">
-                    {course.type_course === "deplacement" && course.statut === "recherche_livreur" ? " Recherche chauffeur..." :
-                     course.type_course === "deplacement" && course.statut === "livreur_en_route" ? " Chauffeur en route" :
-                     course.type_course === "deplacement" && course.statut === "arrive_prise_en_charge" ? " Arrivé au point de prise en charge" :
-                     course.type_course === "deplacement" && course.statut === "passager_embarque" ? " Passager à bord" :
-                     course.type_course === "deplacement" && course.statut === "livree" ? " Déplacement terminé" :
-                     course.statut === "recherche_livreur" ? " Recherche livreur..." :
-                     course.statut === "livreur_en_route"  ? " Livreur en route" :
-                     course.statut === "colis_recupere"    ? " Colis récupéré" : " En livraison"}
-                  </p>
-                  <p className="text-[11px] text-white/50 truncate mt-0.5">
-                    {course.livreur_nom || "Livreur assigné"} · {course.adresse_depart} → {course.adresse_arrivee}
-                  </p>
-                  {course.is_multi_colis && (
-                    <div className="mt-1">
-                      <MultiColisProgressBadge
-                        nbColis={course.nb_colis || 1}
-                        nbLivres={course.nb_colis_livres || 0}
-                        nbAnnules={course.nb_colis_annules || 0}
-                        size="sm"
-                      />
-                    </div>
-                  )}
-                </div>
-                <ChevronRight className="w-4 h-4 text-white/60 flex-shrink-0" />
+      {/* ── COURSE ACTIVE UNIQUE — bannière flottante ─────── */}
+      {coursesActives.length === 1 && (
+        <div className="fixed top-3 left-3 right-3 z-50">
+          <div
+            className="bg-[#1f2429]/95 backdrop-blur-md rounded-2xl shadow-xl border border-[#00a86b]/20 overflow-hidden cursor-pointer active:scale-[0.98] transition-transform"
+            onClick={() => navigate("/client/suivi", { state: { course_id: coursesActives[0].id } })}
+          >
+            <div className="h-1 bg-gradient-to-r from-[#00a86b] to-red-500 w-full" />
+            <div className="p-3 flex items-center gap-3">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-black text-[#00a86b]">
+                  {coursesActives[0].type_course === "deplacement" && coursesActives[0].statut === "recherche_livreur" ? " Recherche chauffeur..." :
+                   coursesActives[0].type_course === "deplacement" && coursesActives[0].statut === "livreur_en_route" ? " Chauffeur en route" :
+                   coursesActives[0].type_course === "deplacement" && coursesActives[0].statut === "arrive_prise_en_charge" ? " Arrivé au point de prise en charge" :
+                   coursesActives[0].type_course === "deplacement" && coursesActives[0].statut === "passager_embarque" ? " Passager à bord" :
+                   coursesActives[0].type_course === "deplacement" && coursesActives[0].statut === "livree" ? " Déplacement terminé" :
+                   coursesActives[0].statut === "recherche_livreur" ? " Recherche livreur..." :
+                   coursesActives[0].statut === "livreur_en_route"  ? " Livreur en route" :
+                   coursesActives[0].statut === "colis_recupere"    ? " Colis récupéré" : " En livraison"}
+                </p>
+                <p className="text-[11px] text-white/50 truncate mt-0.5">
+                  {coursesActives[0].livreur_nom || "Livreur assigné"} · {coursesActives[0].adresse_depart} → {coursesActives[0].adresse_arrivee}
+                </p>
+                {coursesActives[0].is_multi_colis && (
+                  <div className="mt-1">
+                    <MultiColisProgressBadge
+                      nbColis={coursesActives[0].nb_colis || 1}
+                      nbLivres={coursesActives[0].nb_colis_livres || 0}
+                      nbAnnules={coursesActives[0].nb_colis_annules || 0}
+                      size="sm"
+                    />
+                  </div>
+                )}
+              </div>
+              <ChevronRight className="w-4 h-4 text-white/60 flex-shrink-0" />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MULTI-COURSES — bannière compacte + sélecteur ─────── */}
+      {coursesActives.length > 1 && (
+        <div className="fixed top-3 left-3 right-3 z-50">
+          <div
+            className="bg-[#1f2429]/95 backdrop-blur-md rounded-2xl shadow-xl border border-[#00a86b]/20 overflow-hidden cursor-pointer active:scale-[0.98] transition-transform"
+            onClick={() => setShowMultiCourseSelector(true)}
+          >
+            <div className="h-1 bg-gradient-to-r from-[#00a86b] via-amber-400 to-red-500 w-full" />
+            <div className="p-3 flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-[#00a86b]/20 flex items-center justify-center flex-shrink-0">
+                <Package className="w-4 h-4 text-[#00a86b]" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-black text-white">
+                  {coursesActives.length} courses en cours
+                </p>
+                <p className="text-[11px] text-white/50 truncate">
+                  Tap pour voir et sélectionner
+                </p>
+              </div>
+              <div className="flex items-center gap-1 flex-shrink-0">
+                {coursesActives.slice(0, 3).map((c, i) => (
+                  <span
+                    key={c.id}
+                    className={`w-2 h-2 rounded-full ${
+                      c.livreur_id ? "bg-green-400" :
+                      c.statut === "recherche_livreur" ? "bg-amber-400" : "bg-white/40"
+                    }`}
+                    style={{ marginLeft: i === 0 ? 0 : -4 }}
+                  />
+                ))}
+                <ChevronRight className="w-4 h-4 text-white/60 ml-1" />
               </div>
             </div>
-          ))}
+          </div>
         </div>
       )}
 
@@ -1171,7 +1208,13 @@ export default function ClientExterneApp() {
                 {coursesActives.length > 0 && (
                   <button
                     className="w-full flex items-center gap-4 rounded-2xl bg-white border border-black/5 shadow-[0_8px_24px_rgba(15,23,42,0.07)] p-5 active:scale-[0.98] transition-all text-left hover:shadow-md"
-                    onClick={() => navigate("/client/suivi")}
+                    onClick={() => {
+                      if (coursesActives.length > 1) {
+                        setShowMultiCourseSelector(true);
+                      } else {
+                        navigate("/client/suivi");
+                      }
+                    }}
                   >
                     <div className="w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center flex-shrink-0">
                       <Navigation className="w-7 h-7 text-blue-600" />
@@ -1182,7 +1225,23 @@ export default function ClientExterneApp() {
                         {coursesActives.length} course{coursesActives.length > 1 ? "s" : ""} en cours
                       </p>
                     </div>
-                    <div className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse" />
+                    {coursesActives.length > 1 && (
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        {coursesActives.slice(0, 3).map((c, i) => (
+                          <span
+                            key={c.id}
+                            className={`w-2 h-2 rounded-full ${
+                              c.livreur_id ? "bg-green-400" :
+                              c.statut === "recherche_livreur" ? "bg-amber-400" : "bg-gray-300"
+                            }`}
+                            style={{ marginLeft: i === 0 ? 0 : -4 }}
+                          />
+                        ))}
+                      </div>
+                    )}
+                    {coursesActives.length === 1 && (
+                      <div className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse" />
+                    )}
                   </button>
                 )}
               </div>
@@ -1506,10 +1565,22 @@ export default function ClientExterneApp() {
       )}
 
       {/* ── BARRE DE SUIVI PERSISTANTE — en bas de l'écran ── */}
-      {coursePrincipale && !showRecherche && !showSuiviFullscreen && (
+      {coursePrincipale && !showRecherche && !showSuiviFullscreen && !showMultiCourseSelector && (
         <SuiviBarreFlottante
           course={coursePrincipale}
           onClick={() => setShowSuiviFullscreen(true)}
+        />
+      )}
+
+      {/* ── SÉLECTEUR MULTI-COURSES — liste compacte des courses actives ── */}
+      {showMultiCourseSelector && coursesActives.length > 1 && (
+        <MultiCourseSelector
+          courses={coursesActives}
+          onSelect={(courseId) => {
+            setShowMultiCourseSelector(false);
+            navigate("/client/suivi", { state: { course_id: courseId } });
+          }}
+          onClose={() => setShowMultiCourseSelector(false)}
         />
       )}
 

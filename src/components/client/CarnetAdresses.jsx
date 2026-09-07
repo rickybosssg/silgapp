@@ -8,10 +8,27 @@ import { Input } from "@/components/ui/input";
  * Sauvegarde ou incrémente un contact dans la base de données.
  * À appeler après une course créée avec succès.
  */
-export async function sauvegarderContactDB(clientId, clientTelephone, nom, telephone, type) {
+export async function sauvegarderContactDB(clientId, clientTelephone, nom, telephone, type, adresseData) {
   if (!clientId || !telephone?.trim()) return;
   try {
     const telNormalized = telephone.replace(/\s/g, "");
+    // Sauvegarde parallèle sécurisée de l'adresse ClientAddress (client_user_email résolu backend)
+    if (adresseData?.adresse) {
+      const addressRole = type === "expediteur" ? "pickup" : "delivery";
+      base44.functions.invoke("upsertClientAddressSecure", {
+        clientId,
+        phoneNormalized: clientTelephone?.replace(/\s/g, "") || null,
+        role: addressRole,
+        addressData: {
+          adresse: adresseData.adresse,
+          quartier: adresseData.quartier || null,
+          ville: adresseData.ville || null,
+          latitude: adresseData.latitude || null,
+          longitude: adresseData.longitude || null,
+        },
+        countryCode: adresseData.countryCode || null,
+      }).catch(() => {});
+    }
     // Chercher si ce contact existe déjà pour ce client
     const existants = await base44.entities.ContactCarnet.filter({
       client_id: clientId,
@@ -20,13 +37,22 @@ export async function sauvegarderContactDB(clientId, clientTelephone, nom, telep
     });
     if (existants && existants.length > 0) {
       const contact = existants[0];
-      await base44.entities.ContactCarnet.update(contact.id, {
+      const updateData = {
         nom: nom || contact.nom,
         nb_utilisations: (contact.nb_utilisations || 1) + 1,
         derniere_utilisation: new Date().toISOString(),
-      });
+      };
+      // Enrichir avec l'adresse habituelle si fournie et non déjà mémorisée
+      if (adresseData?.adresse && !contact.adresse) {
+        updateData.adresse = adresseData.adresse;
+        updateData.quartier = adresseData.quartier || null;
+        updateData.ville = adresseData.ville || null;
+        updateData.latitude = adresseData.latitude || null;
+        updateData.longitude = adresseData.longitude || null;
+      }
+      await base44.entities.ContactCarnet.update(contact.id, updateData);
     } else {
-      await base44.entities.ContactCarnet.create({
+      const createData = {
         client_id: clientId,
         client_telephone: clientTelephone,
         nom: nom || "",
@@ -34,7 +60,15 @@ export async function sauvegarderContactDB(clientId, clientTelephone, nom, telep
         type,
         nb_utilisations: 1,
         derniere_utilisation: new Date().toISOString(),
-      });
+      };
+      if (adresseData?.adresse) {
+        createData.adresse = adresseData.adresse;
+        createData.quartier = adresseData.quartier || null;
+        createData.ville = adresseData.ville || null;
+        createData.latitude = adresseData.latitude || null;
+        createData.longitude = adresseData.longitude || null;
+      }
+      await base44.entities.ContactCarnet.create(createData);
     }
   } catch (err) {
     console.error("[CarnetAdresses] Erreur sauvegarde:", err);

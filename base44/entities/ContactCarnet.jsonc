@@ -10,6 +10,10 @@
       "type": "string",
       "description": "T\u00e9l\u00e9phone du client propri\u00e9taire (pour retrouver ses contacts rapidement)"
     },
+    "client_user_email": {
+      "type": "string",
+      "description": "Email du compte User li\u00e9 au client propri\u00e9taire. R\u00e9solu c\u00f4t\u00e9 backend UNIQUEMENT (jamais fourni par le frontend). Permet la RLS read pour que le client voie ses propres contacts. Null si le client n'a pas de compte User."
+    },
     "nom": {
       "type": "string",
       "description": "Nom du contact"
@@ -26,6 +30,26 @@
       ],
       "description": "Type de contact : destinataire ou exp\u00e9diteur"
     },
+    "adresse": {
+      "type": "string",
+      "description": "Adresse habituelle du contact (optionnel). M\u00e9moris\u00e9e lors d'une course r\u00e9ussie si connue."
+    },
+    "quartier": {
+      "type": "string",
+      "description": "Quartier de l'adresse habituelle du contact (optionnel)"
+    },
+    "ville": {
+      "type": "string",
+      "description": "Ville de l'adresse habituelle du contact (optionnel)"
+    },
+    "latitude": {
+      "type": "number",
+      "description": "Latitude GPS de l'adresse habituelle du contact (optionnel)"
+    },
+    "longitude": {
+      "type": "number",
+      "description": "Longitude GPS de l'adresse habituelle du contact (optionnel)"
+    },
     "nb_utilisations": {
       "type": "number",
       "default": 1,
@@ -41,5 +65,53 @@
     "client_id",
     "telephone",
     "type"
-  ]
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "data.client_user_email": "{{user.email}}"
+        },
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "create": {},
+    "update": {
+      "$or": [
+        {
+          "data.client_user_email": "{{user.email}}"
+        },
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "data.client_user_email": "{{user.email}}"
+        },
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
 }

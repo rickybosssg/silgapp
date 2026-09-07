@@ -6,16 +6,15 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   ArrowLeft, ArrowRight, MapPin, Navigation, Package,
   User, FileText, CheckCircle, Truck, AlertCircle,
-  Loader2, Search,
+  Loader2,
   Pencil, ChevronDown, ChevronUp, Info
 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
-import { toast } from "sonner";
 import { calculerPrixApproximatif } from "@/lib/priceEstimate";
 import { isPaysTarificationGrandOuaga, calculerTarifGrandOuagaAsync } from "@/lib/tarifGrandOuaga";
 import CarnetAdresses from "@/components/client/CarnetAdresses";
 import ContactPickerButton from "@/components/client/ContactPickerButton";
-import { SILGAPP_COUNTRIES, phoneVariants } from "@/lib/phoneUtils";
+import { SILGAPP_COUNTRIES, getValidContactPhone, findClientByPhone } from "@/lib/phoneUtils";
 import NombreColisSelector from "@/components/multi-colis/NombreColisSelector";
 import MultiColisFormStep from "@/components/multi-colis/MultiColisFormStep";
 import SmartAddressInput from "@/components/location/SmartAddressInput";
@@ -55,17 +54,6 @@ function getPhonePlaceholder(countryCode) {
   const xs = "X".repeat(c.len).replace(/(.{2})/g, "$1 ").trim();
   return `+${c.dial} ${xs}`;
 }
-function normalizeForSearch(phone, countryCode) {
-  const raw = (phone || "").replace(/\D/g, "");
-  if (!raw) return phone || "";
-  const c = SILGAPP_COUNTRIES.find(x => x.code === countryCode);
-  if (!c) return raw;
-  if (raw.startsWith(c.dial) && raw.length === c.dial.length + c.len) return "+" + raw;
-  if (raw.length === c.len) return "+" + c.dial + raw;
-  if (raw.startsWith("0") && raw.length === c.len + 1) return "+" + c.dial + raw.slice(1);
-  return "+" + raw;
-}
-
 const STORAGE_KEY = "silgapp_course_draft";
 
 // ─── Composant icône d'étape ──────────────────────────────────────────────────
@@ -221,9 +209,174 @@ export default function CourseStepForm({
   const phonePlaceholder = activeCountry ? getPhonePlaceholder(activeCountry) : "";
   const [expediteurFound, setExpediteurFound] = useState(null);
   const [destinataireFound, setDestinataireFound] = useState(null);
-  const [verifying, setVerifying] = useState(false);
+  const [passagerFound, setPassagerFound] = useState(null);
+
+  const [destSearching, setDestSearching] = useState(false);
+  const [expSearching, setExpSearching] = useState(false);
+  const [passagerSearching, setPassagerSearching] = useState(false);
+  const destSearchRequestId = useRef(0);
+  const expSearchRequestId = useRef(0);
+  const passagerSearchRequestId = useRef(0);
   const [showNotes, setShowNotes] = useState(false);
   const { devise: countryDevise, prixSuggeres: countryPrixSuggeres } = useCountryPricing(activeCountry);
+
+  // ── Auto-recherche destinataire dans SILGAPP (debounce + anti-race) ──────────
+  // Déclenche automatiquement la recherche quand le numéro est valide pour le pays.
+  // Aucune recherche tant que le numéro est incomplet. Annule les recherches obsolètes.
+  useEffect(() => {
+    const phone = getValidContactPhone(formData.destinataire_telephone, activeCountry);
+    if (!phone || !activeCountry) {
+      setDestSearching(false);
+      setDestinataireFound(undefined);
+      return;
+    }
+
+    const requestId = ++destSearchRequestId.current;
+    const timer = setTimeout(async () => {
+      setDestSearching(true);
+      setDestinataireFound(undefined);
+      try {
+        const client = await findClientByPhone(base44, phone, activeCountry);
+        if (requestId !== destSearchRequestId.current) return; // race condition
+        if (client) {
+          setDestinataireFound(client);
+          const hasGps = !!(client.latitude && client.longitude);
+          setFormData(prev => ({
+            ...prev,
+            destinataire_nom: prev.destinataire_nom || client.nom || client.prenom || "",
+            destinataire_client_id: client.id,
+            recipient_has_app: client.has_app_account === true,
+            ...(hasGps ? {
+              gps_arrivee_lat: client.latitude,
+              gps_arrivee_lng: client.longitude,
+              livraisonGPS: true,
+              adresse_arrivee: "Position GPS du destinataire",
+            } : {}),
+          }));
+          try {
+            await base44.functions.invoke("notifyClientSync", {
+              course_id: "pending", destinataire_id: client.id, notification_type: "preparation_reception"
+            });
+          } catch (_) {}
+        } else {
+          setDestinataireFound(null);
+          setFormData(prev => ({
+            ...prev,
+            destinataire_client_id: null,
+            recipient_has_app: false,
+          }));
+        }
+      } catch (err) {
+        if (requestId !== destSearchRequestId.current) return;
+        setDestinataireFound(null);
+      } finally {
+        if (requestId === destSearchRequestId.current) setDestSearching(false);
+      }
+    }, 600);
+
+    return () => {
+      clearTimeout(timer);
+      destSearchRequestId.current++; // invalider toute recherche en cours
+    };
+  }, [formData.destinataire_telephone, activeCountry]);
+
+  // ── Auto-recherche expéditeur dans SILGAPP (debounce + anti-race) ──────────
+  useEffect(() => {
+    const phone = getValidContactPhone(formData.expediteur_telephone, activeCountry);
+    if (!phone || !activeCountry) {
+      setExpSearching(false);
+      setExpediteurFound(undefined);
+      return;
+    }
+
+    const requestId = ++expSearchRequestId.current;
+    const timer = setTimeout(async () => {
+      setExpSearching(true);
+      setExpediteurFound(undefined);
+      try {
+        const client = await findClientByPhone(base44, phone, activeCountry);
+        if (requestId !== expSearchRequestId.current) return;
+        if (client) {
+          setExpediteurFound(client);
+          const hasGps = !!(client.latitude && client.longitude);
+          setFormData(prev => ({
+            ...prev,
+            expediteur_nom: prev.expediteur_nom || client.nom || client.prenom || "",
+            expediteur_client_id: client.id,
+            expediteur_has_app: client.has_app_account === true,
+            expediteur_gps_available: hasGps,
+            expediteur_gps_lat: hasGps ? client.latitude : null,
+            expediteur_gps_lng: hasGps ? client.longitude : null,
+            ...(hasGps ? {
+              gps_depart_lat: client.latitude,
+              gps_depart_lng: client.longitude,
+              recuperationGPS: true,
+              adresse_depart: "Position GPS de l'expéditeur",
+            } : {}),
+          }));
+        } else {
+          setExpediteurFound(null);
+          setFormData(prev => ({
+            ...prev,
+            expediteur_client_id: null,
+            expediteur_has_app: false,
+            expediteur_gps_available: false,
+            expediteur_gps_lat: null,
+            expediteur_gps_lng: null,
+          }));
+        }
+      } catch (err) {
+        if (requestId !== expSearchRequestId.current) return;
+        setExpediteurFound(null);
+      } finally {
+        if (requestId === expSearchRequestId.current) setExpSearching(false);
+      }
+    }, 600);
+
+    return () => {
+      clearTimeout(timer);
+      expSearchRequestId.current++;
+    };
+  }, [formData.expediteur_telephone, activeCountry]);
+
+  // ── Auto-recherche passager dans SILGAPP (debounce + anti-race) ────────────
+  useEffect(() => {
+    const phone = getValidContactPhone(formData.passager_telephone, activeCountry);
+    if (!phone || !activeCountry) {
+      setPassagerSearching(false);
+      setPassagerFound(undefined);
+      return;
+    }
+
+    const requestId = ++passagerSearchRequestId.current;
+    const timer = setTimeout(async () => {
+      setPassagerSearching(true);
+      setPassagerFound(undefined);
+      try {
+        const client = await findClientByPhone(base44, phone, activeCountry);
+        if (requestId !== passagerSearchRequestId.current) return;
+        if (client) {
+          setPassagerFound(client);
+          setFormData(prev => ({
+            ...prev,
+            passager_nom: prev.passager_nom || client.nom || client.prenom || "",
+          }));
+        } else {
+          setPassagerFound(null);
+        }
+      } catch (err) {
+        if (requestId !== passagerSearchRequestId.current) return;
+        setPassagerFound(null);
+      } finally {
+        if (requestId === passagerSearchRequestId.current) setPassagerSearching(false);
+      }
+    }, 600);
+
+    return () => {
+      clearTimeout(timer);
+      passagerSearchRequestId.current++;
+    };
+  }, [formData.passager_telephone, activeCountry]);
 
   const isExpedie = formData.type_course === "expedier";
   const isRecevoir = formData.type_course === "recevoir";
@@ -348,125 +501,23 @@ export default function CourseStepForm({
     }
   }, [formDataStr]);
 
-  // ─── Vérification expéditeur ───────────────────────────────────────────────
-  const verifyExpediteur = async () => {
-    const phone = formData.expediteur_telephone?.replace(/\D/g, "") || "";
-    if (phone.length < 8) { toast.error("Numéro de téléphone invalide"); return; }
-    setVerifying(true);
-    try {
-      const normalized = normalizeForSearch(phone, activeCountry);
-      const variants = phoneVariants(phone);
-      let clients = await base44.entities.ClientExterne.filter({ telephone: normalized, actif: true });
-      if (!clients || clients.length === 0) {
-        for (const v of variants) {
-          clients = await base44.entities.ClientExterne.filter({ telephone: v, actif: true }).catch(() => []);
-          if (clients?.length > 0) break;
-        }
-      }
-      if (clients && clients.length > 0) {
-        const client = clients[0];
-        setExpediteurFound(client);
-        const hasGps = !!(client.latitude && client.longitude);
-        setFormData(prev => ({
-          ...prev,
-          expediteur_nom: prev.expediteur_nom || client.nom || client.prenom || "",
-          expediteur_client_id: client.id,
-          expediteur_has_app: true,
-          expediteur_gps_available: hasGps,
-          expediteur_gps_lat: hasGps ? client.latitude : null,
-          expediteur_gps_lng: hasGps ? client.longitude : null,
-          ...(hasGps ? {
-            gps_depart_lat: client.latitude,
-            gps_depart_lng: client.longitude,
-            recuperationGPS: true,
-            adresse_depart: "Position GPS de l'expéditeur",
-          } : {}),
-        }));
-        toast.success(`${client.nom || client.prenom} trouvé dans SILGAPP !`);
-        if (hasGps) toast.success("Position GPS de l'expéditeur disponible !");
-        try {
-          await base44.functions.invoke("notifyClientSync", {
-            course_id: "pending", expediteur_id: client.id, notification_type: "preparation_expedition"
-          });
-        } catch (_) {}
-      } else {
-        setExpediteurFound(null);
-        setFormData(prev => ({
-          ...prev,
-          expediteur_client_id: null,
-          expediteur_has_app: false,
-          expediteur_gps_available: false,
-          expediteur_gps_lat: null,
-          expediteur_gps_lng: null,
-        }));
-        toast.info("Expéditeur non trouvé dans SILGAPP - flux standard activé");
-      }
-    } catch (err) {
-      toast.error("Erreur lors de la vérification");
-      setExpediteurFound(null);
-    } finally {
-      setVerifying(false);
-    }
-  };
-
-  // ─── Vérification destinataire ─────────────────────────────────────────────
-  const verifyDestinataire = async () => {
-    const phone = formData.destinataire_telephone?.replace(/\D/g, "") || "";
-    if (phone.length < 8) { toast.error("Numéro de téléphone invalide"); return; }
-    setVerifying(true);
-    try {
-      const normalized = normalizeForSearch(phone, activeCountry);
-      const variants = phoneVariants(phone);
-      let clients = await base44.entities.ClientExterne.filter({ telephone: normalized, actif: true });
-      if (!clients || clients.length === 0) {
-        for (const v of variants) {
-          clients = await base44.entities.ClientExterne.filter({ telephone: v, actif: true }).catch(() => []);
-          if (clients?.length > 0) break;
-        }
-      }
-      if (clients && clients.length > 0) {
-        const client = clients[0];
-        setDestinataireFound(client);
-        const hasGps = !!(client.latitude && client.longitude);
-        setFormData(prev => ({
-          ...prev,
-          destinataire_nom: prev.destinataire_nom || client.nom || client.prenom || "",
-          destinataire_client_id: client.id,
-          recipient_has_app: true,
-          ...(hasGps ? {
-            gps_arrivee_lat: client.latitude,
-            gps_arrivee_lng: client.longitude,
-            livraisonGPS: true,
-            adresse_arrivee: "Position GPS du destinataire",
-          } : {}),
-        }));
-        toast.success(`${client.nom || client.prenom} trouvé dans SILGAPP !`);
-        if (hasGps) toast.success("Position GPS du destinataire disponible !");
-        try {
-          await base44.functions.invoke("notifyClientSync", {
-            course_id: "pending", destinataire_id: client.id, notification_type: "preparation_reception"
-          });
-        } catch (_) {}
-      } else {
-        setDestinataireFound(null);
-        setFormData(prev => ({
-          ...prev,
-          destinataire_client_id: null,
-          recipient_has_app: false,
-        }));
-        toast.info("Destinataire non trouvé dans SILGAPP - flux standard activé");
-      }
-    } catch (err) {
-      toast.error("Erreur lors de la vérification");
-      setDestinataireFound(null);
-    } finally {
-      setVerifying(false);
-    }
-  };
-
   // ─── Composant résultat vérification ──────────────────────────────────────
-  const VerificationResult = ({ found, nom, latitude, longitude, labelTrouve, labelNonTrouve }) => {
+  const VerificationResult = ({ found, searching, nom, latitude, longitude, hasAppAccount, labelTrouve, labelConnu, labelNonTrouve }) => {
+    if (searching) {
+      return (
+        <div
+          className="p-4 rounded-2xl border-2"
+          style={{ background: COLORS.bgSection, borderColor: COLORS.border }}
+        >
+          <div className="flex items-center gap-3">
+            <Loader2 className="w-5 h-5 animate-spin" style={{ color: COLORS.textSecondary }} />
+            <p className="font-semibold text-sm" style={{ color: COLORS.textSecondary }}>Recherche dans SILGAPP…</p>
+          </div>
+        </div>
+      );
+    }
     if (found) {
+      const isFound = hasAppAccount !== false; // has_app_account true ou undefined (legacy)
       return (
         <div
           className="p-4 rounded-2xl border-2"
@@ -480,9 +531,11 @@ export default function CourseStepForm({
               <CheckCircle className="w-5 h-5 text-white" />
             </div>
             <div className="flex-1">
-              <p className="font-bold" style={{ color: COLORS.secondary }}>{labelTrouve}</p>
+              <p className="font-bold" style={{ color: COLORS.secondary }}>
+                {isFound ? labelTrouve : (labelConnu || labelTrouve)}
+              </p>
               <p className="text-sm mt-1" style={{ color: COLORS.textSecondary }}>
-                <strong>{nom}</strong> est inscrit dans SILGAPP
+                <strong>{nom}</strong> {isFound ? "est inscrit dans SILGAPP" : "est connu de SILGAPP"}
               </p>
               <div className="flex flex-wrap gap-2 mt-2">
                 <span className="text-xs px-2.5 py-1 rounded-full font-medium" style={{ background: COLORS.primaryLight, color: COLORS.primary }}>Synchronisation</span>
@@ -644,7 +697,10 @@ export default function CourseStepForm({
                 <Input
                   type="tel"
                   value={formData.expediteur_telephone}
-                  onChange={(e) => setFormData({ ...formData, expediteur_telephone: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, expediteur_telephone: e.target.value });
+                    setExpediteurFound(undefined);
+                  }}
                   placeholder={phonePlaceholder}
                   className="h-14 rounded-xl border-2 bg-white px-4 text-base focus:outline-none"
                   style={{ borderColor: COLORS.borderInput }}
@@ -660,6 +716,7 @@ export default function CourseStepForm({
                         expediteur_nom: contact.nom || formData.expediteur_nom,
                         expediteur_telephone: contact.telephone,
                       });
+                      setExpediteurFound(undefined);
                     }}
                   />
                   <ContactPickerButton
@@ -674,24 +731,16 @@ export default function CourseStepForm({
                   />
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={verifyExpediteur}
-                disabled={!formData.expediteur_telephone || verifying}
-                className="w-full h-14 rounded-xl text-white font-bold text-base shadow-md active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                style={{ background: COLORS.secondary }}
-              >
-                {verifying
-                  ? <><Loader2 className="w-5 h-5 animate-spin" />Recherche en cours...</>
-                  : <><Search className="w-5 h-5" />Vérifier dans SILGAPP</>}
-              </button>
               <VerificationResult
                 found={expediteurFound}
+                searching={expSearching}
+                hasAppAccount={expediteurFound?.has_app_account}
                 nom={expediteurFound?.nom || expediteurFound?.prenom}
                 latitude={expediteurFound?.latitude}
                 longitude={expediteurFound?.longitude}
-                labelTrouve="Expéditeur trouvé !"
-                labelNonTrouve="Expéditeur non trouvé dans SILGAPP"
+                labelTrouve="Contact trouvé dans SILGAPP ✓"
+                labelConnu="Contact connu de SILGAPP ✓"
+                labelNonTrouve="Contact non trouvé dans SILGAPP"
               />
             </div>
           );
@@ -884,24 +933,16 @@ export default function CourseStepForm({
                   />
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={verifyDestinataire}
-                disabled={!formData.destinataire_telephone || verifying}
-                className="w-full h-14 rounded-xl text-white font-bold text-base shadow-md active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                style={{ background: COLORS.secondary }}
-              >
-                {verifying
-                  ? <><Loader2 className="w-5 h-5 animate-spin" />Recherche en cours...</>
-                  : <><Search className="w-5 h-5" />Vérifier dans SILGAPP</>}
-              </button>
               <VerificationResult
                 found={destinataireFound}
+                searching={destSearching}
+                hasAppAccount={destinataireFound?.has_app_account}
                 nom={destinataireFound?.nom || destinataireFound?.prenom}
                 latitude={destinataireFound?.latitude}
                 longitude={destinataireFound?.longitude}
-                labelTrouve="Destinataire trouvé !"
-                labelNonTrouve="Destinataire non trouvé dans SILGAPP"
+                labelTrouve="Contact trouvé dans SILGAPP ✓"
+                labelConnu="Contact connu de SILGAPP ✓"
+                labelNonTrouve="Contact non trouvé dans SILGAPP"
               />
             </div>
           );
@@ -935,13 +976,25 @@ export default function CourseStepForm({
                 <Input
                   type="tel"
                   value={formData.passager_telephone || ""}
-                  onChange={(e) => setFormData({ ...formData, passager_telephone: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, passager_telephone: e.target.value });
+                    setPassagerFound(undefined);
+                  }}
                   placeholder={phonePlaceholder}
                   className="h-14 rounded-xl border-2 bg-white px-4 text-base focus:outline-none"
                   style={{ borderColor: COLORS.borderInput }}
                 />
                 <p className="text-xs pl-1" style={{ color: COLORS.textHint }}>Format : {phonePlaceholder}</p>
               </div>
+              <VerificationResult
+                found={passagerFound}
+                searching={passagerSearching}
+                hasAppAccount={passagerFound?.has_app_account}
+                nom={passagerFound?.nom || passagerFound?.prenom}
+                labelTrouve="Contact trouvé dans SILGAPP ✓"
+                labelConnu="Contact connu de SILGAPP ✓"
+                labelNonTrouve="Contact non trouvé dans SILGAPP"
+              />
               <PremiumInput
                 label="Nombre de passagers"
                 required={false}
