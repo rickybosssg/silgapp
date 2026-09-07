@@ -35,8 +35,14 @@ export const SILGAPP_COUNTRIES = [
  */
 export function normalizePhone(phone: string | null | undefined, countryCode: string | null = null): string | null {
   if (!phone) return null;
-  const n = String(phone).replace(/\D/g, "");
+  let n = String(phone).replace(/\D/g, "");
   if (!n) return null;
+
+  // ── Préfixe international "00" → retirer AVANT toute analyse ──
+  // Ex: "0022672824795" → "22672824795" puis traité normalement
+  if (n.startsWith("00")) {
+    n = n.slice(2);
+  }
 
   // 1. Déjà en format international (commence par un indicatif connu)
   for (const { dial, len } of SILGAPP_COUNTRIES) {
@@ -82,8 +88,14 @@ export function normalizePhone(phone: string | null | undefined, countryCode: st
  * Utile pour les recherches en base où le format de stockage est incertain.
  */
 export function phoneVariants(phone: string | null | undefined): string[] {
-  const n = (phone || "").replace(/\D/g, "");
+  let n = (phone || "").replace(/\D/g, "");
   if (!n) return [];
+
+  // ── Préfixe international "00" → retirer AVANT analyse ──
+  if (n.startsWith("00")) {
+    n = n.slice(2);
+  }
+
   const variants = new Set<string>([n]);
 
   for (const { dial, len } of SILGAPP_COUNTRIES) {
