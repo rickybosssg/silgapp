@@ -8,6 +8,7 @@ import { fr } from "date-fns/locale";
 import ChatBubble from "@/components/chat/ChatBubble";
 import AudioRecorder from "@/components/chat/AudioRecorder";
 import NewConversationDialog from "@/components/chat/NewConversationDialog";
+import CourseChatPanel from "@/components/chat/CourseChatPanel";
 import { playNotificationSound } from "@/hooks/useSonEtVibration";
 import {
   buildClientMessageId,
@@ -321,9 +322,10 @@ function GeneralChatWindow({ conversationId, myType, myId, myName, onBack }) {
   );
 }
 
-export default function MessagesPage({ myType, myId, myName, onBack, initialConversationId }) {
+export default function MessagesPage({ myType, myId, myName, onBack, initialConversationId, initialCourseId }) {
   const [conversations, setConversations] = useState([]);
   const [activeConvId, setActiveConvId] = useState(initialConversationId || null);
+  const [activeCourseId, setActiveCourseId] = useState(initialCourseId || null);
   const [loading, setLoading] = useState(true);
   const [showNewConv, setShowNewConv] = useState(false);
 
@@ -387,6 +389,18 @@ export default function MessagesPage({ myType, myId, myName, onBack, initialConv
       await base44.entities.Conversation.update(convId, { admin_last_read_date: now });
     } catch (_) {}
   };
+
+  if (activeCourseId) {
+    return (
+      <CourseChatPanel
+        courseId={activeCourseId}
+        myType={myType}
+        myId={myId}
+        myName={myName}
+        onBack={() => setActiveCourseId(null)}
+      />
+    );
+  }
 
   if (activeConvId) {
     return (
