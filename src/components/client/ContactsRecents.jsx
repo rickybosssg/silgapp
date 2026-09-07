@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Clock, Trash2, ArrowRight } from "lucide-react";
 import { Preferences } from "@capacitor/preferences";
+import { normalizePhone } from "@/lib/phoneUtils";
 
 const STORAGE_KEY = "silgapp_contacts_recents";
 
@@ -38,8 +39,8 @@ export async function sauvegarderContactRecent(nom, telephone, type) {
   if (!telephone?.trim()) return;
   try {
     const contacts = await lireContacts();
-    const telNormalized = telephone.replace(/\s/g, "");
-    const idx = contacts.findIndex(c => c.telephone.replace(/\s/g, "") === telNormalized && c.type === type);
+    const telNormalized = normalizePhone(telephone);
+    const idx = contacts.findIndex(c => normalizePhone(c.telephone) === telNormalized && c.type === type);
     if (idx >= 0) {
       contacts[idx].nom = nom || contacts[idx].nom;
       contacts[idx].usage_count = (contacts[idx].usage_count || 1) + 1;
@@ -76,9 +77,9 @@ export default function ContactsRecents({ type = "destinataire", onSelect }) {
   const supprimerContact = async (e, telephone) => {
     e.stopPropagation();
     const all = await lireContacts();
-    const updated = all.filter(c => !(c.telephone.replace(/\s/g, "") === telephone.replace(/\s/g, "") && c.type === type));
+    const updated = all.filter(c => !(normalizePhone(c.telephone) === normalizePhone(telephone) && c.type === type));
     await ecrireContacts(updated);
-    setContacts(prev => prev.filter(c => c.telephone.replace(/\s/g, "") !== telephone.replace(/\s/g, "")));
+    setContacts(prev => prev.filter(c => normalizePhone(c.telephone) !== normalizePhone(telephone)));
   };
 
   if (contacts.length === 0) return null;

@@ -23,6 +23,47 @@ export const SILGAPP_COUNTRIES = [
 ];
 
 /**
+ * Charge dynamiquement les indicatifs pays depuis Country.indicatif.
+ * Met à jour SILGAPP_COUNTRIES (source de vérité = Country entity).
+ * Idempotent — ne fait rien si la BDD est indisponible.
+ */
+export async function loadCountryDialCodes(base44: any, countryCode?: string): Promise<void> {
+  try {
+    if (countryCode) {
+      const country = await base44.asServiceRole.entities.Country.filter({ code: countryCode, actif: true });
+      if (country?.[0]?.indicatif) {
+        const dial = String(country[0].indicatif).replace(/^\+/, "");
+        const len = country[0].phone_max_length || 8;
+        const idx = SILGAPP_COUNTRIES.findIndex(c => c.code === countryCode);
+        if (idx >= 0) {
+          SILGAPP_COUNTRIES[idx].dial = dial;
+          SILGAPP_COUNTRIES[idx].len = len;
+        } else {
+          SILGAPP_COUNTRIES.push({ code: countryCode, dial, len });
+        }
+      }
+    } else {
+      const countries = await base44.asServiceRole.entities.Country.filter({ actif: true });
+      for (const c of (countries || [])) {
+        if (c.code && c.indicatif) {
+          const dial = String(c.indicatif).replace(/^\+/, "");
+          const len = c.phone_max_length || 8;
+          const idx = SILGAPP_COUNTRIES.findIndex(co => co.code === c.code);
+          if (idx >= 0) {
+            SILGAPP_COUNTRIES[idx].dial = dial;
+            SILGAPP_COUNTRIES[idx].len = len;
+          } else {
+            SILGAPP_COUNTRIES.push({ code: c.code, dial, len });
+          }
+        }
+      }
+    }
+  } catch {
+    // BDD indisponible — fallback sur la liste statique
+  }
+}
+
+/**
  * Normalise un numéro de téléphone au format international sans "+"
  * Retourne null si le numéro ne peut pas être normalisé.
  *

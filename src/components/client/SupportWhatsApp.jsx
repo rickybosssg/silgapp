@@ -1,5 +1,5 @@
 import React from "react";
-import { getDialCodeSync } from "@/lib/countryService";
+import { normalizePhone } from "@/lib/phoneUtils";
 
 const SUPPORT_NUMBER = "22666925190";
 const SUPPORT_MSG = `Bonjour, j'ai besoin d'assistance sur SILGAPP.
@@ -9,12 +9,7 @@ Code livreur :
 Problème rencontré :`;
 
 export function openWhatsAppNative(phone, message = "", countryCode) {
-  let num = phone?.replace(/\D/g, "") || "";
-  const dial = (getDialCodeSync(countryCode) || "").replace(/^\+/, "");
-  if (dial) {
-    if (num.startsWith("0") && num.length <= 9) num = dial + num.slice(1);
-    if (num.length === 8) num = dial + num;
-  }
+  const num = normalizePhone(phone, countryCode) || "";
 
   const encoded = encodeURIComponent(message);
   // wa.me fonctionne sur Android APK, Play Store et navigateur (redirige vers l'app si installée, sinon WhatsApp Web)

@@ -49,15 +49,13 @@ function timeAgo(dateStr) {
   return new Date(dateStr).toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
 }
 
-function normalizePhone(phone) {
-  return String(phone || "").replace(/[^\d+]/g, "");
-}
+import { normalizePhone } from "@/lib/phoneUtils";
 
 function openWhatsApp(phone, message) {
   const clean = normalizePhone(phone);
   if (!clean) return;
   const text = encodeURIComponent(message || "Bonjour, je vous contacte depuis SILGAPP.");
-  window.open(`https://wa.me/${clean.replace(/^\+/, "")}?text=${text}`, "_blank");
+  window.open(`https://wa.me/${clean}?text=${text}`, "_blank");
 }
 
 function LivreurCompactCard({ livreur }) {
