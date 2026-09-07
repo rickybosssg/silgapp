@@ -41,7 +41,6 @@ import EcranFinCourse from "@/components/client/EcranFinCourse";
 import MultiCourseSelector from "@/components/client/MultiCourseSelector";
 import QuickOrderPanel from "@/components/client/QuickOrderPanel";
 import QuickOrderProPanel from "@/components/client/QuickOrderProPanel";
-import { isLibre } from "@/lib/dispatchRules";
 
 function GPSBadge({ profil, onForceSync }) {
   const hasCoords = !!(profil?.latitude && profil?.longitude);
@@ -869,10 +868,12 @@ export default function ClientExterneApp() {
       }
       const livreurs = await base44.entities.Livreur.filter(filter);
 
-      // ── Cohérence avec le dashboard admin : GPS ≤ 60 min (isLibre) ──
-      // Un livreur avec GPS expiré (> 60 min) n'est PAS vraiment disponible.
-      const eligibles = (livreurs || []).filter(l => isLibre(l));
-      console.log(`[Carte] Affichés sur la carte: ${eligibles.length}`);
+      // ── Compteur client : livreurs déclarés disponibles (sans filtre GPS) ──
+      // Contrairement à isLibre() qui exclut les livreurs avec GPS > 30 min,
+      // ce compteur représentatif n'applique PAS de filtre GPS.
+      // Dispatch V2 reste responsable de la priorisation et de l'attribution réelle.
+      const eligibles = livreurs || [];
+      console.log(`[Client] Livreurs disponibles (sans filtre GPS): ${eligibles.length}`);
 
       // Ne pas écraser si la requête retourne vide (protection anti-flash)
       if (eligibles.length > 0) {
@@ -881,16 +882,30 @@ export default function ClientExterneApp() {
         // Vraiment aucun livreur dispo — on peut vider
         setLivreursProches([]);
       }
-      // Si eligibles.length === 0 mais livreurs.length > 0, c'est un pb de GPS → on garde l'ancienne liste
     } catch (err) {
       console.error("Erreur chargement livreurs:", err);
-      // En cas d'erreur réseau, NE PAS vider la liste existante
+      // En cas d'erreur réseau, NE PAS vider la liste existante (anti-flash)
     }
   };
 
+  // ── Polling 30s : rafraîchissement léger du compteur livreurs ──
+  // Le badge affiche "Temps réel" — le compteur doit refléter l'état actuel.
+  // Réutilise loadLivreursProches avec la dernière position connue.
+  // Anti-flash : loadLivreursProches conserve déjà la dernière valeur en cas d'erreur.
+  const lastPosRef = useRef(null);
+  if (position) lastPosRef.current = position;
 
-
-
+  useEffect(() => {
+    if (!clientProfil?.country_code) return;
+    const pollLivreurs = () => {
+      const pos = lastPosRef.current || position;
+      if (pos) loadLivreursProches(pos);
+    };
+    // Premier appel après 5s (laisser le temps à l'écran de se stabiliser)
+    const initial = setTimeout(pollLivreurs, 5000);
+    const interval = setInterval(pollLivreurs, 30000);
+    return () => { clearTimeout(initial); clearInterval(interval); };
+  }, [clientProfil?.country_code, position]);
 
   // ── Session expirée ───────────────────────────────────────────────────────
   if (sessionExpired) {
