@@ -112,8 +112,28 @@ export default function CarteLivreurClient({ livreurLat, livreurLng, livreurNom,
     };
   }, [mapLoaded, livreurLat, livreurLng]);
 
-  if (!livreurLat || !livreurLng) return null;
   if (mapError) return null;
+
+  if (!livreurLat || !livreurLng) {
+    return (
+      <Card className="overflow-hidden border border-slate-200 shadow-md rounded-2xl">
+        <div className="bg-gradient-to-r from-slate-900 to-slate-800 px-4 py-3 flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg bg-amber-500 flex items-center justify-center flex-shrink-0">
+            <MapPin className="w-4 h-4 text-white" />
+          </div>
+          <div className="flex-1">
+            <p className="text-white font-bold text-sm leading-tight">{isVersRecup ? "En route vers récupération" : isVersLivraison ? "En route vers livraison" : "Position du livreur"}</p>
+            <p className="text-white/50 text-[10px] leading-tight">Position en attente</p>
+          </div>
+        </div>
+        <div className="h-56 w-full bg-slate-100 rounded-b-2xl flex flex-col items-center justify-center gap-3">
+          <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+          <p className="text-xs text-slate-500 font-medium">Position du livreur en attente</p>
+          <p className="text-[10px] text-slate-400">La carte s'affichera dès réception du signal GPS</p>
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <Card className="overflow-hidden border border-slate-200 shadow-md rounded-2xl">
