@@ -28,6 +28,7 @@ Deno.serve(async (req) => {
       conversation_id,
       sender_type,
       sender_id: raw_sender_id,
+      client_message_id,
       message_type,
       content,
       audio_url,
@@ -37,6 +38,18 @@ Deno.serve(async (req) => {
 
     if (!sender_type || !final_sender_id) {
       return Response.json({ error: 'sender_type et sender_id sont requis' }, { status: 400 });
+    }
+
+    // ── 0. Idempotence : si client_message_id déjà présent, retourner le message existant ──
+    if (client_message_id) {
+      try {
+        const existing = await base44.asServiceRole.entities.Message.filter({ client_message_id });
+        if (existing && existing.length > 0) {
+          return Response.json({ success: true, message: existing[0], idempotent: true });
+        }
+      } catch (e: any) {
+        console.warn('[envoyerMessage] Idempotency check failed:', e?.message);
+      }
     }
 
     // ── 1. Résoudre le VRAI nom et la photo depuis le profil ──
@@ -173,6 +186,7 @@ Deno.serve(async (req) => {
       sender_id: final_sender_id,
       sender_name: realName,
       sender_photo_url: photoUrl,
+      client_message_id: client_message_id || null,
       message_type: message_type || 'text',
       content: content || '',
       audio_url: audio_url || null,
@@ -315,7 +329,7 @@ Deno.serve(async (req) => {
               conversation_id: conversation_id || undefined,
               message_id: message.id,
               country_code: admin.country_code || messageCountryCode,
-              action_url: conversation_id ? `/admin/messages?conv=${conversation_id}` : (course_id ? '/admin/messages' : '/admin/centre-notifications'),
+              action_url: conversation_id ? `/admin/messages?conv=${conversation_id}` : (course_id ? `/admin/messages?course=${course_id}` : '/admin/centre-notifications'),
               deduplication_key: `INBOX_MSG_${message.id}_${admin.email}`,
             });
             if (inboxId) adminInboxIds.set(admin.email, inboxId);

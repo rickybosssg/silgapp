@@ -9,7 +9,7 @@ import { Preferences } from "@capacitor/preferences";
 import { Capacitor } from "@capacitor/core";
 import { Contacts } from "@capacitor-community/contacts";
 import { pickNativeContact } from "@/lib/nativeAndroid";
-import { getDialCodeSync } from "@/lib/countryService";
+import { normalizePhone, formatPhoneDisplay } from "@/lib/phoneUtils";
 
 const FREQUENT_CONTACTS_KEY = "silgapp_frequent_contacts";
 
@@ -85,25 +85,7 @@ export default function ContactPicker({ type = "destinataire", onSelect }) {
     }
   };
 
-  const normalizePhone = (phone) => {
-    if (!phone) return "";
-    return phone.replace(/\D/g, "");
-  };
-
-  const formatPhone = (phone) => {
-    if (!phone) return "";
-    const digits = phone.replace(/\D/g, "");
-    const dial = getDialCodeSync() || "";
-    const dialDigits = dial.replace(/^\+/, "");
-    if (dialDigits && digits.startsWith(dialDigits) && digits.length === dialDigits.length + 8) {
-      const d = digits.slice(dialDigits.length);
-      return `${dial} ${d.replace(/(\d{2})(\d{2})(\d{2})(\d{2})/, "$1 $2 $3 $4")}`;
-    }
-    if (digits.length === 8 && dialDigits) {
-      return `${dial} ${digits.replace(/(\d{2})(\d{2})(\d{2})(\d{2})/, "$1 $2 $3 $4")}`;
-    }
-    return phone;
-  };
+  const formatPhone = (phone) => formatPhoneDisplay(phone) || phone;
 
   // ─── Accès direct contacts via Contact Picker API (doit être appelé depuis un clic direct) ──
   // IMPORTANT : navigator.contacts.select() DOIT être dans le handler du clic utilisateur direct.

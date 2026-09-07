@@ -1,7 +1,7 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { Navigation, Phone } from "lucide-react";
-import { SILGAPP_COUNTRIES } from "@/lib/phoneUtils";
+import { normalizePhone } from "@/lib/phoneUtils";
 
 /**
  * Navigation GPS intelligente pour livreurs
@@ -87,21 +87,8 @@ export default function NavigationGPSButton({ course, isExterne = false }) {
  * Bouton WhatsApp natif (ouvre l'app, pas le navigateur)
  */
 export function WhatsAppButton({ phone, message = "", course }) {
-  const normalizePhone = (num) => {
-    let normalized = num?.replace(/\D/g, "") || "";
-    const cc = course?.country_code || "";
-    const dial = cc ? (SILGAPP_COUNTRIES.find(c => c.code === cc)?.dial || "") : "";
-    if (normalized.startsWith("0") && normalized.length <= 9 && dial) {
-      normalized = dial + normalized.slice(1);
-    }
-    if (normalized.length === 8 && dial) {
-      normalized = dial + normalized;
-    }
-    return normalized;
-  };
-
   const handleWhatsApp = () => {
-    const num = normalizePhone(phone);
+    const num = normalizePhone(phone, course?.country_code) || "";
     const encoded = message ? encodeURIComponent(message) : "";
     // Utiliser wa.me qui ouvre l'app native si installée
     const url = `https://wa.me/${num}${encoded ? `?text=${encoded}` : ""}`;

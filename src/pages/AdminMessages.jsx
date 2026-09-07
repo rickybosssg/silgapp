@@ -8,6 +8,7 @@ export default function AdminMessages() {
   const [user, setUser] = useState(null);
   const [searchParams] = useSearchParams();
   const [initialConvId, setInitialConvId] = useState(null);
+  const [initialCourseId, setInitialCourseId] = useState(null);
 
   useEffect(() => {
     base44.auth.me()
@@ -15,10 +16,12 @@ export default function AdminMessages() {
       .catch(() => setUser(null));
   }, []);
 
-  // Si l'URL contient ?conv=<id>, pré-sélectionner cette conversation
+  // Si l'URL contient ?conv=<id> ou ?course=<id>, pré-sélectionner
   useEffect(() => {
     const convId = searchParams.get("conv");
     if (convId) setInitialConvId(convId);
+    const courseId = searchParams.get("course");
+    if (courseId) setInitialCourseId(courseId);
   }, [searchParams]);
 
   if (!user) {
@@ -36,6 +39,7 @@ export default function AdminMessages() {
         myId={user.email}
         myName={user.full_name || user.email}
         initialConversationId={initialConvId}
+        initialCourseId={initialCourseId}
       />
     </div>
   );

@@ -155,6 +155,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     try { localStorage.setItem("silgapp_dismissed_courses", JSON.stringify(obj)); } catch {}
   };
   const dismissedCourseIdsRef = useRef(loadDismissed());
+  const fallbackAcceptingRef = useRef(false); // Anti-double-clic pour handleFallbackAccepter
 
   const dismissCourse = (courseId) => {
     if (courseId) {
@@ -1095,6 +1096,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
   const handleFallbackAccepter = async (course) => {
     if (!course?.id || !livreurProfil?.id) return;
+    if (fallbackAcceptingRef.current) return;
+    fallbackAcceptingRef.current = true;
     try {
       let payload = {
         action: "accepter_course",
@@ -1120,12 +1123,12 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       });
 
       const res = await base44.functions.invoke("dispatchExterneAuto", payload);
-      const data = res?.data;
+      const data = res;
       if (data?.success && data?.accepted !== false) {
         stopUrgentCourseAlert("fallback-accepted");
         handleAccepter(data?.pending_client_validation === true);
-      } else if (data?.already_taken || data?.reason === "already_taken" || data?.accepted === false) {
-        handleCourseDejaPrise("fallback");
+      } else if (data?.already_taken || data?.reason === "already_taken") {
+        toast.error("Cette course vient d'être prise par un autre livreur.");
       } else if (data?.expired) {
         stopUrgentCourseAlert("fallback-expired");
         toast.error("Course expiree");
@@ -1138,6 +1141,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         error: error?.message || String(error),
       });
       toast.error("Erreur reseau lors de l'acceptation");
+    } finally {
+      fallbackAcceptingRef.current = false;
     }
   };
 

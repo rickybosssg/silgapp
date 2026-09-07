@@ -527,9 +527,17 @@ export default function CourseDetailDialog({ course: courseProp, open, onClose, 
           </div>
 
           {/* 💬 Messagerie admin */}
-          {reseau === "externe" && course.livreur_id && !["livree", "annulee"].includes(course.statut) && (
+          {reseau === "externe" && (
             <div className="pt-2 border-t">
-              <p className="text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">💬 Messagerie</p>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-bold text-gray-600 uppercase tracking-wider">💬 Messagerie</p>
+                <button
+                  onClick={() => window.open(`/admin/messages?course=${course.id}`, "_self")}
+                  className="text-[10px] font-bold text-primary hover:underline flex items-center gap-1"
+                >
+                  Agrandir →
+                </button>
+              </div>
               <ChatWindow
                 courseId={course.id}
                 senderType="admin"

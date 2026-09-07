@@ -962,14 +962,6 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                       Prix final calculé à la livraison selon le tarif du pays
                     </p>
                   )}
-                  <div className="mt-2 pt-2 border-t flex items-center justify-between text-xs"
-                    style={{ borderColor: isPrixManuel ? "rgb(200, 235, 215)" : "rgb(191, 226, 255)" }}
-                  >
-                    <span className={cn("font-semibold", isPrixManuel ? "text-green-700" : "text-blue-700")}>Votre gain estimé</span>
-                    <span className={cn("font-bold", isPrixManuel ? "text-green-800" : "text-green-700")}>
-                      {gain !== null ? `+${gain.toLocaleString()} ${course.devise || "F"}` : "—"}
-                    </span>
-                  </div>
                 </div>
               );
             })()
@@ -1395,17 +1387,11 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                   </p>
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 <div className="bg-white rounded-xl p-2.5 text-center border border-blue-100">
                   <p className="text-[10px] text-gray-600 font-semibold uppercase">Montant</p>
                   <p className="text-sm font-black text-blue-700">
                     {Number(deplacementRecap.prix_final || 0).toLocaleString()} {course.devise || "F"}
-                  </p>
-                </div>
-                <div className="bg-white rounded-xl p-2.5 text-center border border-blue-100">
-                  <p className="text-[10px] text-gray-600 font-semibold uppercase">Ton gain</p>
-                  <p className="text-sm font-black text-green-700">
-                    +{Number(deplacementRecap.montant_livreur || 0).toLocaleString()} {course.devise || "F"}
                   </p>
                 </div>
                 <div className="bg-white rounded-xl p-2.5 text-center border border-gray-100">
@@ -1469,14 +1455,10 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                     <p className="font-black text-green-700 text-base">Tournée terminée !</p>
                     <p className="text-xs text-green-600 mt-0.5">{course.nb_colis} colis livrés</p>
                   </div>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 gap-2">
                     <div className="bg-white rounded-xl p-2.5 text-center border border-green-100">
                       <p className="text-[10px] text-gray-600 font-semibold uppercase">Total</p>
                       <p className="text-sm font-black text-gray-800">{total.toLocaleString()} {course.devise || "F"}</p>
-                    </div>
-                    <div className="bg-white rounded-xl p-2.5 text-center border border-green-100">
-                      <p className="text-[10px] text-gray-600 font-semibold uppercase">Ton gain</p>
-                      <p className="text-sm font-black text-green-700">{gain !== null ? `+${gain.toLocaleString()} ${course.devise || "F"}` : "—"}</p>
                     </div>
                     <div className="bg-white rounded-xl p-2.5 text-center border border-gray-100">
                       <p className="text-[10px] text-gray-600 font-semibold uppercase">Commission</p>
@@ -1503,7 +1485,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                   <p className="font-black text-green-700 text-base">Course terminée !</p>
                 </div>
                 {isExterne ? (
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 gap-2">
                     {dist !== null && (
                       <div className="bg-white rounded-xl p-2.5 text-center border border-green-100">
                         <p className="text-[10px] text-gray-600 font-semibold uppercase">Distance</p>
@@ -1520,12 +1502,6 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                       {isPrixManuel && (
                         <p className="text-[9px] text-green-600 font-semibold mt-0.5">Prix convenu</p>
                       )}
-                    </div>
-                    <div className="bg-white rounded-xl p-2.5 text-center border border-green-100">
-                      <p className="text-[10px] text-gray-600 font-semibold uppercase">Ton gain</p>
-                      <p className="text-sm font-black text-green-700">
-                        {gain !== null ? `+${gain.toLocaleString()} ${course.devise || "F"}` : "—"}
-                      </p>
                     </div>
                   </div>
                 ) : (

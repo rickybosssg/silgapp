@@ -46,16 +46,10 @@ interface VenusTool {
 
 // ── Helpers ──
 
-function normalizePhone(phone: string): string {
-  return (phone || '').replace(/\D/g, '');
-}
-
-function phoneMatch(a: string, b: string): boolean {
-  const na = normalizePhone(a);
-  const nb = normalizePhone(b);
-  if (!na || !nb) return false;
-  return na.endsWith(nb.slice(-8)) || nb.endsWith(na.slice(-8));
-}
+// NOTE: Les helpers normalizePhone / phoneMatch précédents ont été supprimés (code mort).
+// SILGAPP utilise shared/phoneUtils.ts comme source unique de normalisation téléphone.
+// VENUS ne fait pas de matching fuzzy sur les derniers chiffres — risque de faux
+// rapprochement inter-pays en multi-pays.
 
 // ── Registre des outils ──
 

@@ -1,5 +1,5 @@
 import React from "react";
-import { getDialCodeSync } from "@/lib/countryService";
+import { normalizePhone } from "@/lib/phoneUtils";
 
 /**
  * InvitationWhatsAppModal
@@ -15,17 +15,6 @@ import { getDialCodeSync } from "@/lib/countryService";
  * onSend — appelé juste avant d'ouvrir WhatsApp (pour future API)
  */
 export default function InvitationWhatsAppModal({ telephone, nomContact, nomExpediteur, countryCode, onClose, onSend }) {
-  const normaliserTel = (tel) => {
-    if (!tel) return "";
-    const digits = tel.replace(/\D/g, "");
-    const dial = (getDialCodeSync(countryCode) || "").replace(/^\+/, "");
-    if (!dial) return digits; // pas d'indicatif résolu — retourne les chiffres bruts
-    if (digits.startsWith(dial) && digits.length >= dial.length + 6) return digits;
-    if (digits.length === 8) return dial + digits;
-    if (digits.length > 8) return digits;
-    return digits;
-  };
-
   const handleEnvoyer = () => {
     onSend?.();
 
@@ -45,7 +34,7 @@ https://silga-dispatch-go.base44.app/telecharger
 
 Merci et bienvenue sur SILGAPP.`;
 
-    const telNormalise = normaliserTel(telephone);
+    const telNormalise = normalizePhone(telephone, countryCode) || "";
     const url = `https://wa.me/${telNormalise}?text=${encodeURIComponent(message)}`;
     window.open(url, "_blank", "noopener,noreferrer");
     onClose();

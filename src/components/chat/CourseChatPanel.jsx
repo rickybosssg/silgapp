@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
-import { Send, Loader2, MessageCircle, ImagePlus, X } from "lucide-react";
+import { ArrowLeft, Send, Loader2, MessageCircle, ImagePlus } from "lucide-react";
 import ChatBubble from "@/components/chat/ChatBubble";
 import AudioRecorder from "@/components/chat/AudioRecorder";
 import { playNotificationSound } from "@/hooks/useSonEtVibration";
@@ -14,19 +14,25 @@ import {
   mergeMessageList,
 } from "@/lib/chatUtils";
 
-export default function ChatWindow({ courseId, senderType, senderId, senderName, compact = false, contextInfo = null }) {
+/**
+ * CourseChatPanel — Vue messagerie plein écran d'une course.
+ * Charge et envoie des messages avec `course_id` (même fil que ChatWindow).
+ * Utilisé par l'admin depuis MessagesPage (?course=<id>).
+ * Le client et le livreur utilisent ChatWindow (embarqué dans CourseActiveCard).
+ */
+export default function CourseChatPanel({ courseId, myType, myId, myName, onBack }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
-  const [open, setOpen] = useState(!compact);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [courseInfo, setCourseInfo] = useState(null);
   const bottomRef = useRef(null);
   const sendingRef = useRef(false);
   const knownIdsRef = useRef(new Set());
 
-  // Charger les messages existants
+  // Charger les messages existants + infos course
   useEffect(() => {
-    if (!courseId || !open) return;
+    if (!courseId) return;
     base44.entities.Message.filter({ course_id: courseId }, "created_date", 100)
       .then(async (msgs) => {
         const list = dedupeAndSortMessages(msgs || []);
@@ -36,19 +42,20 @@ export default function ChatWindow({ courseId, senderType, senderId, senderName,
         setMessages(enriched);
       })
       .catch(() => setMessages([]));
-  }, [courseId, open]);
+    base44.entities.CourseExterne.get(courseId)
+      .then(c => setCourseInfo(c))
+      .catch(() => {});
+  }, [courseId]);
 
-  // Subscription temps réel + son notification
+  // Subscription temps réel
   useEffect(() => {
-    if (!courseId || !open) return;
+    if (!courseId) return;
     const unsub = base44.entities.Message.subscribe((event) => {
       if (event.type === "create" && event.data?.course_id === courseId) {
-        // Anti-doublon : vérifier le ref
         const eventKey = getMessageKey(event.data);
         if (knownIdsRef.current.has(eventKey)) return;
         knownIdsRef.current.add(eventKey);
-
-        const isFromMe = event.data.sender_type === senderType && event.data.sender_id === senderId;
+        const isFromMe = event.data.sender_type === myType && event.data.sender_id === myId;
         if (!isFromMe) {
           playNotificationSound();
           navigator.vibrate?.([200, 100, 200]);
@@ -57,29 +64,27 @@ export default function ChatWindow({ courseId, senderType, senderId, senderName,
       }
     });
     return () => unsub?.();
-  }, [courseId, open, senderType, senderId]);
+  }, [courseId, myType, myId]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Envoi sécurisé via la fonction backend envoyerMessage
   const sendMessage = async (msgData) => {
     if (sendingRef.current || !courseId) return;
     sendingRef.current = true;
     setSending(true);
     try {
-      const clientMessageId = msgData.client_message_id || buildClientMessageId(courseId, senderType, senderId);
+      const clientMessageId = msgData.client_message_id || buildClientMessageId(courseId, myType, myId);
       const res = await base44.functions.invoke("envoyerMessage", {
         course_id: courseId,
-        sender_type: senderType,
-        sender_id: senderId,
+        sender_type: myType,
+        sender_id: myId,
         client_message_id: clientMessageId,
         ...msgData,
       });
       const newMsg = res?.message || res?.data?.message;
       if (newMsg) {
-        // Anti-doublon : ne pas ajouter si déjà présent
         const key = getMessageKey(newMsg);
         if (!knownIdsRef.current.has(key)) {
           knownIdsRef.current.add(key);
@@ -98,10 +103,6 @@ export default function ChatWindow({ courseId, senderType, senderId, senderName,
     const content = input.trim();
     setInput("");
     await sendMessage({ content, message_type: "text" });
-  };
-
-  const handleAudioSend = async (audioData) => {
-    await sendMessage(audioData);
   };
 
   const handlePhotoSend = async (e) => {
@@ -125,38 +126,22 @@ export default function ChatWindow({ courseId, senderType, senderId, senderName,
     }
   };
 
-  if (compact && !open) {
-    return (
-      <button
-        onClick={() => setOpen(true)}
-        className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-primary text-white shadow-xl flex items-center justify-center hover:scale-110 transition-transform"
-      >
-        <MessageCircle className="w-6 h-6" />
-      </button>
-    );
-  }
+  const courseLabel = courseInfo
+    ? `${courseInfo.client_nom || "Client"} — ${courseInfo.adresse_depart || ""} → ${courseInfo.adresse_arrivee || ""}`
+    : `Course #${courseId?.slice(-6)}`;
 
   return (
-    <div className="flex flex-col h-[460px] bg-[#16191d] rounded-2xl overflow-hidden border border-white/8 shadow-sm">
+    <div className="flex flex-col h-full bg-[#16191d]">
       {/* Header */}
-      <div className="p-3 bg-[#0f1216] text-white flex items-center justify-between">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <MessageCircle className="w-4 h-4 flex-shrink-0" />
-            <span className="text-sm font-bold">Messagerie SILGAPP</span>
-          </div>
-          {contextInfo && (
-            <div className="mt-1 text-[10px] leading-4 text-white/65 space-y-0.5">
-              <p className="truncate">{contextInfo.reference || "Commande"} - {contextInfo.statut || "Statut"}</p>
-              <p className="truncate">Client: {contextInfo.client || "-"} - Partenaire: {contextInfo.partenaire || "-"}</p>
-            </div>
-          )}
+      <div className="flex items-center gap-2 p-3 bg-[#0f1216] text-white">
+        <button onClick={onBack} className="text-white/80 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors">
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+        <MessageCircle className="w-4 h-4 flex-shrink-0" />
+        <div className="min-w-0 flex-1">
+          <span className="text-sm font-bold truncate block">Messagerie course</span>
+          <span className="text-[10px] text-white/50 truncate block">{courseLabel}</span>
         </div>
-        {compact && (
-          <button onClick={() => setOpen(false)} className="text-white/80 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors">
-            <X className="w-4 h-4" />
-          </button>
-        )}
       </div>
 
       {/* Messages */}
@@ -172,18 +157,18 @@ export default function ChatWindow({ courseId, senderType, senderId, senderName,
           <ChatBubble
             key={msg.id}
             message={msg}
-            isMine={msg.sender_type === senderType && msg.sender_id === senderId}
+            isMine={msg.sender_type === myType && msg.sender_id === myId}
           />
         ))}
         <div ref={bottomRef} />
       </div>
 
-      {/* Barre de saisie — bouton Envoyer toujours visible */}
-      <div className="p-2.5 bg-[#1f2429] border-t border-white/8 flex items-end gap-1.5 safe-area-bottom">
+      {/* Barre de saisie */}
+      <div className="p-2.5 bg-[#1f2429] border-t border-white/10 flex items-end gap-1.5 safe-area-bottom shadow-[0_-8px_24px_rgba(0,0,0,0.2)]">
         <AudioRecorder
-          onSend={handleAudioSend}
+          onSend={(data) => sendMessage(data)}
           disabled={sending}
-          senderName={senderName}
+          senderName={myName}
         />
         <label className="cursor-pointer flex-shrink-0">
           <input type="file" accept="image/*" onChange={handlePhotoSend} className="hidden" disabled={sending || uploadingPhoto} />
@@ -203,7 +188,7 @@ export default function ChatWindow({ courseId, senderType, senderId, senderName,
         <Button
           onClick={handleSend}
           disabled={sending || !input.trim()}
-          className="h-11 w-11 sm:w-auto sm:min-w-[92px] rounded-full sm:rounded-xl bg-[#00a86b] hover:bg-[#00a86b]/90 shadow-md flex-shrink-0 disabled:opacity-60 gap-2 px-0 sm:px-4 font-black text-white"
+          className="h-11 w-11 sm:w-auto sm:min-w-[92px] rounded-full sm:rounded-xl bg-primary hover:bg-primary/90 shadow-md flex-shrink-0 disabled:opacity-60 gap-2 px-0 sm:px-4 font-black text-white"
         >
           {sending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
           <span className="hidden sm:inline">Envoyer</span>

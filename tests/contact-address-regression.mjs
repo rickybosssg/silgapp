@@ -45,7 +45,7 @@ const deplacement = {
 assert.equal(getContact(deplacement, "recuperation").telephone, "70000004");
 assert.equal(getContact(deplacement, "livraison").telephone, "70000004");
 
-assert.match(contactSource, /return normalizePhone\(num, countryCode\) \|\| num/, "WhatsApp doit utiliser la normalisation téléphone multi-pays");
+assert.match(contactSource, /return normalizePhone\(phone, countryCode\) \|\| ""/, "WhatsApp doit déléguer à la source téléphone multi-pays unique");
 
 const activeCard = read("src/components/livreur/CourseActiveCard.jsx");
 assert.match(activeCard, /const contact = getCourseContactForPhase\(course, phase\)/, "La carte active doit utiliser la source de contact unique");

@@ -68,15 +68,15 @@ export function getCourseContactForPhase(course, phase = "recuperation") {
 
 /**
  * Normalise un numéro de téléphone au format international (sans + ni espaces).
- * Utilise getCountryConfig de phoneUtils.js pour l'indicatif pays.
+ * Utilise normalizePhone de phoneUtils.js (source de vérité unique).
+ *
+ * Le format de sortie SANS "+" est compatible avec wa.me et whatsapp://send.
+ * L'API Twilio backend ajoute le "+" via whatsapp:+${numero} — voir envoyerSuiviWhatsApp.
  *
  * @param {string} phone - Le numéro à normaliser
  * @param {string} countryCode - Code pays ISO 2 lettres (ex: BF, CI, BJ)
  * @returns {string} Numéro au format international (ex: 22670123456)
  */
 export function normalizePhoneForWhatsapp(phone, countryCode = "") {
-  if (!phone) return "";
-  const num = String(phone).replace(/\D/g, "");
-  if (!num) return "";
-  return normalizePhone(num, countryCode) || num;
+  return normalizePhone(phone, countryCode) || "";
 }

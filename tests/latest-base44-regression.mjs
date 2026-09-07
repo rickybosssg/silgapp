@@ -49,7 +49,9 @@ assert.match(restaurantDispatch, /dispatchExterneAuto/, "Le dispatch anticipé d
 assert.ok(read("src/components/client/SuiviCourseFullscreen.jsx").includes("RestaurantParallelTracking"), "Le suivi parallèle restaurant doit être affiché");
 
 const crm = read("src/lib/crmUtils.js");
-assert.match(crm, /getCountryConfig, normalizePhone as normalizePhoneShared/, "Le CRM doit partager la configuration téléphone multi-pays");
+assert.match(crm, /import \{ normalizePhone \} from "@\/lib\/phoneUtils"/, "Le CRM doit importer la source téléphone multi-pays canonique");
+assert.match(crm, /export \{ normalizePhone \}/, "Le CRM doit réexporter la normalisation canonique pour compatibilité");
+assert.doesNotMatch(crm, /COUNTRY_DIAL_CODE|function normalizePhone\(/, "Le CRM ne doit plus maintenir de normalisation concurrente");
 assert.match(crm, /telephone_normalized/, "Le CRM doit rechercher le téléphone normalisé");
 assert.match(crm, /isPlaceholder/, "Le CRM doit remplacer uniquement les noms placeholders");
 

@@ -41,6 +41,7 @@ export async function loadCountryPhoneConfigs() {
         max_len: maxLen,
         name: c.nom,
         flag: c.emoji_flag || "",
+        phone_pattern: c.phone_pattern || null,
       };
     }).filter(c => c.code && c.dial);
 
@@ -94,6 +95,13 @@ export function extractLocalPhone(phone, countryCode = "") {
   let digits = onlyDigits(phone);
   if (!country) return digits;
 
+  // ── Préfixe international "00" → retirer AVANT analyse du dial code ──
+  // Ex: "0022672824795" → "22672824795" → puis dial "226" retiré → "72824795"
+  if (digits.startsWith("00")) {
+    digits = digits.slice(2);
+  }
+
+  // ── Retirer le dial code du pays si présent ──
   if (digits.startsWith(country.dial)) {
     digits = digits.slice(country.dial.length);
   }
@@ -108,7 +116,9 @@ export function extractLocalPhone(phone, countryCode = "") {
     digits = digits.slice(1);
   }
 
-  return digits.slice(0, maxLen);
+  // ── NE PAS tronquer aveuglément — retourner tel quel (peut être invalide) ──
+  // Un numéro trop long doit être déclaré invalide, pas transformé en un autre numéro.
+  return digits;
 }
 
 export function formatLocalPhone(phone, countryCode = "") {
@@ -136,38 +146,64 @@ export function validateLocalPhone(phone, countryCode = "") {
   if (!country) {
     return { valid: digits.length > 0, error: null, length: digits.length, min: 0, max: 0 };
   }
+  // ── Extraire la partie locale (gère "00", dial code, trunk prefix) ──
+  // Permet de valider aussi bien "72824795" que "+22672824795" ou "22672824795"
+  const local = extractLocalPhone(digits, country.code);
   const min = country.min_len || country.len || 8;
   const max = country.max_len || country.len || 8;
-  const len = digits.length;
+  const len = local.length;
   if (len < min) {
     return { valid: false, error: `Trop court (${len}/${min} chiffres minimum)`, length: len, min, max };
   }
   if (len > max) {
     return { valid: false, error: `Trop long (${len}/${max} chiffres maximum)`, length: len, min, max };
   }
+  // ── Si phone_pattern est défini, valider le format du numéro local ──
+  // Permet de rejeter les numéros historiquement corrompus (ex: "02267282" en BF)
+  // sans casser les pays qui n'ont pas de pattern (fallback longueur uniquement).
+  if (country.phone_pattern) {
+    try {
+      const pattern = new RegExp(country.phone_pattern);
+      if (!pattern.test(local)) {
+        return { valid: false, error: "Format de numéro invalide", length: len, min, max };
+      }
+    } catch (e) {
+      // Regex invalide — ignorer la validation par pattern
+    }
+  }
   return { valid: true, error: null, length: len, min, max };
 }
 
 export function normalizePhone(phone, countryCode = null) {
   if (!phone) return null;
-  const n = onlyDigits(phone);
+  let n = onlyDigits(phone);
   if (!n) return null;
 
+  // ── Préfixe international "00" → retirer AVANT toute analyse ──
+  // Ex: "0022672824795" → "22672824795" puis traité normalement
+  if (n.startsWith("00")) {
+    n = n.slice(2);
+  }
+
+  // 1. Déjà en format international (commence par un indicatif connu)
   for (const { dial, len } of SILGAPP_COUNTRIES) {
     if (n.startsWith(dial) && n.length === dial.length + len) {
       return n;
     }
   }
 
+  // 2. countryCode fourni — extraire la partie locale et valider
   if (countryCode) {
     const country = getCountryConfig(countryCode);
     if (country) {
       const local = extractLocalPhone(n, country.code);
+      const minLen = country.min_len || country.len || 8;
       const maxLen = country.max_len || country.len || 8;
-      if (local.length >= (country.min_len || country.len || 8) && local.length <= maxLen) return country.dial + local;
+      if (local.length >= minLen && local.length <= maxLen) return country.dial + local;
     }
   }
 
+  // 3. Format local avec 0 initial (trunk prefix)
   if (n.startsWith("0")) {
     const withoutZero = n.slice(1);
     const countries = countryCode
@@ -182,6 +218,7 @@ export function normalizePhone(phone, countryCode = null) {
     }
   }
 
+  // 4. Format local sans 0
   const countries = countryCode
     ? [
         ...SILGAPP_COUNTRIES.filter((c) => c.code === countryCode),
@@ -193,6 +230,7 @@ export function normalizePhone(phone, countryCode = null) {
     if (n.length === len && !n.startsWith("0")) return dial + n;
   }
 
+  // 5. Fallback — retourner tel quel (NE PAS tronquer)
   return n;
 }
 
