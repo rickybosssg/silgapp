@@ -856,29 +856,21 @@ export default function ClientExterneApp() {
   const loadLivreursProches = async (pos) => {
     try {
       if (!pos) return;
-      // Filtrer par pays du client
-      const filter = {
-        type_livreur: "externe",
-        statut: "disponible",
-        actif: true,
-        validation: "valide",
-      };
-      if (clientProfil?.country_code) {
-        filter.country_code = clientProfil.country_code;
-      }
-      const livreurs = await base44.entities.Livreur.filter(filter);
+      // ── RLS Livreur bloque la lecture directe côté client ──
+      // Utiliser la fonction backend sécurisée qui retourne uniquement le count
+      const res = await base44.functions.invoke("getAvailableCouriersCount", {
+        country_code: clientProfil?.country_code || null,
+      });
+      const count = res?.data?.count ?? res?.count ?? 0;
+      console.log(`[Client] Livreurs disponibles (backend sécurisé): ${count}`);
 
-      // ── Compteur client : livreurs déclarés disponibles (sans filtre GPS) ──
-      // Contrairement à isLibre() qui exclut les livreurs avec GPS > 30 min,
-      // ce compteur représentatif n'applique PAS de filtre GPS.
-      // Dispatch V2 reste responsable de la priorisation et de l'attribution réelle.
-      const eligibles = livreurs || [];
-      console.log(`[Client] Livreurs disponibles (sans filtre GPS): ${eligibles.length}`);
+      // Construire un tableau factice pour le compteur (aucune donnée privée)
+      const eligibles = count > 0 ? Array.from({ length: count }, (_, i) => ({ id: `livreur_${i}` })) : [];
 
       // Ne pas écraser si la requête retourne vide (protection anti-flash)
       if (eligibles.length > 0) {
         setLivreursProches(eligibles);
-      } else if ((livreurs || []).length === 0) {
+      } else if (count === 0) {
         // Vraiment aucun livreur dispo — on peut vider
         setLivreursProches([]);
       }
