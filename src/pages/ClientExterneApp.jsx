@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { base44 } from "@/api/base44Client";
 import { clearPersistedToken } from "@/lib/authPersistence";
 import { useNavigate } from "react-router-dom";
+import { extractLocalPhone } from "@/lib/phoneUtils";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useHeartbeat } from "@/hooks/useHeartbeat";
@@ -646,9 +647,9 @@ export default function ClientExterneApp() {
     try {
       if (!pos?.latitude || !pos?.longitude || !profil?.id) return;
 
-      // Normaliser le téléphone UNE FOIS
+      // Normaliser le téléphone UNE FOIS (via helper officiel)
       const phoneNorm = profil.telephone ? profil.telephone.replace(/\D/g, "") : null;
-      const local = phoneNorm && phoneNorm.startsWith("226") ? phoneNorm.slice(3) : phoneNorm;
+      const local = phoneNorm ? extractLocalPhone(phoneNorm, profil.country_code) : null;
 
       // Trouver les courses où ce client est destinataire (PAR ID OU PAR TÉLÉPHONE)
       const coursesById = await base44.entities.CourseExterne.filter({
