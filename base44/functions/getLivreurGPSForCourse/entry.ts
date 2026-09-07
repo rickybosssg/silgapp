@@ -27,7 +27,12 @@ export default async function(req) {
     if (!courseId) return Response.json({ error: 'courseId requis' }, { status: 400 });
 
     // 1. Charger la course
-    const course = await base44.asServiceRole.entities.CourseExterne.get(courseId);
+    let course;
+    try {
+      course = await base44.asServiceRole.entities.CourseExterne.get(courseId);
+    } catch {
+      return Response.json({ error: 'Course introuvable' }, { status: 404 });
+    }
     if (!course) return Response.json({ error: 'Course introuvable' }, { status: 404 });
 
     // 2. Vérifier l'autorisation : admin OU créateur/client de la course
