@@ -32,8 +32,9 @@ export default function ChatWindow({ courseId, senderType, senderId, senderName,
         const list = dedupeAndSortMessages(msgs || []);
         const profiles = await buildSenderProfiles(base44, list);
         const enriched = enrichMessagesWithProfiles(list, profiles);
-        knownIdsRef.current = new Set(enriched.map(getMessageKey));
-        setMessages(enriched);
+        // ── Fix: fusionner au lieu d'écraser — ne pas perdre les messages reçus via subscription ──
+        enriched.forEach(m => knownIdsRef.current.add(getMessageKey(m)));
+        setMessages(prev => dedupeAndSortMessages([...prev, ...enriched]));
       })
       .catch(() => setMessages([]));
   }, [courseId, open]);
@@ -58,6 +59,26 @@ export default function ChatWindow({ courseId, senderType, senderId, senderName,
     });
     return () => unsub?.();
   }, [courseId, open, senderType, senderId]);
+
+  // ── Refetch au retour au premier plan (rattrapage si WebSocket a raté des messages) ──
+  useEffect(() => {
+    if (!courseId || !open) return;
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        base44.entities.Message.filter({ course_id: courseId }, "created_date", 100)
+          .then(async (msgs) => {
+            const list = dedupeAndSortMessages(msgs || []);
+            const profiles = await buildSenderProfiles(base44, list);
+            const enriched = enrichMessagesWithProfiles(list, profiles);
+            enriched.forEach(m => knownIdsRef.current.add(getMessageKey(m)));
+            setMessages(prev => dedupeAndSortMessages([...prev, ...enriched]));
+          })
+          .catch(() => {});
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, [courseId, open]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });

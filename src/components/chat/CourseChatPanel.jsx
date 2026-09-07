@@ -38,8 +38,9 @@ export default function CourseChatPanel({ courseId, myType, myId, myName, onBack
         const list = dedupeAndSortMessages(msgs || []);
         const profiles = await buildSenderProfiles(base44, list);
         const enriched = enrichMessagesWithProfiles(list, profiles);
-        knownIdsRef.current = new Set(enriched.map(getMessageKey));
-        setMessages(enriched);
+        // ── Fix: fusionner au lieu d'écraser — ne pas perdre les messages reçus via subscription ──
+        enriched.forEach(m => knownIdsRef.current.add(getMessageKey(m)));
+        setMessages(prev => dedupeAndSortMessages([...prev, ...enriched]));
       })
       .catch(() => setMessages([]));
     base44.entities.CourseExterne.get(courseId)
@@ -65,6 +66,26 @@ export default function CourseChatPanel({ courseId, myType, myId, myName, onBack
     });
     return () => unsub?.();
   }, [courseId, myType, myId]);
+
+  // ── Refetch au retour au premier plan (rattrapage si WebSocket a raté des messages) ──
+  useEffect(() => {
+    if (!courseId) return;
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        base44.entities.Message.filter({ course_id: courseId }, "created_date", 100)
+          .then(async (msgs) => {
+            const list = dedupeAndSortMessages(msgs || []);
+            const profiles = await buildSenderProfiles(base44, list);
+            const enriched = enrichMessagesWithProfiles(list, profiles);
+            enriched.forEach(m => knownIdsRef.current.add(getMessageKey(m)));
+            setMessages(prev => dedupeAndSortMessages([...prev, ...enriched]));
+          })
+          .catch(() => {});
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, [courseId]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
