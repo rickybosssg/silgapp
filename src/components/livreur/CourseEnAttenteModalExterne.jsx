@@ -167,13 +167,15 @@ export default function CourseEnAttenteModalExterne({
         livreur_id: livreurId,
         override_pricing_mode: "admin_manuel",
       });
-      const data = res?.data;
+      const data = res;
       if (data?.already_accepted) { stopUrgentCourseAlert("course-accepted"); onAccepter(); return; }
       if (data?.already_taken || data?.reason === "already_taken") { stopUrgentCourseAlert("course-already-taken"); setCourseDejaPrise(true); return; }
       if (data?.expired) { stopUrgentCourseAlert("course-expired"); setCourseExpiree(true); return; }
       if (data?.success && data?.accepted !== false) {
         stopUrgentCourseAlert("course-accepted");
         onAccepter(); // admin_manuel : pas de validation client, prix saisi à la livraison
+      } else if (data?.already_taken || data?.reason === "already_taken") {
+        alert("Cette course vient d'être prise par un autre livreur.");
       } else {
         alert(data?.error || "Erreur lors de l'acceptation");
       }
@@ -194,7 +196,7 @@ export default function CourseEnAttenteModalExterne({
         course_id: course.id,
         livreur_id: livreurId,
       });
-      const data = res?.data;
+      const data = res;
 
       // CORRECTION : already_accepted = requête concurrente du même livreur déjà traitée
       if (data?.already_accepted) {
@@ -207,6 +209,8 @@ export default function CourseEnAttenteModalExterne({
       if (data?.success && data?.accepted !== false) {
         stopUrgentCourseAlert("course-accepted");
         onAccepter();
+      } else if (data?.already_taken || data?.reason === "already_taken") {
+        alert("Cette course vient d'être prise par un autre livreur.");
       } else {
         alert(data?.error || "Erreur lors de l'acceptation");
       }
@@ -230,7 +234,7 @@ export default function CourseEnAttenteModalExterne({
         pricing_mode: "manual",
         manual_price: montant,
       });
-      const data = res?.data;
+      const data = res;
 
       // CORRECTION : already_accepted = requête concurrente du même livreur déjà traitée
       if (data?.already_accepted) {
@@ -245,6 +249,8 @@ export default function CourseEnAttenteModalExterne({
         stopUrgentCourseAlert("course-accepted-manual");
         setShowManualPriceModal(false);
         onAccepter(data?.pending_client_validation === true);
+      } else if (data?.already_taken || data?.reason === "already_taken") {
+        alert("Cette course vient d'être prise par un autre livreur.");
       } else {
         alert(data?.error || "Erreur lors de l'acceptation");
       }
