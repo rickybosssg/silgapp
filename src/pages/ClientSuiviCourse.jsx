@@ -644,13 +644,16 @@ export default function ClientSuiviCourse() {
             return (
               <div className={`grid grid-cols-3 gap-3 pt-3 mt-1 border-t ${isFinal ? "border-green-200" : "border-gray-200"}`}>
                 <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl p-3 text-center shadow-lg">
-                  <span className="text-2xl font-black text-white block">
-                    {distAffichee != null ? Number(distAffichee).toFixed(1) : "—"}
-                  </span>
-                  <span className="text-[10px] font-bold text-blue-100 uppercase tracking-wide">
-                    {isLivree ? "Distance (km)" : colisRecupere ? "→ Livraison" : "→ Récup."}
-                  </span>
-                </div>
+                   <span className="text-2xl font-black text-white block">
+                     {distAffichee != null ? Number(distAffichee).toFixed(1) : "—"}
+                   </span>
+                   <span className="text-[10px] font-bold text-blue-100 uppercase tracking-wide">
+                     Distance
+                   </span>
+                   <span className="text-[9px] text-blue-200/80 block leading-tight">
+                     {isLivree ? "" : colisRecupere ? "vers livraison" : "vers récupération"}
+                   </span>
+                 </div>
                 <ResumeETACell
                   course={maCourse}
                   livreurLat={livreurLat}
@@ -782,18 +785,20 @@ export default function ClientSuiviCourse() {
                 <span className="font-semibold">{Number(maCourse.distance_reelle_km).toFixed(1)} km</span>
               </div>
             )}
-            {maCourse.prix_estimate && !maCourse.prix_final && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Prix estimé</span>
-                <span className="font-medium">{maCourse.prix_estimate.toLocaleString()} {maCourse.devise || countries.find(c => c.code === maCourse.country_code)?.devise || "FCFA"}</span>
-              </div>
-            )}
-            {maCourse.prix_final > 0 ? (
-              <div className="flex justify-between pt-2 border-t">
-                <span className="text-muted-foreground font-semibold">Prix final</span>
-                <span className="font-bold text-lg text-primary">{maCourse.prix_final.toLocaleString()} {maCourse.devise || countries.find(c => c.code === maCourse.country_code)?.devise || "FCFA"}</span>
-              </div>
-            ) : null}
+            {(() => {
+              const prixAff = getPrixAffichable(maCourse);
+              if (!prixAff) return null;
+              const isManual = maCourse.pricing_mode === "manual" && maCourse.manual_price_status === "accepted" && maCourse.manual_price > 0;
+              const isFinal = maCourse.statut === "livree" && maCourse.prix_final > 0;
+              const label = isManual ? "Prix validé" : isFinal ? "Prix final" : (maCourse.prix_propose_client > 0 ? "Prix proposé" : (maCourse.prix_propose_admin > 0 ? "Prix proposé" : "Prix estimé"));
+              const devise = maCourse.devise || countries.find(c => c.code === maCourse.country_code)?.devise || "FCFA";
+              return (
+                <div className={`flex justify-between ${isFinal ? "pt-2 border-t" : ""}`}>
+                  <span className={`text-muted-foreground ${isFinal ? "font-semibold" : ""}`}>{label}</span>
+                  <span className={`text-primary ${isFinal ? "font-bold text-lg" : "font-medium"}`}>{prixAff.toLocaleString()} {devise}</span>
+                </div>
+              );
+            })()}
           </div>
         </Card>
 

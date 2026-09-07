@@ -44,7 +44,7 @@ export default function ResumeETACell({ course, livreurLat, livreurLng, destGpsL
     <div className={`bg-gradient-to-br rounded-xl p-3 text-center shadow-lg ${isCritical ? "from-red-500 to-red-700" : isStale ? "from-orange-500 to-orange-700" : "from-blue-600 to-blue-700"}`}>
       <Clock className="w-4 h-4 mx-auto mb-1 text-blue-200" />
       <span className="text-2xl font-black text-white block">
-        {isCritical ? "—" : (etaMinutes != null ? etaMinutes : "—")}
+        {isCritical ? "—" : (etaMinutes != null ? etaMinutes : "En attente")}
       </span>
       <span className="text-[10px] font-bold text-blue-100 uppercase tracking-wide">
         {isCritical ? "GPS indispo." : isStale ? "ETA figé" : "ETA (min)"}
