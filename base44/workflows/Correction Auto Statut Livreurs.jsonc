@@ -1,0 +1,44 @@
+{
+  "name": "Correction Auto Statut Livreurs",
+  "description": "Corrige automatiquement les statuts livreurs d\u00e9synchronis\u00e9s (en_course sans course active \u2192 disponible, disponible avec course active \u2192 en_course) et les courses livr\u00e9es sans prix (prix par d\u00e9faut 1500 F + commission).",
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "interval",
+      "cron_expression": null,
+      "one_time_date": null,
+      "timezone": "UTC",
+      "interval_value": 5,
+      "interval_unit": "minutes",
+      "interval_anchor": "2026-08-15T16:10:33.427000",
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  },
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "correction_auto_statut_livreurs",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "run_function": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "correctionEnCourse",
+            "args": {}
+          },
+          "then": "end"
+        }
+      }
+    ]
+  },
+  "x-base44-migrated-from-automation": {
+    "legacy_payload_function": "correctionEnCourse"
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "name": "Notification nouveau livreur en attente",
+  "description": "Cr\u00e9e une notification admin \u00e0 chaque nouvelle inscription livreur externe en attente",
+  "trigger": {
+    "condition": "${ ((.trigger.data.validation == \"en_attente\") and (.trigger.data.type_livreur == \"externe\")) }",
+    "config": {
+      "trigger_type": "entity",
+      "events": [
+        "create"
+      ],
+      "entity_name": "Livreur"
+    }
+  },
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "notification_nouveau_livreur_en_attente",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "run_function": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "notifierDemandesLivreurs",
+            "args": {
+              "action": "nouveau_livreur"
+            }
+          },
+          "then": "end"
+        }
+      }
+    ]
+  },
+  "x-base44-migrated-from-automation": {
+    "legacy_payload_function": "notifierDemandesLivreurs"
+  }
+}

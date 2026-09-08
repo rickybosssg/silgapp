@@ -1,0 +1,46 @@
+{
+  "name": "V\u00e9rification \u00e9v\u00e9nements workflows VENUS",
+  "description": "V\u00e9rifie toutes les 5 minutes si les workflows en attente d'\u00e9v\u00e9nement (livreur accept\u00e9, colis r\u00e9cup\u00e9r\u00e9, etc.) peuvent reprendre",
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "interval",
+      "cron_expression": null,
+      "one_time_date": null,
+      "timezone": "UTC",
+      "interval_value": 10,
+      "interval_unit": "minutes",
+      "interval_anchor": "2026-07-19T23:19:21.747000",
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  },
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "v_rification_v_nements_workflows_venus",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "run_function": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "venusWorkflowEventHandler",
+            "args": {
+              "action": "check_events"
+            }
+          },
+          "then": "end"
+        }
+      }
+    ]
+  },
+  "x-base44-migrated-from-automation": {
+    "legacy_payload_function": "venusWorkflowEventHandler"
+  }
+}

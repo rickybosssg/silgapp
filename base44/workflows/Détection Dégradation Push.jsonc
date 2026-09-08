@@ -1,0 +1,44 @@
+{
+  "name": "D\u00e9tection D\u00e9gradation Push",
+  "description": "D\u00e9tection automatique de d\u00e9gradation push toutes les 10 minutes. Calcule le taux d'\u00e9chec, les tokens invalides, et les livreurs injoignables. Cr\u00e9e des AdminInboxItem en cas de d\u00e9gradation. Ne modifie aucune donn\u00e9e.",
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "interval",
+      "cron_expression": null,
+      "one_time_date": null,
+      "timezone": "UTC",
+      "interval_value": 10,
+      "interval_unit": "minutes",
+      "interval_anchor": "2026-08-22T07:57:58.516000",
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  },
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "d_tection_d_gradation_push",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "run_function": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "detecterPushDegradation",
+            "args": {}
+          },
+          "then": "end"
+        }
+      }
+    ]
+  },
+  "x-base44-migrated-from-automation": {
+    "legacy_payload_function": "detecterPushDegradation"
+  }
+}

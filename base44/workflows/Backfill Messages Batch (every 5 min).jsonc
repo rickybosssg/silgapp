@@ -1,0 +1,44 @@
+{
+  "name": "Backfill Messages Batch (every 5 min)",
+  "description": "Backfill automatique des Messages et Conversations sans participant_user_ids \u2014 rattrape les op\u00e9rations asServiceRole (dispatchV2.ts fig\u00e9) et les donn\u00e9es legacy.",
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "interval",
+      "cron_expression": null,
+      "one_time_date": null,
+      "timezone": "UTC",
+      "interval_value": 5,
+      "interval_unit": "minutes",
+      "interval_anchor": "2026-08-21T16:22:10.048000",
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  },
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "backfill_messages_batch_every_5_min",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "run_function": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "backfillMessagesBatch",
+            "args": {}
+          },
+          "then": "end"
+        }
+      }
+    ]
+  },
+  "x-base44-migrated-from-automation": {
+    "legacy_payload_function": "backfillMessagesBatch"
+  }
+}

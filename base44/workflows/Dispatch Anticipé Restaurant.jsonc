@@ -1,0 +1,44 @@
+{
+  "name": "Dispatch Anticip\u00e9 Restaurant",
+  "description": "Surveille les courses restaurant en attente (dispatch_status=en_attente) et d\u00e9clenche le dispatch V2 quand now >= dispatch_at. Ne modifie pas dispatchV2.ts.",
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "interval",
+      "cron_expression": null,
+      "one_time_date": null,
+      "timezone": "UTC",
+      "interval_value": 5,
+      "interval_unit": "minutes",
+      "interval_anchor": "2026-08-27T21:39:38.874000",
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  },
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "dispatch_anticip_restaurant",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "run_function": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "dispatchAnticipeRestaurant",
+            "args": {}
+          },
+          "then": "end"
+        }
+      }
+    ]
+  },
+  "x-base44-migrated-from-automation": {
+    "legacy_payload_function": "dispatchAnticipeRestaurant"
+  }
+}

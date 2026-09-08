@@ -1,0 +1,44 @@
+{
+  "name": "Rappel d\u00e9marrer trajet (client_contact\u00e9 +10min)",
+  "description": "Envoie une notification push au livreur dont la course est rest\u00e9e au statut 'client_contacte' plus de 10 minutes sans d\u00e9marrer le trajet vers l'exp\u00e9diteur.",
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "interval",
+      "cron_expression": null,
+      "one_time_date": null,
+      "timezone": "UTC",
+      "interval_value": 5,
+      "interval_unit": "minutes",
+      "interval_anchor": "2026-08-19T13:33:52.163000",
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  },
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "rappel_d_marrer_trajet_client_contact_10min",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "run_function": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "rappelDemarrerTrajet",
+            "args": {}
+          },
+          "then": "end"
+        }
+      }
+    ]
+  },
+  "x-base44-migrated-from-automation": {
+    "legacy_payload_function": "rappelDemarrerTrajet"
+  }
+}

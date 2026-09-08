@@ -1,0 +1,46 @@
+{
+  "name": "Avancement Vagues Dispatch",
+  "description": "Tick de secours (10 min) \u2014 avance les vagues expir\u00e9es, corrige les statuts fant\u00f4mes, auto-annule les cycle_epuise sans r\u00e9ponse. Le dispatch principal est d\u00e9sormais \u00e9v\u00e9nementiel (entity automation create/update).",
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "interval",
+      "cron_expression": null,
+      "one_time_date": null,
+      "timezone": "UTC",
+      "interval_value": 5,
+      "interval_unit": "minutes",
+      "interval_anchor": "2026-06-16T15:47:30.311000",
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  },
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "avancement_vagues_dispatch",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "run_function": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "dispatchExterneAuto",
+            "args": {
+              "action": "avancer_vagues_expirees"
+            }
+          },
+          "then": "end"
+        }
+      }
+    ]
+  },
+  "x-base44-migrated-from-automation": {
+    "legacy_payload_function": "dispatchExterneAuto"
+  }
+}

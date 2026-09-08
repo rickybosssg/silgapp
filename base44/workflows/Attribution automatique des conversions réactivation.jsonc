@@ -1,0 +1,44 @@
+{
+  "name": "Attribution automatique des conversions r\u00e9activation",
+  "description": "Attribution automatique des courses aux campagnes de r\u00e9activation termin\u00e9es, dans leur fen\u00eatre d'attribution (72h par d\u00e9faut).",
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "interval",
+      "cron_expression": null,
+      "one_time_date": null,
+      "timezone": "UTC",
+      "interval_value": 1,
+      "interval_unit": "hours",
+      "interval_anchor": "2026-08-25T10:48:54.084000",
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  },
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "attribution_automatique_des_conversions_r_activation",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "run_function": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "attributeConversions",
+            "args": {}
+          },
+          "then": "end"
+        }
+      }
+    ]
+  },
+  "x-base44-migrated-from-automation": {
+    "legacy_payload_function": "attributeConversions"
+  }
+}
