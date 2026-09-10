@@ -61,13 +61,6 @@ public class SilgappPushPlugin extends Plugin {
 
         SilgappFirebaseMessagingService.stopUrgentCourseAlert();
 
-        // ── Télémétrie : notification_opened ──
-        // Trace que le livreur a réellement touché la notification.
-        String courseId = data.has("course_id") ? data.getString("course_id") : "";
-        String livreurId = data.has("livreur_id") ? data.getString("livreur_id") : "";
-        String notificationId = data.has("notification_id") ? data.getString("notification_id") : "";
-        trackPushTelemetryAsync(courseId, livreurId, notificationId, "notification_opened", "native_android");
-
         SilgappPushPlugin plugin = activeInstance;
         if (plugin != null) {
             plugin.notifyListeners("nativeNotificationOpened", data, true);
@@ -117,58 +110,8 @@ public class SilgappPushPlugin extends Plugin {
     }
 
     public void emitNotificationTapped(JSObject data) {
-        // ── Télémétrie : notification_opened (foreground path) ──
-        String courseId = data.has("course_id") ? data.getString("course_id") : "";
-        String livreurId = data.has("livreur_id") ? data.getString("livreur_id") : "";
-        String notificationId = data.has("notification_id") ? data.getString("notification_id") : "";
-        trackPushTelemetryAsync(courseId, livreurId, notificationId, "notification_opened", "native_android");
-
         notifyListeners("nativeNotificationOpened", data, true);
         notifyListeners("silgapp:notification-tapped", data, true);
-    }
-
-    // ── Télémétrie push : envoie un événement au backend de manière asynchrone ──
-    private static void trackPushTelemetryAsync(String courseId, String livreurId,
-            String notificationId, String eventType, String source) {
-        if (courseId == null || courseId.isEmpty() || livreurId == null || livreurId.isEmpty()) {
-            return;
-        }
-        new Thread(() -> {
-            try {
-                java.net.URL url = new java.net.URL(
-                        "https://silga-dispatch-go.base44.app/functions/trackPushTelemetry");
-                java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("POST");
-                conn.setRequestProperty("Content-Type", "application/json");
-                conn.setDoOutput(true);
-                conn.setConnectTimeout(5000);
-                conn.setReadTimeout(5000);
-
-                org.json.JSONObject payload = new org.json.JSONObject();
-                payload.put("course_id", courseId);
-                payload.put("livreur_id", livreurId);
-                payload.put("notification_id", notificationId != null ? notificationId : "");
-                payload.put("event_type", eventType);
-                payload.put("platform", "android");
-                payload.put("source", source);
-                payload.put("event_timestamp", new java.text.SimpleDateFormat(
-                        "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US)
-                        .format(new java.util.Date()));
-
-                java.io.OutputStream os = conn.getOutputStream();
-                os.write(payload.toString().getBytes("UTF-8"));
-                os.flush();
-                os.close();
-
-                int responseCode = conn.getResponseCode();
-                if (responseCode >= 400) {
-                    android.util.Log.w("SilgappPush", "trackPushTelemetry HTTP " + responseCode);
-                }
-                conn.disconnect();
-            } catch (Exception e) {
-                android.util.Log.w("SilgappPush", "trackPushTelemetry error: " + e.getMessage());
-            }
-        }, "SilgappTelemetry").start();
     }
 
     @PluginMethod

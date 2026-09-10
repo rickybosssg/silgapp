@@ -1,5 +1,5 @@
-import { useMemo, useState, useEffect } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 
 /**
@@ -105,42 +105,6 @@ export function useCoursesDisponibles(livreurProfil) {
       return true;
     });
   }, [courses, refusedIds, refusedCourseIds, livreurId]);
-
-  // ── Écouter nativeNotificationOpened pour rafraîchissement immédiat ──
-  // Quand le livreur ouvre l'app depuis une notification push, on invalide
-  // immédiatement le cache pour rafraîchir la course concernée sans attendre
-  // le polling de 10 secondes.
-  const queryClient = useQueryClient();
-  useEffect(() => {
-    if (!livreurId) return;
-
-    const handleNotificationOpened = async (event) => {
-      const data = event?.detail || event;
-      const courseId = data?.course_id;
-      const notificationId = data?.notification_id;
-
-      // Tracer app_opened_from_notification
-      if (courseId) {
-        try {
-          await base44.functions.invoke("trackPushTelemetry", {
-            course_id: courseId,
-            livreur_id: livreurId,
-            notification_id: notificationId || "",
-            event_type: "app_opened_from_notification",
-            platform: "android",
-            source: "frontend",
-          });
-        } catch (_) {}
-
-        // Invalidation immédiate du cache pour rafraîchir la course concernée
-        queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles", livreurId, countryCode] });
-      }
-    };
-
-    // Écouter l'événement natif Capacitor
-    window.addEventListener("nativeNotificationOpened", handleNotificationOpened);
-    return () => window.removeEventListener("nativeNotificationOpened", handleNotificationOpened);
-  }, [livreurId, countryCode, queryClient]);
 
   return {
     eligibleCourses,
