@@ -270,10 +270,36 @@ export async function runWatchdog(base44, body = {}) {
     }
   }
 
-  // ── Journaliser toutes les anomalies ──
+  // ── Journaliser toutes les anomalies (avec déduplication par cooldown) ──
+  // Le watchdog continue de DÉTECTER et CORRIGER les anomalies.
+  // Mais il ne crée pas de DispatchLog répétitif pour la même anomalie
+  // (livreur_id + type) tant qu'aucun changement d'état n'a eu lieu.
+  // Cooldown : 30 min — un log par anomalie unique toutes les 30 min maximum.
+  const WATCHDOG_LOG_COOLDOWN_MS = 30 * 60 * 1000;
+  const cooldownSince = new Date(now.getTime() - WATCHDOG_LOG_COOLDOWN_MS).toISOString();
+  const recentWatchdogLogs = await base44.asServiceRole.entities.DispatchLog.filter(
+    { evenement: 'watchdog_anomalie', created_date: { $gte: cooldownSince } },
+    '-created_date', 200
+  ).catch(() => []);
+
+  const recentLogKeys = new Set<string>();
+  for (const rl of (recentWatchdogLogs || [])) {
+    const entityKey = rl.livreur_acceptant_id || rl.course_id || '';
+    const key = `${entityKey}|${rl.raison_blocage || ''}`;
+    if (entityKey) recentLogKeys.add(key);
+  }
+
+  let logsSkipped = 0;
   for (const a of anomalies) {
+    const entityKey = a.livreur_id || a.course_id || '';
+    const logKey = `${entityKey}|${a.type}`;
+    if (entityKey && recentLogKeys.has(logKey)) {
+      logsSkipped++;
+      continue; // Log récent existant pour cette anomalie — cooldown 30 min
+    }
     journaliserDispatch(base44, {
       course_id: a.course_id || '',
+      livreur_acceptant_id: a.livreur_id || '',
       evenement: 'watchdog_anomalie',
       raison_blocage: a.type,
       raison_passage: `severity:${a.severity} | ${a.description || ''}`,
@@ -329,12 +355,13 @@ export async function runWatchdog(base44, body = {}) {
     console.error('[WATCHDOG] Erreur push général T+10:', err?.message || String(err));
   }
 
-  console.log(`[WATCHDOG] 📋 ${anomalies.length} anomalie(s) détectée(s), ${corrections.length} correction(s) appliquée(s)`);
+  console.log(`[WATCHDOG] 📋 ${anomalies.length} anomalie(s) détectée(s), ${corrections.length} correction(s) appliquée(s), ${logsSkipped} log(s) ignoré(s) par cooldown`);
 
   return {
     success: true,
     anomalies_count: anomalies.length,
     corrections_count: corrections.length,
+    logs_skipped_cooldown: logsSkipped,
     anomalies: anomalies.slice(0, 20),
     corrections: corrections.slice(0, 20),
   };
