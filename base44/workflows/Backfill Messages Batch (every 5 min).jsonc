@@ -1,6 +1,4 @@
 {
-  "name": "Backfill Messages Batch (every 5 min)",
-  "description": "Backfill automatique des Messages et Conversations sans participant_user_ids \u2014 rattrape les op\u00e9rations asServiceRole (dispatchV2.ts fig\u00e9) et les donn\u00e9es legacy.",
   "trigger": {
     "condition": null,
     "config": {
@@ -10,19 +8,20 @@
       "cron_expression": null,
       "one_time_date": null,
       "timezone": "UTC",
-      "interval_value": 5,
-      "interval_unit": "minutes",
+      "interval_value": 1,
+      "interval_unit": "hours",
       "interval_anchor": "2026-08-21T16:22:10.048000",
       "ends_type": "never",
       "ends_on_date": null,
       "ends_after_count": null
     }
   },
+  "name": "Backfill Messages Batch (every 1 hour)",
   "definition": {
     "document": {
       "dsl": "1.0.0",
-      "name": "backfill_messages_batch_every_5_min",
-      "version": "1.0",
+      "name": "backfill_messages_batch_every_1_hour",
+      "version": "1.1",
       "namespace": "base44"
     },
     "do": [
@@ -38,6 +37,7 @@
       }
     ]
   },
+  "description": "Backfill automatique des Messages et Conversations sans participant_user_ids \u2014 rattrape les op\u00e9rations asServiceRole (dispatchV2.ts fig\u00e9) et les donn\u00e9es legacy. Audit 2026-09-10 : 0 orphelin sur 500 messages + 244 conversations, toutes les voies de cr\u00e9ation peuplent participant_user_ids. Fr\u00e9quence pass\u00e9e de 5 min \u00e0 1 heure (-92% de reads API, 576\u219248/jour).",
   "x-base44-migrated-from-automation": {
     "legacy_payload_function": "backfillMessagesBatch"
   }
