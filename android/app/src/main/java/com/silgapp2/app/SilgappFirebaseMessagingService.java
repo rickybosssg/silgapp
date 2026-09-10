@@ -253,6 +253,12 @@ public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
             long intervalMs = parseSeconds(data.get("alert_interval_seconds"), DEFAULT_INTERVAL_MS / 1000L, 3L, 30L) * 1000L;
             String alertKey = buildAlertKey(courseId, data.get("notification_id"));
 
+            // ── Télémétrie : notification_received ──
+            // Trace que le téléphone a réellement reçu la notification FCM.
+            // Non-bloquant : envoyé en arrière-plan, n'impacte pas l'UX.
+            trackPushTelemetryAsync(courseId, livreurId, data.get("notification_id"),
+                    "notification_received", "native_android");
+
             wakeUpScreen();
             showUrgentCourseNotification(this, title, body, data, durationMs);
             startUrgentCourseAlert(this, durationMs, intervalMs, alertKey);
@@ -621,5 +627,52 @@ public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
     private static int stableNotificationId(String value) {
         if (value == null || value.isEmpty()) return (int) (System.currentTimeMillis() % Integer.MAX_VALUE);
         return Math.abs(value.hashCode());
+    }
+
+    // ── Télémétrie push : envoie un événement au backend de manière asynchrone ──
+    // Non-bloquant : utilise un thread séparé pour ne pas impacter l'UX.
+    // Idempotent : la clé d'idempotence côté backend empêche les doublons.
+    private static void trackPushTelemetryAsync(String courseId, String livreurId,
+            String notificationId, String eventType, String source) {
+        if (courseId == null || courseId.isEmpty() || livreurId == null || livreurId.isEmpty()) {
+            return;
+        }
+        new Thread(() -> {
+            try {
+                java.net.URL url = new java.net.URL(
+                        "https://silga-dispatch-go.base44.app/functions/trackPushTelemetry");
+                java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("POST");
+                conn.setRequestProperty("Content-Type", "application/json");
+                conn.setDoOutput(true);
+                conn.setConnectTimeout(5000);
+                conn.setReadTimeout(5000);
+
+                org.json.JSONObject payload = new org.json.JSONObject();
+                payload.put("course_id", courseId);
+                payload.put("livreur_id", livreurId);
+                payload.put("notification_id", notificationId != null ? notificationId : "");
+                payload.put("event_type", eventType);
+                payload.put("platform", "android");
+                payload.put("source", source);
+                payload.put("event_timestamp", new java.text.SimpleDateFormat(
+                        "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US)
+                        .format(new java.util.Date()));
+
+                java.io.OutputStream os = conn.getOutputStream();
+                os.write(payload.toString().getBytes("UTF-8"));
+                os.flush();
+                os.close();
+
+                // Consommer la réponse (nécessaire pour libérer la connexion)
+                int responseCode = conn.getResponseCode();
+                if (responseCode >= 400) {
+                    android.util.Log.w("SilgappFCM", "trackPushTelemetry HTTP " + responseCode);
+                }
+                conn.disconnect();
+            } catch (Exception e) {
+                android.util.Log.w("SilgappFCM", "trackPushTelemetry error: " + e.getMessage());
+            }
+        }, "SilgappTelemetry").start();
     }
 }

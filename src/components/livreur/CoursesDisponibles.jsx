@@ -84,6 +84,21 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
 
   // ── eligibleCourses provient du hook useCoursesDisponibles (source unique) ──
 
+  // ── Télémétrie : course_screen_opened ──
+  // Trace qu'une course a été affichée dans le fil du livreur.
+  useEffect(() => {
+    if (!livreurId || eligibleCourses.length === 0) return;
+    for (const course of eligibleCourses) {
+      base44.functions.invoke("trackPushTelemetry", {
+        course_id: course.id,
+        livreur_id: livreurId,
+        event_type: "course_screen_opened",
+        platform: "web",
+        source: "frontend",
+      }).catch(() => {});
+    }
+  }, [eligibleCourses, livreurId]);
+
   useEffect(() => {
     const currentIds = new Set(eligibleCourses.map(course => course.id));
     if (!courseFeedInitializedRef.current) {
@@ -139,6 +154,18 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
   const handleAcceptConfirm = async () => {
     const course = pendingAcceptCourse;
     if (!course?.id || !livreurId) return;
+
+    // ── Télémétrie : acceptation_attempt ──
+    // Trace que le livreur a tenté d'accepter la course AVANT l'appel backend.
+    base44.functions.invoke("trackPushTelemetry", {
+      course_id: course.id,
+      livreur_id: livreurId,
+      notification_id: course.notification_id || "",
+      event_type: "acceptation_attempt",
+      platform: "web",
+      source: "frontend",
+    }).catch(() => {});
+
     setAcceptingId(course.id);
     try {
       const res = await base44.functions.invoke("dispatchExterneAuto", {
