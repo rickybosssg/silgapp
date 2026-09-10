@@ -58,6 +58,26 @@ export async function runWatchdog(base44, body = {}) {
     return true;
   });
 
+  // ── Charger les courses RÉELLEMENT actives (livreur_en_route, en_livraison, etc.) ──
+  // BUGFIX : ANOMALIE 5 et 6 calculaient livreurIdsAvecCourseActive à partir de `courses`
+  // qui ne contenait que recherche_livreur + nouvelle. Comme ces statuts ne sont PAS dans
+  // STATUTS_ACTIFS_VERIF, le filtre retournait toujours un tableau vide → TOUS les
+  // livreurs en_course étaient flaggés comme fantômes (faux positifs massifs).
+  //
+  // On fetche maintenant les courses avec un statut dans STATUTS_ACTIFS_VERIF séparément.
+  // Limite 500 : le nombre de courses simultanément actives ne devrait jamais dépasser
+  // ce seuil. Si cela arrivait, les livreurs concernés au-delà du top 500 ne seraient pas
+  // protégés — cas extrême non observé en production.
+  const coursesActivesPourVerif = await base44.asServiceRole.entities.CourseExterne.filter(
+    { statut: { $in: STATUTS_ACTIFS_VERIF } },
+    '-created_date', 500
+  ).catch(() => []);
+  const livreurIdsAvecCourseActive = new Set(
+    (coursesActivesPourVerif || [])
+      .filter(c => c.livreur_id)
+      .map(c => c.livreur_id)
+  );
+
   // ── Pre-charger les course_ids ayant au moins une DispatchNotification ──
   const notifCourses = await base44.asServiceRole.entities.DispatchNotification.filter(
     {}, 'date_notification', 500
@@ -206,9 +226,7 @@ export async function runWatchdog(base44, body = {}) {
     '-updated_date', 50
   );
   if (livreursEnCourse.length > 0) {
-    const livreurIdsAvecCourseActive = new Set(
-      courses.filter(c => STATUTS_ACTIFS_VERIF.includes(c.statut) && c.livreur_id).map(c => c.livreur_id)
-    );
+    // livreurIdsAvecCourseActive est calculé globalement (voir BUGFIX plus haut).
     const livreursFantomes = livreursEnCourse.filter(l => !livreurIdsAvecCourseActive.has(l.id));
     for (const l of livreursFantomes) {
       const nouveauStatut = l.manual_hors_ligne === true ? 'hors_ligne' : 'disponible';
@@ -224,9 +242,7 @@ export async function runWatchdog(base44, body = {}) {
     '-updated_date', 50
   );
   if (livreursDisponibles.length > 0) {
-    const livreurIdsAvecCourseActive = new Set(
-      courses.filter(c => STATUTS_ACTIFS_VERIF.includes(c.statut) && c.livreur_id).map(c => c.livreur_id)
-    );
+    // livreurIdsAvecCourseActive est calculé globalement (voir BUGFIX plus haut).
     const livreursIncoherents = livreursDisponibles.filter(l => livreurIdsAvecCourseActive.has(l.id));
     for (const l of livreursIncoherents) {
       await base44.asServiceRole.entities.Livreur.update(l.id, { statut: 'en_course' });
