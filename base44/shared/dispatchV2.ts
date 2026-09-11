@@ -34,6 +34,7 @@ import { waitUntil } from 'base44:runtime';
 import { STATUTS_ACTIFS_COURSE, STATUTS_TERMINAUX_COURSE, calculerDistance, chargerConfigPays } from './dispatchConstants.ts';
 import { dispatchLog, reponseDejaPrise, generateToken, generatePIN, journaliserDispatch } from './dispatchUtils.ts';
 import { enregistrerNotification, enregistrerNotificationsBulk, enregistrerInboxNotificationsBulk, getLivreursNotifies, getLivreursRefuses, marquerAccepte } from './dispatchNotifications.ts';
+import { notifierLivreursUnifie } from './dispatchPushUnifie.ts';
 import { chargerConfigDispatch } from './dispatchConfig.ts';
 import { resolveCourseParticipantUserIds } from './conversationSecurity.ts';
 import { ensureCourseCodeMessage, buildCodeMessageContent } from './courseCodeMessage.ts';
@@ -68,7 +69,9 @@ async function notifierLivreursEligiblesV2(base44: any, course: any, options: an
   const { priorityOnly = false, skipAlreadyPublishedCheck = false } = options;
   if (!course?.id || !course?.country_code) return { notified: 0 };
 
-  const [livreurs, dejaNotifies, refuses] = await Promise.all([
+  // 📦 LECTURE UNIFIÉE : 1 Livreur.filter + 1 DispatchNotification.filter
+  // (remplace getLivreursNotifies + getLivreursRefuses → économise 1 read redondant)
+  const [livreurs, allDnRecords] = await Promise.all([
     base44.asServiceRole.entities.Livreur.filter({
       type_livreur: 'externe',
       validation: 'valide',
@@ -79,9 +82,14 @@ async function notifierLivreursEligiblesV2(base44: any, course: any, options: an
       manual_hors_ligne: { $ne: true },
       admin_hors_ligne: { $ne: true },
     }, '-last_seen_at', 500).catch(() => []),
-    getLivreursNotifies(base44, course.id),
-    getLivreursRefuses(base44, course.id),
+    base44.asServiceRole.entities.DispatchNotification.filter(
+      { course_id: course.id }, '-date_notification', 500
+    ).catch(() => []),
   ]);
+
+  // Split DN records en mémoire (évite 2 reads séparés pour notifiés vs refusés)
+  const dejaNotifies = (allDnRecords || []).filter((n: any) => n.statut !== 'refuse').map((n: any) => n.livreur_id);
+  const refuses = (allDnRecords || []).filter((n: any) => n.statut === 'refuse').map((n: any) => n.livreur_id);
 
   // 🛡️ Anti-race-condition : si la course a déjà des notifications, c'est qu'elle
   // a déjà été publiée dans le fil. Ne pas re-notifier (évite les 82 doublons).
@@ -103,40 +111,12 @@ async function notifierLivreursEligiblesV2(base44: any, course: any, options: an
     candidats = candidats.filter((l: any) => Number(l.priorite_dispatch || 0) > 0);
   }
 
-  // 📦 Enregistrer les DispatchNotifications en bulk (1 filter + 1 filter + 1 bulkCreate)
-  // Remplace l'ancien Promise.allSettled(candidats.map(... enregistrerNotification ...))
-  // qui générait 3 appels API par livreur (filter + livreurATokenFCM + create).
-  const dnResult = await enregistrerNotificationsBulk(base44, course.id, candidats, 0, { country_code: course.country_code });
-  dispatchLog(`[V2] 📦 DispatchNotifications bulk: ${dnResult.created} créées pour ${candidats.length} candidat(s)`);
-
-  // 📦 Créer les notifications inbox en bulk (1 filter + 1 bulkCreate)
-  // Idempotence via deduplication_key = COURSE_DISPATCH_<courseId>_<livreurId>
-  // Un retry du même événement est bloqué par comparaison en mémoire.
-  const inboxResult = await enregistrerInboxNotificationsBulk(base44, course, candidats);
-  dispatchLog(`[V2] 📦 Inbox notifications bulk: ${inboxResult.created} créées pour ${candidats.length} candidat(s)`);
-
-  // 📤 Envoi push batch : 1 seule invocation backend pour tous les livreurs prioritaires
-  if (candidats.length > 0) {
-    const batchResult = await base44.asServiceRole.functions.invoke('envoiNotificationPushBatch', {
-      course_id: course.id,
-      livreur_ids: candidats.map((l: any) => l.id),
-      titre: 'Nouvelle course SILGAPP',
-      message: `${course.quartier_depart || course.adresse_depart || 'Départ'} vers ${course.quartier_arrivee || course.adresse_arrivee || 'destination'}`,
-      type: 'nouvelle_course',
-      alert_duration_seconds: 5,
-      alert_interval_seconds: 5,
-      dispatch_version: '2',
-    }).catch((err: any) => {
-      dispatchLog(`[V2] ⚠️ Batch push error (T=0): ${err?.message}`);
-      return null;
-    });
-
-    const sent = batchResult?.succes || 0;
-    dispatchLog(`[V2] 📢 Batch push T=0: ${sent} token(s) envoyé(s) pour ${candidats.length} livreur(s) prioritaire(s)`);
-    return { notified: candidats.length, push_sent: sent, push_failed: batchResult?.echecs || 0 };
-  }
-
-  return { notified: 0 };
+  // 📤 NOTIFICATION UNIFIÉE — remplace 3 appels séparés par 1 seule fonction
+  // Élimine : 1 function invocation + 4 reads redondants + 1 Notification.bulkCreate dupliquée
+  // Conserve : DispatchNotification tracking, inbox Notification (dedup_key), FCM parallèle par chunks de 25
+  const batchResult = await notifierLivreursUnifie(base44, course, candidats, allDnRecords);
+  dispatchLog(`[V2] 📢 Push unifié T=0: ${batchResult.push_sent} token(s) envoyé(s) pour ${batchResult.notified} livreur(s) — course ${course.id}`);
+  return { notified: batchResult.notified, push_sent: batchResult.push_sent, push_failed: batchResult.push_failed };
 }
 
 // ── Helper : liste des livreurs en course (même définition que aCourseActive) ──
