@@ -51,6 +51,15 @@ export default async function(req: Request): Promise<Response> {
 
     // Idempotence: si déjà livrée, ne pas écraser le prix existant
     if (course.statut === 'livree') {
+      // ── Garde livreur_financier_id : si manquant (course finalisée via un chemin
+      //    antérieur qui ne le set pas, ex: validateQRCode → idempotence), le fixer
+      //    une seule fois à l'identité du livreur assigné. Idempotent. ──
+      if (!course.livreur_financier_id && course.livreur_id) {
+        await base44.asServiceRole.entities.CourseExterne.update(course_id, {
+          livreur_financier_id: course.livreur_id,
+        }).catch(() => {});
+      }
+
       // Courses admin : corriger le trou historique (prix_final = 0/null)
       // en écrivant prix_propose_admin comme source de vérité.
       if (isAdminCourse && (!course.prix_final || course.prix_final === 0) && Number(course.prix_propose_admin) > 0) {
@@ -200,6 +209,14 @@ export default async function(req: Request): Promise<Response> {
     try {
       const res = await base44.asServiceRole.functions.invoke('calculPrixCourseExterne', { course_id });
       if (res?.success) {
+        // ── Garde livreur_financier_id : calculPrixCourseExterne ne le set pas.
+        //    Le fixer une seule fois ici, après délégation. Idempotent. ──
+        if (!course.livreur_financier_id && course.livreur_id) {
+          await base44.asServiceRole.entities.CourseExterne.update(course_id, {
+            livreur_financier_id: course.livreur_id,
+          }).catch(() => {});
+        }
+
         // Multi-colis: mettre à jour les colis individuels
         if (is_multi_colis && colis_data) {
           await handleMultiColis(base44, course_id, colis_data, now);
