@@ -127,12 +127,18 @@ export default function ProposedLivreursListV2({ course }) {
   }, [course?.country_code]);
 
   // ── Grouper les interactions par statut ──
+  // Notifiés/Push = toutes les notifications dispatchées (notifie + push_tente + push_succes + push_echec)
+  // Vus réellement = ceux avec vue_at != null (indépendant du statut FCM)
   const stats = useMemo(() => {
-    const notifie = interactions.filter(n => n.statut === "notifie" || n.statut === "push_succes");
+    const notifie = interactions.filter(n =>
+      n.statut === "notifie" || n.statut === "push_tente" ||
+      n.statut === "push_succes" || n.statut === "push_echec"
+    );
+    const vusReellement = interactions.filter(n => n.vue_at != null);
     const refuse = interactions.filter(n => n.statut === "refuse");
     const accepte = interactions.filter(n => n.statut === "accepte");
     const expire = interactions.filter(n => n.statut === "expire");
-    return { notifie, refuse, accepte, expire };
+    return { notifie, vusReellement, refuse, accepte, expire };
   }, [interactions]);
 
   const acceptedId = course.livreur_id || course.accepted_by_livreur_id;
@@ -167,7 +173,7 @@ export default function ProposedLivreursListV2({ course }) {
     interactions.forEach(n => {
       if (!n.livreur) return;
       if (!map.has(n.livreur_id)) {
-        map.set(n.livreur_id, { ...n.livreur, _statut: n.statut, _date: n.date_reponse || n.date_notification });
+        map.set(n.livreur_id, { ...n.livreur, _statut: n.statut, _date: n.date_reponse || n.date_notification, _vue_at: n.vue_at });
       }
     });
     return [...map.values()];
@@ -198,27 +204,34 @@ export default function ProposedLivreursListV2({ course }) {
       </div>
 
       {/* ── Stats temps réel ── */}
-      <div className="grid grid-cols-3 gap-2">
-        <div className="bg-white border border-blue-200 rounded-lg p-2 text-center">
-          <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center mx-auto mb-1">
-            <Radio className="w-3 h-3 text-blue-600 animate-pulse" />
+      <div className="grid grid-cols-4 gap-1.5">
+        <div className="bg-white border border-blue-200 rounded-lg p-1.5 text-center">
+          <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center mx-auto mb-1">
+            <Radio className="w-2.5 h-2.5 text-blue-600 animate-pulse" />
           </div>
-          <p className="text-lg font-black text-blue-600">{stats.notifie.length}</p>
-          <p className="text-[9px] text-gray-500 font-semibold uppercase">Notifiés</p>
+          <p className="text-base font-black text-blue-600">{stats.notifie.length}</p>
+          <p className="text-[8px] text-gray-500 font-semibold uppercase leading-tight">Notifiés</p>
         </div>
-        <div className="bg-white border border-red-200 rounded-lg p-2 text-center">
-          <div className="w-6 h-6 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-1">
-            <X className="w-3 h-3 text-red-500" />
+        <div className="bg-white border border-emerald-200 rounded-lg p-1.5 text-center">
+          <div className="w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-1">
+            <Eye className="w-2.5 h-2.5 text-emerald-600" />
           </div>
-          <p className="text-lg font-black text-red-500">{stats.refuse.length}</p>
-          <p className="text-[9px] text-gray-500 font-semibold uppercase">Refusés</p>
+          <p className="text-base font-black text-emerald-600">{stats.vusReellement.length}</p>
+          <p className="text-[8px] text-gray-500 font-semibold uppercase leading-tight">Vus</p>
         </div>
-        <div className="bg-white border border-amber-200 rounded-lg p-2 text-center">
-          <div className="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-1">
-            <Clock className="w-3 h-3 text-amber-500" />
+        <div className="bg-white border border-red-200 rounded-lg p-1.5 text-center">
+          <div className="w-5 h-5 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-1">
+            <X className="w-2.5 h-2.5 text-red-500" />
           </div>
-          <p className="text-lg font-black text-amber-500">{stats.expire.length}</p>
-          <p className="text-[9px] text-gray-500 font-semibold uppercase">Expirés</p>
+          <p className="text-base font-black text-red-500">{stats.refuse.length}</p>
+          <p className="text-[8px] text-gray-500 font-semibold uppercase leading-tight">Refusés</p>
+        </div>
+        <div className="bg-white border border-amber-200 rounded-lg p-1.5 text-center">
+          <div className="w-5 h-5 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-1">
+            <Clock className="w-2.5 h-2.5 text-amber-500" />
+          </div>
+          <p className="text-base font-black text-amber-500">{stats.expire.length}</p>
+          <p className="text-[8px] text-gray-500 font-semibold uppercase leading-tight">Expirés</p>
         </div>
       </div>
 
@@ -354,6 +367,11 @@ export default function ProposedLivreursListV2({ course }) {
                     {selectedLivreur._statut === "expire" && (
                       <span className="text-[9px] font-bold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded-full shrink-0">
                         Expiré
+                      </span>
+                    )}
+                    {selectedLivreur._vue_at && (
+                      <span className="text-[9px] font-bold text-emerald-600 bg-emerald-100 px-1.5 py-0.5 rounded-full shrink-0">
+                        Vu
                       </span>
                     )}
                     {isAcceptedSelected ? (

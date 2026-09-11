@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { Check, X, Clock, Package, Flame, Navigation } from "lucide-react";
+import { Check, X, Clock, Package, Flame, Navigation, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { startUrgentCourseAlert, stopUrgentCourseAlert } from "@/lib/livreurUrgentAlert";
 import { getPrixAffichable } from "@/utils/getPrixAffichable";
@@ -52,7 +52,7 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
   const livreurLng = livreurProfil?.longitude;
 
   // ── Source unique de vérité : hook partagé avec ActiviteTempsReel ──
-  const { eligibleCourses, courses, isLoading, isV2Enabled, livreurDisponible, refusedCourseIds, setRefusedIds } = useCoursesDisponibles(livreurProfil);
+  const { eligibleCourses, courses, isLoading, isV2Enabled, livreurDisponible, livreurPeutVoirFil, raisonBlocage, refusedCourseIds, setRefusedIds } = useCoursesDisponibles(livreurProfil);
 
   // ── Enregistrer les vues de courses via fonction backend sécurisée ──
   // REMPLACÉ : l'ancien code créait directement DispatchNotification depuis le frontend,
@@ -108,7 +108,11 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
       title: "Nouvelle course SILGAPP",
       body: `${newestCourse.quartier_depart || newestCourse.adresse_depart || "Départ"} vers ${newestCourse.quartier_arrivee || newestCourse.adresse_arrivee || "destination"}`,
     });
-    onNewCourse?.(newCourses.length);
+    onNewCourse?.({
+      count: newCourses.length,
+      course: newestCourse,
+      courseId: newestCourse.id,
+    });
   }, [eligibleCourses, isLoading, onNewCourse]);
 
   // Calculer la distance pour chaque course
@@ -205,15 +209,15 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
     );
   }
 
-  if (!livreurDisponible) {
+  if (!livreurPeutVoirFil) {
     return (
       <div className="rounded-2xl bg-white border border-black/5 p-8 text-center space-y-3 shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
         <div className="w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center mx-auto">
-          <Navigation className="w-7 h-7 text-primary" />
+          <Lock className="w-7 h-7 text-primary" />
         </div>
-        <p className="text-sm font-bold text-slate-800">Passez en ligne pour voir les courses</p>
+        <p className="text-sm font-bold text-slate-800">Compte non éligible au fil de courses</p>
         <p className="text-xs text-slate-500">
-          Les courses disponibles sont réservées aux livreurs actifs, validés et libres.
+          Votre compte doit être validé et actif pour voir les courses disponibles.
         </p>
       </div>
     );
@@ -323,21 +327,28 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
           </div>
 
           <div className="grid grid-cols-[1fr_52px] gap-2.5 border-t border-slate-100 bg-muted p-3">
-            <button
-              type="button"
-              onClick={() => handleAcceptClick(course)}
-              disabled={acceptingId === course.id}
-              className="h-12 rounded-lg bg-primary text-sm font-bold text-white shadow-[0_6px_14px_rgba(0,122,255,0.2)] transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {acceptingId === course.id ? (
-                <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
-              ) : (
-                <>
-                  <Check className="h-5 w-5" />
-                  Accepter la course
-                </>
-              )}
-            </button>
+            {raisonBlocage ? (
+              <div className="h-12 rounded-lg bg-slate-100 text-xs font-medium text-slate-500 flex items-center justify-center gap-1.5 px-2 text-center">
+                <Lock className="h-3.5 w-3.5 shrink-0" />
+                <span className="leading-tight">{raisonBlocage}</span>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => handleAcceptClick(course)}
+                disabled={acceptingId === course.id}
+                className="h-12 rounded-lg bg-primary text-sm font-bold text-white shadow-[0_6px_14px_rgba(0,122,255,0.2)] transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {acceptingId === course.id ? (
+                  <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                ) : (
+                  <>
+                    <Check className="h-5 w-5" />
+                    Accepter la course
+                  </>
+                )}
+              </button>
+            )}
             <button
               type="button"
               onClick={() => handleRefuser(course)}

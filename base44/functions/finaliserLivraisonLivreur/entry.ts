@@ -191,6 +191,11 @@ export default async function(req: Request): Promise<Response> {
         if (is_multi_colis && colis_data) {
           await handleMultiColis(base44, course_id, colis_data, now);
         }
+        if (!course.livreur_financier_id && course.livreur_id) {
+          await base44.asServiceRole.entities.CourseExterne.update(course_id, {
+            livreur_financier_id: course.livreur_id,
+          }).catch(() => {});
+        }
         return Response.json({
           success: true,
           course: res.course,

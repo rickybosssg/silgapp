@@ -26,7 +26,8 @@ assert.match(hook, /course\.livreur_id \|\| course\.accepted_by_livreur_id/, "Le
 assert.match(hook, /refusedCourseIds\.includes\(course\.id\)/, "Les refus backend doivent être appliqués");
 assert.match(hook, /DISMISS_TTL_MS = 30 \* 60 \* 1000/, "Le TTL local de 30 minutes doit être conservé");
 assert.match(hook, /silgapp:dismissed-courses-changed/, "Les refus locaux doivent se synchroniser entre composants");
-assert.match(hook, /if \(!livreurDisponible \|\| !isV2Enabled\) return \[\]/, "Un livreur OFF ou indisponible ne doit voir aucune course");
+assert.match(hook, /if \(!livreurPeutVoirFil \|\| !isV2Enabled\) return \[\]/, "Le fil doit rester visible aux livreurs validés et actifs autorisés");
+assert.match(available, /raisonBlocage \?/, "Un livreur qui voit le fil mais ne peut pas accepter doit avoir un bouton bloqué avec raison claire");
 
 assert.match(dashboard, /CourseExterne\.subscribe/, "Les mises à jour de courses doivent être suivies en temps réel");
 assert.match(dashboard, /DispatchNotification\.subscribe/, "Les refus backend doivent être suivis en temps réel");

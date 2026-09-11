@@ -7,7 +7,7 @@ import { lancerDispatchMulti } from '../../shared/dispatchEngine.ts';
 import { runWatchdog } from '../../shared/dispatchWatchdog.ts';
 import { marquerRefuse, marquerAccepte, getLivreursNotifies, getLivreursRefuses, resetNotifications as resetNotifsEntity } from '../../shared/dispatchNotifications.ts';
 import { accepterCourseV2, publierCourseDansFil, isV2Enabled, secoursDispatchV2, isPilotLivreur, DISPATCH_V2_BUNDLE_VERSION } from '../../shared/dispatchV2.ts';
-import { resolveCourseParticipantUserIds } from '../../shared/conversationSecurity.ts';
+import { ensureCourseCodeMessage } from '../../shared/courseCodeMessage.ts';
 
 // 🔖 Redéploiement forcé — 2026-08-14-simplified-3 — rappel T+5min re-notifie les mêmes livreurs libres
 console.log(`[DISPATCH_EXTERNE_AUTO] 🔖 dispatchV2 bundle version: ${DISPATCH_V2_BUNDLE_VERSION}`);
@@ -514,30 +514,11 @@ Deno.serve(async (req) => {
         // (created_by_venus=true). Clé idempotente par (course_id, livreur_id) pour
         // éviter les doublons et permettre un nouveau message si réassignation.
         if ((course.source === 'admin' || course.created_by_venus === true) && pickupPIN) {
-          const idempotencyKey = `pickup-code-${course_id}-${livreur_id}`;
-          try {
-            const existing = await base44.asServiceRole.entities.Message.filter({
-              client_message_id: idempotencyKey,
-            });
-            if (!existing || existing.length === 0) {
-              const courseMsgUserIds = await resolveCourseParticipantUserIds(base44, course.livreur_id, course.expediteur_client_id || course.destinataire_client_id);
-              await base44.asServiceRole.entities.Message.create({
-                course_id: course_id,
-                participant_user_ids: courseMsgUserIds,
-                security_status: courseMsgUserIds.length > 0 ? 'secured' : 'pending',
-                sender_type: 'admin',
-                sender_id: 'silgapp_system',
-                sender_name: 'SILGAPP',
-                message_type: 'text',
-                content: `🔑 Code de récupération : ${pickupPIN}\n\nUtiliser ce code pour récupérer le Colis${course.prix_propose_admin ? `\n💰 Prix de la course : ${Number(course.prix_propose_admin).toLocaleString()} ${course.devise || 'FCFA'}` : (course.prix_estimate ? `\n💰 Prix estimé : ${Number(course.prix_estimate).toLocaleString()} ${course.devise || 'FCFA'}` : '')}`,
-                source: 'app',
-                client_message_id: idempotencyKey,
-              });
-              console.log(`[DISPATCH] 🔑 Message code de récupération créé pour course admin ${course_id} (livreur ${livreur_id})`);
-            }
-          } catch (err) {
-            console.error(`[DISPATCH] ⚠️ Erreur création message code récupération:`, err?.message || String(err));
-          }
+          await ensureCourseCodeMessage(
+            base44, course, livreur_id, pickupPIN, deliveryPIN, '[V1]'
+          ).catch((err: any) => {
+            console.error(`[DISPATCH] ⚠️ ensureCourseCodeMessage threw (non-blocking):`, err?.message || String(err));
+          });
         }
 
         // ── Phase 9 + QR/PIN : Suivi WhatsApp automatique avec QR Code et Code PIN ──
@@ -977,15 +958,26 @@ Deno.serve(async (req) => {
         return Response.json({ success: true, ignored: true, reason: 'course_terminal' });
       }
 
-      // 4. Vérifier l'idempotence — ne pas créer de doublon
+      // 4. Tracking de vue réelle — UPDATE du champ vue_at, pas de création de doublon.
+      // Le statut existant (push_tente, push_succes, etc.) n'est JAMAIS modifié ici.
+      // La "vue réelle" est mesurée par vue_at, indépendamment du cycle FCM.
       const existing = await base44.asServiceRole.entities.DispatchNotification.filter(
         { course_id: course_id, livreur_id: livreur.id }, '-date_notification', 1
       );
+
       if (existing && existing.length > 0) {
-        return Response.json({ success: true, already_exists: true });
+        const existingNotif = existing[0];
+        if (existingNotif.vue_at) {
+          return Response.json({ success: true, already_viewed: true });
+        }
+        await base44.asServiceRole.entities.DispatchNotification.update(existingNotif.id, {
+          vue_at: new Date().toISOString(),
+        });
+        return Response.json({ success: true, vue_enregistree: true });
       }
 
-      // 5. Créer la DispatchNotification avec livreur_user_email résolu côté backend
+      // 5. Aucun enregistrement existant — créer avec vue_at renseigné
+      // Cas rare : livreur sans token FCM (pas de DispatchNotification créée par le push)
       await base44.asServiceRole.entities.DispatchNotification.create({
         course_id: course_id,
         livreur_id: livreur.id,
@@ -995,9 +987,10 @@ Deno.serve(async (req) => {
         statut: 'notifie',
         priorite_dispatch: livreur.priorite_dispatch || 0,
         date_notification: new Date().toISOString(),
+        vue_at: new Date().toISOString(),
       });
 
-      return Response.json({ success: true });
+      return Response.json({ success: true, vue_enregistree: true });
     }
 
     return Response.json({ error: 'Action inconnue' }, { status: 400 });

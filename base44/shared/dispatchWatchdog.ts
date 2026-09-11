@@ -77,6 +77,33 @@ export async function runWatchdog(base44, body = {}) {
   const DISPONIBLE_PUSH_TIMEOUT_MS = cachedConfig.dispatch.disponiblePushTimeoutMin * 60 * 1000;
   const CYCLE_EPUISE_TIMEOUT_MS = cachedConfig.dispatch.cycleEpuiseTimeoutMs;
 
+  // ── Fail-safe : charger séparément les courses réellement actives ──
+  // Si cette lecture échoue, ANOMALIE 5/6 est skippée. Une erreur réseau/Base44
+  // ne doit jamais être interprétée comme "0 course active" et libérer un livreur.
+  let coursesActivesPourVerif: any[] = [];
+  let activeCoursesQuerySucceeded = false;
+  try {
+    const result = await base44.asServiceRole.entities.CourseExterne.filter(
+      { statut: { $in: STATUTS_ACTIFS_VERIF } },
+      '-created_date', 500
+    );
+    coursesActivesPourVerif = result || [];
+    activeCoursesQuerySucceeded = true;
+  } catch (queryErr: any) {
+    activeCoursesQuerySucceeded = false;
+    console.error('[WATCHDOG] ❌ Échec requête coursesActivesPourVerif — ANOMALIE 5/6 SKIPPÉES:', queryErr?.message || String(queryErr));
+    anomalies.push({
+      type: 'query_error_active_courses',
+      severity: 'critique',
+      description: `Échec lecture courses actives — ANOMALIE 5/6 skippées: ${queryErr?.message || String(queryErr)}`,
+    });
+  }
+  const livreurIdsAvecCourseActive = new Set(
+    coursesActivesPourVerif
+      .filter(c => c.livreur_id)
+      .map(c => c.livreur_id)
+  );
+
   // ═══ ANOMALIE 1: Course nouvelle jamais traitée par l'automation create ═══
   // Une course nouvelle > 2 min sans aucune notification = l'entity automation create a échoué
   for (const course of courses) {
@@ -201,14 +228,13 @@ export async function runWatchdog(base44, body = {}) {
   }
 
   // ═══ ANOMALIE 5: Livreur en_course sans course active (statut fantôme) ═══
-  const livreursEnCourse = await base44.asServiceRole.entities.Livreur.filter(
-    { type_livreur: 'externe', statut: 'en_course' },
-    '-updated_date', 50
-  );
+  const livreursEnCourse = activeCoursesQuerySucceeded
+    ? await base44.asServiceRole.entities.Livreur.filter(
+        { type_livreur: 'externe', statut: 'en_course' },
+        '-updated_date', 50
+      ).catch(() => [])
+    : [];
   if (livreursEnCourse.length > 0) {
-    const livreurIdsAvecCourseActive = new Set(
-      courses.filter(c => STATUTS_ACTIFS_VERIF.includes(c.statut) && c.livreur_id).map(c => c.livreur_id)
-    );
     const livreursFantomes = livreursEnCourse.filter(l => !livreurIdsAvecCourseActive.has(l.id));
     for (const l of livreursFantomes) {
       const nouveauStatut = l.manual_hors_ligne === true ? 'hors_ligne' : 'disponible';
@@ -219,14 +245,13 @@ export async function runWatchdog(base44, body = {}) {
   }
 
   // ═══ ANOMALIE 6: Livreur disponible avec course active ═══
-  const livreursDisponibles = await base44.asServiceRole.entities.Livreur.filter(
-    { type_livreur: 'externe', statut: 'disponible' },
-    '-updated_date', 50
-  );
+  const livreursDisponibles = activeCoursesQuerySucceeded
+    ? await base44.asServiceRole.entities.Livreur.filter(
+        { type_livreur: 'externe', statut: 'disponible' },
+        '-updated_date', 50
+      ).catch(() => [])
+    : [];
   if (livreursDisponibles.length > 0) {
-    const livreurIdsAvecCourseActive = new Set(
-      courses.filter(c => STATUTS_ACTIFS_VERIF.includes(c.statut) && c.livreur_id).map(c => c.livreur_id)
-    );
     const livreursIncoherents = livreursDisponibles.filter(l => livreurIdsAvecCourseActive.has(l.id));
     for (const l of livreursIncoherents) {
       await base44.asServiceRole.entities.Livreur.update(l.id, { statut: 'en_course' });
@@ -270,10 +295,31 @@ export async function runWatchdog(base44, body = {}) {
     }
   }
 
-  // ── Journaliser toutes les anomalies ──
+  // ── Journaliser toutes les anomalies avec cooldown par livreur/course ──
+  const WATCHDOG_LOG_COOLDOWN_MS = 30 * 60 * 1000;
+  const cooldownSince = new Date(now.getTime() - WATCHDOG_LOG_COOLDOWN_MS).toISOString();
+  const recentWatchdogLogs = await base44.asServiceRole.entities.DispatchLog.filter(
+    { evenement: 'watchdog_anomalie', created_date: { $gte: cooldownSince } },
+    '-created_date', 200
+  ).catch(() => []);
+  const recentLogKeys = new Set<string>();
+  for (const rl of (recentWatchdogLogs || [])) {
+    const entityKey = rl.livreur_acceptant_id || rl.course_id || '';
+    const key = `${entityKey}|${rl.raison_blocage || ''}`;
+    if (entityKey) recentLogKeys.add(key);
+  }
+  let logsSkipped = 0;
+
   for (const a of anomalies) {
+    const entityKey = a.livreur_id || a.course_id || '';
+    const logKey = `${entityKey}|${a.type}`;
+    if (entityKey && recentLogKeys.has(logKey)) {
+      logsSkipped++;
+      continue;
+    }
     journaliserDispatch(base44, {
       course_id: a.course_id || '',
+      livreur_acceptant_id: a.livreur_id || '',
       evenement: 'watchdog_anomalie',
       raison_blocage: a.type,
       raison_passage: `severity:${a.severity} | ${a.description || ''}`,
@@ -329,12 +375,13 @@ export async function runWatchdog(base44, body = {}) {
     console.error('[WATCHDOG] Erreur push général T+10:', err?.message || String(err));
   }
 
-  console.log(`[WATCHDOG] 📋 ${anomalies.length} anomalie(s) détectée(s), ${corrections.length} correction(s) appliquée(s)`);
+  console.log(`[WATCHDOG] 📋 ${anomalies.length} anomalie(s) détectée(s), ${corrections.length} correction(s) appliquée(s), ${logsSkipped} log(s) ignoré(s) par cooldown`);
 
   return {
     success: true,
     anomalies_count: anomalies.length,
     corrections_count: corrections.length,
+    logs_skipped_cooldown: logsSkipped,
     anomalies: anomalies.slice(0, 20),
     corrections: corrections.slice(0, 20),
   };

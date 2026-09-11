@@ -49,6 +49,7 @@ import {
   sameLivreurId,
 } from "@/lib/livreurCourseState";
 import CoursesDisponibles from "@/components/livreur/CoursesDisponibles";
+import CourseArrivalToast from "@/components/livreur/CourseArrivalToast";
 import { useCoursesDisponibles } from "@/hooks/useCoursesDisponibles";
 
 // haversineKm importé depuis priceEstimate (source canonique)
@@ -125,6 +126,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   const [prixManuelReponse, setPrixManuelReponse] = useState(null); // { accepted, prix, devise }
   const [showMessages, setShowMessages] = useState(false);
   const [hasNewAvailableCourse, setHasNewAvailableCourse] = useState(false);
+  const [arrivalToastData, setArrivalToastData] = useState(null);
   const initialTabSetRef = useRef(false);
   const tabListRef = useRef(null);
   const tabButtonRefs = useRef(new Map());
@@ -1091,7 +1093,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       source,
       livreur_id: livreurProfil?.id || "",
     });
-    toast.error("Cette course a deja ete prise par un autre livreur.");
+    toast.error("Cette course a déjà été prise par un autre livreur.");
   };
 
   const handleFallbackAccepter = async (course) => {
@@ -1140,7 +1142,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         course_id: course?.id,
         error: error?.message || String(error),
       });
-      toast.error("Erreur reseau lors de l'acceptation");
+      toast.error("Erreur réseau lors de l'acceptation");
     } finally {
       fallbackAcceptingRef.current = false;
     }
@@ -1219,7 +1221,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
           course_id: course?.id,
           error: fallbackError?.message || String(fallbackError),
         });
-        toast.error("Erreur reseau lors de l'annulation");
+        toast.error("Erreur réseau lors de l'annulation");
         return false;
       }
       toast.error("Erreur réseau lors de l'annulation");
@@ -1715,7 +1717,10 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         {activeTab === "disponibles" && (
           <CoursesDisponibles
             livreurProfil={livreurProfil}
-            onNewCourse={() => setHasNewAvailableCourse(true)}
+            onNewCourse={(data) => {
+              setHasNewAvailableCourse(true);
+              setArrivalToastData(data);
+            }}
             onAcceptSuccess={() => {
               setActiveTab("courses");
               statutMutation.mutate("en_course");
@@ -1750,6 +1755,16 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
             }}
           />
         )}
+
+        <CourseArrivalToast
+          courseData={arrivalToastData}
+          onSeeCourses={() => {
+            setArrivalToastData(null);
+            setActiveTab("disponibles");
+            setHasNewAvailableCourse(false);
+          }}
+          onDismiss={() => setArrivalToastData(null)}
+        />
       </div>
     </div>
   );

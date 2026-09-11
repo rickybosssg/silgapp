@@ -49,6 +49,25 @@ export function useCoursesDisponibles(livreurProfil) {
     livreurProfil?.manual_hors_ligne !== true &&
     livreurProfil?.admin_hors_ligne !== true;
 
+  // ── Visibilité du fil : tous les livreurs validés/actifs du pays voient les courses ──
+  // Exclus : admin_hors_ligne, validation != valide, actif=false, autre pays
+  const livreurPeutVoirFil =
+    livreurProfil?.type_livreur === "externe" &&
+    livreurProfil?.validation === "valide" &&
+    livreurProfil?.actif === true &&
+    livreurProfil?.admin_hors_ligne !== true;
+
+  // ── Raison de blocage d'acceptation (null si le livreur peut accepter) ──
+  const raisonBlocage = !livreurPeutVoirFil
+    ? null
+    : livreurDisponible
+      ? null
+      : livreurProfil?.bloque_encours === true
+        ? "Régularisez votre situation avant d'accepter"
+        : livreurProfil?.statut === "en_course"
+          ? "Vous êtes déjà en course"
+          : "Passez en ligne pour accepter";
+
   // ── Feature flag V2 ──
   const { data: isV2Enabled = true } = useQuery({
     queryKey: ["dispatch-v2-enabled", livreurId],
@@ -71,7 +90,7 @@ export function useCoursesDisponibles(livreurProfil) {
       );
       return all || [];
     },
-    enabled: !!livreurId && !!countryCode && livreurDisponible && isV2Enabled,
+    enabled: !!livreurId && !!countryCode && livreurPeutVoirFil && isV2Enabled,
     refetchInterval: 10000,
     staleTime: 0,
     refetchOnWindowFocus: true,
@@ -109,7 +128,7 @@ export function useCoursesDisponibles(livreurProfil) {
 
   // ── Filtrage d'éligibilité (SOURCE UNIQUE) ──
   const eligibleCourses = useMemo(() => {
-    if (!livreurDisponible || !isV2Enabled) return [];
+    if (!livreurPeutVoirFil || !isV2Enabled) return [];
     return courses.filter(course => {
       if (course.statut === "en_attente") return false;
       if (FINAL_COURSE_STATUSES.has(course.statut)) return false;
@@ -125,7 +144,7 @@ export function useCoursesDisponibles(livreurProfil) {
       if (refusedCourseIds.includes(course.id)) return false;
       return true;
     });
-  }, [courses, refusedIds, refusedCourseIds, livreurDisponible, isV2Enabled]);
+  }, [courses, refusedIds, refusedCourseIds, livreurPeutVoirFil, isV2Enabled]);
 
   return {
     eligibleCourses,
@@ -133,6 +152,8 @@ export function useCoursesDisponibles(livreurProfil) {
     isLoading,
     isV2Enabled,
     livreurDisponible,
+    livreurPeutVoirFil,
+    raisonBlocage,
     refusedCourseIds,
     setRefusedIds,
   };

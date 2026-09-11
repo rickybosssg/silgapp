@@ -33,9 +33,10 @@
 import { waitUntil } from 'base44:runtime';
 import { STATUTS_ACTIFS_COURSE, STATUTS_TERMINAUX_COURSE, calculerDistance, chargerConfigPays } from './dispatchConstants.ts';
 import { dispatchLog, reponseDejaPrise, generateToken, generatePIN, journaliserDispatch } from './dispatchUtils.ts';
-import { enregistrerNotification, getLivreursNotifies, getLivreursRefuses, marquerAccepte } from './dispatchNotifications.ts';
+import { getLivreursNotifies, getLivreursRefuses, marquerAccepte } from './dispatchNotifications.ts';
+import { notifierLivreursUnifie } from './dispatchPushUnifie.ts';
 import { chargerConfigDispatch } from './dispatchConfig.ts';
-import { resolveCourseParticipantUserIds } from './conversationSecurity.ts';
+import { ensureCourseCodeMessage, buildCodeMessageContent } from './courseCodeMessage.ts';
 
 // ── Version du bundle (pour vérifier que la production charge la dernière version) ──
 export const DISPATCH_V2_BUNDLE_VERSION = '2026-08-17-fix-en-attente-accept';
@@ -67,7 +68,8 @@ async function notifierLivreursEligiblesV2(base44: any, course: any, options: an
   const { priorityOnly = false, skipAlreadyPublishedCheck = false } = options;
   if (!course?.id || !course?.country_code) return { notified: 0 };
 
-  const [livreurs, dejaNotifies, refuses] = await Promise.all([
+  // Lecture unifiée : livreurs + DispatchNotification existantes, puis split mémoire.
+  const [livreurs, allDnRecords] = await Promise.all([
     base44.asServiceRole.entities.Livreur.filter({
       type_livreur: 'externe',
       validation: 'valide',
@@ -78,9 +80,13 @@ async function notifierLivreursEligiblesV2(base44: any, course: any, options: an
       manual_hors_ligne: { $ne: true },
       admin_hors_ligne: { $ne: true },
     }, '-last_seen_at', 500).catch(() => []),
-    getLivreursNotifies(base44, course.id),
-    getLivreursRefuses(base44, course.id),
+    base44.asServiceRole.entities.DispatchNotification.filter(
+      { course_id: course.id }, '-date_notification', 500
+    ).catch(() => []),
   ]);
+
+  const dejaNotifies = (allDnRecords || []).filter((n: any) => n.statut !== 'refuse').map((n: any) => n.livreur_id);
+  const refuses = (allDnRecords || []).filter((n: any) => n.statut === 'refuse').map((n: any) => n.livreur_id);
 
   // 🛡️ Anti-race-condition : si la course a déjà des notifications, c'est qu'elle
   // a déjà été publiée dans le fil. Ne pas re-notifier (évite les 82 doublons).
@@ -102,58 +108,14 @@ async function notifierLivreursEligiblesV2(base44: any, course: any, options: an
     candidats = candidats.filter((l: any) => Number(l.priorite_dispatch || 0) > 0);
   }
 
-  // Enregistrer les DispatchNotifications (bulk) pour le suivi dispatch
-  await Promise.allSettled(
-    candidats.map((livreur: any) => enregistrerNotification(base44, course.id, livreur, 0, { country_code: course.country_code }))
-  );
-
-  // ── Créer les notifications utilisateur (inbox) ──
-  // Idempotence via deduplication_key = COURSE_DISPATCH_<courseId>_<livreurId>
-  // Deux événements différents (dispatch vs rappel vs attribution) utilisent des
-  // clés différentes. Un retry du même événement est bloqué.
-  await Promise.allSettled(
-    candidats.map((livreur: any) => {
-      if (!livreur.user_email) return Promise.resolve();
-      const dedupKey = `COURSE_DISPATCH_${course.id}_${livreur.id}`;
-      return base44.asServiceRole.entities.Notification.filter({
-        deduplication_key: dedupKey,
-      }).then((existing: any) => {
-        if (existing && existing.length > 0) return; // déjà notifié — pas de doublon
-        return base44.asServiceRole.entities.Notification.create({
-          titre: 'Nouvelle course SILGAPP',
-          message: `${course.quartier_depart || course.adresse_depart || 'Départ'} → ${course.quartier_arrivee || course.adresse_arrivee || 'destination'}`,
-          type: 'nouvelle_course',
-          course_id: course.id,
-          destinataire_email: livreur.user_email,
-          deduplication_key: dedupKey,
-          lue: false,
-        });
-      }).catch(() => {});
-    })
-  );
-
-  // 📤 Envoi push batch : 1 seule invocation backend pour tous les livreurs prioritaires
-  if (candidats.length > 0) {
-    const batchResult = await base44.asServiceRole.functions.invoke('envoiNotificationPushBatch', {
-      course_id: course.id,
-      livreur_ids: candidats.map((l: any) => l.id),
-      titre: 'Nouvelle course SILGAPP',
-      message: `${course.quartier_depart || course.adresse_depart || 'Départ'} vers ${course.quartier_arrivee || course.adresse_arrivee || 'destination'}`,
-      type: 'nouvelle_course',
-      alert_duration_seconds: 5,
-      alert_interval_seconds: 5,
-      dispatch_version: '2',
-    }).catch((err: any) => {
-      dispatchLog(`[V2] ⚠️ Batch push error (T=0): ${err?.message}`);
-      return null;
-    });
-
-    const sent = batchResult?.succes || 0;
-    dispatchLog(`[V2] 📢 Batch push T=0: ${sent} token(s) envoyé(s) pour ${candidats.length} livreur(s) prioritaire(s)`);
-    return { notified: candidats.length, push_sent: sent, push_failed: batchResult?.echecs || 0 };
+  console.log(`[V2] 📊 notifierLivreursEligiblesV2 — candidats=${candidats.length} livreurs=${(livreurs||[]).length} dejaNotifies=${dejaNotifies.length} refuses=${refuses.length} enCourse=${livreursEnCourse.size} course=${course.id}`);
+  if (candidats.length === 0) {
+    console.warn(`[V2] ⚠️ 0 candidat après filtrage — livreurs=${(livreurs||[]).length} dejaNotifies=${dejaNotifies.length} refuses=${refuses.length} enCourse=${livreursEnCourse.size}`);
   }
-
-  return { notified: 0 };
+  const batchResult = await notifierLivreursUnifie(base44, course, candidats, allDnRecords);
+  console.log(`[V2] 📢 Push unifié T=0: ${batchResult.push_sent} token(s) envoyé(s) pour ${batchResult.notified} livreur(s) — course ${course.id} reason=${batchResult.reason || 'none'}`);
+  dispatchLog(`[V2] 📢 Push unifié T=0: ${batchResult.push_sent} token(s) envoyé(s) pour ${batchResult.notified} livreur(s) — course ${course.id}`);
+  return { notified: batchResult.notified, push_sent: batchResult.push_sent, push_failed: batchResult.push_failed };
 }
 
 // ── Helper : liste des livreurs en course (même définition que aCourseActive) ──
@@ -445,57 +407,28 @@ export async function accepterCourseV2(base44: any, courseId: string, livreurId:
 
     // 13. Message code récupération + push notification (courses admin/VENUS)
     if ((course.source === 'admin' || course.created_by_venus === true) && pickupPIN) {
-      const idempotencyKey = `pickup-code-${courseId}-${livreurId}`;
-      try {
-        const existing = await base44.asServiceRole.entities.Message.filter({ client_message_id: idempotencyKey });
-        if (!existing || existing.length === 0) {
-          const prixLabel = course.prix_propose_admin
-            ? `Prix de la course : ${Number(course.prix_propose_admin).toLocaleString()} ${course.devise || 'FCFA'}`
-            : (course.prix_estimate ? `Prix estimé : ${Number(course.prix_estimate).toLocaleString()} ${course.devise || 'FCFA'}` : '');
-          const messageContent = `🔑 Code de récupération : ${pickupPIN}\n📦 Code de livraison : ${deliveryPIN}${prixLabel ? `\n💰 ${prixLabel}` : ''}`;
+      const codeMsgResult = await ensureCourseCodeMessage(
+        base44, course, livreurId, pickupPIN, deliveryPIN, '[V2]'
+      ).catch((err: any) => {
+        console.error('[V2] ⚠️ ensureCourseCodeMessage threw (non-blocking):', err?.message);
+        return { created: false, idempotent: false, error: err?.message };
+      });
 
-          // 🔒 Résolution des participants côté backend (jamais du frontend)
-          // Le message contient les codes PIN — il doit être sécurisé immédiatement.
-          let participantUserIds: string[] = [];
-          let messageSecurityStatus: 'secured' | 'pending' = 'pending';
-          try {
-            const clientId = courseVerifie.expediteur_client_id || courseVerifie.destinataire_client_id;
-            participantUserIds = await resolveCourseParticipantUserIds(base44, livreurId, clientId);
-            if (participantUserIds.length > 0) {
-              messageSecurityStatus = 'secured';
-            } else {
-              dispatchLog(`[V2] ⚠️ [SECURITÉ] Message PIN course ${courseId}: resolveCourseParticipantUserIds a retourné 0 User.id — message créé en pending (backfill nécessaire)`);
-            }
-          } catch (err: any) {
-            dispatchLog(`[V2] ❌ [SECURITÉ] Message PIN course ${courseId}: échec résolution participants — ${err?.message} — message créé en pending (backfill nécessaire)`);
-          }
-
-          await base44.asServiceRole.entities.Message.create({
-            course_id: courseId,
-            sender_type: 'admin',
-            sender_id: 'silgapp_system',
-            sender_name: 'SILGAPP',
-            message_type: 'text',
-            content: messageContent,
-            source: 'app',
-            client_message_id: idempotencyKey,
-            participant_user_ids: participantUserIds,
-            security_status: messageSecurityStatus,
-          });
-
-          // 📤 Push notification au livreur avec PIN + prix
-          if (livreur.user_email) {
-            base44.asServiceRole.functions.invoke('envoiNotificationPush', {
-              destinataire_email: livreur.user_email,
-              livreur_id: livreurId,
-              titre: '🔑 Code PIN + Prix de course',
-              message: messageContent,
-              type: 'nouveau_message',
-              course_id: courseId,
-            }).catch((err: any) => console.error('[V2] ❌ Push PIN/prix:', err?.message));
-          }
-        }
-      } catch (err) { console.error('[V2] ⚠️ Erreur message code récupération:', err?.message); }
+      // 📤 Push notification au livreur avec PIN + prix (uniquement si message créé ou idempotent)
+      if (livreur.user_email && codeMsgResult && (codeMsgResult.created || codeMsgResult.idempotent)) {
+        const messageContent = buildCodeMessageContent(
+          pickupPIN, deliveryPIN,
+          course.prix_propose_admin, course.prix_estimate, course.devise
+        );
+        base44.asServiceRole.functions.invoke('envoiNotificationPush', {
+          destinataire_email: livreur.user_email,
+          livreur_id: livreurId,
+          titre: '🔑 Code PIN + Prix de course',
+          message: messageContent,
+          type: 'nouveau_message',
+          course_id: courseId,
+        }).catch((err: any) => console.error('[V2] ❌ Push PIN/prix:', err?.message));
+      }
     }
 
     // 14. Suivi WhatsApp
