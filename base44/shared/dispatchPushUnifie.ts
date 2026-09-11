@@ -38,14 +38,33 @@ const CHUNK_SIZE = 25;
  * @returns {{ notified, push_sent, push_failed }}
  */
 export async function notifierLivreursUnifie(base44: any, course: any, candidats: any[], existingDnRecords?: any[]) {
-  if (!candidats || candidats.length === 0) return { notified: 0, push_sent: 0, push_failed: 0 };
+  if (!candidats || candidats.length === 0) {
+    console.log('[PushUnifie] ⚠️ 0 candidat — course ' + course?.id);
+    return { notified: 0, push_sent: 0, push_failed: 0, reason: 'no_candidates' };
+  }
 
   const livreurIds = candidats.map((l: any) => l.id);
+  console.log('[PushUnifie] 📊 candidats=' + candidats.length + ' course=' + course?.id);
 
   // ── 1. UN SEUL READ : tous les tokens FCM actifs pour les candidats ──
-  const allTokens = await base44.asServiceRole.entities.NotificationToken.filter(
-    { livreur_id: { $in: livreurIds }, actif: true }, undefined, livreurIds.length * 3
-  ).catch(() => []);
+  // ❌ PAS DE .catch(() => []) — si la lecture échoue, on doit le savoir
+  let allTokens: any[];
+  try {
+    allTokens = await base44.asServiceRole.entities.NotificationToken.filter(
+      { livreur_id: { $in: livreurIds }, actif: true }, undefined, livreurIds.length * 3
+    );
+  } catch (err: any) {
+    console.error('[PushUnifie] ❌ ERREUR LECTURE TOKENS: ' + (err?.message || String(err)));
+    // FALLBACK EXPLICITE — ne jamais retourner silencieusement 0
+    // On journalise l'erreur et on retourne un statut d'échec clair
+    return {
+      notified: 0, push_sent: 0, push_failed: 0,
+      error: 'token_read_failed: ' + (err?.message || String(err)),
+      silent_fallback: false,
+    };
+  }
+
+  console.log('[PushUnifie] 📊 tokens trouvés=' + (allTokens?.length || 0));
 
   // ── 2. Calcul en mémoire : candidats à notifier (avec token, pas déjà notifiés) ──
   const existingIds = new Set((existingDnRecords || []).map((n: any) => n.livreur_id));
@@ -59,15 +78,24 @@ export async function notifierLivreursUnifie(base44: any, course: any, candidats
   }
 
   const toNotify: { livreur: any; tokens: any[] }[] = [];
+  const skippedNoToken: string[] = [];
   for (const livreur of candidats) {
     if (existingIds.has(livreur.id)) continue;
     const tokens = tokensByLivreur.get(livreur.id) || [];
     const nativeTokens = selectLatestNativeTokens(tokens);
-    if (nativeTokens.length === 0) continue;
+    if (nativeTokens.length === 0) {
+      skippedNoToken.push(livreur.id);
+      continue;
+    }
     toNotify.push({ livreur, tokens: nativeTokens });
   }
 
-  if (toNotify.length === 0) return { notified: 0, push_sent: 0, push_failed: 0 };
+  console.log('[PushUnifie] 📊 toNotify=' + toNotify.length + ' skippedNoToken=' + skippedNoToken.length + ' alreadyNotified=' + existingIds.size);
+
+  if (toNotify.length === 0) {
+    console.warn('[PushUnifie] ⚠️ 0 livreur avec token FCM natif — ' + skippedNoToken.length + ' sans token, course ' + course?.id);
+    return { notified: 0, push_sent: 0, push_failed: 0, reason: 'no_native_tokens', candidates: candidats.length, skipped_no_token: skippedNoToken.length };
+  }
 
   // ── 3. Bulk create DispatchNotifications (statut='notifie') — 1 appel ──
   const nowIso = new Date().toISOString();
@@ -81,7 +109,18 @@ export async function notifierLivreursUnifie(base44: any, course: any, candidats
     priorite_dispatch: livreur.priorite_dispatch || 0,
     date_notification: nowIso,
   }));
-  await base44.asServiceRole.entities.DispatchNotification.bulkCreate(dnRecords).catch(() => null);
+  let dnCreated: any[] = [];
+  try {
+    dnCreated = await base44.asServiceRole.entities.DispatchNotification.bulkCreate(dnRecords);
+  } catch (err: any) {
+    console.error('[PushUnifie] ❌ ERREUR BULK CREATE DN: ' + (err?.message || String(err)));
+    return {
+      notified: 0, push_sent: 0, push_failed: 0,
+      error: 'dn_bulk_create_failed: ' + (err?.message || String(err)),
+      silent_fallback: false,
+    };
+  }
+  console.log('[PushUnifie] ✅ DispatchNotification créées=' + (Array.isArray(dnCreated) ? dnCreated.length : 0));
 
   // ── 4. Bulk create inbox Notifications (avec dedup_key — l'inbox officielle) ──
   // 1 filter (dedup keys existantes) + 1 bulkCreate = 2 appels
@@ -99,13 +138,18 @@ export async function notifierLivreursUnifie(base44: any, course: any, candidats
 
   if (notifRecords.length > 0) {
     const dedupKeys = notifRecords.map(n => n.deduplication_key);
-    const existingInbox = await base44.asServiceRole.entities.Notification.filter(
-      { deduplication_key: { $in: dedupKeys } }, undefined, dedupKeys.length
-    ).catch(() => []);
-    const existingKeys = new Set((existingInbox || []).map((n: any) => n.deduplication_key));
-    const toCreate = notifRecords.filter(n => !existingKeys.has(n.deduplication_key));
-    if (toCreate.length > 0) {
-      await base44.asServiceRole.entities.Notification.bulkCreate(toCreate).catch(() => null);
+    try {
+      const existingInbox = await base44.asServiceRole.entities.Notification.filter(
+        { deduplication_key: { $in: dedupKeys } }, undefined, dedupKeys.length
+      );
+      const existingKeys = new Set((existingInbox || []).map((n: any) => n.deduplication_key));
+      const toCreate = notifRecords.filter(n => !existingKeys.has(n.deduplication_key));
+      if (toCreate.length > 0) {
+        await base44.asServiceRole.entities.Notification.bulkCreate(toCreate);
+        console.log('[PushUnifie] ✅ Inbox Notifications créées=' + toCreate.length);
+      }
+    } catch (err: any) {
+      console.error('[PushUnifie] ⚠️ Erreur inbox (non bloquant): ' + (err?.message || String(err)));
     }
   }
 
@@ -234,16 +278,23 @@ export async function notifierLivreursUnifie(base44: any, course: any, candidats
         base44.asServiceRole.entities.DispatchNotification.updateMany(
           { course_id: course.id, livreur_id: { $in: ids }, statut: { $in: ['notifie', 'push_tente', 'sans_token'] } },
           { $set: { statut } }
-        ).catch(() => null)
+        )
       );
     }
-    await Promise.allSettled(promises);
+    const results = await Promise.allSettled(promises);
+    const failed = results.filter(r => r.status === 'rejected').length;
+    if (failed > 0) console.warn('[PushUnifie] ⚠️ ' + failed + ' updateMany DN ont échoué (non bloquant)');
   }
 
   // ── 7. Bulk update NotificationToken statuts — 1 appel ──
   if (tokenUpdates.length > 0) {
-    await base44.asServiceRole.entities.NotificationToken.bulkUpdate(tokenUpdates).catch(() => null);
+    try {
+      await base44.asServiceRole.entities.NotificationToken.bulkUpdate(tokenUpdates);
+    } catch (err: any) {
+      console.warn('[PushUnifie] ⚠️ Erreur bulkUpdate tokens (non bloquant): ' + (err?.message || String(err)));
+    }
   }
 
+  console.log('[PushUnifie] ✅ RÉSULTAT notified=' + toNotify.length + ' push_sent=' + succes + ' push_failed=' + echecs);
   return { notified: toNotify.length, push_sent: succes, push_failed: echecs };
 }
