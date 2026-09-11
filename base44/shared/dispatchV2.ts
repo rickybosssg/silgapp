@@ -112,9 +112,12 @@ async function notifierLivreursEligiblesV2(base44: any, course: any, options: an
   }
 
   // 📤 NOTIFICATION UNIFIÉE — remplace 3 appels séparés par 1 seule fonction
-  // Élimine : 1 function invocation + 4 reads redondants + 1 Notification.bulkCreate dupliquée
-  // Conserve : DispatchNotification tracking, inbox Notification (dedup_key), FCM parallèle par chunks de 25
+  console.log(`[V2] 📊 notifierLivreursEligiblesV2 — candidats=${candidats.length} livreurs=${(livreurs||[]).length} dejaNotifies=${dejaNotifies.length} refuses=${refuses.length} enCourse=${livreursEnCourse.size} course=${course.id}`);
+  if (candidats.length === 0) {
+    console.warn(`[V2] ⚠️ 0 candidat après filtrage — livreurs=${(livreurs||[]).length} dejaNotifies=${dejaNotifies.length} refuses=${refuses.length} enCourse=${livreursEnCourse.size}`);
+  }
   const batchResult = await notifierLivreursUnifie(base44, course, candidats, allDnRecords);
+  console.log(`[V2] 📢 Push unifié T=0: ${batchResult.push_sent} token(s) envoyé(s) pour ${batchResult.notified} livreur(s) — course ${course.id} reason=${batchResult.reason || 'none'}`);
   dispatchLog(`[V2] 📢 Push unifié T=0: ${batchResult.push_sent} token(s) envoyé(s) pour ${batchResult.notified} livreur(s) — course ${course.id}`);
   return { notified: batchResult.notified, push_sent: batchResult.push_sent, push_failed: batchResult.push_failed };
 }
