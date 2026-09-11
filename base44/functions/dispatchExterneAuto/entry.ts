@@ -1040,15 +1040,28 @@ Deno.serve(async (req) => {
         return Response.json({ success: true, ignored: true, reason: 'course_terminal' });
       }
 
-      // 4. Vérifier l'idempotence — ne pas créer de doublon
+      // 4. Tracking de vue réelle — UPDATE du champ vue_at, pas de création de doublon.
+      // Le statut existant (push_tente, push_succes, etc.) n'est JAMAIS modifié ici.
+      // La "vue réelle" est mesurée par vue_at, indépendamment du cycle FCM.
       const existing = await base44.asServiceRole.entities.DispatchNotification.filter(
         { course_id: course_id, livreur_id: livreur.id }, '-date_notification', 1
       );
+
       if (existing && existing.length > 0) {
-        return Response.json({ success: true, already_exists: true });
+        const existingNotif = existing[0];
+        // Déjà vue → pas de mise à jour
+        if (existingNotif.vue_at) {
+          return Response.json({ success: true, already_viewed: true });
+        }
+        // UPDATE uniquement vue_at — ne pas toucher au statut existant
+        await base44.asServiceRole.entities.DispatchNotification.update(existingNotif.id, {
+          vue_at: new Date().toISOString(),
+        });
+        return Response.json({ success: true, vue_enregistree: true });
       }
 
-      // 5. Créer la DispatchNotification avec livreur_user_email résolu côté backend
+      // 5. Aucun enregistrement existant — créer avec vue_at renseigné
+      // Cas rare : livreur sans token FCM (pas de DispatchNotification créée par le push)
       await base44.asServiceRole.entities.DispatchNotification.create({
         course_id: course_id,
         livreur_id: livreur.id,
@@ -1058,9 +1071,10 @@ Deno.serve(async (req) => {
         statut: 'notifie',
         priorite_dispatch: livreur.priorite_dispatch || 0,
         date_notification: new Date().toISOString(),
+        vue_at: new Date().toISOString(),
       });
 
-      return Response.json({ success: true });
+      return Response.json({ success: true, vue_enregistree: true });
     }
 
     return Response.json({ error: 'Action inconnue' }, { status: 400 });

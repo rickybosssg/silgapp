@@ -155,8 +155,12 @@ export async function enregistrerNotification(base44, courseId, livreur, vague, 
  */
 export async function marquerRefuse(base44, courseId, livreurId, raison = '') {
   try {
+    // FIX : ne pas dépendre uniquement de statut='notifie'. Le statut peut avoir
+    // évolué vers push_tente, push_succes, push_echec ou sans_token après le push FCM.
+    // On identifie l'enregistrement par course_id + livreur_id et on refuse tout
+    // statut non-terminal (pas déjà refuse/expire/accepte).
     await base44.asServiceRole.entities.DispatchNotification.updateMany(
-      { course_id: courseId, livreur_id: livreurId, statut: 'notifie' },
+      { course_id: courseId, livreur_id: livreurId, statut: { $in: ['notifie', 'push_tente', 'push_succes', 'push_echec', 'sans_token'] } },
       { $set: { statut: 'refuse', date_reponse: new Date().toISOString(), raison_refus: raison } }
     );
   } catch (err) {
@@ -169,6 +173,7 @@ export async function marquerRefuse(base44, courseId, livreurId, raison = '') {
  */
 export async function marquerAccepte(base44, courseId, livreurId, tempsReponseSec = null) {
   try {
+    // FIX : même correction que marquerRefuse — ne pas dépendre uniquement de statut='notifie'.
     const updateData = {
       $set: {
         statut: 'accepte',
@@ -179,7 +184,7 @@ export async function marquerAccepte(base44, courseId, livreurId, tempsReponseSe
       updateData.$set.temps_reponse_sec = tempsReponseSec;
     }
     await base44.asServiceRole.entities.DispatchNotification.updateMany(
-      { course_id: courseId, livreur_id: livreurId, statut: 'notifie' },
+      { course_id: courseId, livreur_id: livreurId, statut: { $in: ['notifie', 'push_tente', 'push_succes', 'push_echec', 'sans_token'] } },
       updateData
     );
   } catch (err) {
@@ -192,8 +197,9 @@ export async function marquerAccepte(base44, courseId, livreurId, tempsReponseSe
  */
 export async function marquerExpirees(base44, courseId) {
   try {
+    // FIX : même correction que marquerRefuse — ne pas dépendre uniquement de statut='notifie'.
     await base44.asServiceRole.entities.DispatchNotification.updateMany(
-      { course_id: courseId, statut: 'notifie' },
+      { course_id: courseId, statut: { $in: ['notifie', 'push_tente', 'push_succes', 'push_echec', 'sans_token'] } },
       { $set: { statut: 'expire', date_reponse: new Date().toISOString() } }
     );
   } catch (err) {
