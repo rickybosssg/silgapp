@@ -8,6 +8,7 @@ import { runWatchdog } from '../../shared/dispatchWatchdog.ts';
 import { marquerRefuse, marquerAccepte, getLivreursNotifies, getLivreursRefuses, resetNotifications as resetNotifsEntity } from '../../shared/dispatchNotifications.ts';
 import { accepterCourseV2, publierCourseDansFil, isV2Enabled, secoursDispatchV2, isPilotLivreur, DISPATCH_V2_BUNDLE_VERSION } from '../../shared/dispatchV2.ts';
 import { resolveCourseParticipantUserIds } from '../../shared/conversationSecurity.ts';
+import { ensureCourseCodeMessage } from '../../shared/courseCodeMessage.ts';
 
 // 🔖 Redéploiement forcé — 2026-08-14-simplified-3 — rappel T+5min re-notifie les mêmes livreurs libres
 console.log(`[DISPATCH_EXTERNE_AUTO] 🔖 dispatchV2 bundle version: ${DISPATCH_V2_BUNDLE_VERSION}`);
@@ -591,31 +592,15 @@ Deno.serve(async (req) => {
         // Concerné : courses admin (source='admin') et courses créées par VENUS
         // (created_by_venus=true). Clé idempotente par (course_id, livreur_id) pour
         // éviter les doublons et permettre un nouveau message si réassignation.
+        // ── Message système des codes (récupération + livraison + prix) ──
+        // Helper idempotent : vérifie l'existence, retry une fois, jamais d'échec bloquant.
+        // Utilise le même helper que le path V2 pour garantir un contenu identique.
         if ((course.source === 'admin' || course.created_by_venus === true) && pickupPIN) {
-          const idempotencyKey = `pickup-code-${course_id}-${livreur_id}`;
-          try {
-            const existing = await base44.asServiceRole.entities.Message.filter({
-              client_message_id: idempotencyKey,
-            });
-            if (!existing || existing.length === 0) {
-              const courseMsgUserIds = await resolveCourseParticipantUserIds(base44, course.livreur_id, course.expediteur_client_id || course.destinataire_client_id);
-              await base44.asServiceRole.entities.Message.create({
-                course_id: course_id,
-                participant_user_ids: courseMsgUserIds,
-                security_status: courseMsgUserIds.length > 0 ? 'secured' : 'pending',
-                sender_type: 'admin',
-                sender_id: 'silgapp_system',
-                sender_name: 'SILGAPP',
-                message_type: 'text',
-                content: `🔑 Code de récupération : ${pickupPIN}\n\nUtiliser ce code pour récupérer le Colis${course.prix_propose_admin ? `\n💰 Prix de la course : ${Number(course.prix_propose_admin).toLocaleString()} ${course.devise || 'FCFA'}` : (course.prix_estimate ? `\n💰 Prix estimé : ${Number(course.prix_estimate).toLocaleString()} ${course.devise || 'FCFA'}` : '')}`,
-                source: 'app',
-                client_message_id: idempotencyKey,
-              });
-              console.log(`[DISPATCH] 🔑 Message code de récupération créé pour course admin ${course_id} (livreur ${livreur_id})`);
-            }
-          } catch (err) {
-            console.error(`[DISPATCH] ⚠️ Erreur création message code récupération:`, err?.message || String(err));
-          }
+          await ensureCourseCodeMessage(
+            base44, course, livreur_id, pickupPIN, deliveryPIN, '[V1]'
+          ).catch((err: any) => {
+            console.error(`[DISPATCH] ⚠️ ensureCourseCodeMessage threw (non-blocking):`, err?.message || String(err));
+          });
         }
 
         // ── Phase 9 + QR/PIN : Suivi WhatsApp automatique avec QR Code et Code PIN ──
