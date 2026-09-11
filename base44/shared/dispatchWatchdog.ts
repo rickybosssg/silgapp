@@ -68,12 +68,27 @@ export async function runWatchdog(base44, body = {}) {
   // Limite 500 : le nombre de courses simultanément actives ne devrait jamais dépasser
   // ce seuil. Si cela arrivait, les livreurs concernés au-delà du top 500 ne seraient pas
   // protégés — cas extrême non observé en production.
-  const coursesActivesPourVerif = await base44.asServiceRole.entities.CourseExterne.filter(
-    { statut: { $in: STATUTS_ACTIFS_VERIF } },
-    '-created_date', 500
-  ).catch(() => []);
+  // ── FAIL-SAFE : distinguer requête réussie (0 résultats) de requête échouée ──
+  // L'ancien .catch(() => []) avalait silencieusement les erreurs et retournait [],
+  // ce qui était indiscernable d'un résultat légitime de 0 course active.
+  // En cas d'échec de lecture, ANOMALIE 5 et 6 sont SKIPPÉES — aucune modification
+  // de statut livreur. Une erreur de lecture ne doit JAMAIS provoquer en_course → disponible.
+  let coursesActivesPourVerif: any[] = [];
+  let activeCoursesQuerySucceeded = false;
+  try {
+    const result = await base44.asServiceRole.entities.CourseExterne.filter(
+      { statut: { $in: STATUTS_ACTIFS_VERIF } },
+      '-created_date', 500
+    );
+    coursesActivesPourVerif = result || [];
+    activeCoursesQuerySucceeded = true;
+  } catch (queryErr: any) {
+    activeCoursesQuerySucceeded = false;
+    console.error('[WATCHDOG] ❌ Échec requête coursesActivesPourVerif — ANOMALIE 5/6 SKIPPÉES:', queryErr?.message || String(queryErr));
+    anomalies.push({ type: 'query_error_active_courses', severity: 'critique', description: `Échec lecture courses actives — ANOMALIE 5/6 skippées: ${queryErr?.message || String(queryErr)}` });
+  }
   const livreurIdsAvecCourseActive = new Set(
-    (coursesActivesPourVerif || [])
+    coursesActivesPourVerif
       .filter(c => c.livreur_id)
       .map(c => c.livreur_id)
   );
@@ -221,10 +236,18 @@ export async function runWatchdog(base44, body = {}) {
   }
 
   // ═══ ANOMALIE 5: Livreur en_course sans course active (statut fantôme) ═══
-  const livreursEnCourse = await base44.asServiceRole.entities.Livreur.filter(
-    { type_livreur: 'externe', statut: 'en_course' },
-    '-updated_date', 50
-  );
+  // SKIPPÉE si la requête coursesActivesPourVerif a échoué (fail-safe).
+  // Une erreur de lecture ne doit jamais provoquer en_course → disponible.
+  if (!activeCoursesQuerySucceeded) {
+    // Requête échouée — ne modifier AUCUN statut livreur
+    console.warn('[WATCHDOG] ⏭️ ANOMALIE 5/6 skippées (coursesActivesPourVerif query failed)');
+  }
+  const livreursEnCourse = activeCoursesQuerySucceeded
+    ? await base44.asServiceRole.entities.Livreur.filter(
+        { type_livreur: 'externe', statut: 'en_course' },
+        '-updated_date', 50
+      ).catch(() => [])
+    : [];
   if (livreursEnCourse.length > 0) {
     // livreurIdsAvecCourseActive est calculé globalement (voir BUGFIX plus haut).
     const livreursFantomes = livreursEnCourse.filter(l => !livreurIdsAvecCourseActive.has(l.id));
@@ -237,10 +260,13 @@ export async function runWatchdog(base44, body = {}) {
   }
 
   // ═══ ANOMALIE 6: Livreur disponible avec course active ═══
-  const livreursDisponibles = await base44.asServiceRole.entities.Livreur.filter(
-    { type_livreur: 'externe', statut: 'disponible' },
-    '-updated_date', 50
-  );
+  // SKIPPÉE si la requête coursesActivesPourVerif a échoué (fail-safe).
+  const livreursDisponibles = activeCoursesQuerySucceeded
+    ? await base44.asServiceRole.entities.Livreur.filter(
+        { type_livreur: 'externe', statut: 'disponible' },
+        '-updated_date', 50
+      ).catch(() => [])
+    : [];
   if (livreursDisponibles.length > 0) {
     // livreurIdsAvecCourseActive est calculé globalement (voir BUGFIX plus haut).
     const livreursIncoherents = livreursDisponibles.filter(l => livreurIdsAvecCourseActive.has(l.id));
@@ -307,15 +333,22 @@ export async function runWatchdog(base44, body = {}) {
 
   let logsSkipped = 0;
   for (const a of anomalies) {
+    // ── Utiliser livreur_id comme clé de déduplication pour les anomalies livreur ──
+    // ANOMALIE 5/6 sont des anomalies livreur (pas course). Le livreur_id doit être
+    // utilisé comme entityKey pour que le cooldown 30 min fonctionne correctement.
+    // Anciennement, livreur_acceptant_id était vide dans les logs → le cooldown
+    // ne fonctionnait jamais → 134 logs identiques toutes les 5 min.
     const entityKey = a.livreur_id || a.course_id || '';
     const logKey = `${entityKey}|${a.type}`;
     if (entityKey && recentLogKeys.has(logKey)) {
       logsSkipped++;
       continue; // Log récent existant pour cette anomalie — cooldown 30 min
     }
+    // ── Pour les anomalies livreur (ANOMALIE 5/6), utiliser livreur_id comme
+    //    livreur_acceptant_id pour que le cooldown fonctionne. ──
     journaliserDispatch(base44, {
       course_id: a.course_id || '',
-      livreur_acceptant_id: a.livreur_id || '',
+      livreur_acceptant_id: a.livreur_id || a.course_id || '',
       evenement: 'watchdog_anomalie',
       raison_blocage: a.type,
       raison_passage: `severity:${a.severity} | ${a.description || ''}`,
