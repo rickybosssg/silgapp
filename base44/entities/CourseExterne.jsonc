@@ -276,6 +276,11 @@
       "format": "date-time",
       "description": "Date a laquelle la course a ete couverte par un push general recent du meme pays (cooldown), SANS avoir declenche d'envoi propre. Permet de distinguer les courses ayant benefici d'un rappel de celles ayant participe a un envoi."
     },
+    "push_rappel_t20_envoye": {
+      "type": "boolean",
+      "default": false,
+      "description": "True si le rappel push tardif T+20 min a ete envoye pour cette course. Idempotent : garantit qu'un seul rappel T+20 est envoye par course. Ne modifie pas vue_at ni les statuts DispatchNotification existants."
+    },
     "dispatch_wave_started_at": {
       "type": "string",
       "format": "date-time",

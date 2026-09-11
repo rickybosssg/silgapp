@@ -17,7 +17,7 @@ import { journaliserDispatch } from './dispatchUtils.ts';
 import { getLivreursNotifies } from './dispatchNotifications.ts';
 import { lancerDispatchMulti } from './dispatchEngine.ts';
 import { chargerConfigDispatch, chargerConfigVaguesGPS } from './dispatchConfig.ts';
-import { isV2Enabled, secoursDispatchV2 } from './dispatchV2.ts';
+import { isV2Enabled, secoursDispatchV2, calculerScore } from './dispatchV2.ts';
 import { gererPushGeneralT10 } from './pushGeneralT10.ts';
 
 /** Crée une alerte admin si aucune alerte récente n'existe pour la même course. */
@@ -385,6 +385,111 @@ export async function runWatchdog(base44, body = {}) {
           dispatch_v2_secours_phase: 1,
         });
         corrections.push({ course_id: course.id, action: 'secours_v2_rappel_t5min', pushed: result.pushed });
+      }
+    }
+  }
+
+  // ═══ RAPPEL T+20 MIN — Dernier rappel pour les courses V2 non acceptées ═══
+  // Si une course reste sans livreur 20 minutes après sa première diffusion,
+  // envoyer UN SEUL rappel push aux livreurs éligibles (non refusés, non en course).
+  // Idempotent : push_rappel_t20_envoye = true garantit qu'un même rappel n'est jamais envoyé deux fois.
+  // Ne crée aucune nouvelle DispatchNotification (utilise envoiNotificationPushBatch directement).
+  // Ne modifie pas vue_at, ne modifie pas accepterCourseV2, ne modifie pas Dispatch V2.
+  if (v2Enabled) {
+    for (const course of coursesFil) {
+      // Garde idempotence : ne jamais envoyer le rappel T+20 deux fois
+      if (course.push_rappel_t20_envoye === true) continue;
+
+      // Garde : T+5 secours doit avoir été envoyé (dispatch_v2_secours_phase >= 1)
+      if (Number(course.dispatch_v2_secours_phase || 0) < 1) continue;
+
+      // Garde : ne rien faire si la course a déjà un livreur (acceptation concurrente)
+      if (course.livreur_id || course.accepted_by_livreur_id) continue;
+
+      const sollicitationMs = course.heure_sollicitation
+        ? new Date(course.heure_sollicitation).getTime()
+        : new Date(course.created_date).getTime();
+      const ageMin = (now.getTime() - sollicitationMs) / 60000;
+
+      if (ageMin >= cachedConfig.dispatch.rappelT20DelayMin) {
+        // Récupérer les livreurs éligibles (mêmes critères que secoursDispatchV2)
+        const livreurs = await base44.asServiceRole.entities.Livreur.filter({
+          type_livreur: 'externe',
+          validation: 'valide',
+          actif: true,
+          statut: 'disponible',
+          country_code: course.country_code,
+          bloque_encours: false,
+          manual_hors_ligne: { $ne: true },
+          admin_hors_ligne: { $ne: true },
+        }, '-last_seen_at', 50);
+
+        // Exclure les livreurs en course (fresh check)
+        const coursesActivesT20 = await base44.asServiceRole.entities.CourseExterne.filter(
+          { country_code: course.country_code }, '-created_date', 200
+        ).catch(() => []);
+        const livreursEnCourseT20 = new Set(
+          (coursesActivesT20 || [])
+            .filter((c: any) => STATUTS_ACTIFS_COURSE.includes(c.statut) && c.livreur_id)
+            .map((c: any) => c.livreur_id)
+        );
+
+        // Exclure les livreurs ayant refusé cette course
+        const refusedT20 = await getLivreursRefuses(base44, course.id);
+
+        // Filtrer + scorer + trier + slice top N
+        const candidatsT20 = (livreurs || [])
+          .filter((l: any) => !livreursEnCourseT20.has(l.id) && !refusedT20.includes(l.id) && l.user_email)
+          .map((l: any) => ({ ...l, score: calculerScore(l, course) }))
+          .sort((a: any, b: any) => b.score - a.score)
+          .slice(0, cachedConfig.dispatch.rappelT20NbLivreurs);
+
+        if (candidatsT20.length > 0) {
+          // Envoyer le push via envoiNotificationPushBatch — ne crée PAS de nouvelles
+          // DispatchNotification ni Notification inbox. Met à jour uniquement les
+          // statuts push existants (mettreAJourStatutPush) sans casser vue_at.
+          const batchResult = await base44.asServiceRole.functions.invoke('envoiNotificationPushBatch', {
+            course_id: course.id,
+            livreur_ids: candidatsT20.map((l: any) => l.id),
+            titre: 'Course toujours disponible',
+            message: 'Cette course est toujours disponible. Ouvrez SILGAPP pour la consulter.',
+            type: 'nouvelle_course',
+            dispatch_version: '2',
+          }).catch((err: any) => {
+            console.error('[WATCHDOG] ⚠️ Rappel T+20 push error:', err?.message || String(err));
+            return null;
+          });
+
+          const sent = batchResult?.data?.succes ?? batchResult?.succes ?? 0;
+          console.log(`[WATCHDOG] 📢 Rappel T+20: ${sent} push envoyé(s) pour ${candidatsT20.length} livreur(s) — course ${course.id}`);
+
+          journaliserDispatch(base44, {
+            course_id: course.id,
+            country_code: course.country_code,
+            vague: 0,
+            evenement: 'rappel_t20_envoye',
+            raison_passage: `rappel_tardif_t20 | candidats=${candidatsT20.length} | push_succes=${sent}`,
+            nombre_nouveaux_notifies: candidatsT20.length,
+            livreurs_selectionnes: candidatsT20.map((l: any) => ({
+              id: l.id, nom: `${l.prenom || ''} ${l.nom || ''}`.trim(), score: l.score,
+            })),
+          });
+
+          corrections.push({ course_id: course.id, action: 'rappel_t20_envoye', pushed: candidatsT20.length });
+        } else {
+          journaliserDispatch(base44, {
+            course_id: course.id,
+            country_code: course.country_code,
+            vague: 0,
+            evenement: 'rappel_t20_skip',
+            raison_passage: `0 candidat eligible pour le rappel T+20`,
+          });
+        }
+
+        // Marquer idempotent — qu'il y ait eu des candidats ou non, le rappel est considéré envoyé
+        await base44.asServiceRole.entities.CourseExterne.update(course.id, {
+          push_rappel_t20_envoye: true,
+        });
       }
     }
   }
