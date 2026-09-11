@@ -107,7 +107,10 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
       title: "Nouvelle course SILGAPP",
       body: `${newestCourse.quartier_depart || newestCourse.adresse_depart || "Départ"} vers ${newestCourse.quartier_arrivee || newestCourse.adresse_arrivee || "destination"}`,
     });
-    onNewCourse?.(newCourses.length);
+    onNewCourse?.({
+      count: newCourses.length,
+      course: newestCourse,
+    });
   }, [eligibleCourses, isLoading, onNewCourse]);
 
   // Calculer la distance pour chaque course

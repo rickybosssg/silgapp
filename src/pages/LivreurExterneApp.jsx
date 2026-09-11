@@ -49,6 +49,7 @@ import {
   sameLivreurId,
 } from "@/lib/livreurCourseState";
 import CoursesDisponibles from "@/components/livreur/CoursesDisponibles";
+import CourseArrivalToast from "@/components/livreur/CourseArrivalToast";
 
 // haversineKm importé depuis priceEstimate (source canonique)
 
@@ -124,6 +125,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   const [prixManuelReponse, setPrixManuelReponse] = useState(null); // { accepted, prix, devise }
   const [showMessages, setShowMessages] = useState(false);
   const [hasNewAvailableCourse, setHasNewAvailableCourse] = useState(false);
+  const [arrivalToastData, setArrivalToastData] = useState(null);
   const initialTabSetRef = useRef(false);
 
   const [sessionId, setSessionId] = useState(() => {
@@ -1714,13 +1716,31 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         {activeTab === "disponibles" && (
           <CoursesDisponibles
             livreurProfil={livreurProfil}
-            onNewCourse={() => setHasNewAvailableCourse(true)}
+            onNewCourse={(data) => {
+              setHasNewAvailableCourse(true);
+              setArrivalToastData({
+                courseId: data.course?.id,
+                count: data.count,
+                course: data.course,
+              });
+            }}
             onAcceptSuccess={() => {
               setActiveTab("courses");
               statutMutation.mutate("en_course");
             }}
           />
         )}
+
+        {/* ── Toast visuel V2 : nouvelle course détectée (foreground uniquement) ── */}
+        <CourseArrivalToast
+          courseData={arrivalToastData}
+          onSeeCourses={() => {
+            setArrivalToastData(null);
+            setActiveTab("disponibles");
+            setHasNewAvailableCourse(false);
+          }}
+          onDismiss={() => setArrivalToastData(null)}
+        />
 
         {activeTab === "historique" && (
           <LivreurHistorique mesCourses={mesCourses} livreurProfil={livreurProfil} isExterne={true} />
