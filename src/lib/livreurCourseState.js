@@ -8,7 +8,6 @@ export const ACTIVE_LIVREUR_COURSE_STATUSES = new Set([
   "pris_en_charge",
   "en_livraison",
   "arrivee",
-  "acceptee",
 ]);
 
 export function sameLivreurId(value, livreurId) {
