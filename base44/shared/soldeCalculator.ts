@@ -144,10 +144,20 @@ export async function calculerSoldeLivreur(base44: any, livreurId: string): Prom
   });
 
   // 2. Paiements traités
-  const paiements = await base44.asServiceRole.entities.PaiementSilgapp.filter(
-    { user_id: livreurId, statut: 'traite', type_dette: 'commission_livreur' },
-    '-date_envoi', 500
-  ).catch(() => []);
+  // ⚠️ NE JAMAIS utiliser .catch(() => []) ici — un échec silencieux ferait
+  // remonter le dû au total des commissions (totalPaye = 0 → solde = commissions).
+  // Correction racine 2026-09-11 : si la lecture échoue, on remonte une erreur
+  // explicite au lieu d'écraser le solde avec des données incomplètes.
+  let paiements: any[];
+  try {
+    paiements = await base44.asServiceRole.entities.PaiementSilgapp.filter(
+      { user_id: livreurId, statut: 'traite', type_dette: 'commission_livreur' },
+      '-date_envoi', 500
+    );
+  } catch (err: any) {
+    console.error('[SOLDE] ❌ Erreur lecture PaiementSilgapp — ABORT recalcul (livreur ' + livreurId + '):', err?.message || String(err));
+    throw new Error('Erreur lecture paiements (livreur ' + livreurId + '): ' + (err?.message || String(err)));
+  }
 
   const paiementsForCalc = (paiements || []).filter((p: any) => {
     const d = p.traite_at || p.date_envoi;
@@ -198,9 +208,17 @@ export async function calculerSoldesLivreursBatch(
   const paiementsFilter = countryCode
     ? { statut: 'traite', type_dette: 'commission_livreur', country_code: countryCode }
     : { statut: 'traite', type_dette: 'commission_livreur' };
-  const allPaiements = await base44.asServiceRole.entities.PaiementSilgapp.filter(
-    paiementsFilter, '-date_envoi', 2000
-  ).catch(() => []);
+  // ⚠️ Correction racine 2026-09-11 : pas de .catch(() => []) sur les paiements.
+  // Si la lecture échoue, on remonte une erreur explicite.
+  let allPaiements: any[];
+  try {
+    allPaiements = await base44.asServiceRole.entities.PaiementSilgapp.filter(
+      paiementsFilter, '-date_envoi', 2000
+    );
+  } catch (err: any) {
+    console.error('[SOLDE] ❌ Erreur lecture PaiementSilgapp (batch) — ABORT recalcul:', err?.message || String(err));
+    throw new Error('Erreur lecture paiements (batch): ' + (err?.message || String(err)));
+  }
 
   // 3. Récupérer les livreurs avec base comptable pour filtrage
   const livreurIds = new Set<string>();
