@@ -1065,35 +1065,59 @@ Deno.serve(async (req) => {
 
     return Response.json({ error: 'Action inconnue' }, { status: 400 });
   } catch (error) {
-    const isRateLimit = isTransientInfrastructureError(error);
+    const isInfraError = isTransientInfrastructureError(error);
     const isAuthError = error.message?.includes(AUTH_ERROR_SIGNATURE);
     // 🛡️ Les erreurs auth et infra transitoires ont déjà été retentées par withAuthRetry.
     // Si on arrive ici, toutes les tentatives autorisées ont échoué.
     // → L'alerte n'est créée QUE si tous les retries ont échoué (pas de recovery).
-    console.error(`[DISPATCH] STEP_FAILED=dispatchExterneAuto.catch Erreur fatale${isRateLimit ? ' (INFRA_EXHAUSTED)' : ''}${isAuthError ? ' (AUTH_EXHAUSTED)' : ''}:`, error.message);
+
+    // ── Classification technique légère (sans appel API supplémentaire) ──
+    // Permet d'identifier la cause exacte lors du diagnostic sans affirmer
+    // "rate limit" sans preuve. Le log console est capturé par la plateforme.
+    const errorClass = isAuthError
+      ? 'AUTH_EXHAUSTED'
+      : isInfraError
+        ? ((): string => {
+            const msg = (error?.message || String(error)).toLowerCase();
+            if (msg.includes('429') || msg.includes('rate limit') || msg.includes('rate_limit')) return 'RATE_LIMIT_429';
+            if (msg.includes('timeout') || msg.includes('etimedout')) return 'TIMEOUT';
+            if (msg.includes('econnreset') || msg.includes('econnrefused') || msg.includes('network error')) return 'NETWORK';
+            if (msg.includes('fetch failed')) return 'FETCH_FAILED';
+            if (msg.includes('mongodb.net') || msg.includes('connecttimeout')) return 'DB_TIMEOUT';
+            return 'INFRA_OTHER';
+          })()
+        : 'FATAL';
+    const httpStatus = error?.response?.status || error?.statusCode || null;
+    const body = await req.json().catch(() => ({}));
+    console.error(`[DISPATCH] STEP_FAILED=dispatchExterneAuto.catch class=${errorClass} http=${httpStatus} action=${body?.action || 'unknown'} course_id=${body?.course_id || 'none'} msg="${error?.message || String(error)}"`);
+
     try {
       const base44 = createClientFromRequest(req);
-      // 🛡️ Anti-spam atomique : utilise une deduplication_key pour empêcher
-      // la race condition où 2 invocations concurrentes créent chacune une alerte.
-      // La deduplication_key bloque le 2e create si le 1er est déjà en vol.
-      const alertWindow = isRateLimit ? 60 * 60 * 1000 : 5 * 60 * 1000;
-      const dedupKey = isRateLimit
+      // 🛡️ Anti-spam : déduplication par deduplication_key + fenêtre temporelle.
+      // IMPORTANT : ne PAS filtrer par lue=false — une alerte lue ne doit pas
+      // permettre la recréation d'une nouvelle alerte pour la même fenêtre.
+      const alertWindow = isInfraError ? 60 * 60 * 1000 : 5 * 60 * 1000;
+      const dedupKey = isInfraError
         ? `ALERT_INFRA_${new Date().toISOString().slice(0, 13)}` // Heure précise — 1 alerte/heure max
         : `ALERT_FATAL_${new Date().toISOString().slice(0, 16)}`; // Minute précise — 1 alerte/5min max
 
-      const existingAlert = await base44.asServiceRole.entities.Notification.filter({
-        deduplication_key: dedupKey, lue: false,
+      const existingAlerts = await base44.asServiceRole.entities.Notification.filter({
+        deduplication_key: dedupKey,
       }, '-created_date', 1);
 
-      const hasRecent = existingAlert?.[0] && (Date.now() - new Date(existingAlert[0].created_date).getTime()) < alertWindow;
+      const hasRecent = existingAlerts?.[0] && (Date.now() - new Date(existingAlerts[0].created_date).getTime()) < alertWindow;
       if (!hasRecent) {
-        const msg = isRateLimit
-          ? `Le moteur de dispatch a atteint la limite d'appels API (rate limit). Cela est transitoire — le prochain tick reprendra automatiquement. Si le problème persiste, contactez le support.`
+        // ── Libellé générique : ne pas affirmer "rate limit" sans preuve ──
+        // La classification exacte est dans le log console (errorClass), pas dans
+        // l'alerte admin. L'admin voit un message générique ; le diagnostic
+        // se fait via les logs techniques.
+        const msg = isInfraError
+          ? `Le moteur de dispatch a rencontré une erreur technique temporaire (class=${errorClass}). Le prochain cycle reprendra automatiquement.`
           : isAuthError
-            ? `Le moteur de dispatch a échoué après ${MAX_AUTH_RETRIES + 1} tentatives: ${error.message}. Les courses ne sont plus relancées automatiquement. Intervention requise.`
-            : `Le moteur de dispatch a crashé: ${error.message}. Les courses ne sont plus relancées automatiquement. Intervention requise.`;
+            ? `Le moteur de dispatch a échoué après ${MAX_AUTH_RETRIES + 1} tentatives (class=${errorClass}). Les courses ne sont plus relancées automatiquement. Intervention requise.`
+            : `Le moteur de dispatch a crashé (class=${errorClass}). Les courses ne sont plus relancées automatiquement. Intervention requise.`;
         await base44.asServiceRole.entities.Notification.create({
-          titre: isRateLimit ? '⚠️ Surcharge API temporaire — dispatch' : '🚨 Erreur fatale — dispatch automatique',
+          titre: isInfraError ? '⚠️ Incident API temporaire — dispatch' : '🚨 Erreur fatale — dispatch automatique',
           message: msg,
           type: 'alerte_critique_dispatch',
           lue: false,

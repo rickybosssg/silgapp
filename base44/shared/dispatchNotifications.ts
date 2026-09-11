@@ -287,12 +287,22 @@ export async function enregistrerNotificationsBulk(base44, courseId, candidats, 
     }
 
     // 3. Déterminer en mémoire les candidats manquants (idempotence)
+    // ── OPTIMISATION (2026-09-11) : ne pas créer de DispatchNotification pour
+    //    les livreurs sans token FCM. Ces enregistrements (statut='sans_token')
+    //    n'étaient lus par AUCUN écran/comptage métier :
+    //      - Le feed Courses disponibles interroge CourseExterne directement
+    //      - L'éligibilité utilise CourseExterne + refusedCourseIds (statut='refuse')
+    //      - marquerRefuse() ne filtre que statut='notifie' → sans_token ignoré
+    //      - envoiNotificationPushBatch gère son propre lookup de tokens
+    //    Économie : ~95 % des bulkCreate supprimés (83/87 enregistrements en moyenne).
+    //    IMPORTANT : le livreur sans token reste dans `candidats` → inbox Notification
+    //    et feed CourseExterne inchangés. Il voit toujours la course dans l'app.
     const toCreate = [];
     for (const livreur of candidats) {
       if (existingIds.has(livreur.id)) continue; // déjà notifié — pas de doublon
 
       const hasToken = livreursWithToken.has(livreur.id);
-      const statut = hasToken ? 'notifie' : 'sans_token';
+      if (!hasToken) continue; // pas de token FCM → pas de DispatchNotification (push impossible)
 
       toCreate.push({
         course_id: courseId,
@@ -300,7 +310,7 @@ export async function enregistrerNotificationsBulk(base44, courseId, candidats, 
         livreur_user_email: livreur.user_email || null,
         country_code: livreur.country_code || options.country_code || '',
         vague: vague || 1,
-        statut,
+        statut: 'notifie',
         distance_km: livreur.distance != null ? Number(livreur.distance.toFixed(2)) : null,
         gps_age_min: livreur.gpsAgeMin != null ? Number(livreur.gpsAgeMin.toFixed(1)) : null,
         priorite_dispatch: livreur.priorite_dispatch || 0,
