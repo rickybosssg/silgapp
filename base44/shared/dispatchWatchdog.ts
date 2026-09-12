@@ -362,9 +362,13 @@ export async function runWatchdog(base44, body = {}) {
   // Après acceptation : aucun push (la course n'est plus disponible_push).
   // Pas de T+20s, pas de priorité temporelle, pas de cycle_epuise.
   const v2Enabled = await isV2Enabled(base44);
-  if (v2Enabled) {
-    const coursesFil = courses.filter(c => c.dispatch_status === 'disponible_push' && c.statut === 'recherche_livreur');
+  // 📌 coursesFil est défini dans une portée COMMUNE (avant les deux blocs T+5 et T+20)
+  // pour éviter ReferenceError. Les critères de filtre sont strictement identiques.
+  const coursesFil = v2Enabled
+    ? courses.filter(c => c.dispatch_status === 'disponible_push' && c.statut === 'recherche_livreur')
+    : [];
 
+  if (v2Enabled) {
     for (const course of coursesFil) {
       const secoursPhase = Number(course.dispatch_v2_secours_phase || 0);
       if (secoursPhase >= 1) continue; // Rappel déjà envoyé — ne pas re-notifier
