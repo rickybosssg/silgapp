@@ -141,9 +141,11 @@ async function withAuthRetry(req: Request, stepName: string, fn: (base44: any) =
 // HANDLER PRINCIPAL
 // ============================================================================
 Deno.serve(async (req) => {
+  let parsedBody: any = null;
   try {
     const base44 = createClientFromRequest(req);
-    const body = await req.json();
+    parsedBody = await req.json();
+    const body = parsedBody;
     let { action, course_id, livreur_id, raison } = body;
 
     // Déclenchement depuis automation entity
@@ -1102,7 +1104,7 @@ Deno.serve(async (req) => {
           })()
         : 'FATAL';
     const httpStatus = error?.response?.status || error?.statusCode || null;
-    const body = await req.json().catch(() => ({}));
+    const body = parsedBody || {};
     console.error(`[DISPATCH] STEP_FAILED=dispatchExterneAuto.catch class=${errorClass} http=${httpStatus} action=${body?.action || 'unknown'} course_id=${body?.course_id || 'none'} msg="${error?.message || String(error)}"`);
 
     try {

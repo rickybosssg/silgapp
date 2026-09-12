@@ -21,12 +21,12 @@ import { isV2Enabled, secoursDispatchV2, calculerScore } from './dispatchV2.ts';
 import { gererPushGeneralT10 } from './pushGeneralT10.ts';
 
 /** Crée une alerte admin si aucune alerte récente n'existe pour la même course. */
-async function createAdminAlert(base44, titre, message, courseId) {
+async function createAdminAlert(base44, titre, message, courseId, alertDedupMs = 5 * 60 * 1000) {
   try {
     const recent = await base44.asServiceRole.entities.Notification.filter({
       type: 'alerte_critique_dispatch', course_id: courseId, lue: false,
     }, '-created_date', 1);
-    if (recent?.[0] && (Date.now() - new Date(recent[0].created_date).getTime()) < ALERT_DEDUP_MS) {
+    if (recent?.[0] && (Date.now() - new Date(recent[0].created_date).getTime()) < alertDedupMs) {
       return; // Alert déjà envoyée récemment — skip
     }
     await base44.asServiceRole.entities.Notification.create({
@@ -133,7 +133,8 @@ export async function runWatchdog(base44, body = {}) {
     await createAdminAlert(base44,
       '🚨 Watchdog: Course nouvelle jamais traitée',
       `Course ${course.client_nom || '?'} (${course.adresse_depart || '?'}) — nouvelle depuis ${ageMin}min sans notification. Automation create a échoué. Dispatch forcé.`,
-      course.id
+      course.id,
+      ALERT_DEDUP_MS
     );
     await new Promise(r => setTimeout(r, 100));
   }
@@ -160,7 +161,8 @@ export async function runWatchdog(base44, body = {}) {
     await createAdminAlert(base44,
       '🚨 Watchdog: Course en recherche sans vague active',
       `Course ${course.client_nom || '?'} (${course.adresse_depart || '?'}) — en_attente depuis ${ageMin}min sans vague. Automation update a échoué. Dispatch forcé.`,
-      course.id
+      course.id,
+      ALERT_DEDUP_MS
     );
     await new Promise(r => setTimeout(r, 100));
   }

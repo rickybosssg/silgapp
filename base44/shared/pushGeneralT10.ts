@@ -369,7 +369,7 @@ async function marquerCourseCouverte(base44, courseId, ts) {
  * Journalise un événement T+10 à la fois en console.log ET en DispatchLog persistant.
  * Permet de tracer exactement à quelle étape le flux s'arrête pour chaque course.
  */
-function logEvent(event, data) {
+function logEvent(base44, event, data) {
   const ts = new Date().toISOString();
   console.log(`${LOG_PREFIX} ${event}`, {
     country_code: data.country_code,
@@ -384,21 +384,23 @@ function logEvent(event, data) {
 
   // ── Journalisation persistante dans DispatchLog ──
   try {
-    journaliserDispatch(null, {
-      course_id: data.course_ids?.[0] || '',
-      evenement: event,
-      raison_passage: [
-        `country:${data.country_code || 'ALL'}`,
-        `step:${data.step || event}`,
-        `courses:${data.nombre_courses || 0}`,
-        `destinataires:${data.nombre_destinataires || 0}`,
-        `push_succes:${data.nombre_push_succes || 0}`,
-        ...(data.message ? [`msg:${data.message}`] : []),
-        ...(data.course_ids ? [`ids:${data.course_ids.join(',')}`] : []),
-      ].join(' | '),
-      country_code: data.country_code || '',
-      total_candidats: data.nombre_courses || 0,
-    });
+    if (base44) {
+      journaliserDispatch(base44, {
+        course_id: data.course_ids?.[0] || '',
+        evenement: event,
+        raison_passage: [
+          `country:${data.country_code || 'ALL'}`,
+          `step:${data.step || event}`,
+          `courses:${data.nombre_courses || 0}`,
+          `destinataires:${data.nombre_destinataires || 0}`,
+          `push_succes:${data.nombre_push_succes || 0}`,
+          ...(data.message ? [`msg:${data.message}`] : []),
+          ...(data.course_ids ? [`ids:${data.course_ids.join(',')}`] : []),
+        ].join(' | '),
+        country_code: data.country_code || '',
+        total_candidats: data.nombre_courses || 0,
+      });
+    }
   } catch (logErr) {
     console.error(`${LOG_PREFIX} Erreur journalisation persistante:`, logErr?.message);
   }
@@ -408,7 +410,7 @@ function logEvent(event, data) {
  * Journalise une exception T+10 avec le step exact et le message d'erreur.
  */
 function logException(base44, step, message, countryCode, courseIds) {
-  logEvent('PUSH_GENERAL_T10_EXCEPTION', {
+  logEvent(base44, 'PUSH_GENERAL_T10_EXCEPTION', {
     country_code: countryCode || 'ALL',
     step,
     message: message || '',
@@ -500,7 +502,7 @@ export async function gererPushGeneralT10(base44, delayMin = DEFAULT_T10_DELAY_M
 
   // ── EXCEPTION GUARD : englobe tout le flux pour ne jamais masquer une erreur ──
   try {
-    logEvent('PUSH_GENERAL_T10_START', {
+    logEvent(base44, 'PUSH_GENERAL_T10_START', {
       country_code: 'ALL',
       step: 'start',
       nombre_courses: 0,
@@ -559,7 +561,7 @@ export async function gererPushGeneralT10(base44, delayMin = DEFAULT_T10_DELAY_M
       coursesEligibles.push(course);
     }
 
-    logEvent('PUSH_GENERAL_T10_ELIGIBLE_COURSES', {
+    logEvent(base44, 'PUSH_GENERAL_T10_ELIGIBLE_COURSES', {
       country_code: 'ALL',
       step: 'eligible_courses',
       nombre_courses: coursesEligibles.length,
@@ -569,7 +571,7 @@ export async function gererPushGeneralT10(base44, delayMin = DEFAULT_T10_DELAY_M
     });
 
     if (coursesEligibles.length === 0) {
-      logEvent(LOG_PUSH_GENERAL_T10_NO_COURSE, {
+      logEvent(base44, LOG_PUSH_GENERAL_T10_NO_COURSE, {
         country_code: 'ALL',
         step: 'no_course',
         nombre_courses: 0,
@@ -594,7 +596,7 @@ export async function gererPushGeneralT10(base44, delayMin = DEFAULT_T10_DELAY_M
       // ── 4a. Acquérir le lock anti-concurrence ──
       const lockResult = await acquireCountryLock(base44, countryCode);
       if (!lockResult.acquired) {
-        logEvent(LOG_PUSH_GENERAL_T10_ALREADY_HANDLED, {
+        logEvent(base44, LOG_PUSH_GENERAL_T10_ALREADY_HANDLED, {
           country_code: countryCode,
           step: 'lock_failed',
           nombre_courses: courses.length,
@@ -607,7 +609,7 @@ export async function gererPushGeneralT10(base44, delayMin = DEFAULT_T10_DELAY_M
       }
 
       const invocationId = lockResult.invocationId;
-      logEvent('PUSH_GENERAL_T10_LOCK_ACQUIRED', {
+      logEvent(base44, 'PUSH_GENERAL_T10_LOCK_ACQUIRED', {
         country_code: countryCode,
         step: 'lock_acquired',
         nombre_courses: courses.length,
@@ -626,7 +628,7 @@ export async function gererPushGeneralT10(base44, delayMin = DEFAULT_T10_DELAY_M
           for (const course of courses) {
             await marquerCourseCouverte(base44, course.id, now);
           }
-          logEvent(LOG_PUSH_GENERAL_T10_COOLDOWN, {
+          logEvent(base44, LOG_PUSH_GENERAL_T10_COOLDOWN, {
             country_code: countryCode,
             step: 'cooldown',
             nombre_courses: courses.length,
@@ -658,7 +660,7 @@ export async function gererPushGeneralT10(base44, delayMin = DEFAULT_T10_DELAY_M
         );
 
         if (validCourses.length === 0) {
-          logEvent(LOG_PUSH_GENERAL_T10_NO_COURSE, {
+          logEvent(base44, LOG_PUSH_GENERAL_T10_NO_COURSE, {
             country_code: countryCode,
             step: 'no_valid_course_after_revalidation',
             nombre_courses: 0,
@@ -673,7 +675,7 @@ export async function gererPushGeneralT10(base44, delayMin = DEFAULT_T10_DELAY_M
         const destinataires = await getLivreursDestinataires(base44, countryCode);
 
         if (destinataires.length === 0) {
-          logEvent(LOG_PUSH_GENERAL_T10_NO_RECIPIENT, {
+          logEvent(base44, LOG_PUSH_GENERAL_T10_NO_RECIPIENT, {
             country_code: countryCode,
             step: 'no_recipient',
             nombre_courses: validCourses.length,
@@ -685,7 +687,7 @@ export async function gererPushGeneralT10(base44, delayMin = DEFAULT_T10_DELAY_M
           continue;
         }
 
-        logEvent('PUSH_GENERAL_T10_RECIPIENTS_FOUND', {
+        logEvent(base44, 'PUSH_GENERAL_T10_RECIPIENTS_FOUND', {
           country_code: countryCode,
           step: 'recipients_found',
           nombre_courses: validCourses.length,
@@ -703,7 +705,7 @@ export async function gererPushGeneralT10(base44, delayMin = DEFAULT_T10_DELAY_M
         const livreurIds = destinataires.map(l => l.id);
 
         // ── 4f. Envoyer le push via le système existant ──
-        logEvent('PUSH_GENERAL_T10_FCM_START', {
+        logEvent(base44, 'PUSH_GENERAL_T10_FCM_START', {
           country_code: countryCode,
           step: 'fcm_start',
           nombre_courses: validCourses.length,
@@ -733,7 +735,7 @@ export async function gererPushGeneralT10(base44, delayMin = DEFAULT_T10_DELAY_M
             console.error(`${LOG_PREFIX} Échec push batch: 0/${destinataires.length} push réussis pour ${countryCode}`);
           }
 
-          logEvent('PUSH_GENERAL_T10_FCM_RESULT', {
+          logEvent(base44, 'PUSH_GENERAL_T10_FCM_RESULT', {
             country_code: countryCode,
             step: 'fcm_result',
             nombre_courses: validCourses.length,
@@ -752,7 +754,7 @@ export async function gererPushGeneralT10(base44, delayMin = DEFAULT_T10_DELAY_M
           // ÉCHEC FCM : NE PAS marquer push_general_t10_envoye=true
           // Les courses pourront être retentées au prochain tick (sous réserve du cooldown).
           // On ne met PAS à jour le last_sent du pays non plus, car aucun push n'a été envoyé.
-          logEvent('PUSH_GENERAL_T10_FCM_FAILED', {
+          logEvent(base44, 'PUSH_GENERAL_T10_FCM_FAILED', {
             country_code: countryCode,
             step: 'fcm_failed',
             nombre_courses: validCourses.length,
@@ -780,7 +782,7 @@ export async function gererPushGeneralT10(base44, delayMin = DEFAULT_T10_DELAY_M
         await setCountryLastSent(base44, countryCode, now);
 
         // ── 4i. Journaliser ──
-        logEvent(LOG_PUSH_GENERAL_T10_SENT, {
+        logEvent(base44, LOG_PUSH_GENERAL_T10_SENT, {
           country_code: countryCode,
           step: 'sent',
           nombre_courses: validCourses.length,
