@@ -1099,9 +1099,21 @@ export default function CourseStepForm({
     const lng1 = formData.gps_depart_lng;
     const lat2 = formData.gps_arrivee_lat;
     const lng2 = formData.gps_arrivee_lng;
-    const estimation = (lat1 && lng1 && lat2 && lng2)
-      ? calculerPrixApproximatif(lat1, lng1, lat2, lng2, activeCountry)
-      : null;
+    // ── Source unique : distance ORS déjà calculée dans _tarifGrandOuaga ──
+    // Aucun deuxième appel ORS — on réutilise le résultat du useEffect ligne 414.
+    // Fallback Haversine uniquement si ORS n'a pas encore répondu ou a échoué.
+    const tarifRoute = formData._tarifGrandOuaga;
+    const estimation = tarifRoute
+      ? {
+          prix: tarifRoute.prix,
+          distance: tarifRoute.distanceKm,
+          devise: tarifRoute.devise,
+          isRoute: tarifRoute.distanceSource === "ors",
+          isHorsTarif: !tarifRoute.prix,
+        }
+      : (lat1 && lng1 && lat2 && lng2)
+        ? { ...calculerPrixApproximatif(lat1, lng1, lat2, lng2, activeCountry), isRoute: false, isHorsTarif: false }
+        : null;
 
     const typesColis = [
       { value: "petit_colis", label: "Petit colis", icon: "", desc: "< 2 kg" },
@@ -1201,7 +1213,12 @@ export default function CourseStepForm({
                 >
                   <Info className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: COLORS.secondary }} />
                   <p className="text-xs" style={{ color: COLORS.secondary }}>
-                    Estimation GPS indicative : ~{estimation.prix.toLocaleString()} {countryDevise} ({estimation.distance} km).
+                    {estimation.isHorsTarif
+                      ? `Distance par route : ${estimation.distance} km. Tarif personnalisé requis.`
+                      : estimation.isRoute
+                        ? `Distance par route : ${estimation.distance} km — Tarif indicatif : ~${estimation.prix.toLocaleString()} ${countryDevise}.`
+                        : `Distance estimée : ${estimation.distance} km — Tarif indicatif : ~${estimation.prix.toLocaleString()} ${countryDevise}.`
+                    }
                     Le prix reste librement choisi par vous.
                   </p>
                 </div>
