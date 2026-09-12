@@ -20,6 +20,7 @@ import NombreColisSelector from "@/components/multi-colis/NombreColisSelector";
 import MultiColisFormStep from "@/components/multi-colis/MultiColisFormStep";
 import SmartAddressInput from "@/components/location/SmartAddressInput";
 import { useCountryPricing } from "@/hooks/useCountryPricing";
+import { resolveGpsFromSelection } from "@/lib/resolveGpsFromSelection";
 
 // ─── Palette premium ─────────────────────────────────────────────────────────
 // Vert émeraude #059669 — Bleu ardoise #1E293B — Fond #F8FAFC
@@ -483,6 +484,11 @@ export default function CourseStepForm({
 
   const updateAddress = (side, text, location) => {
     const isDeparture = side === "depart";
+    const latField = isDeparture ? "gps_depart_lat" : "gps_arrivee_lat";
+    const lngField = isDeparture ? "gps_depart_lng" : "gps_arrivee_lng";
+    const sourceField = isDeparture ? "gps_depart_source" : "gps_arrivee_source";
+
+    // Coordonnées immédiates depuis l'item sélectionné
     setFormData((previous) => ({
       ...previous,
       [isDeparture ? "adresse_depart" : "adresse_arrivee"]: text,
@@ -490,12 +496,27 @@ export default function CourseStepForm({
         location?.quartier || (location ? location.label : text),
       ...(location && Number.isFinite(Number(location.latitude)) && Number.isFinite(Number(location.longitude))
         ? {
-            [isDeparture ? "gps_depart_lat" : "gps_arrivee_lat"]: Number(location.latitude),
-            [isDeparture ? "gps_depart_lng" : "gps_arrivee_lng"]: Number(location.longitude),
+            [latField]: Number(location.latitude),
+            [lngField]: Number(location.longitude),
+            [sourceField]: location?.type === "quartier" ? "quartier" : "geocodage",
             [isDeparture ? "recuperationGPS" : "livraisonGPS"]: true,
           }
         : {}),
     }));
+
+    // Si un quartier a été sélectionné, essayer de géocoder pour des coordonnées précises
+    // Le quartier ne doit servir que de fallback — ORS doit recevoir des coordonnées exactes
+    if (location?.type === "quartier" && location.latitude && location.longitude && activeCountry) {
+      resolveGpsFromSelection(location, activeCountry).then((resolved) => {
+        if (!resolved || resolved.source !== "geocodage") return;
+        setFormData((prev) => ({
+          ...prev,
+          [latField]: resolved.lat,
+          [lngField]: resolved.lng,
+          [sourceField]: resolved.source,
+        }));
+      });
+    }
   };
 
   // ─── Auto-remplir le prix proposé avec l'estimation GPS (conseil uniquement) ──

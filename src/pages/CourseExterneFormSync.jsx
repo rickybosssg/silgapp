@@ -728,12 +728,14 @@ export default function CourseExterneFormSync() {
       exactLng: formData.gps_depart_lng,
       quartierName: (formData.quartier_depart || "").trim(),
       quartiers: quartiersList,
+      source: formData.gps_depart_source || null,
     });
     const arriveeGps = isMulti ? null : resolveGpsForCourse({
       exactLat: gpsArriveLat,
       exactLng: gpsArriveLng,
       quartierName: (formData.quartier_arrivee || "").trim(),
       quartiers: quartiersList,
+      source: formData.gps_arrivee_source || null,
     });
 
     // ── Gestion des ambiguïtés : ne jamais choisir silencieusement ──
