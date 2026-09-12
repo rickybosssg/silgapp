@@ -14,7 +14,7 @@
 
 import { STATUTS_ACTIFS_COURSE, STATUTS_ACTIFS_VERIF } from './dispatchConstants.ts';
 import { journaliserDispatch } from './dispatchUtils.ts';
-import { getLivreursNotifies } from './dispatchNotifications.ts';
+import { getLivreursNotifies, getLivreursRefuses } from './dispatchNotifications.ts';
 import { lancerDispatchMulti } from './dispatchEngine.ts';
 import { chargerConfigDispatch, chargerConfigVaguesGPS } from './dispatchConfig.ts';
 import { isV2Enabled, secoursDispatchV2, calculerScore } from './dispatchV2.ts';
