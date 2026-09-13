@@ -19,6 +19,7 @@ import NombreColisSelector from "@/components/multi-colis/NombreColisSelector";
 import MultiColisFormStep from "@/components/multi-colis/MultiColisFormStep";
 import SmartAddressInput from "@/components/location/SmartAddressInput";
 import { useCountryPricing } from "@/hooks/useCountryPricing";
+import { resolveGpsFromSelection } from "@/lib/resolveGpsFromSelection";
 
 // ─── Palette premium ─────────────────────────────────────────────────────────
 // Vert émeraude #059669 — Bleu ardoise #1E293B — Fond #F8FAFC
@@ -461,6 +462,10 @@ export default function CourseStepForm({
 
   const updateAddress = (side, text, location) => {
     const isDeparture = side === "depart";
+    const latField = isDeparture ? "gps_depart_lat" : "gps_arrivee_lat";
+    const lngField = isDeparture ? "gps_depart_lng" : "gps_arrivee_lng";
+    const sourceField = isDeparture ? "gps_depart_source" : "gps_arrivee_source";
+
     setFormData((previous) => ({
       ...previous,
       [isDeparture ? "adresse_depart" : "adresse_arrivee"]: text,
@@ -468,12 +473,25 @@ export default function CourseStepForm({
         location?.quartier || (location ? location.label : text),
       ...(location && Number.isFinite(Number(location.latitude)) && Number.isFinite(Number(location.longitude))
         ? {
-            [isDeparture ? "gps_depart_lat" : "gps_arrivee_lat"]: Number(location.latitude),
-            [isDeparture ? "gps_depart_lng" : "gps_arrivee_lng"]: Number(location.longitude),
+            [latField]: Number(location.latitude),
+            [lngField]: Number(location.longitude),
+            [sourceField]: location?.type === "quartier" ? "quartier" : "geocodage",
             [isDeparture ? "recuperationGPS" : "livraisonGPS"]: true,
           }
         : {}),
     }));
+
+    if (location?.type === "quartier" && location.latitude && location.longitude && activeCountry) {
+      resolveGpsFromSelection(location, activeCountry).then((resolved) => {
+        if (!resolved || resolved.source !== "geocodage") return;
+        setFormData((prev) => ({
+          ...prev,
+          [latField]: resolved.lat,
+          [lngField]: resolved.lng,
+          [sourceField]: resolved.source,
+        }));
+      });
+    }
   };
 
   // ─── Auto-remplir le prix proposé avec l'estimation GPS (conseil uniquement) ──
@@ -1077,9 +1095,18 @@ export default function CourseStepForm({
     const lng1 = formData.gps_depart_lng;
     const lat2 = formData.gps_arrivee_lat;
     const lng2 = formData.gps_arrivee_lng;
-    const estimation = (lat1 && lng1 && lat2 && lng2)
-      ? calculerPrixApproximatif(lat1, lng1, lat2, lng2, activeCountry)
-      : null;
+    const tarifRoute = formData._tarifGrandOuaga;
+    const estimation = tarifRoute
+      ? {
+          prix: tarifRoute.prix,
+          distance: tarifRoute.distanceKm,
+          devise: tarifRoute.devise,
+          isRoute: tarifRoute.distanceSource === "ors",
+          isHorsTarif: !tarifRoute.prix,
+        }
+      : (lat1 && lng1 && lat2 && lng2)
+        ? { ...calculerPrixApproximatif(lat1, lng1, lat2, lng2, activeCountry), isRoute: false, isHorsTarif: false }
+        : null;
 
     const typesColis = [
       { value: "petit_colis", label: "Petit colis", icon: "", desc: "< 2 kg" },

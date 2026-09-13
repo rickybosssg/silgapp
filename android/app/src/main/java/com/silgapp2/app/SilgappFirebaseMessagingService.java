@@ -40,7 +40,7 @@ import java.util.UUID;
 
 public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
     private static final String CHANNEL_ID = "silgapp_courses_official_v2";
-    private static final long DISPATCH_V2_ALERT_DURATION_MS = 10000L;
+    private static final long DISPATCH_V2_ALERT_DURATION_MS = 20000L;
     private static final String DEFAULT_CHANNEL_ID = "silgapp_default";
     private static final long DEFAULT_DURATION_MS = 300000L;
     private static final long DEFAULT_INTERVAL_MS = 5000L;

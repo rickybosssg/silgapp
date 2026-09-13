@@ -26,10 +26,24 @@ import { resolveQuartier } from "@/lib/quartierResolver";
  * @param {Array} params.quartiers - Liste des quartiers (entity Quartier) pour le pays
  * @returns {{ lat: number, lng: number, source: string } | null}
  */
-export function resolveGpsForCourse({ exactLat, exactLng, quartierName, quartiers }) {
-  // A — GPS exact disponible
+export function resolveGpsForCourse({ exactLat, exactLng, quartierName, quartiers, source }) {
+  // A — GPS exact disponible (source "exact" ou "geocodage")
   if (exactLat && exactLng && isFinite(exactLat) && isFinite(exactLng)) {
-    return { lat: exactLat, lng: exactLng, source: "exact" };
+    // Si la source est "quartier", les coordonnées sont approximatives
+    // et ne doivent pas être traitées comme GPS exact.
+    if (source === "quartier") {
+      if (quartierName && quartiers && quartiers.length > 0) {
+        const result = resolveQuartier(quartierName, quartiers);
+        if (result.ambiguous) {
+          return { ambiguous: true, suggestions: result.suggestions };
+        }
+        if (result.match && result.match.latitude && result.match.longitude) {
+          return { lat: result.match.latitude, lng: result.match.longitude, source: "quartier" };
+        }
+      }
+      return { lat: exactLat, lng: exactLng, source: "quartier" };
+    }
+    return { lat: exactLat, lng: exactLng, source: source || "exact" };
   }
 
   // B — Quartier reconnu → utiliser ses coordonnées

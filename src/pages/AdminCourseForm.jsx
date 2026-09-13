@@ -16,6 +16,7 @@ import { upsertClientsFromCourseContacts, normalizePhone } from "@/lib/crmUtils"
 import { calculerPrixApproximatif } from "@/lib/priceEstimate";
 import { isPaysTarificationGrandOuaga, calculerTarifGrandOuagaAsync } from "@/lib/tarifGrandOuaga";
 import { resolveGpsForCourse, GPS_BLOCK_MESSAGE } from "@/lib/gpsResolution";
+import { resolveGpsFromSelection } from "@/lib/resolveGpsFromSelection";
 
 const DRAFT_KEY = "silgapp_admin_course_draft";
 
@@ -330,12 +331,14 @@ export default function AdminCourseForm() {
         exactLng: gpsDepart?.lng,
         quartierName: quartierDepart,
         quartiers,
+        source: gpsDepartSource || null,
       });
       const arriveeGps = resolveGpsForCourse({
         exactLat: gpsArrivee?.lat,
         exactLng: gpsArrivee?.lng,
         quartierName: quartierArrivee,
         quartiers,
+        source: gpsArriveeSource || null,
       });
 
       // ── Gestion des ambiguïtés : ne jamais choisir silencieusement ──
@@ -748,11 +751,14 @@ export default function AdminCourseForm() {
                 role="depart"
                 value={adresseDepart}
                 onChange={setAdresseDepart}
-                onSelect={(r) => {
+                onSelect={async (r) => {
                   if (r?.latitude && r?.longitude) {
-                    setGpsDepart({ lat: r.latitude, lng: r.longitude });
-                    setGpsDepartSource("geocodage");
-                    if (r.quartier) setQuartierDepart(r.quartier);
+                    const resolved = await resolveGpsFromSelection(r, countryCode);
+                    if (resolved) {
+                      setGpsDepart({ lat: resolved.lat, lng: resolved.lng });
+                      setGpsDepartSource(resolved.source);
+                      if (resolved.quartier) setQuartierDepart(resolved.quartier);
+                    }
                   }
                 }}
                 countryCode={countryCode}
@@ -789,11 +795,14 @@ export default function AdminCourseForm() {
                 role="arrivee"
                 value={adresseArrivee}
                 onChange={setAdresseArrivee}
-                onSelect={(r) => {
+                onSelect={async (r) => {
                   if (r?.latitude && r?.longitude) {
-                    setGpsArrivee({ lat: r.latitude, lng: r.longitude });
-                    setGpsArriveeSource("geocodage");
-                    if (r.quartier) setQuartierArrivee(r.quartier);
+                    const resolved = await resolveGpsFromSelection(r, countryCode);
+                    if (resolved) {
+                      setGpsArrivee({ lat: resolved.lat, lng: resolved.lng });
+                      setGpsArriveeSource(resolved.source);
+                      if (resolved.quartier) setQuartierArrivee(resolved.quartier);
+                    }
                   }
                 }}
                 countryCode={countryCode}

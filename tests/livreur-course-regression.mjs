@@ -112,7 +112,7 @@ assert.doesNotMatch(courseActiveCardSource, /CourseExterne\.(?:create|update|del
 assert.match(finaliserLivraisonSource, /course\.statut === 'livree' && \(!isAdminCourse \|\| hasFinancialData\)/, "une course livree avec sa repartition doit rester idempotente");
 assert.match(finaliserLivraisonSource, /const hasFinancialData[\s\S]*commission_silga[\s\S]*montant_livreur/, "la reprise financiere Admin doit verifier les deux montants calcules");
 assert.match(dispatchWatchdogSource, /deadlineMs === 0 && course\.dispatch_status === 'disponible_push'/, "le watchdog ne doit pas retirer prematurement une course V2");
-assert.match(nativePushSource, /DISPATCH_V2_ALERT_DURATION_MS\s*=\s*10000L/, "l'alerte native V2 doit durer dix secondes");
+assert.match(nativePushSource, /DISPATCH_V2_ALERT_DURATION_MS\s*=\s*20000L/, "l'alerte native V2 doit durer vingt secondes");
 assert.match(nativePushSource, /playNotificationSound\(context, false\)/, "la sonnerie native V2 ne doit pas boucler");
 assert.doesNotMatch(nativePushSource, /setFullScreenIntent\(/, "la notification V2 ne doit pas ouvrir MainActivity automatiquement");
 assert.doesNotMatch(mainActivitySource, /void onResume\(\)[\s\S]*stopUrgentCourseAlert/, "reprendre l'app ne doit pas tronquer l'alerte V2");
