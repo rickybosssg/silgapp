@@ -355,12 +355,14 @@ export default function AdminCourseForm() {
         exactLng: gpsDepart?.lng,
         quartierName: quartierDepart,
         quartiers,
+        source: gpsDepartSource,
       });
       const arriveeGps = resolveGpsForCourse({
         exactLat: gpsArrivee?.lat,
         exactLng: gpsArrivee?.lng,
         quartierName: quartierArrivee,
         quartiers,
+        source: gpsArriveeSource,
       });
 
       // ── Gestion des ambiguïtés : ne jamais choisir silencieusement ──
