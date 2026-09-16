@@ -9,6 +9,7 @@ import { Search, Users, ArrowLeft, Phone, MessageCircle, Flame, Zap, Ban, Loader
 import ClientFicheDialog from "@/components/crm/ClientFicheDialog";
 import CrmConversionDashboard from "@/components/crm/CrmConversionDashboard";
 import CrmProspectionPanel from "@/components/crm/CrmProspectionPanel";
+import ProsAutonomiserScore, { ProsBadge } from "@/components/crm/ProsAutonomiserScore";
 import { normalizePhoneForWhatsapp } from "@/lib/courseContact";
 import { cn } from "@/lib/utils";
 
@@ -46,6 +47,7 @@ export default function ClientsCRM() {
   const [filterType, setFilterType] = useState("all");
   const [selectedClient, setSelectedClient] = useState(null);
   const [ficheOpen, setFicheOpen] = useState(false);
+  const [prosScoreMap, setProsScoreMap] = useState(new Map());
 
   // ── Chargement bulk : clients + prospections ──
   const { data: clients = [], isLoading: loadingClients } = useQuery({
@@ -132,6 +134,14 @@ export default function ClientsCRM() {
       });
     }
 
+    // Filtre "Pros à autonomiser" — uniquement les clients Sans App avec score ≥ 6
+    if (filterStatut === "pros_autonomiser") {
+      result = result.filter(c => {
+        const score = prosScoreMap.get(c.id);
+        return score && (score.niveau === "priorite_forte" || score.niveau === "potentiel");
+      });
+    }
+
     // Recherche
     if (search.trim()) {
       const q = search.toLowerCase().trim();
@@ -192,6 +202,9 @@ export default function ClientsCRM() {
         {/* Tableau de bord conversion */}
         <CrmConversionDashboard stats={conversionStats} />
 
+        {/* Score Pros à autonomiser */}
+        <ProsAutonomiserScore onProsLoaded={setProsScoreMap} />
+
         {/* File de prospection WhatsApp */}
         <CrmProspectionPanel
           prospections={prospections}
@@ -221,6 +234,7 @@ export default function ClientsCRM() {
               { key: "with_app", label: "Avec App" },
               { key: "without_app", label: "Sans App" },
               { key: "priority_1", label: "🔥 Priorité 1" },
+              { key: "pros_autonomiser", label: "🎯 Pros à autonomiser" },
               { key: "with_phone", label: "Avec tél" },
               { key: "actif", label: "Actifs" },
               { key: "vip", label: "VIP" },
@@ -341,6 +355,9 @@ export default function ClientsCRM() {
                           <Badge className="text-[9px] bg-purple-100 text-purple-700">App</Badge>
                         ) : (
                           <Badge className="text-[9px] bg-slate-100 text-slate-500">CRM</Badge>
+                        )}
+                        {!hasApp && prosScoreMap.get(c.id) && (
+                          <ProsBadge scoreData={prosScoreMap.get(c.id)} />
                         )}
                         {prospect?.pipeline_status && (
                           <Badge className={cn("text-[9px]", PIPELINE_COLORS[prospect.pipeline_status])}>
