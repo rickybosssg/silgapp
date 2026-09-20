@@ -30,8 +30,33 @@ async function chargerCommissionPays(base44, countryCode) {
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
-    if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+
+    // ── Auth : accepter les appels service-role (courseEventOrchestrator) ET les appels admin ──
+    try {
+      const user = await base44.auth.me();
+      if (user && user.role !== 'admin') {
+        return Response.json({ error: 'Admin requis' }, { status: 403 });
+      }
+    } catch {
+      // Appel depuis courseEventOrchestrator (service role) — pas de contexte utilisateur
+    }
+
+    // ── KILL SWITCH : le versement automatique de primes est DÉSACTIVÉ par défaut ──
+    // PRIME_PROMO_AUTO_ENABLED doit être 'true' dans AppConfig pour que les primes soient versées.
+    // Tant que ce flag n'est pas explicitement activé, la fonction s'exécute mais ne crée aucune prime.
+    let primeAutoEnabled = false;
+    try {
+      const configs = await base44.asServiceRole.entities.AppConfig.filter({ cle: 'PRIME_PROMO_AUTO_ENABLED' });
+      primeAutoEnabled = configs?.[0]?.valeur === 'true';
+    } catch {}
+
+    if (!primeAutoEnabled) {
+      return Response.json({
+        success: false,
+        skipped: 'kill_switch_active',
+        message: 'Versement automatique de primes désactivé (PRIME_PROMO_AUTO_ENABLED != true). Aucune prime créée.',
+      });
+    }
 
     const body = await req.json();
     const course_id = body.course_id || body.event?.entity_id || body.data?.id;

@@ -1,0 +1,43 @@
+{
+  "name": "Rappels d'Habitude (DRY-RUN)",
+  "description": "Moteur de rappels d'habitude \u2014 d\u00e9tecte les clients avec des habitudes de commande r\u00e9currentes et pr\u00e9pare des rappels push FCM. DRY-RUN par d\u00e9faut (HABIT_REMINDER_DRY_RUN != false). Aucun envoi r\u00e9el sans validation admin. Kill switch : HABIT_REMINDER_ENABLED.",
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "interval",
+      "cron_expression": null,
+      "one_time_date": null,
+      "timezone": "UTC",
+      "interval_value": 6,
+      "interval_unit": "hours",
+      "interval_anchor": null,
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  },
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "rappels_habitude_dry_run",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "run_function": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "moteurRappelsHabitude",
+            "args": {
+              "action": "run"
+            }
+          },
+          "then": "end"
+        }
+      }
+    ]
+  }
+}
