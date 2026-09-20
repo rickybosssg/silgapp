@@ -58,6 +58,57 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ── CONTRÔLE DU PLAFOND BUDGÉTAIRE JOURNALIER ──
+    // PRIME_PROMO_BUDGET_PER_DAY : budget max de primes par jour (défaut 1000 FCFA)
+    // On calcule le total des primes déjà validées aujourd'hui et on refuse
+    // toute nouvelle prime qui ferait dépasser le plafond.
+    const PRIME_FIXE = 100;
+    let budgetPerDay = 1000;
+    try {
+      const budgetConfigs = await base44.asServiceRole.entities.AppConfig.filter({ cle: 'PRIME_PROMO_BUDGET_PER_DAY' });
+      if (budgetConfigs?.[0]?.valeur) {
+        const parsed = Number(budgetConfigs[0].valeur);
+        if (Number.isFinite(parsed) && parsed >= 0) budgetPerDay = parsed;
+      }
+    } catch {}
+
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    let spentToday = 0;
+    try {
+      const primesToday = await base44.asServiceRole.entities.PrimePromo.filter({
+        statut: 'validee',
+      });
+      for (const p of primesToday) {
+        const valideeAt = p.validee_at ? new Date(p.validee_at) : null;
+        if (valideeAt && valideeAt >= todayStart) {
+          spentToday += (p.prime_proprietaire || 0);
+        }
+      }
+    } catch {}
+
+    if (budgetPerDay === 0) {
+      return Response.json({
+        success: false,
+        skipped: 'budget_zero',
+        message: 'Budget primes journalier = 0 FCFA. Aucune prime autorisée.',
+        budget_per_day: budgetPerDay,
+        spent_today: spentToday,
+      });
+    }
+
+    if (spentToday + PRIME_FIXE > budgetPerDay) {
+      return Response.json({
+        success: false,
+        skipped: 'budget_exceeded',
+        message: `Plafond journalier dépassé : ${spentToday} + ${PRIME_FIXE} = ${spentToday + PRIME_FIXE} > ${budgetPerDay} FCFA`,
+        budget_per_day: budgetPerDay,
+        spent_today: spentToday,
+        prime_amount: PRIME_FIXE,
+      });
+    }
+
     const body = await req.json();
     const course_id = body.course_id || body.event?.entity_id || body.data?.id;
     if (!course_id) return Response.json({ error: 'course_id requis' }, { status: 400 });
@@ -119,8 +170,6 @@ Deno.serve(async (req) => {
     if (!codePromo || !codePromo.actif) {
       return Response.json({ success: false, reason: 'Code promo inactif ou introuvable' });
     }
-
-    const PRIME_FIXE = 100;
     const prixClientPaye = prixFinal - PRIME_FIXE;
     const commissionPct = await chargerCommissionPays(base44, course.country_code);
     const commissionBrute = Math.round(prixFinal * (commissionPct / 100));
