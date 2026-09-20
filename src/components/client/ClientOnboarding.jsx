@@ -170,6 +170,7 @@ function EtapeProfil({ clientProfil, onSuccess, onBack }) {
         latitude: gpsData?.latitude,
         longitude: gpsData?.longitude,
         country_code: countryCode,
+        telephone: telNormalise,
       }).catch(() => null);
 
       onSuccess(updated || { ...(clientProfil || {}), ...profileData });

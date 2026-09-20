@@ -20,18 +20,32 @@ function detectPlatform() {
   return 'web';
 }
 
-export function trackAppInstall() {
+export async function trackAppInstall() {
   try {
     const deviceId = getOrCreateDeviceId();
     const platform = detectPlatform();
     let countryCode = '';
     try { countryCode = localStorage.getItem('silgapp_selected_country') || ''; } catch {}
+
+    // Récupérer l'email utilisateur si authentifié (optionnel — ne bloque pas le tracking anonyme)
+    let userEmail = null;
+    try {
+      const isAuth = await base44.auth.isAuthenticated();
+      if (isAuth) {
+        const user = await base44.auth.me();
+        userEmail = user?.email || null;
+      }
+    } catch {
+      // Non authentifié ou erreur — tracking anonyme continue
+    }
+
     // Fire-and-forget avec timeout — un échec de tracking ne doit JAMAIS
     // bloquer l'ouverture de SILGAPP ni remonter comme erreur critique.
     const invokePromise = base44.functions.invoke('trackAppInstall', {
       device_id: deviceId,
       platform,
       country_code: countryCode,
+      ...(userEmail ? { user_email: userEmail } : {}),
     });
     Promise.race([
       invokePromise,

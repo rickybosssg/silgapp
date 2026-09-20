@@ -1,9 +1,21 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 import { ensureCodePromo } from '../../shared/codePromoUtils.ts';
+import { normalizePhone, loadCountryDialCodes } from '../../shared/phoneUtils.ts';
 
 /**
  * Initialisation automatique pour NOUVEAU CLIENT
  * Configure : GPS, device, notifications, heartbeat
+ *
+ * RATTACHEMENT CRM (idempotent) :
+ *   1. Recherche par user_email (comportement existant)
+ *   2. Si aucun profil trouvé ET un téléphone fiable est fourni dans le payload,
+ *      recherche par telephone_normalized sur les profils CRM existants (sans user_email).
+ *   3. Si exactement UN profil correspond → rattachement (ajout de user_email).
+ *   4. Si plusieurs profils correspondent → aucune fusion automatique, journalisation.
+ *   5. Si aucun profil ne correspond → création normale (comportement existant).
+ *
+ * Le téléphone doit provenir du flux d'authentification (formulaire d'inscription validé).
+ * Aucun rattachement n'est effectué à partir d'un numéro fourni arbitrairement.
  */
 Deno.serve(async (req) => {
   try {
@@ -15,7 +27,7 @@ Deno.serve(async (req) => {
     }
 
     const payload = await req.json();
-    const { device_id, platform, notification_token, latitude, longitude, country_code } = payload;
+    const { device_id, platform, notification_token, latitude, longitude, country_code, telephone } = payload;
 
     // VALIDATION STRICTE : country_code OBLIGATOIRE
     if (!country_code) {
@@ -26,6 +38,9 @@ Deno.serve(async (req) => {
         message: "Le pays est obligatoire pour utiliser SILGAPP. Veuillez sélectionner un pays lors de l'inscription."
       }, { status: 400 });
     }
+
+    // Charger les indicatifs pays dynamiques (pour normalisation du téléphone)
+    await loadCountryDialCodes(base44, country_code);
 
     // 1. VÉRIFIER si l'email existe déjà dans Livreur (livreur externe)
     const existingLivreur = await base44.asServiceRole.entities.Livreur.filter({ user_email: user.email });
@@ -39,21 +54,63 @@ Deno.serve(async (req) => {
       }, { status: 409 });
     }
 
-    // 2. Créer le profil client s'il n'existe pas
+    // 2. Rechercher le profil client par user_email (comportement existant)
     let client = await base44.asServiceRole.entities.ClientExterne.filter({ user_email: user.email });
-    if (!client || client.length === 0) {
-      client = await base44.asServiceRole.entities.ClientExterne.create({
-        nom: user.full_name?.split(' ')[0] || user.email.split('@')[0],
-        prenom: user.full_name?.split(' ').slice(1).join(' ') || '',
-        telephone: "",
-        user_email: user.email,
-        actif: true,
-        latitude: latitude || null,
-        longitude: longitude || null,
-        country_code: country_code, // OBLIGATOIRE - rejeté si manquant
-      });
-    } else {
+    let linkedToCrm = false;
+
+    if (client && client.length > 0) {
       client = client[0];
+    } else {
+      // ── RATTACHEMENT CRM : rechercher par téléphone si fourni ──
+      // Le téléphone doit provenir du formulaire d'inscription validé (ClientOnboarding).
+      // Il est normalisé avec les helpers SILGAPP (phoneUtils.ts).
+      const normalizedTel = telephone ? normalizePhone(telephone, country_code) : null;
+
+      if (normalizedTel) {
+        const crmMatches = await base44.asServiceRole.entities.ClientExterne.filter({
+          telephone_normalized: normalizedTel,
+        });
+
+        if (crmMatches.length === 1) {
+          // ── Profil CRM unique trouvé → rattachement sûr ──
+          const crmProfile = crmMatches[0];
+          if (!crmProfile.user_email) {
+            console.log(`[initClientAuto] Rattachement CRM: profil ${crmProfile.id} (tél=${normalizedTel}) lié à ${user.email}`);
+            client = await base44.asServiceRole.entities.ClientExterne.update(crmProfile.id, {
+              user_email: user.email,
+              // Préserver toutes les données existantes — ne pas écraser
+            });
+            linkedToCrm = true;
+          } else {
+            // Le profil a déjà un user_email différent — ne pas écraser
+            console.warn(`[initClientAuto] Profil CRM ${crmProfile.id} déjà lié à ${crmProfile.user_email} — pas de rattachement`);
+            client = null;
+          }
+        } else if (crmMatches.length > 1) {
+          // ── Plusieurs profils avec le même téléphone → ne pas fusionner ──
+          console.warn(`[initClientAuto] ${crmMatches.length} profils CRM trouvés pour tél=${normalizedTel} — fusion automatique refusée (IDs: ${crmMatches.map(c => c.id).join(', ')})`);
+          client = null;
+        } else {
+          client = null;
+        }
+      } else {
+        client = null;
+      }
+
+      // 3. Si aucun profil existant trouvé → créer un nouveau profil
+      if (!client) {
+        client = await base44.asServiceRole.entities.ClientExterne.create({
+          nom: user.full_name?.split(' ')[0] || user.email.split('@')[0],
+          prenom: user.full_name?.split(' ').slice(1).join(' ') || '',
+          telephone: telephone || "",
+          telephone_normalized: normalizedTel || undefined,
+          user_email: user.email,
+          actif: true,
+          latitude: latitude || null,
+          longitude: longitude || null,
+          country_code: country_code,
+        });
+      }
     }
 
     // 1b. Créer automatiquement un code promo ambassadeur pour le client
@@ -110,6 +167,7 @@ Deno.serve(async (req) => {
       session_id: session.id,
       gps_sync: !!(latitude && longitude),
       notifications: !!notification_token,
+      linked_to_crm: linkedToCrm,
     });
   } catch (error) {
     console.error('[initClientAuto] Erreur:', error);
