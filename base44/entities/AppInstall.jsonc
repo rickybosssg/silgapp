@@ -47,7 +47,72 @@
     },
     "user_email": {
       "type": "string",
-      "description": "Email utilisateur si connecte"
+      "description": "Email utilisateur si connecte. Enrichi apres inscription, sans ecraser l'attribution initiale."
+    },
+    "utm_source": {
+      "type": "string",
+      "description": "Source UTM capturee lors de la premiere visite (ex: meta, facebook). Non ecrasee apres attribution initiale."
+    },
+    "utm_medium": {
+      "type": "string",
+      "description": "Medium UTM (ex: cpc, social). Non ecrasee apres attribution initiale."
+    },
+    "utm_campaign": {
+      "type": "string",
+      "description": "Nom de campagne UTM. Non ecrasee apres attribution initiale."
+    },
+    "utm_content": {
+      "type": "string",
+      "description": "Contenu UTM (ex: nom de l'annonce). Non ecrasee apres attribution initiale."
+    },
+    "utm_term": {
+      "type": "string",
+      "description": "Terme UTM (optionnel). Non ecrasee apres attribution initiale."
+    },
+    "meta_campaign_id": {
+      "type": "string",
+      "description": "ID de campagne Meta Ads si l'attribution provient de Meta"
+    },
+    "meta_adset_id": {
+      "type": "string",
+      "description": "ID de l'ensemble de publicite Meta Ads"
+    },
+    "meta_ad_id": {
+      "type": "string",
+      "description": "ID de l'annonce Meta Ads"
+    },
+    "attribution_source": {
+      "type": "string",
+      "enum": [
+        "meta_ads",
+        "google_ads",
+        "organic",
+        "direct",
+        "referral",
+        "unknown"
+      ],
+      "default": "unknown",
+      "description": "Source d'attribution de l'installation. Meta_ads = provient d'une campagne Meta Ads tracee."
+    },
+    "attribution_confidence": {
+      "type": "string",
+      "enum": [
+        "high",
+        "medium",
+        "low"
+      ],
+      "default": "low",
+      "description": "Niveau de confiance de l'attribution. High = UTM capture directement, Medium = match par cookie/token, Low = attribution par defaut."
+    },
+    "attributed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date d'attribution initiale. Non ecrasee apres attribution initiale."
+    },
+    "user_email_linked_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date a laquelle le user_email a ete enrichi (inscription). L'attribution initiale est conservee."
     }
   },
   "required": [

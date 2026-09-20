@@ -178,9 +178,11 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
     course.commande_restaurant_id ||
     course.pharmacie_id
   );
-  // ── Étape « Client contacté » : visible pour TOUTES les courses (admin + client)
-  //    sauf déplacements et courses partenaire (boutique/restaurant/pharmacie) ──
-  const isAdminColisCourse = !isDeplacement && !isPartnerCourse;
+  // ── Étape « Client contacté » : workflow administratif uniquement.
+  // Les courses source=client doivent accéder directement au QR/PIN de récupération.
+  const isAdminColisCourse = !isDeplacement && !isPartnerCourse && (
+    course.source === "admin" || course.pricing_mode === "admin_manuel"
+  );
   const isClientContactePhase = isAdminColisCourse && effectiveStatut === "livreur_en_route";
   const isEnRouteExpediteurPending = isAdminColisCourse && effectiveStatut === "client_contacte";
   const adminPreTrip = isClientContactePhase || isEnRouteExpediteurPending;

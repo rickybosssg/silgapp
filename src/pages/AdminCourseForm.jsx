@@ -750,7 +750,11 @@ export default function AdminCourseForm() {
                 client={detectedClient}
                 role="depart"
                 value={adresseDepart}
-                onChange={setAdresseDepart}
+                onChange={(text) => {
+                  setAdresseDepart(text);
+                  setGpsDepart(null);
+                  setGpsDepartSource(null);
+                }}
                 onSelect={async (r) => {
                   if (r?.latitude && r?.longitude) {
                     const resolved = await resolveGpsFromSelection(r, countryCode);
@@ -794,7 +798,11 @@ export default function AdminCourseForm() {
                 client={detectedClient}
                 role="arrivee"
                 value={adresseArrivee}
-                onChange={setAdresseArrivee}
+                onChange={(text) => {
+                  setAdresseArrivee(text);
+                  setGpsArrivee(null);
+                  setGpsArriveeSource(null);
+                }}
                 onSelect={async (r) => {
                   if (r?.latitude && r?.longitude) {
                     const resolved = await resolveGpsFromSelection(r, countryCode);
