@@ -232,8 +232,15 @@ Deno.serve(async (req) => {
       return Response.json({ success: false, reason: 'Pas de code promo associé' });
     }
 
-    if (client.premiere_course_faite) {
-      return Response.json({ success: false, reason: 'Première course déjà effectuée, code promo expiré' });
+    // ── VERROU ATOMIQUE : compare-and-set sur premiere_course_faite ──
+    // Garantit qu'un seul appel concurrent peut traiter ce client.
+    // Si deux appels arrivent simultanément, un seul obtient updated=1.
+    const claimResult = await base44.asServiceRole.entities.ClientExterne.updateMany(
+      { id: client.id, premiere_course_faite: false },
+      { $set: { premiere_course_faite: true } }
+    );
+    if (Number(claimResult?.updated || 0) === 0) {
+      return Response.json({ success: false, reason: 'Première course déjà effectuée ou en cours de validation' });
     }
 
     // ── 3. IDEMPORENCE ──
@@ -314,10 +321,7 @@ Deno.serve(async (req) => {
         validee_at: new Date().toISOString(),
       });
 
-      // Marquer première course faite sur le client
-      await base44.asServiceRole.entities.ClientExterne.update(client.id, {
-        premiere_course_faite: true,
-      });
+      // premiere_course_faite déjà positionné par le verrou atomique ci-dessus
 
       // Mettre à jour les compteurs du CodePromo
       await base44.asServiceRole.entities.CodePromo.update(codePromo.id, {
@@ -347,10 +351,17 @@ Deno.serve(async (req) => {
         }
       }
     } catch (creationErr) {
-      // ── ROLLBACK : la prime n'a pas pu être créée → restaurer le budget ──
-      await rollbackPrimeBudget(base44, reservation.counterId, primeAmount);
-      console.error('[validerPrimePromo] Échec création prime — budget restauré:', creationErr);
-      return Response.json({ error: 'Échec validation prime. Budget restauré.' }, { status: 500 });
+      if (!prime) {
+        // ── PrimePromo.create a échoué → restaurer budget ET premiere_course_faite ──
+        await rollbackPrimeBudget(base44, reservation.counterId, primeAmount);
+        await base44.asServiceRole.entities.ClientExterne.update(client.id, { premiere_course_faite: false }).catch(() => {});
+        console.error('[validerPrimePromo] Échec création prime — budget restauré:', creationErr);
+        return Response.json({ error: 'Échec validation prime. Budget restauré.' }, { status: 500 });
+      }
+      // ── Prime créée mais opération secondaire échouée → budget NON restauré ──
+      // La prime validée existe, les 100 FCFA doivent rester consommés.
+      console.error('[validerPrimePromo] Prime créée mais opération secondaire échouée — budget conservé:', creationErr);
+      return Response.json({ error: 'Prime créée mais une opération secondaire a échoué. Budget conservé.' }, { status: 500 });
     }
 
     // ── 7. JOURNALISATION ──
