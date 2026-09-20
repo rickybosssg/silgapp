@@ -6,7 +6,7 @@
 // NE CRÉE PAS de nouvelle architecture — lit uniquement les données existantes.
 // ═══════════════════════════════════════════════════════════════════════════
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 
 // ── Helper : filtre date ISO depuis N jours ──
@@ -172,36 +172,55 @@ async function fetchAutomationStatus() {
 }
 
 // ── Budget publicité ──
+// IMPORTANT : PubliciteVue n'est PAS une dépense réelle.
+// Tant qu'aucune plateforme publicitaire payante n'est connectée,
+// la dépense réelle = 0 FCFA.
 async function fetchAdBudget() {
   const configs = await base44.entities.AppConfig.list();
   const cfg = parseAppConfig(configs);
   const budgetPerDay = parseInt(cfg["ADVERTISING_BUDGET_PER_DAY"] || "1000");
   const autoEnabled = cfg["ADVERTISING_AUTO_ENABLED"] === "true";
 
-  // ── Dépensé aujourd'hui (PubliciteVue aujourd'hui) ──
+  // ── Dépenses réelles depuis GrowthSpend (publicité) ──
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
 
-  const pubVues = await base44.entities.PubliciteVue.list("-created_date", 500);
-  const spentToday = (pubVues || []).filter(v =>
-    v.created_date && new Date(v.created_date) >= todayStart
-  ).length;
+  let adSpends = [];
+  try {
+    adSpends = await base44.entities.GrowthSpend.filter(
+      { moteur: "publicite", statut: ["engagee", "payee"] },
+      "-date_depense", 500
+    );
+  } catch {
+    // GrowthSpend peut être vide au début
+  }
+
+  const spentToday = (adSpends || [])
+    .filter(s => s.date_depense && new Date(s.date_depense) >= todayStart)
+    .reduce((sum, s) => sum + (s.montant || 0), 0);
+
+  const spent7Days = (adSpends || [])
+    .filter(s => s.date_depense && new Date(s.date_depense) >= dateNDaysAgo(7))
+    .reduce((sum, s) => sum + (s.montant || 0), 0);
+
+  const spent30Days = (adSpends || [])
+    .filter(s => s.date_depense && new Date(s.date_depense) >= dateNDaysAgo(30))
+    .reduce((sum, s) => sum + (s.montant || 0), 0);
 
   return {
     budgetPerDay,
     autoEnabled,
     spentToday,
     remainingToday: Math.max(0, budgetPerDay - spentToday),
-    spent7Days: (pubVues || []).filter(v =>
-      v.created_date && new Date(v.created_date) >= dateNDaysAgo(7)
-    ).length,
-    spent30Days: (pubVues || []).filter(v =>
-      v.created_date && new Date(v.created_date) >= dateNDaysAgo(30)
-    ).length,
+    spent7Days,
+    spent30Days,
+    hasRealAdPlatform: false, // Aucune plateforme publicitaire payante connectée
   };
 }
 
 // ── Budget primes ──
+// Seules les primes réellement validées (statut=validee) sont comptées comme dépense réelle.
+// Les primes pending, créées ou simulées ne sont PAS des dépenses.
 async function fetchPrimeBudget() {
   const configs = await base44.entities.AppConfig.list();
   const cfg = parseAppConfig(configs);
@@ -212,17 +231,29 @@ async function fetchPrimeBudget() {
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
 
-  const primesToday = (primes || []).filter(p =>
+  // ── Uniquement les primes validées (statut=validee) ──
+  const validatedPrimes = (primes || []).filter(p => p.statut === "validee");
+  const primesToday = validatedPrimes.filter(p =>
     p.validee_at && new Date(p.validee_at) >= todayStart
   );
+
+  const spent7Days = validatedPrimes
+    .filter(p => p.validee_at && new Date(p.validee_at) >= dateNDaysAgo(7))
+    .reduce((sum, p) => sum + (p.prime_proprietaire || 0), 0);
+
+  const spent30Days = validatedPrimes
+    .filter(p => p.validee_at && new Date(p.validee_at) >= dateNDaysAgo(30))
+    .reduce((sum, p) => sum + (p.prime_proprietaire || 0), 0);
 
   return {
     budgetPerDay,
     autoEnabled,
     spentToday: primesToday.reduce((sum, p) => sum + (p.prime_proprietaire || 0), 0),
     primesCountToday: primesToday.length,
-    coursesAttribuees: (primes || []).filter(p => p.course_id).length,
-    totalPrimes: (primes || []).length,
+    coursesAttribuees: validatedPrimes.filter(p => p.course_id).length,
+    totalPrimes: validatedPrimes.length,
+    spent7Days,
+    spent30Days,
   };
 }
 
@@ -419,5 +450,128 @@ export function useGrowthJournal(periodDays = 7, countryCode = null) {
     queryKey: ["growth-journal", periodDays, countryCode],
     queryFn: () => fetchGrowthJournal(periodDays, countryCode),
     staleTime: 60000,
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Mutations — modifier budgets et contrôler les moteurs
+// Utilise AppConfig existant — aucune nouvelle architecture.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── Trouver ou créer une entrée AppConfig ──
+async function upsertAppConfig(base44, cle, valeur) {
+  const existing = await base44.entities.AppConfig.filter({ cle });
+  if (existing && existing.length > 0) {
+    return base44.entities.AppConfig.update(existing[0].id, { valeur: String(valeur) });
+  }
+  return base44.entities.AppConfig.create({ cle, valeur: String(valeur) });
+}
+
+// ── Mutation : modifier le budget publicité ──
+export function useUpdateAdBudget() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ budgetPerDay }) => {
+      await upsertAppConfig(base44, "ADVERTISING_BUDGET_PER_DAY", budgetPerDay);
+      // Journaliser le changement
+      await base44.entities.GrowthSpend.create({
+        moteur: "publicite",
+        type_depense: "autre",
+        montant: 0,
+        country_code: "",
+        description_depense: `Budget publicité modifié à ${budgetPerDay} FCFA/jour`,
+        statut: "engagee",
+        date_depense: new Date().toISOString(),
+      }).catch(() => {});
+      return { budgetPerDay };
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["growth-ad-budget"] });
+      qc.invalidateQueries({ queryKey: ["growth-automation-status"] });
+    },
+  });
+}
+
+// ── Mutation : modifier le budget primes ──
+export function useUpdatePrimeBudget() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ budgetPerDay }) => {
+      await upsertAppConfig(base44, "PRIME_PROMO_BUDGET_PER_DAY", budgetPerDay);
+      await base44.entities.GrowthSpend.create({
+        moteur: "prime_promo",
+        type_depense: "autre",
+        montant: 0,
+        country_code: "",
+        description_depense: `Budget primes modifié à ${budgetPerDay} FCFA/jour`,
+        statut: "engagee",
+        date_depense: new Date().toISOString(),
+      }).catch(() => {});
+      return { budgetPerDay };
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["growth-prime-budget"] });
+      qc.invalidateQueries({ queryKey: ["growth-automation-status"] });
+    },
+  });
+}
+
+// ── Mutation : basculer un moteur Growth ──
+// Utilise les clés AppConfig existantes — ne crée pas de nouveau mécanisme.
+export function useToggleGrowthEngine() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ engine, newState }) => {
+      const configMap = {
+        reactivation: {
+          LIVE: { REACTIVATION_ENGINE_ENABLED: "true", REACTIVATION_ENGINE_DRY_RUN: "false" },
+          "DRY-RUN": { REACTIVATION_ENGINE_ENABLED: "true", REACTIVATION_ENGINE_DRY_RUN: "true" },
+          OFF: { REACTIVATION_ENGINE_ENABLED: "false", REACTIVATION_ENGINE_DRY_RUN: "true" },
+        },
+        firstCourseRelance: {
+          LIVE: { FIRST_COURSE_RELANCE_SEND_ENABLED: "true", FIRST_COURSE_RELANCE_ANALYSIS_ENABLED: "true" },
+          "DRY-RUN": { FIRST_COURSE_RELANCE_SEND_ENABLED: "false", FIRST_COURSE_RELANCE_ANALYSIS_ENABLED: "true" },
+          OFF: { FIRST_COURSE_RELANCE_SEND_ENABLED: "false", FIRST_COURSE_RELANCE_ANALYSIS_ENABLED: "false" },
+        },
+        habitReminders: {
+          LIVE: { HABIT_REMINDER_ENABLED: "true", HABIT_REMINDER_DRY_RUN: "false" },
+          "DRY-RUN": { HABIT_REMINDER_ENABLED: "true", HABIT_REMINDER_DRY_RUN: "true" },
+          OFF: { HABIT_REMINDER_ENABLED: "false", HABIT_REMINDER_DRY_RUN: "true" },
+        },
+        primePromo: {
+          ON: { PRIME_PROMO_AUTO_ENABLED: "true" },
+          OFF: { PRIME_PROMO_AUTO_ENABLED: "false" },
+        },
+        advertising: {
+          ON: { ADVERTISING_AUTO_ENABLED: "true" },
+          OFF: { ADVERTISING_AUTO_ENABLED: "false" },
+        },
+      };
+
+      const configs = configMap[engine]?.[newState];
+      if (!configs) throw new Error(`Configuration non trouvée: ${engine}/${newState}`);
+
+      for (const [cle, valeur] of Object.entries(configs)) {
+        await upsertAppConfig(base44, cle, valeur);
+      }
+
+      // Journaliser le changement d'état
+      await base44.entities.GrowthSpend.create({
+        moteur: engine,
+        type_depense: "autre",
+        montant: 0,
+        country_code: "",
+        description_depense: `Moteur ${engine} → ${newState}`,
+        statut: "engagee",
+        date_depense: new Date().toISOString(),
+      }).catch(() => {});
+
+      return { engine, newState };
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["growth-automation-status"] });
+      qc.invalidateQueries({ queryKey: ["growth-ad-budget"] });
+      qc.invalidateQueries({ queryKey: ["growth-prime-budget"] });
+    },
   });
 }

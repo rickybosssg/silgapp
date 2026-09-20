@@ -10,10 +10,13 @@ import {
   useGrowthPrimeBudget,
   useGrowthTunnel,
   useGrowthJournal,
+  useUpdateAdBudget,
+  useUpdatePrimeBudget,
+  useToggleGrowthEngine,
 } from "@/hooks/useGrowthData";
 import GrowthKpiCard from "@/components/growth/GrowthKpiCard";
-import GrowthAutomationCard from "@/components/growth/GrowthAutomationCard";
-import GrowthBudgetCard from "@/components/growth/GrowthBudgetCard";
+import GrowthEngineToggle from "@/components/growth/GrowthEngineToggle";
+import GrowthBudgetEditor from "@/components/growth/GrowthBudgetEditor";
 import GrowthConversionTunnel from "@/components/growth/GrowthConversionTunnel";
 import GrowthPerformancePanel from "@/components/growth/GrowthPerformancePanel";
 import GrowthJournalTable from "@/components/growth/GrowthJournalTable";
@@ -39,6 +42,10 @@ export default function GrowthDashboard() {
   const { data: primeBudget } = useGrowthPrimeBudget();
   const { data: tunnel, isLoading: tunnelLoading } = useGrowthTunnel();
   const { data: journal, isLoading: journalLoading } = useGrowthJournal(journalPeriod, countryCode);
+
+  const updateAdBudget = useUpdateAdBudget();
+  const updatePrimeBudget = useUpdatePrimeBudget();
+  const toggleEngine = useToggleGrowthEngine();
 
   const handleRefresh = () => {
     refetchOverview();
@@ -151,39 +158,49 @@ export default function GrowthDashboard() {
       <div>
         <h2 className="text-sm font-bold text-slate-700 mb-2 mt-4">Automatisations</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          <GrowthAutomationCard
+          <GrowthEngineToggle
             title="Réactivation clients"
+            engineKey="reactivation"
             status={automationStatus?.reactivation?.status || "OFF"}
             description="Moteur J0/J+2/J+5 — relance des clients inactifs"
             lastRun={automationStatus?.reactivation?.lastRun}
             analyzed={automationStatus?.reactivation?.analyzed}
             sent={automationStatus?.reactivation?.sent}
             converted={automationStatus?.reactivation?.converted}
+            onToggle={(newState) => toggleEngine.mutate({ engine: "reactivation", newState })}
           />
-          <GrowthAutomationCard
+          <GrowthEngineToggle
             title="Relance 1ère → 2ème course"
+            engineKey="firstCourseRelance"
             status={automationStatus?.firstCourseRelance?.status || "DRY-RUN"}
             description="Push 48h après la première livraison"
             lastRun={automationStatus?.firstCourseRelance?.lastRun}
+            onToggle={(newState) => toggleEngine.mutate({ engine: "firstCourseRelance", newState })}
           />
-          <GrowthAutomationCard
+          <GrowthEngineToggle
             title="Rappels d'habitude"
+            engineKey="habitReminders"
             status={automationStatus?.habitReminders?.status || "OFF"}
             description="Rappel basé sur les habitudes de commande"
             lastRun={automationStatus?.habitReminders?.lastRun}
             sent={automationStatus?.habitReminders?.sent}
             converted={automationStatus?.habitReminders?.converted}
+            onToggle={(newState) => toggleEngine.mutate({ engine: "habitReminders", newState })}
           />
-          <GrowthAutomationCard
+          <GrowthEngineToggle
             title="Primes automatiques"
+            engineKey="primePromo"
             status={automationStatus?.primePromo?.status || "OFF"}
             description="Versement de primes code promo"
             lastRun={automationStatus?.primePromo?.lastRun}
+            onToggle={(newState) => toggleEngine.mutate({ engine: "primePromo", newState })}
           />
-          <GrowthAutomationCard
+          <GrowthEngineToggle
             title="Publicité automatique"
+            engineKey="advertising"
             status={automationStatus?.advertising?.status || "OFF"}
             description="Diffusion automatique de publicités"
+            onToggle={(newState) => toggleEngine.mutate({ engine: "advertising", newState })}
           />
         </div>
       </div>
@@ -193,7 +210,7 @@ export default function GrowthDashboard() {
         <h2 className="text-sm font-bold text-slate-700 mb-2 mt-4">Budgets</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {adBudget && (
-            <GrowthBudgetCard
+            <GrowthBudgetEditor
               title="Budget publicité"
               icon={Megaphone}
               budgetPerDay={adBudget.budgetPerDay}
@@ -202,22 +219,29 @@ export default function GrowthDashboard() {
               spent7Days={adBudget.spent7Days}
               spent30Days={adBudget.spent30Days}
               accent="blue"
+              extraStats={
+                !adBudget.hasRealAdPlatform
+                  ? [{ label: "Plateforme payante connectée", value: "Non", color: "text-slate-400" }]
+                  : []
+              }
+              onBudgetChange={(budget) => updateAdBudget.mutate({ budgetPerDay: budget })}
             />
           )}
           {primeBudget && (
-            <GrowthBudgetCard
+            <GrowthBudgetEditor
               title="Budget primes"
               icon={Gift}
               budgetPerDay={primeBudget.budgetPerDay}
               spentToday={primeBudget.spentToday}
               remainingToday={Math.max(0, primeBudget.budgetPerDay - primeBudget.spentToday)}
-              spent7Days={0}
-              spent30Days={0}
+              spent7Days={primeBudget.spent7Days}
+              spent30Days={primeBudget.spent30Days}
+              accent="amber"
               extraStats={[
-                { label: "Primes versées aujourd'hui", value: primeBudget.primesCountToday },
+                { label: "Primes validées aujourd'hui", value: primeBudget.primesCountToday },
                 { label: "Courses attribuées", value: primeBudget.coursesAttribuees },
               ]}
-              accent="amber"
+              onBudgetChange={(budget) => updatePrimeBudget.mutate({ budgetPerDay: budget })}
             />
           )}
         </div>
@@ -259,9 +283,9 @@ export default function GrowthDashboard() {
       {/* ── Footer ── */}
       <Card className="p-3 bg-slate-100 border-slate-200">
         <p className="text-[10px] text-slate-500 text-center">
-          Dashboard Growth — lecture seule. Les budgets et activations sont modifiables
-          depuis les pages dédiées (Configuration Dispatch, Tarification, Publicités).
-          Aucune donnée financière existante n'est modifiée.
+          Dashboard Growth — Centre de contrôle. Les budgets et activations sont modifiables
+          directement depuis cette page. Chaque changement est journalisé dans GrowthSpend.
+          Dépenses publicitaires réelles : 0 FCFA tant qu'aucune plateforme payante n'est connectée.
         </p>
       </Card>
     </div>

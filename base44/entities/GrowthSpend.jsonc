@@ -1,0 +1,102 @@
+{
+  "name": "GrowthSpend",
+  "type": "object",
+  "properties": {
+    "moteur": {
+      "type": "string",
+      "enum": [
+        "publicite",
+        "prime_promo",
+        "reactivation",
+        "relance_premiere_course",
+        "rappels_habitude"
+      ],
+      "description": "Moteur Growth ayant engag\u00e9 la d\u00e9pense"
+    },
+    "type_depense": {
+      "type": "string",
+      "enum": [
+        "pub_impression",
+        "pub_clic",
+        "prime_livreur",
+        "prime_client",
+        "whatsapp_credit",
+        "sms_credit",
+        "autre"
+      ],
+      "description": "Type de d\u00e9pense Growth"
+    },
+    "montant": {
+      "type": "number",
+      "description": "Montant r\u00e9ellement d\u00e9pens\u00e9 en FCFA. Toujours un montant r\u00e9el et v\u00e9rifiable, jamais une estimation."
+    },
+    "devise": {
+      "type": "string",
+      "default": "FCFA"
+    },
+    "country_code": {
+      "type": "string",
+      "description": "Code pays (ex: BF, CI). Vide = global."
+    },
+    "campagne_id": {
+      "type": "string",
+      "description": "ID de la campagne li\u00e9e (ReactivationCampaign, PushCampagne, etc.) si applicable."
+    },
+    "reference_id": {
+      "type": "string",
+      "description": "ID de l'entit\u00e9 li\u00e9e (PrimePromo, HabitReminder, etc.) si applicable."
+    },
+    "idempotency_key": {
+      "type": "string",
+      "description": "Cl\u00e9 d'idempotencit\u00e9 pour \u00e9viter les doublons de d\u00e9pense. Doit \u00eatre unique par d\u00e9pense."
+    },
+    "description_depense": {
+      "type": "string",
+      "description": "Description libre de la d\u00e9pense."
+    },
+    "statut": {
+      "type": "string",
+      "enum": [
+        "engagee",
+        "payee",
+        "annulee"
+      ],
+      "default": "engagee",
+      "description": "engagee = d\u00e9pense engag\u00e9e mais non encore pay\u00e9e. payee = paiement confirm\u00e9. annulee = d\u00e9pense annul\u00e9e (n'est pas compt\u00e9e dans le r\u00e9el)."
+    },
+    "date_depense": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date et heure de la d\u00e9pense."
+    }
+  },
+  "required": [
+    "moteur",
+    "type_depense",
+    "montant",
+    "statut",
+    "date_depense"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
