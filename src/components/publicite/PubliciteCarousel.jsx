@@ -115,19 +115,19 @@ export default function PubliciteCarousel({ cible = "clients", userId = null, us
         style={{ background: pub.couleur_fond || "#1a1a2e", minHeight: 120 }}
         onClick={() => handleClic(pub)}
       >
-        {/* Média */}
+        {/* Média — object-contain : aucune partie du média n'est coupée, quel que soit le ratio */}
         {pub.media_url && pub.type_media === "image" && (
           <img
             src={pub.media_url}
             alt={pub.titre}
-            className="w-full h-40 object-cover"
+            className="w-full h-40 object-contain bg-black"
             loading="lazy"
           />
         )}
         {pub.media_url && pub.type_media === "video" && (
           <video
             src={pub.media_url}
-            className="w-full h-40 object-cover"
+            className="w-full h-40 object-contain bg-black"
             autoPlay
             muted
             playsInline
