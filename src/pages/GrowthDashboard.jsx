@@ -211,7 +211,7 @@ export default function GrowthDashboard() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {adBudget && (
             <GrowthBudgetEditor
-              title="Budget publicité"
+              title="Budget publicité — Meta Ads"
               icon={Megaphone}
               budgetPerDay={adBudget.budgetPerDay}
               spentToday={adBudget.spentToday}
@@ -220,9 +220,16 @@ export default function GrowthDashboard() {
               spent30Days={adBudget.spent30Days}
               accent="blue"
               extraStats={
-                !adBudget.hasRealAdPlatform
-                  ? [{ label: "Plateforme payante connectée", value: "Non", color: "text-slate-400" }]
-                  : []
+                adBudget.hasRealAdPlatform && adBudget.metaMetrics?.today
+                  ? [
+                      { label: "Plateforme Meta", value: "Connectée", color: "text-green-600" },
+                      { label: "Impressions (jour)", value: adBudget.metaMetrics.today.impressions?.toLocaleString() || 0 },
+                      { label: "Clics (jour)", value: adBudget.metaMetrics.today.clicks || 0 },
+                      { label: "CTR", value: `${(adBudget.metaMetrics.today.ctr || 0).toFixed(2)}%` },
+                      { label: "CPC", value: `${(adBudget.metaMetrics.today.cpc || 0).toFixed(2)}` },
+                      { label: "Campagnes actives", value: (adBudget.metaMetrics.campaigns || []).filter(c => c.status === "ACTIVE").length },
+                    ]
+                  : [{ label: "Plateforme Meta", value: "Non connectée", color: "text-slate-400" }]
               }
               onBudgetChange={(budget) => updateAdBudget.mutate({ budgetPerDay: budget })}
             />
@@ -285,7 +292,7 @@ export default function GrowthDashboard() {
         <p className="text-[10px] text-slate-500 text-center">
           Dashboard Growth — Centre de contrôle. Les budgets et activations sont modifiables
           directement depuis cette page. Chaque changement est journalisé dans GrowthSpend.
-          Dépenses publicitaires réelles : 0 FCFA tant qu'aucune plateforme payante n'est connectée.
+          Dépenses publicitaires réelles synchronisées depuis Meta Ads (lecture seule). Aucune campagne créée ou modifiée par SILGAPP.
         </p>
       </Card>
     </div>

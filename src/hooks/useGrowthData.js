@@ -165,8 +165,9 @@ async function fetchAutomationStatus() {
       count: (primePromos || []).length,
     },
     advertising: {
-      status: "OFF",
+      status: cfg["ADVERTISING_AUTO_ENABLED"] === "true" ? "ON" : "OFF",
       budgetPerDay: parseInt(cfg["ADVERTISING_BUDGET_PER_DAY"] || "1000"),
+      metaConnected: cfg["META_ADS_LATEST_INSIGHTS"] ? true : false,
     },
   };
 }
@@ -207,6 +208,15 @@ async function fetchAdBudget() {
     .filter(s => s.date_depense && new Date(s.date_depense) >= dateNDaysAgo(30))
     .reduce((sum, s) => sum + (s.montant || 0), 0);
 
+  // ── Métriques Meta Ads (si connecté) ──
+  let metaMetrics = null;
+  try {
+    const metaConfigs = await base44.entities.AppConfig.filter({ cle: 'META_ADS_LATEST_INSIGHTS' });
+    if (metaConfigs?.[0]?.valeur) {
+      metaMetrics = JSON.parse(metaConfigs[0].valeur);
+    }
+  } catch {}
+
   return {
     budgetPerDay,
     autoEnabled,
@@ -214,7 +224,8 @@ async function fetchAdBudget() {
     remainingToday: Math.max(0, budgetPerDay - spentToday),
     spent7Days,
     spent30Days,
-    hasRealAdPlatform: false, // Aucune plateforme publicitaire payante connectée
+    hasRealAdPlatform: !!metaMetrics,
+    metaMetrics,
   };
 }
 
