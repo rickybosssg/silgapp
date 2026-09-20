@@ -22,6 +22,13 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 const META_API_BASE = 'https://graph.facebook.com/v25.0';
 const DEFAULT_AD_ACCOUNT_ID = '2382788582549104'; // SILGAPP (Read-Only)
 
+// ── WHITELIST HARD-CODÉE : seuls ces comptes sont autorisés ──
+// Empêche toute importation de dépenses depuis Eric Compaore ou CDL
+// même si META_AD_ACCOUNT_ID est modifié dans AppConfig.
+const ALLOWED_AD_ACCOUNT_IDS = new Set([
+  '2382788582549104', // SILGAPP (Read-Only)
+]);
+
 function todayStr() {
   return new Date().toISOString().split('T')[0];
 }
@@ -33,11 +40,17 @@ function dateNDaysAgoStr(days) {
 }
 
 async function getAdAccountId(base44) {
+  let accountId = DEFAULT_AD_ACCOUNT_ID;
   try {
     const configs = await base44.asServiceRole.entities.AppConfig.filter({ cle: 'META_AD_ACCOUNT_ID' });
-    if (configs?.[0]?.valeur) return configs[0].valeur;
+    if (configs?.[0]?.valeur) accountId = configs[0].valeur;
   } catch {}
-  return DEFAULT_AD_ACCOUNT_ID;
+  // ── VERROU DE SÉCURITÉ : rejeter tout compte non whitelisté ──
+  const rawId = accountId.replace(/^act_/, '').trim();
+  if (!ALLOWED_AD_ACCOUNT_IDS.has(rawId)) {
+    throw new Error(`Compte publicitaire non autorisé: ${accountId}. Seul le compte SILGAPP (2382788582549104) est whitelisté.`);
+  }
+  return rawId;
 }
 
 async function fetchAccountInsights(accessToken, accountId, dateSince, dateUntil) {

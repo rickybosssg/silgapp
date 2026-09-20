@@ -412,6 +412,18 @@ async function fetchGrowthJournal(periodDays, countryCode) {
   return filtered.slice(0, 200);
 }
 
+// ── Attribution Meta → Install → Client → Courses ──
+export function useAttributionStats() {
+  return useQuery({
+    queryKey: ["attribution-stats"],
+    queryFn: async () => {
+      const res = await base44.functions.invoke("getAttributionStats", {});
+      return res.data;
+    },
+    staleTime: 60000,
+  });
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Hook principal
 // ═══════════════════════════════════════════════════════════════════════════

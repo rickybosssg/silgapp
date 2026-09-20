@@ -10,6 +10,7 @@ import {
   useGrowthPrimeBudget,
   useGrowthTunnel,
   useGrowthJournal,
+  useAttributionStats,
   useUpdateAdBudget,
   useUpdatePrimeBudget,
   useToggleGrowthEngine,
@@ -21,6 +22,7 @@ import GrowthConversionTunnel from "@/components/growth/GrowthConversionTunnel";
 import GrowthPerformancePanel from "@/components/growth/GrowthPerformancePanel";
 import GrowthJournalTable from "@/components/growth/GrowthJournalTable";
 import GrowthAlertsPanel from "@/components/growth/GrowthAlertsPanel";
+import GrowthAttributionTable from "@/components/growth/GrowthAttributionTable";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -42,6 +44,7 @@ export default function GrowthDashboard() {
   const { data: primeBudget } = useGrowthPrimeBudget();
   const { data: tunnel, isLoading: tunnelLoading } = useGrowthTunnel();
   const { data: journal, isLoading: journalLoading } = useGrowthJournal(journalPeriod, countryCode);
+  const { data: attributionStats } = useAttributionStats();
 
   const updateAdBudget = useUpdateAdBudget();
   const updatePrimeBudget = useUpdatePrimeBudget();
@@ -252,6 +255,12 @@ export default function GrowthDashboard() {
             />
           )}
         </div>
+      </div>
+
+      {/* ── Attribution Meta → Install → Client → Courses ── */}
+      <div>
+        <h2 className="text-sm font-bold text-slate-700 mb-2 mt-4">Attribution publicitaire</h2>
+        <GrowthAttributionTable data={attributionStats} />
       </div>
 
       {/* ── Performance + Alertes ── */}

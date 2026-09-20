@@ -13,6 +13,28 @@ export default function TelechargerSILGAPP() {
   useEffect(() => {
     setMounted(true);
 
+    // ── Capture UTM depuis l'URL pour attribution publicitaire ──
+    // Stocke l'attribution dans localStorage pour que trackAppInstall
+    // puisse la récupérer quand l'app s'ouvre (PWA ou WebView).
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const utm = {
+        utm_source: urlParams.get('utm_source'),
+        utm_medium: urlParams.get('utm_medium'),
+        utm_campaign: urlParams.get('utm_campaign'),
+        utm_content: urlParams.get('utm_content'),
+        utm_term: urlParams.get('utm_term'),
+        meta_campaign_id: urlParams.get('meta_campaign_id'),
+        meta_adset_id: urlParams.get('meta_adset_id'),
+        meta_ad_id: urlParams.get('meta_ad_id'),
+        captured_at: new Date().toISOString(),
+      };
+      // Ne stocker que si au moins un UTM est présent
+      if (utm.utm_source || utm.utm_campaign || utm.meta_campaign_id) {
+        localStorage.setItem('silgapp_attribution', JSON.stringify(utm));
+      }
+    } catch {}
+
     // Charger le lien APK depuis AppConfig
     base44.entities.AppConfig.filter({ cle: "GOOGLE_DRIVE_APK_URL" })
       .then(configs => {
@@ -30,13 +52,25 @@ export default function TelechargerSILGAPP() {
     })();
     const platform = /Android/i.test(navigator.userAgent) ? "android" : /iPhone|iPad/i.test(navigator.userAgent) ? "ios" : "web";
 
-    base44.functions.invoke("trackDownloadPublic", { event_type: "page_visit", country_code: country, platform, referrer: "direct" }).catch(() => {});
+    // Transmettre les UTM au tracking de téléchargement
+    let referrer = "direct";
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      referrer = urlParams.get('utm_source') || urlParams.get('utm_campaign') || "direct";
+    } catch {}
+
+    base44.functions.invoke("trackDownloadPublic", { event_type: "page_visit", country_code: country, platform, referrer }).catch(() => {});
   }, []);
 
   const trackDownload = () => {
     const country = navigator.language?.includes("BF") ? "BF" : navigator.language?.includes("CI") ? "CI" : null;
     const platform = /Android/i.test(navigator.userAgent) ? "android" : "web";
-    base44.functions.invoke("trackDownloadPublic", { event_type: "apk_download", country_code: country, platform, referrer: "direct" }).catch(() => {});
+    let referrer = "direct";
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      referrer = urlParams.get('utm_source') || urlParams.get('utm_campaign') || "direct";
+    } catch {}
+    base44.functions.invoke("trackDownloadPublic", { event_type: "apk_download", country_code: country, platform, referrer }).catch(() => {});
   };
 
   if (!mounted) return null;

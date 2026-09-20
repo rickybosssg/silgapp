@@ -20,6 +20,61 @@ function detectPlatform() {
   return 'web';
 }
 
+// ── Capture UTM depuis l'URL courante OU depuis le localStorage ──
+// L'attribution initiale est stockée dans localStorage par la page /telecharger
+// Lorsque l'app s'ouvre (PWA ou WebView), on récupère l'attribution stockée
+function captureUtmAttribution() {
+  const utm = {
+    utm_source: null,
+    utm_medium: null,
+    utm_campaign: null,
+    utm_content: null,
+    utm_term: null,
+    meta_campaign_id: null,
+    meta_adset_id: null,
+    meta_ad_id: null,
+  };
+
+  // 1. D'abord, essayer l'URL courante (si l'app est ouverte via un lien avec UTM)
+  try {
+    const urlParams = new URLSearchParams(window.location.search);
+    utm.utm_source = urlParams.get('utm_source') || utm.utm_source;
+    utm.utm_medium = urlParams.get('utm_medium') || utm.utm_medium;
+    utm.utm_campaign = urlParams.get('utm_campaign') || utm.utm_campaign;
+    utm.utm_content = urlParams.get('utm_content') || utm.utm_content;
+    utm.utm_term = urlParams.get('utm_term') || utm.utm_term;
+    // Meta campaign ID peut être passé dans l'URL (deep link)
+    utm.meta_campaign_id = urlParams.get('meta_campaign_id') || utm.meta_campaign_id;
+    utm.meta_adset_id = urlParams.get('meta_adset_id') || utm.meta_adset_id;
+    utm.meta_ad_id = urlParams.get('meta_ad_id') || utm.meta_ad_id;
+  } catch {}
+
+  // 2. Ensuite, essayer le localStorage (stocké par /telecharger)
+  try {
+    const stored = localStorage.getItem('silgapp_attribution');
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      // Ne remplir que les champs non déjà présents dans l'URL
+      utm.utm_source = utm.utm_source || parsed.utm_source || null;
+      utm.utm_medium = utm.utm_medium || parsed.utm_medium || null;
+      utm.utm_campaign = utm.utm_campaign || parsed.utm_campaign || null;
+      utm.utm_content = utm.utm_content || parsed.utm_content || null;
+      utm.utm_term = utm.utm_term || parsed.utm_term || null;
+      utm.meta_campaign_id = utm.meta_campaign_id || parsed.meta_campaign_id || null;
+      utm.meta_adset_id = utm.meta_adset_id || parsed.meta_adset_id || null;
+      utm.meta_ad_id = utm.meta_ad_id || parsed.meta_ad_id || null;
+    }
+  } catch {}
+
+  // 3. Déterminer la source d'attribution
+  const attribution_source =
+    utm.utm_source === 'meta' || utm.utm_source === 'facebook' ? 'meta_ads' :
+    utm.utm_source ? 'referral' :
+    'direct';
+
+  return { ...utm, attribution_source };
+}
+
 export async function trackAppInstall() {
   try {
     const deviceId = getOrCreateDeviceId();
@@ -39,6 +94,9 @@ export async function trackAppInstall() {
       // Non authentifié ou erreur — tracking anonyme continue
     }
 
+    // Capturer l'attribution UTM/Meta
+    const attribution = captureUtmAttribution();
+
     // Fire-and-forget avec timeout — un échec de tracking ne doit JAMAIS
     // bloquer l'ouverture de SILGAPP ni remonter comme erreur critique.
     const invokePromise = base44.functions.invoke('trackAppInstall', {
@@ -46,6 +104,7 @@ export async function trackAppInstall() {
       platform,
       country_code: countryCode,
       ...(userEmail ? { user_email: userEmail } : {}),
+      ...attribution,
     });
     Promise.race([
       invokePromise,
