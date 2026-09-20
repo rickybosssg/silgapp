@@ -774,7 +774,15 @@ export default function AdminCourseForm() {
                 client={detectedClient}
                 role="depart"
                 value={adresseDepart}
-                onChange={setAdresseDepart}
+                onChange={(text) => {
+                  setAdresseDepart(text);
+                  // ── INVALIDATION IMMÉDIATE des anciennes coordonnées ──
+                  // Si l'utilisateur modifie le texte sans sélectionner une suggestion,
+                  // les anciennes coordonnées GPS sont effacées pour empêcher qu'une
+                  // adresse nouvellement saisie hérite des coordonnées précédentes.
+                  setGpsDepart(null);
+                  setGpsDepartSource(null);
+                }}
                 onSelect={async (r) => {
                   if (r?.latitude && r?.longitude) {
                     const resolved = await resolveGpsFromSelection(r, countryCode);
@@ -818,7 +826,12 @@ export default function AdminCourseForm() {
                 client={detectedClient}
                 role="arrivee"
                 value={adresseArrivee}
-                onChange={setAdresseArrivee}
+                onChange={(text) => {
+                  setAdresseArrivee(text);
+                  // ── INVALIDATION IMMÉDIATE des anciennes coordonnées ──
+                  setGpsArrivee(null);
+                  setGpsArriveeSource(null);
+                }}
                 onSelect={async (r) => {
                   if (r?.latitude && r?.longitude) {
                     const resolved = await resolveGpsFromSelection(r, countryCode);

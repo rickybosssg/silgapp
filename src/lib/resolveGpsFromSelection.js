@@ -35,29 +35,10 @@ export async function resolveGpsFromSelection(item, countryCode) {
     };
   }
 
-  // 2. Item quartier : essayer de géocoder l'adresse pour des coordonnées précises
-  const addressText = item.address || item.label || "";
-  if (addressText.trim().length >= 3 && countryCode) {
-    try {
-      const res = await base44.functions.invoke("geocodeAddress", {
-        query: addressText.trim(),
-        country_code: countryCode,
-      });
-      const results = res?.data?.results || res?.results || [];
-      if (results.length > 0 && results[0].latitude && results[0].longitude) {
-        return {
-          lat: Number(results[0].latitude),
-          lng: Number(results[0].longitude),
-          source: "geocodage",
-          quartier: item.quartier || results[0].quartier || null,
-        };
-      }
-    } catch (_) {
-      // Geocoding échoué — fallback quartier
-    }
-  }
-
-  // 3. Fallback : centre du quartier (coordonnées approximatives)
+  // 2. Item quartier : utiliser en priorité les coordonnées de référence du quartier.
+  // Le géocodage ORS ne doit JAMAIS remplacer silencieusement une coordonnée de
+  // quartier valide par un résultat homonyme éloigné (POI, village homonyme, etc.).
+  // Les coordonnées de la table Quartier sont la source de vérité pour les quartiers.
   return {
     lat: Number(item.latitude),
     lng: Number(item.longitude),
