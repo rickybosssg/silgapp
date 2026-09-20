@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 import { normalizePhone } from '../../shared/phoneUtils.ts';
+import { getRecentlySolicitedClients, isClientSolicited } from '../../shared/antiSolicitation.ts';
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -33,12 +34,13 @@ import { normalizePhone } from '../../shared/phoneUtils.ts';
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
-const RELANCE_DELAY_HOURS = 2; // Délai minimum avant relance après livraison
+const RELANCE_DELAY_HOURS = 48; // Délai minimum avant relance après livraison (48h)
+const RELANCE_DELAY_MAX_HOURS = 7 * 24; // Délai maximum : 7 jours après livraison (au-delà, la relance n'est plus pertinente)
 const MAX_TARGETS_PER_RUN = 50; // Limite anti-saturation
 const ANTI_SOLICITATION_WINDOW_HOURS = 72; // Fenêtre anti-sollicitation croisée
 
-const RELANCE_TITLE = "SILGAPP — Et si on recommençait ?";
-const RELANCE_MESSAGE = "Bonjour ! Vous avez récemment utilisé SILGAPP pour votre première livraison. Si vous avez besoin d'un livreur à nouveau, ouvrez l'app et créez une course en quelques secondes. À tout de suite !";
+const RELANCE_TITLE = "Besoin d'un livreur ? 🛵";
+const RELANCE_MESSAGE = "Votre prochaine livraison peut partir en quelques secondes avec SILGAPP. Ouvrez l'app et lancez votre course.";
 
 export default async function(req: Request): Promise<Response> {
   try {
@@ -171,8 +173,10 @@ export default async function(req: Request): Promise<Response> {
 
 async function analyzeEligibleClients(base44: any): Promise<any> {
   const now = Date.now();
+  const delayMinMs = RELANCE_DELAY_HOURS * 3600000;       // 48h
+  const delayMaxMs = RELANCE_DELAY_MAX_HOURS * 3600000;     // 7 jours
 
-  // ── Charger les courses livrées récentes (7 derniers jours) ──
+  // ── Charger les courses livrées récentes (14 derniers jours pour couvrir la fenêtre 48h-7j) ──
   const recentDelivered: any[] = [];
   let skip = 0;
   while (true) {
@@ -184,7 +188,7 @@ async function analyzeEligibleClients(base44: any): Promise<any> {
     recentDelivered.push(...batch);
     if (batch.length < 500) break;
     skip += 500;
-    if (skip > 2000) break;
+    if (skip > 3000) break;
   }
 
   // ── Grouper par client (phone_normalized ou user_email) ──
@@ -196,16 +200,50 @@ async function analyzeEligibleClients(base44: any): Promise<any> {
     clientCourses.get(key)!.push(c);
   }
 
-  // ── Filtrer : exactement 1 course livrée ET délai ≥ 2h ──
+  // ── Filtrer : exactement 1 course livrée ET délai ≥ 48h ET ≤ 7 jours ──
   const firstCourseClients: any[] = [];
+  let excludedTooRecent = 0;    // < 48h
+  let excludedTooOld = 0;        // > 7 jours
+  let excludedSecondCourse = 0;  // a déjà créé une 2ème course
+
   for (const [key, courses] of clientCourses) {
-    if (courses.length !== 1) continue;
-    const course = courses[0];
+    // Compter les courses livrées ET les courses créées (tous statuts)
+    const deliveredCourses = courses.filter(c => c.statut === 'livree');
+
+    // Le client ne doit avoir qu'EXACTEMENT 1 course livrée
+    if (deliveredCourses.length !== 1) {
+      if (deliveredCourses.length > 1) excludedSecondCourse++;
+      continue;
+    }
+
+    // Vérifier qu'aucune autre course (non livrée) n'a été créée après la livraison
+    const course = deliveredCourses[0];
     const deliveredAt = course.heure_livraison || course.colis_livre_at || course.created_date;
     if (!deliveredAt) continue;
+
     const deliveredMs = new Date(deliveredAt).getTime();
     const hoursSinceDelivery = (now - deliveredMs) / 3600000;
-    if (hoursSinceDelivery < RELANCE_DELAY_HOURS) continue;
+
+    // Si une autre course a été créée après la livraison → le client a déjà commandé à nouveau
+    const hasSecondCourse = courses.some(c => {
+      if (c.id === course.id) return false;
+      const createdMs = c.created_date ? new Date(c.created_date).getTime() : 0;
+      return createdMs > deliveredMs;
+    });
+    if (hasSecondCourse) {
+      excludedSecondCourse++;
+      continue;
+    }
+
+    if (hoursSinceDelivery < RELANCE_DELAY_HOURS) {
+      excludedTooRecent++;
+      continue;
+    }
+    if (hoursSinceDelivery > RELANCE_DELAY_MAX_HOURS) {
+      excludedTooOld++;
+      continue;
+    }
+
     firstCourseClients.push({ key, course, deliveredAt, hoursSinceDelivery });
   }
 
@@ -230,42 +268,16 @@ async function analyzeEligibleClients(base44: any): Promise<any> {
     }
   }
 
-  // ── Charger les HabitReminder existants (anti-doublon + anti-sollicitation) ──
-  const allReminders = await base44.asServiceRole.entities.HabitReminder.list();
-  const remindedClientIds = new Set<string>(); // Déjà relancé par cette fonction
-  const recentlySolicitedClientIds = new Set<string>(); // Sollicité par moteurRappelsHabitude dans les 72h
-  const solWindowMs = ANTI_SOLICITATION_WINDOW_HOURS * 3600000;
+  // ── Anti-sollicitation bidirectionnelle (module partagé) ──
+  // Charge tous les clients sollicités dans les 72h par n'importe quel moteur
+  const solicitationResult = await getRecentlySolicitedClients(base44);
 
+  // ── Anti-doublon : déjà relancé par cette fonction (segment first_course_delivered) ──
+  const allReminders = await base44.asServiceRole.entities.HabitReminder.list();
+  const remindedClientIds = new Set<string>();
   for (const r of allReminders) {
-    // Anti-doublon : déjà relancé par cette fonction (segment first_course_delivered)
     if (r.segment === 'first_course_delivered' && r.client_id) {
       remindedClientIds.add(r.client_id);
-    }
-    // Anti-sollicitation : push envoyé par moteurRappelsHabitude dans les 72h
-    if (r.status === 'sent' && r.sent_at) {
-      const sentMs = new Date(r.sent_at).getTime();
-      if (now - sentMs < solWindowMs && r.client_id) {
-        recentlySolicitedClientIds.add(r.client_id);
-      }
-    }
-  }
-
-  // ── Charger les ReactivationScenario (anti-doublon + anti-sollicitation) ──
-  const allScenarios = await base44.asServiceRole.entities.ReactivationScenario.list();
-  const reactivationClientIds = new Set<string>(); // Scénario actif
-  const recentlyReactivatedClientIds = new Set<string>(); // Push récent dans les 72h
-
-  for (const s of allScenarios) {
-    if (s.status === 'active' && s.client_id) {
-      reactivationClientIds.add(s.client_id);
-    }
-    // Anti-sollicitation : push de réactivation envoyé dans les 72h
-    const lastPush = s.j0_sent_at || s.j2_sent_at || s.j5_sent_at;
-    if (lastPush && s.client_id) {
-      const pushMs = new Date(lastPush).getTime();
-      if (now - pushMs < solWindowMs) {
-        recentlyReactivatedClientIds.add(s.client_id);
-      }
     }
   }
 
@@ -293,25 +305,26 @@ async function analyzeEligibleClients(base44: any): Promise<any> {
       excludedDuplicate++;
       continue;
     }
-    // 2. Anti-doublon : déjà dans un scénario de réactivation actif
-    if (reactivationClientIds.has(client.id)) {
-      excludedDuplicate++;
-      continue;
-    }
-    // 3. Anti-sollicitation croisée : push récent par moteurRappelsHabitude ou moteurReactivationAuto
-    if (recentlySolicitedClientIds.has(client.id) || recentlyReactivatedClientIds.has(client.id)) {
+
+    // 2. Anti-sollicitation bidirectionnelle : client sollicité par un autre moteur dans les 72h
+    if (isClientSolicited(
+      client.id,
+      client.telephone_normalized,
+      client.user_email,
+      solicitationResult
+    )) {
       excludedRecentSolicitation++;
       continue;
     }
 
-    // 4. Vérifier le token FCM natif
+    // 3. Vérifier le token FCM natif
     const token = client.user_email ? tokenByEmail.get(client.user_email) : null;
     if (!token || !token.token || String(token.token).startsWith('web_')) {
       excludedNoFcm++;
       continue;
     }
 
-    // 5. Vérifier le consentement marketing
+    // 4. Vérifier le consentement marketing
     const prefs = parseMarketingPrefs(token.preferences_categories);
     if (prefs.includes('marketing')) {
       excludedOptOut++;
@@ -330,6 +343,10 @@ async function analyzeEligibleClients(base44: any): Promise<any> {
 
   return {
     eligible_count: firstCourseClients.length,
+    total_with_exactly_one_delivered: firstCourseClients.length + excludedTooRecent + excludedTooOld,
+    excluded_too_recent_lt_48h: excludedTooRecent,
+    excluded_too_old_gt_7d: excludedTooOld,
+    excluded_second_course_created: excludedSecondCourse,
     excluded_opt_out: excludedOptOut,
     excluded_duplicate: excludedDuplicate,
     excluded_no_fcm: excludedNoFcm,

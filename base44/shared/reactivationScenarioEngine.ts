@@ -17,6 +17,7 @@
 
 import { sendReactivationPush } from './reactivationEngine.ts';
 import { normalizePhone } from './phoneUtils.ts';
+import { getRecentlySolicitedClients, isClientSolicited } from './antiSolicitation.ts';
 
 // ── Messages par défaut (configurables via AppConfig) ──────────────────────
 // Messages génériques (rétrocompatibilité — utilisés si pas de message segment)
@@ -356,6 +357,10 @@ export async function findEligibleClients(
     }
   }
 
+  // ── Anti-sollicitation bidirectionnelle : charger les clients sollicités dans les 72h ──
+  // par relancePremiereCourse ou moteurRappelsHabitude
+  const solicitationResult = await getRecentlySolicitedClients(base44);
+
   // ── Clients déjà dans un scénario actif ou en cooldown POUR CETTE CAMPAGNE ──
   // IMPORTANT : les scénarios des ANCIENNES campagnes ne bloquent PAS la nouvelle
   // vague. Chaque campagne est évaluée indépendamment (reset contrôlé).
@@ -406,6 +411,15 @@ export async function findEligibleClients(
 
     // Pas en cooldown
     if (inCooldown.has(c.id)) continue;
+
+    // ── Anti-sollicitation bidirectionnelle : exclure si le client a été sollicité ──
+    // par relancePremiereCourse ou moteurRappelsHabitude dans les 72h
+    if (isClientSolicited(
+      c.id,
+      c.telephone_normalized,
+      c.user_email,
+      solicitationResult
+    )) continue;
 
     // ── Déduplication hybride : vérifier si la PERSONNE est déjà active ou en cooldown ──
     const phone = (c.telephone_normalized || '').trim();

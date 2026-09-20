@@ -26,6 +26,7 @@ import {
 } from './habitDetector.ts';
 import { sendReactivationPush } from './reactivationEngine.ts';
 import { normalizePhone } from './phoneUtils.ts';
+import { getRecentlySolicitedClients, isClientSolicited } from './antiSolicitation.ts';
 
 // ── Configuration ──────────────────────────────────────────────────────────
 
@@ -125,6 +126,9 @@ export async function findEligibleHabitClients(base44: any, auditMode: boolean =
     }
   }
 
+  // ── Anti-sollicitation bidirectionnelle : charger les clients sollicités dans les 72h ──
+  const solicitationResult = await getRecentlySolicitedClients(base44);
+
   // ── Pour chaque client avec ≥3 courses, vérifier l'éligibilité ──
   const eligible: any[] = [];
   const seenPersonKeys = new Set<string>();
@@ -175,13 +179,15 @@ export async function findEligibleHabitClients(base44: any, auditMode: boolean =
     const hasActiveCourse = clientCourses.some(c => activeStatuses.has(c.statut));
     if (hasRecentActiveCourse || hasActiveCourse) continue;
 
-    // ── Vérifier qu'aucun scénario de réactivation n'est actif ──
-    // (respect de l'anti-spam global existant)
-    const activeScenarios = await base44.asServiceRole.entities.ReactivationScenario.filter({
-      client_id: client.id,
-      status: 'active',
-    }).catch(() => []);
-    if (activeScenarios.length > 0) continue;
+    // ── Anti-sollicitation bidirectionnelle (module partagé) ──
+    // Vérifie si le client a été sollicité par relancePremiereCourse OU moteurReactivationAuto
+    // dans les 72 dernières heures
+    if (isClientSolicited(
+      client.id,
+      client.telephone_normalized,
+      client.user_email,
+      solicitationResult
+    )) continue;
 
     // ── Groupe contrôle déterministe (15%) ──
     const isControl = (hashClientId(client.id) % 100) < CONTROL_GROUP_PCT;
