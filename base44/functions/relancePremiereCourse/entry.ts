@@ -8,31 +8,37 @@ import { normalizePhone } from '../../shared/phoneUtils.ts';
  * OBJECTIF : identifier les clients qui viennent de livrer leur première course
  * et préparer une relance push FCM pour provoquer une deuxième commande.
  *
+ * DEUX SWITCHS SÉPARÉS :
+ *   1. FIRST_COURSE_RELANCE_ANALYSIS_ENABLED (défaut: true)
+ *      → Le moteur analyse les clients, applique tous les filtres, et enregistre
+ *        ce qu'il aurait envoyé en DRY-RUN. Aucun push n'est envoyé.
+ *   2. FIRST_COURSE_RELANCE_SEND_ENABLED (défaut: false)
+ *      → Autorise l'envoi FCM réel. Tant que false, aucun push n'est envoyé.
+ *
+ * ANTI-SOLLICITATION CROISÉE :
+ *   - Vérifie les HabitReminder 'sent' des dernières 72h (moteurRappelsHabitude + cette fonction)
+ *   - Vérifie les ReactivationScenario actifs ou avec push récent (moteurReactivationAuto)
+ *   - Si un client a reçu une sollicitation marketing dans les 72h, il est exclu
+ *
  * CONTRAINTES :
  *   - Aucune dépense publicitaire (FCM natif uniquement)
  *   - Aucune réduction/récompense financière
- *   - DRY-RUN par défaut (aucun envoi réel sans activation explicite)
  *   - Pas de doublon avec moteurReactivationAuto (first_course_delivered J+1/J+3/J+7)
  *   - Séparation par pays
- *   - Frequency cap : 1 relance par client, jamais de doublon
+ *   - Frequency cap : 1 relance par client
  *   - Idempotence : vérifie les HabitReminder existants
  *   - Consentement marketing respecté (preferences_categories)
- *   - Kill switch immédiat via AppConfig
- *
- * DIFFÉRENCE avec moteurReactivationAuto :
- *   - moteurReactivationAuto utilise le segment `first_course_delivered` avec
- *     J+1/J+3/J+7 (rappels à 1, 3 et 7 jours après la livraison).
- *   - Cette fonction prépare une relance PLUS RAPIDE (2h après la livraison)
- *     qui n'entre pas en conflit car elle crée des HabitReminder (entité séparée)
- *     et ne crée pas de ReactivationScenario.
- *   - Si un scénario `first_course_delivered` existe déjà, le client est ignoré.
  *
  * NE MODIFIE PAS : Dispatch V2, tarification, finance, QR/PIN, GPS, FCM natif.
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
-const RELANCE_DELAY_HOURS = 2; // Délai avant relance après la livraison
+const RELANCE_DELAY_HOURS = 2; // Délai minimum avant relance après livraison
 const MAX_TARGETS_PER_RUN = 50; // Limite anti-saturation
+const ANTI_SOLICITATION_WINDOW_HOURS = 72; // Fenêtre anti-sollicitation croisée
+
+const RELANCE_TITLE = "SILGAPP — Et si on recommençait ?";
+const RELANCE_MESSAGE = "Bonjour ! Vous avez récemment utilisé SILGAPP pour votre première livraison. Si vous avez besoin d'un livreur à nouveau, ouvrez l'app et créez une course en quelques secondes. À tout de suite !";
 
 export default async function(req: Request): Promise<Response> {
   try {
@@ -50,114 +56,105 @@ export default async function(req: Request): Promise<Response> {
 
     const body = await req.json().catch(() => ({}));
     const action = body.action || 'run';
-    const forcedDryRun = body.dry_run !== false; // DRY-RUN par défaut
 
-    // ── Kill switch ──
-    let enabled = false;
-    let dryRun = true;
+    // ── Deux switches séparés ──
+    let analysisEnabled = true; // Analyse activée par défaut (DRY-RUN observation)
+    let sendEnabled = false;    // Envoi FCM désactivé par défaut
     try {
       const configs = await base44.asServiceRole.entities.AppConfig.filter({
-        cle: { $in: ['FIRST_COURSE_RELANCE_ENABLED', 'FIRST_COURSE_RELANCE_DRY_RUN'] },
+        cle: { $in: ['FIRST_COURSE_RELANCE_ANALYSIS_ENABLED', 'FIRST_COURSE_RELANCE_SEND_ENABLED'] },
       });
       const configMap: Record<string, string> = {};
       for (const c of configs) {
         if (c.cle) configMap[c.cle] = c.valeur;
       }
-      enabled = configMap['FIRST_COURSE_RELANCE_ENABLED'] === 'true';
-      dryRun = configMap['FIRST_COURSE_RELANCE_DRY_RUN'] !== 'false'; // DRY-RUN par défaut
+      analysisEnabled = configMap['FIRST_COURSE_RELANCE_ANALYSIS_ENABLED'] !== 'false'; // true par défaut
+      sendEnabled = configMap['FIRST_COURSE_RELANCE_SEND_ENABLED'] === 'true';            // false par défaut
     } catch {}
 
-    if (!enabled) {
+    if (!analysisEnabled) {
       return Response.json({
         action,
-        status: 'disabled',
-        message: 'FIRST_COURSE_RELANCE_ENABLED is not true. No relance prepared.',
+        status: 'analysis_disabled',
+        message: 'FIRST_COURSE_RELANCE_ANALYSIS_ENABLED is false. Motor does not run.',
       });
     }
 
-    // ── Action : audit (compter sans rien créer) ──
+    // ── Action : audit (analyser sans rien créer) ──
     if (action === 'audit') {
-      const eligible = await findEligibleClients(base44);
+      const result = await analyzeEligibleClients(base44);
       return Response.json({
         action: 'audit',
-        eligible_count: eligible.length,
-        details: eligible.map(e => ({
-          client_id: e.client.id,
-          country_code: e.client.country_code,
-          delivered_at: e.deliveredAt,
-          hours_since_delivery: e.hoursSinceDelivery,
-          has_fcm: !!e.token?.token,
-        })),
+        analysis_enabled: true,
+        send_enabled: sendEnabled,
+        dry_run: !sendEnabled,
+        ...result,
+        message_title: RELANCE_TITLE,
+        message_body: RELANCE_MESSAGE,
       });
     }
 
     // ── Action : run (préparer les relances en DRY-RUN) ──
     if (action === 'run') {
-      const eligible = await findEligibleClients(base44);
-      const effectiveDryRun = forcedDryRun && dryRun;
+      const result = await analyzeEligibleClients(base44);
+      const effectiveDryRun = !sendEnabled; // DRY-RUN tant que sendEnabled est false
 
       const now = new Date().toISOString();
       const batchId = `first_course_relance_${Date.now()}`;
       let prepared = 0;
-      let skipped = 0;
       const details: any[] = [];
 
-      for (const el of eligible) {
+      for (const el of result.retained) {
         const { client, token, deliveredAt, hoursSinceDelivery } = el;
 
-        // ── Vérifier le délai (2h minimum après livraison) ──
-        if (hoursSinceDelivery < RELANCE_DELAY_HOURS) continue;
-
-        // ── Vérifier le token FCM natif ──
-        if (!token || !token.token || String(token.token).startsWith('web_')) {
-          skipped++;
-          continue;
-        }
-
-        // ── Vérifier le consentement marketing ──
-        const prefs = parseMarketingPrefs(token.preferences_categories);
-        if (prefs.includes('marketing')) {
-          skipped++;
-          continue;
-        }
-
         // ── Créer un HabitReminder (DRY-RUN = status 'pending', pas d'envoi) ──
-        if (effectiveDryRun) {
-          await base44.asServiceRole.entities.HabitReminder.create({
-            client_id: client.id,
-            client_telephone: client.telephone || '',
-            client_phone_normalized: normalizePhone(client.telephone, client.country_code || undefined) || '',
-            client_user_email: client.user_email || '',
-            country_code: client.country_code || '',
-            segment: 'first_course_delivered',
-            habit_type: 'tranche_horaire',
-            habit_detail: JSON.stringify({ first_course_delivered_at: deliveredAt }),
-            habit_occurrences: 1,
-            habit_ratio: 1.0,
-            is_control_group: false,
-            status: 'pending',
-            push_token: token.token,
-            push_token_id: token.id || '',
-            campaign_batch_id: batchId,
-          });
-          prepared++;
-          details.push({
-            client_id: client.id,
-            country_code: client.country_code,
-            status: 'dry_run_pending',
+        await base44.asServiceRole.entities.HabitReminder.create({
+          client_id: client.id,
+          client_telephone: client.telephone || '',
+          client_phone_normalized: normalizePhone(client.telephone, client.country_code || undefined) || '',
+          client_user_email: client.user_email || '',
+          country_code: client.country_code || '',
+          segment: 'first_course_delivered',
+          habit_type: 'tranche_horaire',
+          habit_detail: JSON.stringify({
+            first_course_delivered_at: deliveredAt,
             hours_since_delivery: hoursSinceDelivery,
-          });
-        }
+            message_title: RELANCE_TITLE,
+            message_body: RELANCE_MESSAGE,
+          }),
+          habit_occurrences: 1,
+          habit_ratio: 1.0,
+          is_control_group: false,
+          status: effectiveDryRun ? 'pending' : 'sent',
+          push_token: token.token,
+          push_token_id: token.id || '',
+          campaign_batch_id: batchId,
+        });
+        prepared++;
+        details.push({
+          client_id: client.id,
+          country_code: client.country_code,
+          status: effectiveDryRun ? 'dry_run_pending' : 'sent',
+          hours_since_delivery: hoursSinceDelivery,
+          delivered_at: deliveredAt,
+        });
       }
 
       return Response.json({
         action: 'run',
+        analysis_enabled: true,
+        send_enabled: sendEnabled,
         dry_run: effectiveDryRun,
-        enabled,
-        eligible_count: eligible.length,
+        eligible_count: result.eligible_count,
+        excluded_opt_out: result.excluded_opt_out,
+        excluded_duplicate: result.excluded_duplicate,
+        excluded_no_fcm: result.excluded_no_fcm,
+        excluded_recent_solicitation: result.excluded_recent_solicitation,
+        retained_count: result.retained.length,
         prepared,
-        skipped,
-        details: details.slice(0, 10), // Échantillon anonymisé
+        message_title: RELANCE_TITLE,
+        message_body: RELANCE_MESSAGE,
+        details: details.slice(0, 10),
       });
     }
 
@@ -168,14 +165,14 @@ export default async function(req: Request): Promise<Response> {
   }
 }
 
-// ── Trouver les clients éligibles (exactly 1 delivered course, pas de relance existante) ──
+// ═══════════════════════════════════════════════════════════════════════════
+// Analyse complète des clients éligibles avec breakdown détaillé
+// ═══════════════════════════════════════════════════════════════════════════
 
-async function findEligibleClients(base44: any): Promise<any[]> {
+async function analyzeEligibleClients(base44: any): Promise<any> {
   const now = Date.now();
-  const delayMs = RELANCE_DELAY_HOURS * 3600000;
 
   // ── Charger les courses livrées récentes (7 derniers jours) ──
-  const sevenDaysAgo = new Date(now - 7 * 86400000).toISOString();
   const recentDelivered: any[] = [];
   let skip = 0;
   while (true) {
@@ -199,10 +196,10 @@ async function findEligibleClients(base44: any): Promise<any[]> {
     clientCourses.get(key)!.push(c);
   }
 
-  // ── Filtrer : exactement 1 course livrée ──
+  // ── Filtrer : exactement 1 course livrée ET délai ≥ 2h ──
   const firstCourseClients: any[] = [];
   for (const [key, courses] of clientCourses) {
-    if (courses.length !== 1) continue; // Exactement 1 course livrée
+    if (courses.length !== 1) continue;
     const course = courses[0];
     const deliveredAt = course.heure_livraison || course.colis_livre_at || course.created_date;
     if (!deliveredAt) continue;
@@ -233,21 +230,52 @@ async function findEligibleClients(base44: any): Promise<any[]> {
     }
   }
 
-  // ── Charger les HabitReminder existants (anti-doublon) ──
-  const existingReminders = await base44.asServiceRole.entities.HabitReminder.filter({
-    segment: 'first_course_delivered',
-  });
-  const remindedClientIds = new Set(existingReminders.map((r: any) => r.client_id));
+  // ── Charger les HabitReminder existants (anti-doublon + anti-sollicitation) ──
+  const allReminders = await base44.asServiceRole.entities.HabitReminder.list();
+  const remindedClientIds = new Set<string>(); // Déjà relancé par cette fonction
+  const recentlySolicitedClientIds = new Set<string>(); // Sollicité par moteurRappelsHabitude dans les 72h
+  const solWindowMs = ANTI_SOLICITATION_WINDOW_HOURS * 3600000;
 
-  // ── Charger les ReactivationScenario actifs (anti-doublon avec moteurReactivationAuto) ──
-  const activeScenarios = await base44.asServiceRole.entities.ReactivationScenario.filter({
-    status: 'active',
-  });
-  const reactivationClientIds = new Set(activeScenarios.map((s: any) => s.client_id));
+  for (const r of allReminders) {
+    // Anti-doublon : déjà relancé par cette fonction (segment first_course_delivered)
+    if (r.segment === 'first_course_delivered' && r.client_id) {
+      remindedClientIds.add(r.client_id);
+    }
+    // Anti-sollicitation : push envoyé par moteurRappelsHabitude dans les 72h
+    if (r.status === 'sent' && r.sent_at) {
+      const sentMs = new Date(r.sent_at).getTime();
+      if (now - sentMs < solWindowMs && r.client_id) {
+        recentlySolicitedClientIds.add(r.client_id);
+      }
+    }
+  }
 
-  // ── Construire la liste finale ──
+  // ── Charger les ReactivationScenario (anti-doublon + anti-sollicitation) ──
+  const allScenarios = await base44.asServiceRole.entities.ReactivationScenario.list();
+  const reactivationClientIds = new Set<string>(); // Scénario actif
+  const recentlyReactivatedClientIds = new Set<string>(); // Push récent dans les 72h
+
+  for (const s of allScenarios) {
+    if (s.status === 'active' && s.client_id) {
+      reactivationClientIds.add(s.client_id);
+    }
+    // Anti-sollicitation : push de réactivation envoyé dans les 72h
+    const lastPush = s.j0_sent_at || s.j2_sent_at || s.j5_sent_at;
+    if (lastPush && s.client_id) {
+      const pushMs = new Date(lastPush).getTime();
+      if (now - pushMs < solWindowMs) {
+        recentlyReactivatedClientIds.add(s.client_id);
+      }
+    }
+  }
+
+  // ── Construire la liste finale avec breakdown ──
   const eligible: any[] = [];
   const seenClientIds = new Set<string>();
+  let excludedOptOut = 0;
+  let excludedDuplicate = 0;
+  let excludedNoFcm = 0;
+  let excludedRecentSolicitation = 0;
 
   for (const fc of firstCourseClients) {
     let client = null;
@@ -257,14 +285,38 @@ async function findEligibleClients(base44: any): Promise<any[]> {
     if (!client && email) client = clientByEmail.get(email);
     if (!client) continue;
 
-    // Anti-doublon : déjà relancé
-    if (remindedClientIds.has(client.id)) continue;
-    // Anti-doublon : déjà dans un scénario de réactivation actif
-    if (reactivationClientIds.has(client.id)) continue;
     if (seenClientIds.has(client.id)) continue;
     seenClientIds.add(client.id);
 
+    // 1. Anti-doublon : déjà relancé par cette fonction
+    if (remindedClientIds.has(client.id)) {
+      excludedDuplicate++;
+      continue;
+    }
+    // 2. Anti-doublon : déjà dans un scénario de réactivation actif
+    if (reactivationClientIds.has(client.id)) {
+      excludedDuplicate++;
+      continue;
+    }
+    // 3. Anti-sollicitation croisée : push récent par moteurRappelsHabitude ou moteurReactivationAuto
+    if (recentlySolicitedClientIds.has(client.id) || recentlyReactivatedClientIds.has(client.id)) {
+      excludedRecentSolicitation++;
+      continue;
+    }
+
+    // 4. Vérifier le token FCM natif
     const token = client.user_email ? tokenByEmail.get(client.user_email) : null;
+    if (!token || !token.token || String(token.token).startsWith('web_')) {
+      excludedNoFcm++;
+      continue;
+    }
+
+    // 5. Vérifier le consentement marketing
+    const prefs = parseMarketingPrefs(token.preferences_categories);
+    if (prefs.includes('marketing')) {
+      excludedOptOut++;
+      continue;
+    }
 
     eligible.push({
       client,
@@ -274,7 +326,23 @@ async function findEligibleClients(base44: any): Promise<any[]> {
     });
   }
 
-  return eligible.slice(0, MAX_TARGETS_PER_RUN);
+  const retained = eligible.slice(0, MAX_TARGETS_PER_RUN);
+
+  return {
+    eligible_count: firstCourseClients.length,
+    excluded_opt_out: excludedOptOut,
+    excluded_duplicate: excludedDuplicate,
+    excluded_no_fcm: excludedNoFcm,
+    excluded_recent_solicitation: excludedRecentSolicitation,
+    retained_count: retained.length,
+    retained: retained.map(e => ({
+      client_id: e.client.id,
+      country_code: e.client.country_code,
+      delivered_at: e.deliveredAt,
+      hours_since_delivery: Math.round(e.hoursSinceDelivery * 10) / 10,
+      has_fcm: !!e.token?.token,
+    })),
+  };
 }
 
 function parseMarketingPrefs(prefsStr: string | null | undefined): string[] {
