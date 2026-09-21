@@ -184,13 +184,23 @@ async function analyzeEligibleClients(base44: any): Promise<any> {
   const delayMaxMs = RELANCE_DELAY_MAX_HOURS * 3600000;     // 7 jours
 
   // ── Charger les courses livrées dans la fenêtre 48h-7j uniquement ──
-  // OPTIMISATION : au lieu de charger toutes les courses livrées (jusqu'à 3000+),
-  // on filtre par date pour ne charger que celles dans la fenêtre pertinente.
+  // OPTIMISATION : filtre par date pour ne charger que les courses des 7 derniers jours.
+  // PAGINATION CORRECTE : le SDK supporte skip (4e paramètre, max 5000/requête).
+  // Si >500 courses livrées sur 7 jours, on pagine proprement sans ignorer de clients.
   const sevenDaysAgo = new Date(now - delayMaxMs).toISOString();
-  const recentDelivered = await base44.asServiceRole.entities.CourseExterne.filter(
-    { statut: 'livree', heure_livraison: { $gte: sevenDaysAgo } },
-    '-heure_livraison', 500
-  ).catch(() => []);
+  const recentDelivered: any[] = [];
+  let skipCount = 0;
+  while (true) {
+    const batch = await base44.asServiceRole.entities.CourseExterne.filter(
+      { statut: 'livree', heure_livraison: { $gte: sevenDaysAgo } },
+      '-heure_livraison', 500, skipCount
+    ).catch(() => []);
+    if (!batch || batch.length === 0) break;
+    recentDelivered.push(...batch);
+    if (batch.length < 500) break;    // Moins de 500 = dernière page
+    skipCount += 500;
+    if (skipCount >= 5000) break;     // Limite de sécurité SDK (max 5000/requête)
+  }
 
   // ── Grouper par client (phone_normalized ou user_email) ──
   const clientCourses = new Map<string, any[]>();
