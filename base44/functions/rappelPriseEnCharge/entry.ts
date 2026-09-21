@@ -26,11 +26,12 @@ Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
 
-    // Récupérer toutes les courses avec un livreur assigné et un statut concerné
+    // Récupérer les courses avec un livreur assigné ET un statut concerné
+    // (filtrage DB côté statut pour éviter de charger 500 courses inutiles)
     const courses = await base44.asServiceRole.entities.CourseExterne.filter(
-      { livreur_id: { $ne: null } },
+      { livreur_id: { $ne: null }, statut: { $in: STATUTS_CONCERNES } },
       '-created_date',
-      500
+      100
     );
 
     const now = Date.now();
@@ -51,11 +52,12 @@ Deno.serve(async (req) => {
     }
 
     // Vérifier les notifications déjà envoyées pour éviter les doublons
+    // (filtrage DB par course_id pour éviter de charger 500 notifications inutiles)
     const courseIds = coursesEnRetard.map((c) => c.id);
     const notifsExistantes = await base44.asServiceRole.entities.Notification.filter(
-      { type: 'rappel_prise_en_charge' },
+      { type: 'rappel_prise_en_charge', course_id: { $in: courseIds } },
       '-created_date',
-      500
+      courseIds.length
     );
     const dejaNotifie = new Set(
       (notifsExistantes || [])
