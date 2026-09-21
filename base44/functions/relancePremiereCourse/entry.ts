@@ -106,8 +106,15 @@ export default async function(req: Request): Promise<Response> {
       let prepared = 0;
       const details: any[] = [];
 
-      for (const el of result.retained) {
+      // BUGFIX : result.retained est un résumé (client_id, country_code, ...)
+      // Les objets complets (client, token) sont dans result.eligible_full.
+      for (const el of result.eligible_full || []) {
         const { client, token, deliveredAt, hoursSinceDelivery } = el;
+
+        if (!client || !client.id) {
+          // Garde-fou : ne jamais planter sur un objet undefined
+          continue;
+        }
 
         // ── Créer un HabitReminder (DRY-RUN = status 'pending', pas d'envoi) ──
         await base44.asServiceRole.entities.HabitReminder.create({
@@ -128,8 +135,8 @@ export default async function(req: Request): Promise<Response> {
           habit_ratio: 1.0,
           is_control_group: false,
           status: effectiveDryRun ? 'pending' : 'sent',
-          push_token: token.token,
-          push_token_id: token.id || '',
+          push_token: token?.token || '',
+          push_token_id: token?.id || '',
           campaign_batch_id: batchId,
         });
         prepared++;
@@ -176,20 +183,14 @@ async function analyzeEligibleClients(base44: any): Promise<any> {
   const delayMinMs = RELANCE_DELAY_HOURS * 3600000;       // 48h
   const delayMaxMs = RELANCE_DELAY_MAX_HOURS * 3600000;     // 7 jours
 
-  // ── Charger les courses livrées récentes (14 derniers jours pour couvrir la fenêtre 48h-7j) ──
-  const recentDelivered: any[] = [];
-  let skip = 0;
-  while (true) {
-    const batch = await base44.asServiceRole.entities.CourseExterne.filter(
-      { statut: 'livree' },
-      '-heure_livraison', 500, skip
-    );
-    if (!batch || batch.length === 0) break;
-    recentDelivered.push(...batch);
-    if (batch.length < 500) break;
-    skip += 500;
-    if (skip > 3000) break;
-  }
+  // ── Charger les courses livrées dans la fenêtre 48h-7j uniquement ──
+  // OPTIMISATION : au lieu de charger toutes les courses livrées (jusqu'à 3000+),
+  // on filtre par date pour ne charger que celles dans la fenêtre pertinente.
+  const sevenDaysAgo = new Date(now - delayMaxMs).toISOString();
+  const recentDelivered = await base44.asServiceRole.entities.CourseExterne.filter(
+    { statut: 'livree', heure_livraison: { $gte: sevenDaysAgo } },
+    '-heure_livraison', 500
+  ).catch(() => []);
 
   // ── Grouper par client (phone_normalized ou user_email) ──
   const clientCourses = new Map<string, any[]>();
@@ -273,10 +274,15 @@ async function analyzeEligibleClients(base44: any): Promise<any> {
   const solicitationResult = await getRecentlySolicitedClients(base44);
 
   // ── Anti-doublon : déjà relancé par cette fonction (segment first_course_delivered) ──
-  const allReminders = await base44.asServiceRole.entities.HabitReminder.list();
+  // OPTIMISATION : ne charger que les HabitReminder du segment first_course_delivered
+  // au lieu de charger TOUS les HabitReminder.
+  const firstCourseReminders = await base44.asServiceRole.entities.HabitReminder.filter(
+    { segment: 'first_course_delivered' },
+    undefined, 500
+  ).catch(() => []);
   const remindedClientIds = new Set<string>();
-  for (const r of allReminders) {
-    if (r.segment === 'first_course_delivered' && r.client_id) {
+  for (const r of firstCourseReminders) {
+    if (r.client_id) {
       remindedClientIds.add(r.client_id);
     }
   }
@@ -359,6 +365,9 @@ async function analyzeEligibleClients(base44: any): Promise<any> {
       hours_since_delivery: Math.round(e.hoursSinceDelivery * 10) / 10,
       has_fcm: !!e.token?.token,
     })),
+    // BUGFIX : retourner les objets complets pour que l'action 'run' puisse
+    // accéder à client.id, token.token, etc. sans crash undefined.id
+    eligible_full: retained,
   };
 }
 
