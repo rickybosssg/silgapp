@@ -1,171 +1,44 @@
 /**
  * venusObserverEngine.ts — Moteur d'Observation Autonome VENUS
  *
- * Surveille en permanence: courses, livreurs, partenaires, paiements, notifications, GPS
- * Détecte les événements importants et déclenche des actions automatiques
+ * OPTIMISATION 2026-09-21 :
+ *   - Suppression de la surveillance des courses annulées (décision métier)
+ *   - Suppression des branches obsolètes (statuts en_cours, proposee, en_ligne — 0 résultat)
+ *   - Chargement unique des VenusAutomationRule par cycle (élimine N+1)
+ *   - Requêtes filtrées avec limite (pas de table complète)
+ *
+ * SURVEILLANCES SUPPRIMÉES (obsolètes, couvertes par d'autres moteurs) :
+ *   - CourseExterne 'en_cours'   (livreur_retard)     → couverte par Détection Courses à Sauver
+ *   - CourseExterne 'proposee'   (course_bloquee)      → couverte par Dispatch V2
+ *   - CourseExterne 'annulee'    (course_annulee)      → supprimée par décision métier
+ *   - Livreur 'en_ligne'         (encours_depasse)     → couverte par verifierEncoursLivreur + gestionPresenceLivreurs
+ *
+ * SURVEILLANCES CONSERVÉES :
+ *   - PaiementSilgapp 'echec' (paiement_refuse) — retourne actuellement 0 résultat
+ *   - CommandeBoutique 'en_attente' (zone_saturee) — retourne actuellement 0 résultat
+ *
+ * NOTE : Les deux surveillances conservées utilisent des statuts qui ne retournent
+ * actuellement aucun résultat. Elles sont conservées telles quelles sans modification
+ * (pas de remplacement de statut) conformément à la directive métier.
  */
 
 // ─── Cycle d'Observation Principal ───
 export async function runObservationCycle(base44) {
-  const now = new Date();
   const observations: any[] = [];
 
-  // 1. Observer les courses actives
-  const coursesObs = await observerCourses(base44, now);
-  observations.push(...coursesObs);
-
-  // 2. Observer les livreurs
-  const livreursObs = await observerLivreurs(base44, now);
-  observations.push(...livreursObs);
-
-  // 3. Observer les paiements
-  const paiementsObs = await observerPaiements(base44, now);
+  // 1. Observer les paiements échoués
+  const paiementsObs = await observerPaiements(base44);
   observations.push(...paiementsObs);
 
-  // 4. Observer les partenaires (boutiques/restaurants)
-  const partenairesObs = await observerPartenaires(base44, now);
+  // 2. Observer les partenaires (boutiques avec commandes en attente)
+  const partenairesObs = await observerPartenaires(base44);
   observations.push(...partenairesObs);
 
-  // 5. Évaluer les règles d'automatisation
-  for (const obs of observations) {
-    await evaluerReglesPourObservation(base44, obs);
-  }
-
-  return observations;
-}
-
-// ─── Observer les Courses ───
-async function observerCourses(base44, now: Date) {
-  const observations: any[] = [];
-  const tenMinutesAgo = new Date(now.getTime() - 10 * 60 * 1000);
-
-  // Courses en cours avec retard potentiel
-  const coursesEnCours = await base44.asServiceRole.entities.CourseExterne.filter(
-    { statut: 'en_cours' }
-  );
-
-  for (const course of coursesEnCours) {
-    if (course.date_prise_en_charge) {
-      const priseEnCharge = new Date(course.date_prise_en_charge);
-      const retardMin = Math.round((now.getTime() - priseEnCharge.getTime()) / 60000);
-
-      if (retardMin > 45) {
-        observations.push({
-          type: 'livreur_retard',
-          severity: retardMin > 60 ? 'critique' : 'haute',
-          entity_type: 'course',
-          entity_id: course.id,
-          cible_id: course.client_telephone,
-          data: {
-            course_id: course.id,
-            retard_minutes: retardMin,
-            livreur_id: course.livreur_id,
-            client_telephone: course.client_telephone,
-          },
-          message: `Course ${course.id}: livreur en retard de ${retardMin} minutes`,
-        });
-      }
-    }
-  }
-
-  // Courses bloquées (proposées depuis trop longtemps)
-  const coursesProposees = await base44.asServiceRole.entities.CourseExterne.filter(
-    { statut: 'proposee' }
-  );
-
-  for (const course of coursesProposees) {
-    const creation = new Date(course.created_date);
-    const attenteMin = Math.round((now.getTime() - creation.getTime()) / 60000);
-
-    if (attenteMin > 10) {
-      observations.push({
-        type: 'course_bloquee',
-        severity: attenteMin > 20 ? 'critique' : 'haute',
-        entity_type: 'course',
-        entity_id: course.id,
-        data: {
-          course_id: course.id,
-          attente_minutes: attenteMin,
-          client_telephone: course.client_telephone,
-        },
-        message: `Course ${course.id}: en attente de livreur depuis ${attenteMin} minutes`,
-      });
-    }
-  }
-
-  // Courses annulées récemment → proposer re-dispatch
-  const coursesAnnulees = await base44.asServiceRole.entities.CourseExterne.filter(
-    { statut: 'annulee' }
-  );
-
-  for (const course of coursesAnnulees.slice(0, 5)) {
-    if (course.updated_date) {
-      const annulation = new Date(course.updated_date);
-      const delai = (now.getTime() - annulation.getTime()) / 60000;
-      if (delai < 5) {
-        observations.push({
-          type: 'course_annulee',
-          severity: 'normale',
-          entity_type: 'course',
-          entity_id: course.id,
-          data: {
-            course_id: course.id,
-            client_telephone: course.client_telephone,
-            raison: course.raison_annulation || 'N/A',
-          },
-          message: `Course ${course.id} annulée — proposer nouvelle recherche au client`,
-        });
-      }
-    }
-  }
-
-  return observations;
-}
-
-// ─── Observer les Livreurs ───
-async function observerLivreurs(base44, now: Date) {
-  const observations: any[] = [];
-
-  const livreurs = await base44.asServiceRole.entities.Livreur.filter(
-    { statut: 'en_ligne' }
-  );
-
-  for (const livreur of livreurs) {
-    // Vérifier l'encours financier
-    if (livreur.encours && livreur.encours > 5000) {
-      observations.push({
-        type: 'encours_depasse',
-        severity: 'haute',
-        entity_type: 'livreur',
-        entity_id: livreur.id,
-        cible_id: livreur.id,
-        data: {
-          livreur_id: livreur.id,
-          livreur_nom: livreur.nom,
-          encours: livreur.encours,
-        },
-        message: `Livreur ${livreur.nom}: encours élevé (${livreur.encours} FCFA)`,
-      });
-    }
-
-    // Vérifier si le livreur est en ligne mais sans activité prolongée
-    if (livreur.derniere_activite) {
-      const derniereActivite = new Date(livreur.derniere_activite);
-      const inactiviteMin = Math.round((now.getTime() - derniereActivite.getTime()) / 60000);
-      if (inactiviteMin > 30 && livreur.statut === 'en_ligne') {
-        observations.push({
-          type: 'livreur_hors_ligne',
-          severity: 'basse',
-          entity_type: 'livreur',
-          entity_id: livreur.id,
-          data: {
-            livreur_id: livreur.id,
-            livreur_nom: livreur.nom,
-            inactivite_minutes: inactiviteMin,
-          },
-          message: `Livreur ${livreur.nom}: en ligne mais inactif depuis ${inactiviteMin} min`,
-        });
-      }
+  // 3. Évaluer les règles d'automatisation (chargement unique par cycle)
+  if (observations.length > 0) {
+    const rules = await base44.asServiceRole.entities.VenusAutomationRule.filter({ active: true });
+    for (const obs of observations) {
+      await evaluerReglesPourObservation(base44, obs, rules);
     }
   }
 
@@ -173,15 +46,16 @@ async function observerLivreurs(base44, now: Date) {
 }
 
 // ─── Observer les Paiements ───
-async function observerPaiements(base44, now: Date) {
+async function observerPaiements(base44) {
   const observations: any[] = [];
 
-  // Paiements récents échoués
+  // Paiements récents échoués (limité à 10 pour éviter le chargement complet)
   const paiements = await base44.asServiceRole.entities.PaiementSilgapp.filter(
-    { statut: 'echec' }
+    { statut: 'echec' },
+    '-created_date', 10
   );
 
-  for (const paiement of paiements.slice(0, 10)) {
+  for (const paiement of paiements) {
     observations.push({
       type: 'paiement_refuse',
       severity: 'normale',
@@ -202,12 +76,13 @@ async function observerPaiements(base44, now: Date) {
 }
 
 // ─── Observer les Partenaires ───
-async function observerPartenaires(base44, now: Date) {
+async function observerPartenaires(base44) {
   const observations: any[] = [];
 
-  // Vérifier les boutiques avec commandes en attente
+  // Vérifier les boutiques avec commandes en attente (limité à 100)
   const commandesBoutique = await base44.asServiceRole.entities.CommandeBoutique.filter(
-    { statut: 'en_attente' }
+    { statut: 'en_attente' },
+    '-created_date', 100
   );
 
   const byBoutique: Record<string, number> = {};
@@ -235,12 +110,11 @@ async function observerPartenaires(base44, now: Date) {
 }
 
 // ─── Évaluer les règles d'automatisation pour une observation ───
-async function evaluerReglesPourObservation(base44, observation: any) {
-  const rules = await base44.asServiceRole.entities.VenusAutomationRule.filter(
-    { condition_type: observation.type, active: true }
-  );
+async function evaluerReglesPourObservation(base44, observation: any, allRules: any[]) {
+  // Filtrer les règles en mémoire (au lieu d'une requête DB par observation)
+  const matchingRules = allRules.filter(r => r.condition_type === observation.type);
 
-  for (const rule of rules) {
+  for (const rule of matchingRules) {
     const action = await base44.asServiceRole.entities.VenusAgentAction.create({
       type_action: 'auto_notification',
       declencheur: `observer:${observation.type}`,
