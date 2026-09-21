@@ -100,8 +100,19 @@ export interface CourseRisk {
  * Charge les seuils configurables depuis AppConfig.
  * Le seuil GPS vient de Country.gps_expire_seuil_min (pas de duplication).
  */
+const RISK_CONFIG_KEYS = [
+  'COURSE_RISQUE_SANS_LIVREUR_MIN',
+  'COURSE_RISQUE_NON_PROGRESSION_MIN',
+  'COURSE_RISQUE_RECUPERATION_MIN',
+  'COURSE_RISQUE_LIVRAISON_MIN',
+  'COURSE_RISQUE_BLOQUE_MIN',
+  'COURSE_RISQUE_ALERT_DEDUP_MIN',
+];
+
 export async function loadRiskConfig(base44: any) {
-  const configs = await base44.asServiceRole.entities.AppConfig.filter({}).catch(() => []);
+  const configs = await base44.asServiceRole.entities.AppConfig.filter({
+    cle: { $in: RISK_CONFIG_KEYS },
+  }).catch(() => []);
   const get = (key: string, def: number) => {
     const c = configs.find((x: any) => x.cle === key);
     return c ? (parseInt(c.valeur, 10) || def) : def;
@@ -134,29 +145,35 @@ export async function computeCoursesARisque(base44: any): Promise<{ courses: Cou
     return { courses: [], total: 0 };
   }
 
-  // ── Charger les livreurs liés ──
+  // ── Charger les livreurs liés (batch $in au lieu de N+1 Livreur.get) ──
   const livreurIds = [...new Set(courses.filter((c: any) => c.livreur_id).map((c: any) => c.livreur_id))];
   const livreurMap: Record<string, any> = {};
-  for (const id of livreurIds) {
-    try {
-      const l = await base44.asServiceRole.entities.Livreur.get(id);
-      livreurMap[id] = l;
-    } catch {}
+  if (livreurIds.length > 0) {
+    const livreurs = await base44.asServiceRole.entities.Livreur.filter({
+      id: { $in: livreurIds },
+    }).catch(() => []);
+    for (const l of (livreurs || [])) {
+      livreurMap[l.id] = l;
+    }
   }
 
-  // ── Charger les pays (pour gps_expire_seuil_min) ──
+  // ── Charger les pays (batch $in au lieu de N+1 Country.filter) ──
   const countryCodes = [...new Set(courses.map((c: any) => c.country_code).filter(Boolean))];
   const countryMap: Record<string, any> = {};
-  for (const code of countryCodes) {
-    try {
-      const cs = await base44.asServiceRole.entities.Country.filter({ code });
-      if (cs[0]) countryMap[code] = cs[0];
-    } catch {}
+  if (countryCodes.length > 0) {
+    const countries = await base44.asServiceRole.entities.Country.filter({
+      code: { $in: countryCodes },
+    }).catch(() => []);
+    for (const c of (countries || [])) {
+      if (c.code) countryMap[c.code] = c;
+    }
   }
 
-  // ── Charger les annulations récentes (R5) ──
+  // ── Charger les annulations récentes (R5) — fenêtre 7 jours (couvre toutes courses actives possibles) ──
+  const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString();
   const annulations = await base44.asServiceRole.entities.AnnulationLivreur.filter(
-    {}, '-date_annulation', 50
+    { date_annulation: { $gte: sevenDaysAgo } },
+    '-date_annulation', 50
   ).catch(() => []);
   const annulationCourseIds = new Set((annulations || []).map((a: any) => a.course_id));
 
@@ -362,9 +379,10 @@ export async function computeCoursesARisque(base44: any): Promise<{ courses: Cou
  * - Archive les alertes dont le risque a disparu
  */
 export async function syncAdminAlerts(base44: any, courses: CourseRisk[], config: any) {
-  // ── Charger les AdminInboxItem existants pour courses à risque ──
+  // ── Charger uniquement les AdminInboxItem non archivés (au lieu de 500 incluant les archivés) ──
   const existingItems = await base44.asServiceRole.entities.AdminInboxItem.filter(
-    {}, '-created_date', 500
+    { status: { $ne: 'archived' } },
+    '-created_date', 500
   ).catch(() => []);
 
   const courseRiskItems = (existingItems || []).filter((item: any) =>
