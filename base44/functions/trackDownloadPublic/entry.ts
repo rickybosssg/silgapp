@@ -7,7 +7,7 @@ Deno.serve(async (req) => {
 
     // Récupérer le corps de la requête
     const body = await req.json().catch(() => ({}));
-    const { event_type, country_code, platform, referrer } = body;
+    const { event_type, country_code, platform, referrer, utm_source, utm_medium, utm_campaign, fbclid, meta_campaign_id } = body;
 
     // Validation minimale
     if (!event_type) {
@@ -38,6 +38,10 @@ Deno.serve(async (req) => {
         updates.downloads = (stats.downloads || 0) + 1;
         updates.last_download_date = new Date().toISOString();
       }
+      if (event_type === 'play_download') {
+        updates.play_downloads = (stats.play_downloads || 0) + 1;
+        updates.last_download_date = new Date().toISOString();
+      }
 
       if (Object.keys(updates).length > 0) {
         await base44.asServiceRole.entities.DownloadStats.update(stats.id, updates);
@@ -48,11 +52,12 @@ Deno.serve(async (req) => {
         month: monthKey,
         country_code: country_code || 'INCONNU',
         platform: platform || 'web',
-        referrer: referrer || 'direct',
+        referrer: referrer || utm_source || 'direct',
         page_visits: event_type === 'page_visit' ? 1 : 0,
         clicks: event_type === 'download_click' ? 1 : 0,
         downloads: event_type === 'apk_download' ? 1 : 0,
-        last_download_date: event_type === 'apk_download' ? new Date().toISOString() : null
+        play_downloads: event_type === 'play_download' ? 1 : 0,
+        last_download_date: (event_type === 'apk_download' || event_type === 'play_download') ? new Date().toISOString() : null
       };
       await base44.asServiceRole.entities.DownloadStats.create(newStats);
     }

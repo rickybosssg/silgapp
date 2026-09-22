@@ -30,6 +30,7 @@ function captureUtmAttribution() {
     utm_campaign: null,
     utm_content: null,
     utm_term: null,
+    fbclid: null,
     meta_campaign_id: null,
     meta_adset_id: null,
     meta_ad_id: null,
@@ -43,6 +44,7 @@ function captureUtmAttribution() {
     utm.utm_campaign = urlParams.get('utm_campaign') || utm.utm_campaign;
     utm.utm_content = urlParams.get('utm_content') || utm.utm_content;
     utm.utm_term = urlParams.get('utm_term') || utm.utm_term;
+    utm.fbclid = urlParams.get('fbclid') || utm.fbclid;
     // Meta campaign ID peut être passé dans l'URL (deep link)
     utm.meta_campaign_id = urlParams.get('meta_campaign_id') || utm.meta_campaign_id;
     utm.meta_adset_id = urlParams.get('meta_adset_id') || utm.meta_adset_id;
@@ -60,6 +62,7 @@ function captureUtmAttribution() {
       utm.utm_campaign = utm.utm_campaign || parsed.utm_campaign || null;
       utm.utm_content = utm.utm_content || parsed.utm_content || null;
       utm.utm_term = utm.utm_term || parsed.utm_term || null;
+      utm.fbclid = utm.fbclid || parsed.fbclid || null;
       utm.meta_campaign_id = utm.meta_campaign_id || parsed.meta_campaign_id || null;
       utm.meta_adset_id = utm.meta_adset_id || parsed.meta_adset_id || null;
       utm.meta_ad_id = utm.meta_ad_id || parsed.meta_ad_id || null;

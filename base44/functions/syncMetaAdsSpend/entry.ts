@@ -81,6 +81,21 @@ async function fetchCampaigns(accessToken, accountId) {
   return data.data || [];
 }
 
+async function fetchCampaignInsights(accessToken, campaignId, dateSince, dateUntil) {
+  const url = `${META_API_BASE}/${campaignId}/insights` +
+    `?fields=spend,impressions,clicks,ctr,cpc,reach,date_start,date_stop` +
+    `&time_increment=1` +
+    `&time_range={"since":"${dateSince}","until":"${dateUntil}"}` +
+    `&limit=100`;
+
+  const res = await fetch(url, {
+    headers: { 'Authorization': `Bearer ${accessToken}` },
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(`Meta API campaign insights: ${data.error.message}`);
+  return data.data || [];
+}
+
 async function upsertGrowthSpend(base44, accountId, date, spend, impressions, clicks) {
   const idempotencyKey = `meta_spend_${accountId}_${date}`;
 
@@ -145,6 +160,12 @@ async function storeLatestMetrics(base44, accountId, campaigns, insights) {
       status: c.status,
       objective: c.objective,
       daily_budget: c.daily_budget || null,
+      spend: c.spend || 0,
+      impressions: c.impressions || 0,
+      clicks: c.clicks || 0,
+      reach: c.reach || 0,
+      ctr: c.ctr || '0',
+      cpc: c.cpc || '0',
     })),
   };
 
@@ -188,6 +209,46 @@ export default async function(req) {
     // 2. Lire les insights (dépenses réelles par jour)
     const insights = await fetchAccountInsights(accessToken, accountId, dateSince, dateUntil);
 
+    // 2b. Lire les insights par campagne
+    const campaignMetrics = [];
+    for (const campaign of campaigns) {
+      try {
+        const cInsights = await fetchCampaignInsights(accessToken, campaign.id, dateSince, dateUntil);
+        const cSpend = cInsights.reduce((sum, i) => sum + parseFloat(i.spend || '0'), 0);
+        const cImpressions = cInsights.reduce((sum, i) => sum + parseInt(i.impressions || '0'), 0);
+        const cClicks = cInsights.reduce((sum, i) => sum + parseInt(i.clicks || '0'), 0);
+        const cReach = cInsights.length > 0 ? Math.max(...cInsights.map(i => parseInt(i.reach || '0'))) : 0;
+
+        campaignMetrics.push({
+          id: campaign.id,
+          name: campaign.name,
+          status: campaign.status,
+          objective: campaign.objective,
+          daily_budget: campaign.daily_budget || null,
+          spend: cSpend,
+          impressions: cImpressions,
+          clicks: cClicks,
+          reach: cReach,
+          ctr: cImpressions > 0 ? (cClicks / cImpressions * 100).toFixed(2) : '0',
+          cpc: cClicks > 0 ? (cSpend / cClicks).toFixed(2) : '0',
+        });
+      } catch (err) {
+        campaignMetrics.push({
+          id: campaign.id,
+          name: campaign.name,
+          status: campaign.status,
+          objective: campaign.objective,
+          daily_budget: campaign.daily_budget || null,
+          spend: 0,
+          impressions: 0,
+          clicks: 0,
+          reach: 0,
+          ctr: '0',
+          cpc: '0',
+        });
+      }
+    }
+
     // 3. Enregistrer les dépenses réelles dans GrowthSpend (idempotent)
     const syncResults = [];
     for (const insight of insights) {
@@ -209,7 +270,7 @@ export default async function(req) {
     }
 
     // 4. Stocker les métriques dans AppConfig pour le dashboard
-    const metrics = await storeLatestMetrics(base44, accountId, campaigns, insights);
+    const metrics = await storeLatestMetrics(base44, accountId, campaignMetrics, insights);
 
     return Response.json({
       success: true,
