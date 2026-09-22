@@ -300,7 +300,8 @@ Deno.serve(async (req) => {
       const metaCampaignId = campaignData.id;
       await logAction('meta_api_called', 'meta_campaign', campaign_id, campaign.name, { api: 'create_campaign', meta_id: metaCampaignId });
 
-      // 2. Create ad set on Meta (PAUSED)
+      // 2. Create ad set on Meta (PAUSED) — ciblage Ouagadougou + 25km, 18-45 ans
+      const OUAGADOUGOU_CITY_KEY = '193625'; // Meta city key pour Ouagadougou (région Kadiogo, BF)
       const adsetRes = await fetch(`${META_API_BASE}/${accountId}/adsets`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -310,7 +311,14 @@ Deno.serve(async (req) => {
           daily_budget: campaign.daily_budget * 100, // FCFA to centimes
           billing_event: 'IMPRESSIONS',
           optimization_goal: campaign.objective === 'OUTCOME_TRAFFIC' ? 'LINK_CLICKS' : 'OFFSITE_CONVERSIONS',
-          targeting: { geo_locations: { countries: countries } },
+          targeting: {
+            geo_locations: {
+              cities: [{ key: OUAGADOUGOU_CITY_KEY, radius: 25, distance_unit: 'kilometer' }],
+            },
+            age_min: 18,
+            age_max: 45,
+            genders: [0], // 0 = tous genres
+          },
           status: 'PAUSED',
         }),
       });
@@ -319,19 +327,78 @@ Deno.serve(async (req) => {
         await logAction('meta_api_error', 'meta_campaign', campaign_id, campaign.name, { api: 'create_adset', error: adsetData.error.message });
         throw new Error(`Meta adset: ${adsetData.error.message}`);
       }
-      await logAction('meta_api_called', 'meta_campaign', campaign_id, campaign.name, { api: 'create_adset', meta_id: adsetData.id });
+      await logAction('meta_api_called', 'meta_campaign', campaign_id, campaign.name, { api: 'create_adset', meta_id: adsetData.id, targeting: 'Ouagadougou+25km, 18-45, all genders' });
 
-      // 3. Update MetaCampaign with Meta IDs (status = paused since Meta campaign is PAUSED)
+      // 3. Create ad creative on Meta (using image_url from approved AdCreative)
+      let metaAdId = null;
+      let metaCreativeId = null;
+      if (creativeIds.length > 0) {
+        const adCreative = await base44.asServiceRole.entities.AdCreative.get(creativeIds[0]);
+        if (adCreative && adCreative.image_url) {
+          const creativeRes = await fetch(`${META_API_BASE}/${accountId}/adcreatives`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: adCreative.name,
+              title: adCreative.headline || campaign.name,
+              body: adCreative.primary_text || '',
+              image_url: adCreative.image_url,
+              object_url: adCreative.landing_url || 'https://silga-dispatch-go.base44.app/telecharger',
+              call_to_action_type: adCreative.call_to_action || 'INSTALL_APP',
+            }),
+          });
+          const creativeData = await creativeRes.json();
+          if (creativeData.error) {
+            await logAction('meta_api_error', 'meta_campaign', campaign_id, campaign.name, { api: 'create_creative', error: creativeData.error.message });
+            throw new Error(`Meta creative: ${creativeData.error.message}`);
+          }
+          metaCreativeId = creativeData.id;
+          await logAction('meta_api_called', 'meta_campaign', campaign_id, campaign.name, { api: 'create_creative', meta_id: metaCreativeId });
+
+          // Update AdCreative with Meta creative ID
+          await base44.asServiceRole.entities.AdCreative.update(adCreative.id, { meta_creative_id: metaCreativeId });
+
+          // 4. Create ad on Meta (PAUSED)
+          const adRes = await fetch(`${META_API_BASE}/${accountId}/ads`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: `${campaign.name} - Ad`,
+              adset_id: adsetData.id,
+              creative: { creative_id: metaCreativeId },
+              status: 'PAUSED',
+            }),
+          });
+          const adData = await adRes.json();
+          if (adData.error) {
+            await logAction('meta_api_error', 'meta_campaign', campaign_id, campaign.name, { api: 'create_ad', error: adData.error.message });
+            throw new Error(`Meta ad: ${adData.error.message}`);
+          }
+          metaAdId = adData.id;
+          await logAction('meta_api_called', 'meta_campaign', campaign_id, campaign.name, { api: 'create_ad', meta_id: metaAdId });
+        }
+      }
+
+      // 5. Update MetaCampaign with Meta IDs (status = paused since Meta campaign is PAUSED)
       await base44.asServiceRole.entities.MetaCampaign.update(campaign_id, {
         status: 'paused',
         meta_campaign_id: metaCampaignId,
         activated_at: new Date().toISOString(),
       });
-      await logAction('campaign_activated', 'meta_campaign', campaign_id, campaign.name, { meta_campaign_id: metaCampaignId, adset_id: adsetData.id, meta_status: 'PAUSED' });
+      await logAction('campaign_activated', 'meta_campaign', campaign_id, campaign.name, {
+        meta_campaign_id: metaCampaignId,
+        adset_id: adsetData.id,
+        ad_id: metaAdId,
+        creative_id: metaCreativeId,
+        meta_status: 'PAUSED',
+        targeting: 'Ouagadougou+25km, 18-45, all genders',
+      });
 
       return Response.json({
         success: true, campaign_id, meta_campaign_id: metaCampaignId, meta_adset_id: adsetData.id,
+        meta_ad_id: metaAdId, meta_creative_id: metaCreativeId,
         meta_status: 'PAUSED',
+        targeting: 'Ouagadougou + 25km, 18-45 ans, tous genres',
         message: 'Campagne créée sur Meta en PAUSED. Utilisez resume_campaign pour démarrer la diffusion.',
       });
     }
