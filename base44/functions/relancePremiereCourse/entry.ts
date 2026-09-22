@@ -1,6 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 import { normalizePhone } from '../../shared/phoneUtils.ts';
 import { getRecentlySolicitedClients, isClientSolicited } from '../../shared/antiSolicitation.ts';
+import { sendReactivationPush } from '../../shared/reactivationEngine.ts';
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -96,50 +97,137 @@ export default async function(req: Request): Promise<Response> {
       });
     }
 
-    // ── Action : run (préparer les relances en DRY-RUN) ──
+    // ── Action : run (préparer les relances + envoi FCM si LIVE) ──
     if (action === 'run') {
       const result = await analyzeEligibleClients(base44);
       const effectiveDryRun = !sendEnabled; // DRY-RUN tant que sendEnabled est false
 
-      const now = new Date().toISOString();
       const batchId = `first_course_relance_${Date.now()}`;
       let prepared = 0;
+      let sentOk = 0;
+      let sentFailed = 0;
       const details: any[] = [];
 
-      for (const el of result.retained) {
-        const { client, token, deliveredAt, hoursSinceDelivery } = el;
+      // BUGFIX : result.retained est un résumé (client_id, country_code, ...)
+      // Les objets complets (client, token) sont dans result.eligible_full.
+      const eligibleFull = (result.eligible_full || []).filter(
+        el => el?.client?.id && el?.token?.token
+      );
 
-        // ── Créer un HabitReminder (DRY-RUN = status 'pending', pas d'envoi) ──
-        await base44.asServiceRole.entities.HabitReminder.create({
-          client_id: client.id,
-          client_telephone: client.telephone || '',
-          client_phone_normalized: normalizePhone(client.telephone, client.country_code || undefined) || '',
-          client_user_email: client.user_email || '',
-          country_code: client.country_code || '',
-          segment: 'first_course_delivered',
-          habit_type: 'tranche_horaire',
-          habit_detail: JSON.stringify({
-            first_course_delivered_at: deliveredAt,
+      // ── DRY-RUN : créer des HabitReminder 'pending' sans appel FCM ──
+      if (effectiveDryRun) {
+        for (const el of eligibleFull) {
+          const { client, token, deliveredAt, hoursSinceDelivery } = el;
+          await base44.asServiceRole.entities.HabitReminder.create({
+            client_id: client.id,
+            client_telephone: client.telephone || '',
+            client_phone_normalized: normalizePhone(client.telephone, client.country_code || undefined) || '',
+            client_user_email: client.user_email || '',
+            country_code: client.country_code || '',
+            segment: 'first_course_delivered',
+            habit_type: 'tranche_horaire',
+            habit_detail: JSON.stringify({
+              first_course_delivered_at: deliveredAt,
+              hours_since_delivery: hoursSinceDelivery,
+              message_title: RELANCE_TITLE,
+              message_body: RELANCE_MESSAGE,
+            }),
+            habit_occurrences: 1,
+            habit_ratio: 1.0,
+            is_control_group: false,
+            status: 'pending',
+            push_token: token?.token || '',
+            push_token_id: token?.id || '',
+            campaign_batch_id: batchId,
+          });
+          prepared++;
+          details.push({
+            client_id: client.id,
+            country_code: client.country_code,
+            status: 'dry_run_pending',
             hours_since_delivery: hoursSinceDelivery,
-            message_title: RELANCE_TITLE,
-            message_body: RELANCE_MESSAGE,
-          }),
-          habit_occurrences: 1,
-          habit_ratio: 1.0,
-          is_control_group: false,
-          status: effectiveDryRun ? 'pending' : 'sent',
-          push_token: token.token,
-          push_token_id: token.id || '',
-          campaign_batch_id: batchId,
-        });
-        prepared++;
-        details.push({
-          client_id: client.id,
-          country_code: client.country_code,
-          status: effectiveDryRun ? 'dry_run_pending' : 'sent',
-          hours_since_delivery: hoursSinceDelivery,
-          delivered_at: deliveredAt,
-        });
+            delivered_at: deliveredAt,
+          });
+        }
+      } else {
+        // ── LIVE : envoyer FCM réellement via sendReactivationPush() ──
+        // Réutilise le mécanisme FCM éprouvé de reactivationEngine.ts.
+        // Ne jamais marquer 'sent' avant confirmation FCM.
+        const targets = eligibleFull.map(el => ({
+          token: el.token.token,
+          recipient_id: el.client.id,
+        }));
+
+        let fcmResults: { results: any[] } = { results: [] };
+        if (targets.length > 0) {
+          try {
+            fcmResults = await sendReactivationPush(
+              targets,
+              RELANCE_TITLE,
+              RELANCE_MESSAGE,
+              batchId
+            ) as { results: any[] };
+          } catch (err) {
+            console.error('[relancePremiereCourse] FCM batch error:', err.message);
+            // Si l'envoi batch échoue globalement, marquer tous comme 'failed'
+            fcmResults = {
+              results: targets.map(t => ({
+                recipient_id: t.recipient_id,
+                ok: false,
+                error: err.message || 'fcm_batch_error',
+              })),
+            };
+          }
+        }
+
+        // ── Créer les HabitReminder avec le statut réel FCM ──
+        const resultMap = new Map<string, any>();
+        for (const r of fcmResults.results || []) {
+          if (r.recipient_id) resultMap.set(r.recipient_id, r);
+        }
+
+        const nowIso = new Date().toISOString();
+        for (const el of eligibleFull) {
+          const { client, token, deliveredAt, hoursSinceDelivery } = el;
+          const fcmResult = resultMap.get(client.id) || { ok: false, error: 'no_fcm_result' };
+          const ok = !!fcmResult.ok;
+          const errorMsg = fcmResult.error || null;
+
+          await base44.asServiceRole.entities.HabitReminder.create({
+            client_id: client.id,
+            client_telephone: client.telephone || '',
+            client_phone_normalized: normalizePhone(client.telephone, client.country_code || undefined) || '',
+            client_user_email: client.user_email || '',
+            country_code: client.country_code || '',
+            segment: 'first_course_delivered',
+            habit_type: 'tranche_horaire',
+            habit_detail: JSON.stringify({
+              first_course_delivered_at: deliveredAt,
+              hours_since_delivery: hoursSinceDelivery,
+              message_title: RELANCE_TITLE,
+              message_body: RELANCE_MESSAGE,
+            }),
+            habit_occurrences: 1,
+            habit_ratio: 1.0,
+            is_control_group: false,
+            status: ok ? 'sent' : 'failed',
+            sent_at: ok ? nowIso : null,
+            fcm_error: ok ? null : errorMsg,
+            push_token: token?.token || '',
+            push_token_id: token?.id || '',
+            campaign_batch_id: batchId,
+          });
+          prepared++;
+          if (ok) sentOk++; else sentFailed++;
+          details.push({
+            client_id: client.id,
+            country_code: client.country_code,
+            status: ok ? 'sent' : 'failed',
+            fcm_error: ok ? null : errorMsg,
+            hours_since_delivery: hoursSinceDelivery,
+            delivered_at: deliveredAt,
+          });
+        }
       }
 
       return Response.json({
@@ -154,6 +242,8 @@ export default async function(req: Request): Promise<Response> {
         excluded_recent_solicitation: result.excluded_recent_solicitation,
         retained_count: result.retained.length,
         prepared,
+        sent_ok: sentOk,
+        sent_failed: sentFailed,
         message_title: RELANCE_TITLE,
         message_body: RELANCE_MESSAGE,
         details: details.slice(0, 10),
@@ -176,19 +266,23 @@ async function analyzeEligibleClients(base44: any): Promise<any> {
   const delayMinMs = RELANCE_DELAY_HOURS * 3600000;       // 48h
   const delayMaxMs = RELANCE_DELAY_MAX_HOURS * 3600000;     // 7 jours
 
-  // ── Charger les courses livrées récentes (14 derniers jours pour couvrir la fenêtre 48h-7j) ──
+  // ── Charger les courses livrées dans la fenêtre 48h-7j uniquement ──
+  // OPTIMISATION : filtre par date pour ne charger que les courses des 7 derniers jours.
+  // PAGINATION CORRECTE : le SDK supporte skip (4e paramètre, max 5000/requête).
+  // Si >500 courses livrées sur 7 jours, on pagine proprement sans ignorer de clients.
+  const sevenDaysAgo = new Date(now - delayMaxMs).toISOString();
   const recentDelivered: any[] = [];
-  let skip = 0;
+  let skipCount = 0;
   while (true) {
     const batch = await base44.asServiceRole.entities.CourseExterne.filter(
-      { statut: 'livree' },
-      '-heure_livraison', 500, skip
-    );
+      { statut: 'livree', heure_livraison: { $gte: sevenDaysAgo } },
+      '-heure_livraison', 500, skipCount
+    ).catch(() => []);
     if (!batch || batch.length === 0) break;
     recentDelivered.push(...batch);
-    if (batch.length < 500) break;
-    skip += 500;
-    if (skip > 3000) break;
+    if (batch.length < 500) break;    // Moins de 500 = dernière page
+    skipCount += 500;
+    if (skipCount >= 5000) break;     // Limite de sécurité SDK (max 5000/requête)
   }
 
   // ── Grouper par client (phone_normalized ou user_email) ──
@@ -273,10 +367,15 @@ async function analyzeEligibleClients(base44: any): Promise<any> {
   const solicitationResult = await getRecentlySolicitedClients(base44);
 
   // ── Anti-doublon : déjà relancé par cette fonction (segment first_course_delivered) ──
-  const allReminders = await base44.asServiceRole.entities.HabitReminder.list();
+  // OPTIMISATION : ne charger que les HabitReminder du segment first_course_delivered
+  // au lieu de charger TOUS les HabitReminder.
+  const firstCourseReminders = await base44.asServiceRole.entities.HabitReminder.filter(
+    { segment: 'first_course_delivered' },
+    undefined, 500
+  ).catch(() => []);
   const remindedClientIds = new Set<string>();
-  for (const r of allReminders) {
-    if (r.segment === 'first_course_delivered' && r.client_id) {
+  for (const r of firstCourseReminders) {
+    if (r.client_id) {
       remindedClientIds.add(r.client_id);
     }
   }
@@ -359,6 +458,9 @@ async function analyzeEligibleClients(base44: any): Promise<any> {
       hours_since_delivery: Math.round(e.hoursSinceDelivery * 10) / 10,
       has_fcm: !!e.token?.token,
     })),
+    // BUGFIX : retourner les objets complets pour que l'action 'run' puisse
+    // accéder à client.id, token.token, etc. sans crash undefined.id
+    eligible_full: retained,
   };
 }
 

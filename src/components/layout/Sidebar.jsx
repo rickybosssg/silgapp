@@ -39,6 +39,7 @@ export const navItems = [
   { path: "/admin/gestion-pays", label: "Gestion des pays", icon: Settings },
   { path: "/admin/crm-clients", label: "CRM Clients", icon: Users },
   { path: "/admin/growth", label: "Growth", icon: TrendingUp },
+  { path: "/admin/meta-ads", label: "Publicités Meta", icon: Megaphone },
   { path: "/admin/reactivation-clients", label: "Réactivation Clients", icon: Bell },
   { path: "/admin/externe/clients", label: "Clients externes", icon: Users },
   { path: "/admin/publicites", label: "Publicités", icon: Megaphone },

@@ -8,10 +8,11 @@ import { Download, CheckCircle, ExternalLink, User, Phone, Users, MessageCircle,
 import { QRCodeSVG } from "qrcode.react";
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
+import { captureAttribution } from "@/lib/playStoreUrl";
 
 export default function DownloadCard({ downloadCount }) {
-  const apkUrl = "https://drive.google.com/file/d/1CpTlE9E2EE3bnydQPsA0CarV9-taWkVO/view?usp=sharing";
-  const apkUrlDirect = "https://drive.google.com/uc?export=download&id=1CpTlE9E2EE3bnydQPsA0CarV9-taWkVO";
+  const apkUrl = "https://play.google.com/store/apps/details?id=com.base6a0ec08f3af5e1d1284254c1.app";
+  const apkUrlDirect = apkUrl;
   const [formData, setFormData] = useState({ nom: "", telephone: "", profil: "" });
   const [leadSaved, setLeadSaved] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -53,12 +54,17 @@ export default function DownloadCard({ downloadCount }) {
                      navigator.userAgent?.includes('iPhone') || navigator.userAgent?.includes('iPad') ? 'ios' : 'web';
 
     // Appel asynchrone sans await - ne bloque jamais
+    const attribution = captureAttribution();
     base44.functions.invoke('trackDownloadPublic', {
-      event_type: 'download_click',
+      event_type: 'play_download',
       country_code: country,
       platform: platform,
-      referrer: 'direct'
-    }).catch(() => {}); // Ignore silencieusement toutes les erreurs
+      referrer: attribution.utm_source || 'direct',
+      utm_source: attribution.utm_source,
+      utm_campaign: attribution.utm_campaign,
+      fbclid: attribution.fbclid,
+      meta_campaign_id: attribution.meta_campaign_id,
+    }).catch(() => {});
   };
 
   return (
@@ -289,7 +295,7 @@ export default function DownloadCard({ downloadCount }) {
                 </p>
                 <div className="flex items-center justify-center sm:justify-start gap-1.5 sm:gap-2 text-[10px] sm:text-xs text-white/40">
                   <div className="w-1.5 sm:w-2 h-1.5 sm:h-2 bg-green-500 rounded-full animate-pulse flex-shrink-0" />
-                  <span className="truncate">Lien sécurisé Google Drive</span>
+                  <span className="truncate">Disponible sur Google Play</span>
                 </div>
               </div>
             </div>

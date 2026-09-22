@@ -20,13 +20,13 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 // ═══════════════════════════════════════════════════════════════════════════
 
 const META_API_BASE = 'https://graph.facebook.com/v25.0';
-const DEFAULT_AD_ACCOUNT_ID = '2382788582549104'; // SILGAPP (Read-Only)
+const DEFAULT_AD_ACCOUNT_ID = '234850849367733'; // Eric Compaore (compte réel SILGAPP)
 
 // ── WHITELIST HARD-CODÉE : seuls ces comptes sont autorisés ──
-// Empêche toute importation de dépenses depuis Eric Compaore ou CDL
+// Empêche toute importation de dépenses depuis d'autres comptes (CDL, etc.)
 // même si META_AD_ACCOUNT_ID est modifié dans AppConfig.
 const ALLOWED_AD_ACCOUNT_IDS = new Set([
-  '2382788582549104', // SILGAPP (Read-Only)
+  '234850849367733', // Eric Compaore (compte réel SILGAPP)
 ]);
 
 function todayStr() {
@@ -48,7 +48,7 @@ async function getAdAccountId(base44) {
   // ── VERROU DE SÉCURITÉ : rejeter tout compte non whitelisté ──
   const rawId = accountId.replace(/^act_/, '').trim();
   if (!ALLOWED_AD_ACCOUNT_IDS.has(rawId)) {
-    throw new Error(`Compte publicitaire non autorisé: ${accountId}. Seul le compte SILGAPP (2382788582549104) est whitelisté.`);
+    throw new Error(`Compte publicitaire non autorisé: ${accountId}. Seul le compte Eric Compaore (234850849367733) est whitelisté.`);
   }
   return rawId;
 }
@@ -78,6 +78,21 @@ async function fetchCampaigns(accessToken, accountId) {
   });
   const data = await res.json();
   if (data.error) throw new Error(`Meta API campaigns: ${data.error.message}`);
+  return data.data || [];
+}
+
+async function fetchCampaignInsights(accessToken, campaignId, dateSince, dateUntil) {
+  const url = `${META_API_BASE}/${campaignId}/insights` +
+    `?fields=spend,impressions,clicks,ctr,cpc,reach,date_start,date_stop` +
+    `&time_increment=1` +
+    `&time_range={"since":"${dateSince}","until":"${dateUntil}"}` +
+    `&limit=100`;
+
+  const res = await fetch(url, {
+    headers: { 'Authorization': `Bearer ${accessToken}` },
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(`Meta API campaign insights: ${data.error.message}`);
   return data.data || [];
 }
 
@@ -139,13 +154,20 @@ async function storeLatestMetrics(base44, accountId, campaigns, insights) {
       ctr: parseFloat(i.ctr || '0'),
       cpc: parseFloat(i.cpc || '0'),
     })),
-    campaigns: campaigns.map(c => ({
-      id: c.id,
-      name: c.name,
-      status: c.status,
-      objective: c.objective,
-      daily_budget: c.daily_budget || null,
-    })),
+    campaigns: campaigns
+      .sort((a, b) => (b.spend || 0) - (a.spend || 0))
+      .slice(0, 10)
+      .map(c => ({
+        id: c.id,
+        name: (c.name || '').substring(0, 50),
+        status: c.status,
+        objective: c.objective,
+        spend: c.spend || 0,
+        impressions: c.impressions || 0,
+        clicks: c.clicks || 0,
+        ctr: c.ctr || '0',
+        cpc: c.cpc || '0',
+      })),
   };
 
   const existing = await base44.asServiceRole.entities.AppConfig.filter({ cle: 'META_ADS_LATEST_INSIGHTS' });
@@ -188,6 +210,46 @@ export default async function(req) {
     // 2. Lire les insights (dépenses réelles par jour)
     const insights = await fetchAccountInsights(accessToken, accountId, dateSince, dateUntil);
 
+    // 2b. Lire les insights par campagne
+    const campaignMetrics = [];
+    for (const campaign of campaigns) {
+      try {
+        const cInsights = await fetchCampaignInsights(accessToken, campaign.id, dateSince, dateUntil);
+        const cSpend = cInsights.reduce((sum, i) => sum + parseFloat(i.spend || '0'), 0);
+        const cImpressions = cInsights.reduce((sum, i) => sum + parseInt(i.impressions || '0'), 0);
+        const cClicks = cInsights.reduce((sum, i) => sum + parseInt(i.clicks || '0'), 0);
+        const cReach = cInsights.length > 0 ? Math.max(...cInsights.map(i => parseInt(i.reach || '0'))) : 0;
+
+        campaignMetrics.push({
+          id: campaign.id,
+          name: campaign.name,
+          status: campaign.status,
+          objective: campaign.objective,
+          daily_budget: campaign.daily_budget || null,
+          spend: cSpend,
+          impressions: cImpressions,
+          clicks: cClicks,
+          reach: cReach,
+          ctr: cImpressions > 0 ? (cClicks / cImpressions * 100).toFixed(2) : '0',
+          cpc: cClicks > 0 ? (cSpend / cClicks).toFixed(2) : '0',
+        });
+      } catch (err) {
+        campaignMetrics.push({
+          id: campaign.id,
+          name: campaign.name,
+          status: campaign.status,
+          objective: campaign.objective,
+          daily_budget: campaign.daily_budget || null,
+          spend: 0,
+          impressions: 0,
+          clicks: 0,
+          reach: 0,
+          ctr: '0',
+          cpc: '0',
+        });
+      }
+    }
+
     // 3. Enregistrer les dépenses réelles dans GrowthSpend (idempotent)
     const syncResults = [];
     for (const insight of insights) {
@@ -209,7 +271,7 @@ export default async function(req) {
     }
 
     // 4. Stocker les métriques dans AppConfig pour le dashboard
-    const metrics = await storeLatestMetrics(base44, accountId, campaigns, insights);
+    const metrics = await storeLatestMetrics(base44, accountId, campaignMetrics, insights);
 
     return Response.json({
       success: true,

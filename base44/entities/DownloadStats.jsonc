@@ -36,7 +36,7 @@
     "referrer": {
       "type": "string",
       "default": "direct",
-      "description": "Source du trafic (facebook, whatsapp, tiktok, direct)"
+      "description": "Source du trafic (utm_source, facebook, whatsapp, tiktok, direct)"
     },
     "page_visits": {
       "type": "number",
@@ -51,12 +51,17 @@
     "downloads": {
       "type": "number",
       "default": 0,
-      "description": "Nombre de t\u00e9l\u00e9chargements effectifs"
+      "description": "Nombre de t\u00e9l\u00e9chargements APK effectifs (ancien m\u00e9canisme Google Drive \u2014 conserv\u00e9 pour compatibilit\u00e9 historique)"
+    },
+    "play_downloads": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre de clics vers Google Play Store (nouveau m\u00e9canisme officiel)"
     },
     "last_download_date": {
       "type": "string",
       "format": "date-time",
-      "description": "Date du dernier t\u00e9l\u00e9chargement"
+      "description": "Date du dernier t\u00e9l\u00e9chargement (APK ou Google Play)"
     }
   },
   "required": [

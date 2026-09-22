@@ -116,9 +116,10 @@ Deno.serve(async (req) => {
       const revenue = attributedCourses.reduce((sum, c) => sum + (c.prix_final || 0), 0);
       const commission = attributedCourses.reduce((sum, c) => sum + (c.commission_silga || 0), 0);
 
-      // Dépenses Meta pour cette campagne (approximation : total / nombre de campagnes si pas de breakdown par campagne)
-      // TODO: affiner avec les insights par campagne quand disponibles
-      const campaignSpend = totalSpendAllDays / Math.max(campaigns.length, 1);
+      // Dépenses Meta réelles pour cette campagne (depuis les insights par campagne)
+      const campaignMetrics = metaMetrics?.campaigns?.find(c => c.id === campaign.id);
+      const campaignSpend = campaignMetrics?.spend || 0;
+      const campaignClicks = campaignMetrics?.clicks || 0;
 
       const installsCount = installsForCampaign.length;
       const signupsCount = signups.length;
@@ -131,7 +132,7 @@ Deno.serve(async (req) => {
         campaign_status: campaign.status,
         objective: campaign.objective,
         meta_spend: campaignSpend,
-        meta_clicks: 0, // TODO: insights par campagne
+        meta_clicks: campaignClicks,
         installs: installsCount,
         signups: signupsCount,
         first_courses: firstCoursesCount,
