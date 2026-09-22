@@ -1,0 +1,86 @@
+{
+  "name": "AcquisitionLog",
+  "type": "object",
+  "properties": {
+    "action_type": {
+      "type": "string",
+      "enum": [
+        "campaign_created",
+        "campaign_approved",
+        "campaign_rejected",
+        "campaign_activated",
+        "campaign_paused",
+        "campaign_completed",
+        "campaign_archived",
+        "creative_created",
+        "creative_approved",
+        "creative_rejected",
+        "creative_archived",
+        "config_changed",
+        "budget_changed",
+        "kill_switch_toggled",
+        "meta_api_called",
+        "meta_api_error"
+      ],
+      "description": "Type d'action du journal d'acquisition. Toutes les actions du moteur d'acquisition sont journalis\u00e9es ici."
+    },
+    "actor_email": {
+      "type": "string",
+      "description": "Email de l'administrateur ayant effectu\u00e9 l'action"
+    },
+    "target_type": {
+      "type": "string",
+      "enum": [
+        "meta_campaign",
+        "ad_creative",
+        "config",
+        "system"
+      ],
+      "description": "Type de cible de l'action"
+    },
+    "target_id": {
+      "type": "string",
+      "description": "ID de l'entit\u00e9 cible (MetaCampaign ID, AdCreative ID, cl\u00e9 de config, etc.)"
+    },
+    "target_name": {
+      "type": "string",
+      "description": "Nom de la cible pour affichage rapide"
+    },
+    "details": {
+      "type": "string",
+      "description": "JSON: d\u00e9tails complets de l'action (avant/apr\u00e8s, param\u00e8tres, etc.)"
+    },
+    "action_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date et heure de l'action"
+    }
+  },
+  "required": [
+    "action_type",
+    "actor_email",
+    "action_date"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

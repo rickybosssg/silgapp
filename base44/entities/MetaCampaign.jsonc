@@ -1,0 +1,121 @@
+{
+  "name": "MetaCampaign",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Nom interne de la campagne"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "pending_approval",
+        "approved",
+        "active",
+        "paused",
+        "completed",
+        "archived",
+        "rejected"
+      ],
+      "default": "draft",
+      "description": "Statut de la campagne. draft=proposition, pending_approval=en attente validation admin, approved=valid\u00e9e mais non active, active=diffus\u00e9e sur Meta (requiert ads_management + META_ACQUISITION_ENABLED=true), paused=mise en pause, completed=termin\u00e9e, archived=archiv\u00e9e, rejected=rejet\u00e9e par admin."
+    },
+    "meta_campaign_id": {
+      "type": "string",
+      "description": "ID Meta de la campagne cr\u00e9\u00e9e via l'API (null tant que non cr\u00e9\u00e9e sur Meta). Renseign\u00e9 uniquement apr\u00e8s activation avec ads_management."
+    },
+    "objective": {
+      "type": "string",
+      "enum": [
+        "OUTCOME_TRAFFIC",
+        "OUTCOME_SALES",
+        "OUTCOME_AWARENESS",
+        "OUTCOME_APP_PROMOTION"
+      ],
+      "default": "OUTCOME_TRAFFIC",
+      "description": "Objectif publicitaire Meta. Doit figurer dans META_ALLOWED_OBJECTIVES."
+    },
+    "daily_budget": {
+      "type": "number",
+      "description": "Budget journalier en FCFA. Ne peut pas d\u00e9passer META_DAILY_BUDGET_CAP."
+    },
+    "lifetime_budget": {
+      "type": "number",
+      "description": "Budget total (lifetime) en FCFA (optionnel)"
+    },
+    "creative_ids": {
+      "type": "string",
+      "description": "JSON: liste des IDs AdCreative utilis\u00e9s. TOUS doivent avoir status=approved."
+    },
+    "country_codes": {
+      "type": "string",
+      "description": "JSON: codes pays cibl\u00e9s. Doivent tous figurer dans META_ALLOWED_COUNTRIES."
+    },
+    "target_audience": {
+      "type": "string",
+      "description": "Description du ciblage (\u00e2ge, genre, centres d'int\u00e9r\u00eat, etc.)"
+    },
+    "approved_by": {
+      "type": "string",
+      "description": "Email de l'admin ayant approuv\u00e9 la campagne"
+    },
+    "approved_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "rejected_by": {
+      "type": "string"
+    },
+    "rejected_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "rejection_reason": {
+      "type": "string"
+    },
+    "idempotency_key": {
+      "type": "string",
+      "description": "Cl\u00e9 anti-doublon. Deux campagnes avec la m\u00eame idempotency_key ne peuvent pas \u00eatre cr\u00e9\u00e9es."
+    },
+    "activated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date d'activation r\u00e9elle sur Meta (requiert ads_management)"
+    },
+    "paused_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "name",
+    "status"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

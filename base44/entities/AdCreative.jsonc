@@ -1,0 +1,141 @@
+{
+  "name": "AdCreative",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Nom interne du cr\u00e9atif"
+    },
+    "type_media": {
+      "type": "string",
+      "enum": [
+        "image",
+        "video",
+        "carousel"
+      ],
+      "default": "image",
+      "description": "Type de m\u00e9dia du cr\u00e9atif Meta"
+    },
+    "image_url": {
+      "type": "string",
+      "description": "URL de l'image (pour cr\u00e9atifs image)"
+    },
+    "video_url": {
+      "type": "string",
+      "description": "URL de la vid\u00e9o (pour cr\u00e9atifs vid\u00e9o)"
+    },
+    "headline": {
+      "type": "string",
+      "description": "Titre court affich\u00e9 dans la publicit\u00e9 Meta (max 40 caract\u00e8res)"
+    },
+    "primary_text": {
+      "type": "string",
+      "description": "Texte principal affich\u00e9 dans la publicit\u00e9 Meta (max 125 caract\u00e8res)"
+    },
+    "description": {
+      "type": "string",
+      "description": "Description longue du cr\u00e9atif (interne)"
+    },
+    "call_to_action": {
+      "type": "string",
+      "enum": [
+        "INSTALL_APP",
+        "DOWNLOAD",
+        "LEARN_MORE",
+        "SIGN_UP",
+        "SHOP_NOW",
+        "CONTACT_US"
+      ],
+      "default": "INSTALL_APP",
+      "description": "Appel \u00e0 l'action du cr\u00e9atif Meta"
+    },
+    "landing_url": {
+      "type": "string",
+      "description": "URL de destination (doit pointer vers /telecharger avec UTM)"
+    },
+    "meta_objective": {
+      "type": "string",
+      "enum": [
+        "OUTCOME_TRAFFIC",
+        "OUTCOME_SALES",
+        "OUTCOME_AWARENESS",
+        "OUTCOME_APP_PROMOTION"
+      ],
+      "default": "OUTCOME_TRAFFIC",
+      "description": "Objectif publicitaire Meta autoris\u00e9 pour ce cr\u00e9atif"
+    },
+    "platforms": {
+      "type": "string",
+      "description": "JSON: plateformes Meta cibl\u00e9es (ex: [\"facebook\",\"instagram\",\"audience_network\"])"
+    },
+    "country_codes": {
+      "type": "string",
+      "description": "JSON: codes pays autoris\u00e9s pour ce cr\u00e9atif (ex: [\"BF\",\"CI\"])"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "pending_approval",
+        "approved",
+        "rejected",
+        "archived"
+      ],
+      "default": "draft",
+      "description": "Statut d'approbation du cr\u00e9atif. Un cr\u00e9atif non approuv\u00e9 (status != approved) ne peut JAMAIS \u00eatre diffus\u00e9."
+    },
+    "approved_by": {
+      "type": "string",
+      "description": "Email de l'admin ayant approuv\u00e9 le cr\u00e9atif"
+    },
+    "approved_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "rejected_by": {
+      "type": "string",
+      "description": "Email de l'admin ayant rejet\u00e9 le cr\u00e9atif"
+    },
+    "rejected_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "rejection_reason": {
+      "type": "string"
+    },
+    "meta_creative_id": {
+      "type": "string",
+      "description": "ID Meta du cr\u00e9atif cr\u00e9\u00e9 via l'API (null tant que non cr\u00e9\u00e9 sur Meta). Renseign\u00e9 uniquement apr\u00e8s activation avec ads_management."
+    },
+    "meta_campaign_ids": {
+      "type": "string",
+      "description": "JSON: liste des IDs MetaCampaign utilisant ce cr\u00e9atif"
+    }
+  },
+  "required": [
+    "name",
+    "status"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
