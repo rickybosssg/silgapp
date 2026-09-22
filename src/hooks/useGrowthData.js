@@ -16,6 +16,26 @@ export function dateNDaysAgo(days) {
   return d.toISOString();
 }
 
+// ── Helper : paginer toutes les CourseExterne livrées (anti-troncature) ──
+// Récupère l'intégralité des courses livrées par batches de 500, sans limite fixe.
+// Fonctionne avec des milliers ou dizaines de milliers de courses.
+async function fetchAllDeliveredCourses() {
+  const all = [];
+  let skip = 0;
+  const batchSize = 500;
+  while (true) {
+    const batch = await base44.entities.CourseExterne.filter(
+      { statut: "livree" },
+      "-heure_livraison", batchSize, skip
+    );
+    if (!batch || batch.length === 0) break;
+    all.push(...batch);
+    if (batch.length < batchSize) break;
+    skip += batchSize;
+  }
+  return all;
+}
+
 // ── Helper : parse AppConfig list → map ──
 function parseAppConfig(configs) {
   const map = {};
@@ -36,11 +56,8 @@ async function fetchOverview(periodDays) {
     c.created_date && new Date(c.created_date) >= sinceDate
   );
 
-  // ── Courses livrées (base de calcul, paginé) ──
-  const deliveredCourses = await base44.entities.CourseExterne.filter(
-    { statut: "livree" },
-    "-heure_livraison", 1000
-  );
+  // ── Courses livrées (pagination complète — anti-troncature) ──
+  const deliveredCourses = await fetchAllDeliveredCourses();
   const recentDelivered = (deliveredCourses || []).filter(c =>
     c.heure_livraison && new Date(c.heure_livraison) >= sinceDate
   );
@@ -336,10 +353,8 @@ async function fetchConversionTunnel(periodDays = 7) {
   const since = dateNDaysAgo(periodDays);
   const sinceDate = new Date(since);
 
-  // ── Base cohorte : courses livrées ──
-  const deliveredCourses = await base44.entities.CourseExterne.filter(
-    { statut: "livree" }, "-heure_livraison", 1000
-  );
+  // ── Base cohorte : courses livrées (pagination complète — anti-troncature) ──
+  const deliveredCourses = await fetchAllDeliveredCourses();
 
   // Grouper par téléphone, trier par heure_livraison
   const coursesByPhone = {};
