@@ -42,7 +42,7 @@ export default function GrowthDashboard() {
   const { data: automationStatus, isLoading: autoLoading } = useGrowthAutomationStatus();
   const { data: adBudget } = useGrowthAdBudget();
   const { data: primeBudget } = useGrowthPrimeBudget();
-  const { data: tunnel, isLoading: tunnelLoading } = useGrowthTunnel();
+  const { data: tunnel, isLoading: tunnelLoading } = useGrowthTunnel(periodDays);
   const { data: journal, isLoading: journalLoading } = useGrowthJournal(journalPeriod, countryCode);
   const { data: attributionStats } = useAttributionStats();
 
@@ -148,7 +148,7 @@ export default function GrowthDashboard() {
         />
         <GrowthKpiCard
           label="Commission SILGAPP"
-          value={overview ? `${overview.automationCommission.toLocaleString()} F` : "—"}
+          value={overview ? (overview.automationCommission != null ? `${overview.automationCommission.toLocaleString()} F` : "Non disponible") : "—"}
           icon={Wallet}
           accent="blue"
         />
@@ -223,14 +223,19 @@ export default function GrowthDashboard() {
               spent30Days={adBudget.spent30Days}
               accent="blue"
               extraStats={
-                adBudget.hasRealAdPlatform && adBudget.metaMetrics?.today
+                adBudget.hasRealAdPlatform
                   ? [
                       { label: "Plateforme Meta", value: "Connectée", color: "text-green-600" },
-                      { label: "Impressions (jour)", value: adBudget.metaMetrics.today.impressions?.toLocaleString() || 0 },
-                      { label: "Clics (jour)", value: adBudget.metaMetrics.today.clicks || 0 },
-                      { label: "CTR", value: `${(adBudget.metaMetrics.today.ctr || 0).toFixed(2)}%` },
-                      { label: "CPC", value: `${(adBudget.metaMetrics.today.cpc || 0).toFixed(2)}` },
-                      { label: "Campagnes actives", value: (adBudget.metaMetrics.campaigns || []).filter(c => c.status === "ACTIVE").length },
+                      ...(adBudget.metaMetrics?.today
+                        ? [
+                            { label: "Impressions (jour)", value: adBudget.metaMetrics.today.impressions?.toLocaleString() || 0 },
+                            { label: "Clics (jour)", value: adBudget.metaMetrics.today.clicks || 0 },
+                            { label: "CTR", value: `${(adBudget.metaMetrics.today.ctr || 0).toFixed(2)}%` },
+                            { label: "CPC", value: `${(adBudget.metaMetrics.today.cpc || 0).toFixed(2)}` },
+                          ]
+                        : [{ label: "Dépensé aujourd'hui", value: "0 FCFA" }]
+                      ),
+                      { label: "Campagnes actives", value: (adBudget.metaMetrics?.campaigns || []).filter(c => c.status === "ACTIVE").length },
                     ]
                   : [{ label: "Plateforme Meta", value: "Non connectée", color: "text-slate-400" }]
               }

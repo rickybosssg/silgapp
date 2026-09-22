@@ -9,7 +9,7 @@ const read = (file) => readFileSync(join(root, file), "utf8");
 const variables = read("android/variables.gradle");
 assert.match(variables, /compileSdkVersion\s*=\s*36\b/, "compileSdk doit cibler Android 16/API 36");
 assert.match(variables, /targetSdkVersion\s*=\s*36\b/, "targetSdk doit cibler Android 16/API 36");
-assert.match(variables, /minSdkVersion\s*=\s*23\b/, "La compatibilite minimale Android doit rester API 23");
+assert.match(variables, /minSdkVersion\s*=\s*24\b/, "La compatibilite minimale Android doit respecter l'exigence Play API 24");
 
 const manifest = read("android/app/src/main/AndroidManifest.xml");
 assert.match(manifest, /android:enableOnBackInvokedCallback="false"/, "Le comportement Retour Capacitor 5 doit etre preserve sur Android 16");
@@ -27,4 +27,4 @@ assert.match(css, /safe-area-inset-bottom/, "La safe area basse doit etre geree"
 const mainActivity = read("android/app/src/main/java/com/silgapp2/app/MainActivity.java");
 assert.match(mainActivity, /extends BridgeActivity/, "MainActivity doit rester une BridgeActivity Capacitor");
 
-console.log("ANDROID_API36_REGRESSION=PASS compile=36 target=36 min=23 back=preserved edge_to_edge=prepared fgs_location=preserved");
+console.log("ANDROID_API36_REGRESSION=PASS compile=36 target=36 min=24 back=preserved edge_to_edge=prepared fgs_location=preserved");

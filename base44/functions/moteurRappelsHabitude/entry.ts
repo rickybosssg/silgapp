@@ -8,9 +8,16 @@ import {
 export default async function(req: Request): Promise<Response> {
   try {
     const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
-    if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
-    if (user.role !== 'admin') return Response.json({ error: 'Forbidden' }, { status: 403 });
+
+    // ── Auth : accepter les appels service-role (Workflow Base44) ET les appels admin manuels ──
+    try {
+      const user = await base44.auth.me();
+      if (user && user.role !== 'admin') {
+        return Response.json({ error: 'Forbidden' }, { status: 403 });
+      }
+    } catch {
+      // Appel depuis un Workflow Base44 (service role) — pas de contexte utilisateur
+    }
 
     const body = await req.json().catch(() => ({}));
     const action = body.action || 'run';
