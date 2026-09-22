@@ -119,6 +119,7 @@ const LieuxSilgappPanel = lazy(() => import('./pages/LieuxSilgappPanel.jsx'));
 const HabitRemindersPage = lazy(() => import('./pages/HabitRemindersPage.jsx'));
 const ClientsAutonomiser = lazy(() => import('./pages/ClientsAutonomiser.jsx'));
 const GrowthDashboard = lazy(() => import('./pages/GrowthDashboard.jsx'));
+const MetaAdsDashboard = lazy(() => import('./pages/MetaAdsDashboard.jsx'));
 import Diag500Panel from './components/admin/Diag500Panel.jsx';
 
 function AnimatedRoutes({ children }) {
@@ -446,6 +447,7 @@ function AppContent() {
           <Route path="/admin/rappels-habitude" element={<AnimatedRoutes><HabitRemindersPage /></AnimatedRoutes>} />
           <Route path="/admin/clients-autonomiser" element={<AnimatedRoutes><ClientsAutonomiser /></AnimatedRoutes>} />
           <Route path="/admin/growth" element={<AnimatedRoutes><GrowthDashboard /></AnimatedRoutes>} />
+          <Route path="/admin/meta-ads" element={<AnimatedRoutes><MetaAdsDashboard /></AnimatedRoutes>} />
           <Route path="/admin/messages" element={<AnimatedRoutes><AdminMessages /></AnimatedRoutes>} />
           <Route path="/admin/whatsapp" element={<AnimatedRoutes><WhatsAppAdmin /></AnimatedRoutes>} />
           <Route path="/admin/venus" element={<AnimatedRoutes><VenusAdminCenter /></AnimatedRoutes>} />
