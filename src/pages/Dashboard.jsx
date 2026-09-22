@@ -22,6 +22,7 @@ import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import CodePromoPanel from "@/components/admin/CodePromoPanel";
+import SilgappLiveStats from "@/components/shared/SilgappLiveStats";
 import { toast } from "sonner";
 
 export default function Dashboard() {
@@ -195,6 +196,9 @@ export default function Dashboard() {
         <StatCard title="CA du jour" value={`${stats.ca.toLocaleString()}`} icon={TrendingUp} iconBg="bg-indigo-500" trendLabel="FCFA" />
         <StatCard title="Livreurs dispo" value={stats.dispoLivreurs} icon={Truck} iconBg="bg-accent" />
       </div>
+
+      {/* ── SILGAPP EN DIRECT — activité globale du réseau ── */}
+      <SilgappLiveStats />
 
       {/* Livreurs en ligne */}
       <LivreursEnLigne livreurs={livreursEnLigne} livreurIdsEnCourseReelle={livreurIdsEnCourseReelle} />
