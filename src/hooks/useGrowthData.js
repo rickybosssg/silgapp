@@ -36,76 +36,137 @@ async function fetchOverview(periodDays) {
     c.created_date && new Date(c.created_date) >= sinceDate
   );
 
-  // ── Courses livrées dans la période ──
+  // ── Courses livrées (base de calcul, paginé) ──
   const deliveredCourses = await base44.entities.CourseExterne.filter(
     { statut: "livree" },
-    "-heure_livraison", 500
+    "-heure_livraison", 1000
   );
   const recentDelivered = (deliveredCourses || []).filter(c =>
     c.heure_livraison && new Date(c.heure_livraison) >= sinceDate
   );
 
-  // ── Courses créées dans la période (toutes sources) ──
-  const recentCreatedCourses = (deliveredCourses || []).filter(c =>
-    c.created_date && new Date(c.created_date) >= sinceDate
-  );
-
-  // ── Premières courses (clients avec premiere_course_faite=false → true) ──
-  // Approximation : courses livrées où le client n'avait pas de course livrée antérieure
-  const firstCourses = recentDelivered.filter(c => {
-    const clientCourses = deliveredCourses.filter(dc =>
-      (dc.client_phone_normalized || dc.client_telephone) === (c.client_phone_normalized || c.client_telephone)
-    );
-    return clientCourses.length === 1;
-  });
-
-  // ── Deuxièmes courses (clients avec ≥2 courses livrées, 2ème dans la période) ──
-  const secondCourses = recentDelivered.filter(c => {
+  // ── Grouper les courses livrées par téléphone (triées par heure_livraison) ──
+  // Utilisé pour les KPI cohortés : 1ère / 2ème / 3ème course à vie.
+  const coursesByPhone = {};
+  for (const c of deliveredCourses || []) {
     const phone = c.client_phone_normalized || c.client_telephone;
-    const clientCourses = deliveredCourses.filter(dc =>
-      (dc.client_phone_normalized || dc.client_telephone) === phone
+    if (!phone) continue;
+    if (!coursesByPhone[phone]) coursesByPhone[phone] = [];
+    coursesByPhone[phone].push(c);
+  }
+  for (const phone of Object.keys(coursesByPhone)) {
+    coursesByPhone[phone].sort((a, b) =>
+      new Date(a.heure_livraison || 0).getTime() - new Date(b.heure_livraison || 0).getTime()
     );
-    return clientCourses.length >= 2;
-  });
+  }
+
+  // ── Premières courses : clients dont la 1ère course à vie est dans la période ──
+  const firstCourses = Object.values(coursesByPhone)
+    .filter(cs => cs.length >= 1)
+    .map(cs => cs[0])
+    .filter(c => c.heure_livraison && new Date(c.heure_livraison) >= sinceDate);
+
+  // ── Deuxièmes courses : clients dont la 2ème course à vie est dans la période ──
+  // CORRECTION : un client ne compte qu'une fois, pour sa 2ème course à vie.
+  // Ancienne définition (surévaluée) : toutes les courses de clients ayant ≥2 courses.
+  const secondCourses = Object.values(coursesByPhone)
+    .filter(cs => cs.length >= 2)
+    .map(cs => cs[1])
+    .filter(c => c.heure_livraison && new Date(c.heure_livraison) >= sinceDate);
+
+  // ── Clients réguliers : clients dont la 3ème course à vie est dans la période ──
+  // CORRECTION : cohorté par période (anciennement lifetime total).
+  const regularClients = Object.values(coursesByPhone)
+    .filter(cs => cs.length >= 3)
+    .map(cs => cs[2])
+    .filter(c => c.heure_livraison && new Date(c.heure_livraison) >= sinceDate);
 
   // ── Clients réactivés (ReactivationScenario converted dans la période) ──
   const reactivationScenarios = await base44.entities.ReactivationScenario.list("-converted_at", 500);
-  const reactivatedClients = (reactivationScenarios || []).filter(s =>
+  const convertedScenarios = (reactivationScenarios || []).filter(s =>
     s.status === "converted" && s.converted_at && new Date(s.converted_at) >= sinceDate
   );
 
-  // ── Clients réguliers (≥3 courses livrées) ──
-  const phoneCounts = {};
-  for (const c of deliveredCourses) {
-    const phone = c.client_phone_normalized || c.client_telephone;
-    if (phone) phoneCounts[phone] = (phoneCounts[phone] || 0) + 1;
-  }
-  const regularClients = Object.values(phoneCounts).filter(count => count >= 3).length;
-
-  // ── Push envoyés (HabitReminder sent + ReactivationScenario pushes) ──
+  // ── Push envoyés : HabitReminder sent + ReactivationScenario pushes dans la période ──
+  // CORRECTION : périmètre cohérent — tous les moteurs de push inclus.
+  // Anciennement : HabitReminder seul, mais conversions incluaient ReactivationScenario.
   const habitReminders = await base44.entities.HabitReminder.filter(
     { status: "sent" },
     "-sent_at", 500
   );
-  const recentPushes = (habitReminders || []).filter(r =>
+  const recentHabitPushes = (habitReminders || []).filter(r =>
     r.sent_at && new Date(r.sent_at) >= sinceDate
   );
 
-  // ── Conversions après push (HabitReminder converted) ──
+  // ReactivationScenario : chaque push J0/J+2/J+5 envoyé dans la période compte
+  let reactivationPushCount = 0;
+  for (const s of reactivationScenarios || []) {
+    if (s.j0_sent_at && new Date(s.j0_sent_at) >= sinceDate) reactivationPushCount++;
+    if (s.j2_sent_at && new Date(s.j2_sent_at) >= sinceDate) reactivationPushCount++;
+    if (s.j5_sent_at && new Date(s.j5_sent_at) >= sinceDate) reactivationPushCount++;
+  }
+  const pushesSent = recentHabitPushes.length + reactivationPushCount;
+
+  // ── Conversions Growth : vérifier que la course attribuée est réellement livrée ──
+  // CORRECTION : une course annulée/inexistante ne compte PAS comme conversion.
   const convertedReminders = (habitReminders || []).filter(r =>
     r.status === "converted" && r.converted_at && new Date(r.converted_at) >= sinceDate
   );
 
-  // ── Courses générées par automatisations (ReactivationScenario converted) ──
-  const automationCourses = reactivatedClients.length + convertedReminders.length;
+  // Collecter les course_ids à vérifier
+  const conversionCourseIds = new Set();
+  for (const s of convertedScenarios) { if (s.course_id) conversionCourseIds.add(s.course_id); }
+  for (const r of convertedReminders) { if (r.course_id) conversionCourseIds.add(r.course_id); }
 
-  // ── CA généré (somme des prix_final des courses converties) ──
-  const automationRevenue = reactivatedClients.reduce((sum, s) => sum + (s.revenue || 0), 0)
-    + convertedReminders.reduce((sum, r) => sum + (r.revenue || 0), 0);
+  // Fetch les courses réelles et vérifier statut === "livree"
+  const courseCache = new Map();
+  for (const courseId of conversionCourseIds) {
+    try {
+      const course = await base44.entities.CourseExterne.get(courseId);
+      courseCache.set(courseId, course);
+    } catch {
+      courseCache.set(courseId, null);
+    }
+  }
 
-  // ── Commission SILGAPP générée ──
-  const automationCommission = reactivatedClients.reduce((sum, s) => sum + (s.commission || 0), 0)
-    + convertedReminders.reduce((sum, r) => sum + (r.commission || 0), 0);
+  // Filtrer les conversions dont la course est réellement livrée
+  const verifiedScenarios = convertedScenarios.filter(s => {
+    const course = courseCache.get(s.course_id);
+    return course && course.statut === "livree";
+  });
+  const verifiedReminders = convertedReminders.filter(r => {
+    const course = courseCache.get(r.course_id);
+    return course && course.statut === "livree";
+  });
+
+  // ── Courses générées par automatisations (conversions vérifiées) ──
+  const automationCourses = verifiedScenarios.length + verifiedReminders.length;
+
+  // ── CA généré : prix_final réel de la course livrée (plus le revenue stocké) ──
+  // CORRECTION : lire le prix réel depuis CourseExterne, pas depuis ReactivationScenario.revenue.
+  const automationRevenue = verifiedScenarios.reduce((sum, s) => {
+    const course = courseCache.get(s.course_id);
+    return sum + (course?.prix_final || 0);
+  }, 0) + verifiedReminders.reduce((sum, r) => {
+    const course = courseCache.get(r.course_id);
+    return sum + (course?.prix_final || 0);
+  }, 0);
+
+  // ── Commission SILGAPP : lire la commission réelle depuis la course livrée ──
+  // CORRECTION : ne pas inventer 0 F ; afficher null ("Non disponible") si non fiable.
+  const allVerified = [...verifiedScenarios, ...verifiedReminders];
+  let automationCommission;
+  if (allVerified.length === 0) {
+    automationCommission = null; // "Non disponible"
+  } else {
+    const allHaveCommission = allVerified.every(item => {
+      const course = courseCache.get(item.course_id);
+      return course?.commission_silga != null;
+    });
+    automationCommission = allHaveCommission
+      ? allVerified.reduce((sum, item) => sum + (courseCache.get(item.course_id)?.commission_silga || 0), 0)
+      : null; // "Non disponible"
+  }
 
   return {
     periodDays,
@@ -113,12 +174,12 @@ async function fetchOverview(periodDays) {
     totalClients: (clients || []).length,
     firstCourses: firstCourses.length,
     secondCourses: secondCourses.length,
-    reactivatedClients: reactivatedClients.length,
-    regularClients,
-    pushesSent: recentPushes.length,
-    pushConversions: convertedReminders.length + reactivatedClients.length,
-    pushConversionRate: recentPushes.length > 0
-      ? ((convertedReminders.length + reactivatedClients.length) / recentPushes.length * 100).toFixed(1)
+    reactivatedClients: verifiedScenarios.length,
+    regularClients: regularClients.length,
+    pushesSent,
+    pushConversions: verifiedScenarios.length + verifiedReminders.length,
+    pushConversionRate: pushesSent > 0
+      ? ((verifiedScenarios.length + verifiedReminders.length) / pushesSent * 100).toFixed(1)
       : "0.0",
     automationCourses,
     automationRevenue,
@@ -268,64 +329,91 @@ async function fetchPrimeBudget() {
   };
 }
 
-// ── Tunnel de conversion ──
-async function fetchConversionTunnel() {
-  const clients = await base44.entities.ClientExterne.list();
-  const crmProspections = await base44.entities.CrmProspection.list();
-  const appInstalls = await base44.entities.AppInstall.list();
-  const notificationTokens = await base44.entities.NotificationToken.filter({ user_type: "client" });
-  const courses = await base44.entities.CourseExterne.filter({ statut: "livree" }, "-heure_livraison", 500);
+// ── Tunnel de conversion (cohorte période) ──
+// CORRECTION : chaque étape est un sous-ensemble de la précédente, filtré par période.
+// Anciennement : mélange incohérent lifetime + période + populations indépendantes.
+async function fetchConversionTunnel(periodDays = 7) {
+  const since = dateNDaysAgo(periodDays);
+  const sinceDate = new Date(since);
 
-  // ── Compter par téléphone normalisé ──
-  const phoneCourseCount = {};
-  for (const c of courses || []) {
+  // ── Base cohorte : courses livrées ──
+  const deliveredCourses = await base44.entities.CourseExterne.filter(
+    { statut: "livree" }, "-heure_livraison", 1000
+  );
+
+  // Grouper par téléphone, trier par heure_livraison
+  const coursesByPhone = {};
+  for (const c of deliveredCourses || []) {
     const phone = c.client_phone_normalized || c.client_telephone;
-    if (phone) phoneCourseCount[phone] = (phoneCourseCount[phone] || 0) + 1;
+    if (!phone) continue;
+    if (!coursesByPhone[phone]) coursesByPhone[phone] = [];
+    coursesByPhone[phone].push(c);
+  }
+  for (const phone of Object.keys(coursesByPhone)) {
+    coursesByPhone[phone].sort((a, b) =>
+      new Date(a.heure_livraison || 0).getTime() - new Date(b.heure_livraison || 0).getTime()
+    );
   }
 
-  const firstCoursePhones = Object.entries(phoneCourseCount).filter(([, count]) => count === 1).map(([phone]) => phone);
-  const secondCoursePhones = Object.entries(phoneCourseCount).filter(([, count]) => count >= 2).map(([phone]) => phone);
-  const regularPhones = Object.entries(phoneCourseCount).filter(([, count]) => count >= 3).map(([phone]) => phone);
+  // ── Étapes du tunnel (cohorte période) ──
+  const firstCourses = Object.values(coursesByPhone)
+    .filter(cs => cs.length >= 1)
+    .map(cs => cs[0])
+    .filter(c => c.heure_livraison && new Date(c.heure_livraison) >= sinceDate);
 
-  // ── Tokens FCM actifs natifs ──
-  const fcmTokens = (notificationTokens || []).filter(t =>
-    t.actif && t.token && !String(t.token).startsWith("web_")
+  const secondCourses = Object.values(coursesByPhone)
+    .filter(cs => cs.length >= 2)
+    .map(cs => cs[1])
+    .filter(c => c.heure_livraison && new Date(c.heure_livraison) >= sinceDate);
+
+  const regularClients = Object.values(coursesByPhone)
+    .filter(cs => cs.length >= 3)
+    .map(cs => cs[2])
+    .filter(c => c.heure_livraison && new Date(c.heure_livraison) >= sinceDate);
+
+  const periodDelivered = (deliveredCourses || []).filter(c =>
+    c.heure_livraison && new Date(c.heure_livraison) >= sinceDate
   );
-  const fcmEmails = new Set(fcmTokens.map(t => t.user_email?.toLowerCase()).filter(Boolean));
 
-  // ── Clients avec compte User (user_email renseigné) ──
-  const clientsWithAccount = (clients || []).filter(c => c.user_email);
-  const clientsWithAccountEmails = new Set(
-    clientsWithAccount.map(c => c.user_email?.toLowerCase()).filter(Boolean)
-  );
+  // ── CA livré dans la période ──
+  const caLivre = periodDelivered.reduce((sum, c) => sum + (c.prix_final || 0), 0);
 
-  // ── Installations uniques (par device_id) ──
-  const installDeviceIds = new Set((appInstalls || []).map(i => i.device_id).filter(Boolean));
+  // ── Commission : "Non disponible" si aucune course n'a commission_silga ──
+  const coursesWithCommission = periodDelivered.filter(c => c.commission_silga != null);
+  const commission = coursesWithCommission.length > 0
+    ? periodDelivered.reduce((sum, c) => sum + (c.commission_silga || 0), 0)
+    : null;
 
-  // ── Clients réactivés ──
-  const reactivationScenarios = await base44.entities.ReactivationScenario.filter({ status: "converted" });
-  const reactivatedClientIds = new Set((reactivationScenarios || []).map(s => s.client_id));
+  // ── Attribution Meta → installations (lifetime, chaîne démontrable) ──
+  let metaSpend = null;
+  let attributedInstalls = null;
+  let attributedSignups = null;
 
-  const totalProspects = (crmProspections || []).length + (clients || []).length;
-  const totalClients = (clients || []).length;
-  const totalWithAccount = clientsWithAccountEmails.size;
-  const totalInstalls = installDeviceIds.size;
-  const totalFcmActive = fcmEmails.size;
-  const totalFirstCourse = firstCoursePhones.length;
-  const totalSecondCourse = secondCoursePhones.length;
-  const totalRegular = regularPhones.length;
-  const totalReactivated = reactivatedClientIds.size;
+  try {
+    const adSpends = await base44.entities.GrowthSpend.filter(
+      { moteur: "publicite" }, "-date_depense", 500
+    );
+    const totalSpend = (adSpends || []).reduce((sum, s) => sum + (s.montant || 0), 0);
+    if (totalSpend > 0) metaSpend = totalSpend;
+
+    const installs = await base44.entities.AppInstall.list('-created_date', 1000);
+    const attributed = (installs || []).filter(i => i.utm_source || i.meta_campaign_id);
+    attributedInstalls = attributed.length;
+    attributedSignups = attributed.filter(i => i.user_email).length;
+  } catch {}
 
   return {
-    prospects: totalProspects,
-    clients: totalClients,
-    withAccount: totalWithAccount,
-    installs: totalInstalls,
-    fcmActive: totalFcmActive,
-    firstCourse: totalFirstCourse,
-    secondCourse: totalSecondCourse,
-    regular: totalRegular,
-    reactivated: totalReactivated,
+    // Tunnel cohérent (cohorte période)
+    firstCourse: firstCourses.length,
+    secondCourse: secondCourses.length,
+    regular: regularClients.length,
+    caLivre,
+    commission, // null = "Non disponible"
+    deliveredCourses: periodDelivered.length,
+    // Attribution Meta (lifetime — non cohorté par période)
+    metaSpend,
+    attributedInstalls,
+    attributedSignups,
   };
 }
 
@@ -460,10 +548,10 @@ export function useGrowthPrimeBudget() {
   });
 }
 
-export function useGrowthTunnel() {
+export function useGrowthTunnel(periodDays = 7) {
   return useQuery({
-    queryKey: ["growth-tunnel"],
-    queryFn: fetchConversionTunnel,
+    queryKey: ["growth-tunnel", periodDays],
+    queryFn: () => fetchConversionTunnel(periodDays),
     staleTime: 120000,
   });
 }
