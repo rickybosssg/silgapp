@@ -142,10 +142,7 @@ export default async function(req: Request): Promise<Response> {
       } else {
         skip += pageSize;
       }
-      // Garde-fou anti-boucle : max 10 000 courses
-      if (skip >= 10000) {
-        hasMore = false;
-      }
+      // Aucun plafond arbitraire : pagination exhaustive jusqu'à épuisement
     }
 
     const data = {
