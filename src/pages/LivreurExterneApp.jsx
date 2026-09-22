@@ -34,6 +34,7 @@ import NotificationStatusBanner from "@/components/livreur/NotificationStatusBan
 import LivreurMesInfosModal from "@/components/livreur/LivreurMesInfosModal";
 import VenusFloatingButton from "@/components/client/VenusFloatingButton";
 import AlertesLivreurModal from "@/components/livreur/AlertesLivreurModal";
+import SilgappLiveStats from "@/components/shared/SilgappLiveStats";
 import PubliciteCarousel from "@/components/publicite/PubliciteCarousel";
 import PubliciteFullscreen from "@/components/publicite/PubliciteFullscreen";
 import PrixManuelReponseAlert from "@/components/livreur/PrixManuelReponseAlert";
@@ -1615,6 +1616,9 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
               isExterne={true}
               livreurId={livreurProfil?.id}
             />
+
+            {/* ── SILGAPP EN DIRECT — activité globale du réseau ── */}
+            <SilgappLiveStats countryCode={livreurProfil?.country_code} />
 
             <Link to="/payer-silgapp">
               <div className={`rounded-2xl border flex items-center justify-between transition active:scale-[0.98] ${

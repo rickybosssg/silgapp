@@ -13,6 +13,7 @@ import PartenaireBottomNav from "@/components/partenaire/PartenaireBottomNav";
 import NewMessageModal from "@/components/partenaire/NewMessageModal";
 import OngletCodePromoPartenaire from "@/components/partenaire/OngletCodePromoPartenaire";
 import VenusFloatingButton from "@/components/client/VenusFloatingButton";
+import SilgappLiveStats from "@/components/shared/SilgappLiveStats";
 import { clearPersistedToken } from "@/lib/authPersistence";
 import { registerPushToken, consumePendingNotificationData } from "@/lib/notifications";
 import { usePushTokenRetry } from "@/hooks/usePushTokenRetry";
@@ -395,7 +396,12 @@ export default function PartenaireDashboard() {
 
       {/* ── Contenu ── */}
       <div className="max-w-lg mx-auto px-4 pt-4 pb-[calc(5rem+env(safe-area-inset-bottom))]">
-        {tab === "home" && <PartenaireHome etablissement={etablissement} etablissementType={etablissementType} onNavigate={setTab} />}
+        {tab === "home" && (
+          <div className="space-y-4">
+            <SilgappLiveStats countryCode={etablissement?.pays_code} />
+            <PartenaireHome etablissement={etablissement} etablissementType={etablissementType} onNavigate={setTab} />
+          </div>
+        )}
         {tab === "commandes" && !hasPharmacie && <CommandesManager type={etablissementType} etablissementId={etablissement.id} />}
         {tab === "produits" && !hasPharmacie && <ProduitsManager type={etablissementType} etablissementId={etablissement.id} />}
         {tab === "livraisons" && hasPharmacie && <PharmacieLivraisons pharmacieId={etablissement.id} pharmacieNom={etablissement.nom} onNavigate={setTab} />}

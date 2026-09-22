@@ -23,6 +23,7 @@ import LivreurRatingDialog from "@/components/client/LivreurRatingDialog";
 import CourseAnnuleeRelanceDialog from "@/components/client/CourseAnnuleeRelanceDialog";
 import VenusFloatingButton from "@/components/client/VenusFloatingButton";
 import LiveCounterBadge from "@/components/ui/LiveCounterBadge";
+import SilgappLiveStats from "@/components/shared/SilgappLiveStats";
 import MessagesPage from "@/components/chat/MessagesPage";
 import ModernMap from "@/components/client/ModernMap";
 import ProfilModal from "@/components/client/ProfilModal";
@@ -1165,6 +1166,9 @@ export default function ClientExterneApp() {
                   )}
                 </div>
               </div>
+
+              {/* ── SILGAPP EN DIRECT ─────────────── */}
+              <SilgappLiveStats countryCode={clientProfil?.country_code} />
 
               {/* ── COMMANDE RAPIDE PRO — Phase 5 : départ habituel + destinataires récents ── */}
               <QuickOrderProPanel

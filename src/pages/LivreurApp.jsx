@@ -22,6 +22,7 @@ import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
 import VenusFloatingButton from "@/components/client/VenusFloatingButton";
 import AlertesLivreurModal from "@/components/livreur/AlertesLivreurModal";
+import SilgappLiveStats from "@/components/shared/SilgappLiveStats";
 
 const saveLivreur = (id, data) => base44.functions.invoke('updateLivreur', { id, data });
 
@@ -458,6 +459,9 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
 
             <LivreurStatsBanner mesCourses={mesCourses} totalEncaisse={totalEncaisse} />
             <LivreurStatutCard statut={livreurProfil.statut} livreur={livreurProfil} />
+
+            {/* ── SILGAPP EN DIRECT — activité globale du réseau ── */}
+            <SilgappLiveStats countryCode={livreurProfil?.country_code} />
 
             {coursesActives.length > 0 && (
               <div className="space-y-3">
