@@ -993,67 +993,75 @@ export async function checkScenarioConversion(
     ? (scenario.reference_date ? new Date(scenario.reference_date).getTime() : Date.now())
     : (scenario.j0_sent_at ? new Date(scenario.j0_sent_at).getTime() : Date.now());
   const windowMs = config.attributionWindowHours * 3600000;
-  const now = Date.now();
 
-  // Chercher les courses créées après J0 — HYBRIDE
+  // Chercher les courses créées après le push — HYBRIDE
   let courses: any[] = [];
   if (scenario.client_phone_normalized) {
     courses = await base44.asServiceRole.entities.CourseExterne.filter(
       { client_phone_normalized: scenario.client_phone_normalized },
-      '-created_date', 10
+      '-created_date', 50
     ).catch(() => []);
   }
   if (courses.length === 0 && scenario.client_telephone) {
     courses = await base44.asServiceRole.entities.CourseExterne.filter(
       { client_telephone: scenario.client_telephone },
-      '-created_date', 10
+      '-created_date', 50
     ).catch(() => []);
   }
   // Fallback HYBRIDE : recherche par client_user_email (clients App sans téléphone)
   if (courses.length === 0 && scenario.client_user_email) {
     courses = await base44.asServiceRole.entities.CourseExterne.filter(
       { client_user_email: scenario.client_user_email },
-      '-created_date', 10
+      '-created_date', 50
     ).catch(() => []);
   }
 
+  // ── CORRECTION ATTRIBUTION : ne marquer converted QUE pour une course LIVRÉE ──
+  // Une course annulée / en cours / en attente NE DOIT PAS marquer le scénario comme converti.
+  // On parcourt TOUTES les courses dans la fenêtre et on retient la PREMIÈRE course
+  // réellement livrée (ordre chronologique = created_date le plus ancien).
+  let convertedCourse: any | null = null;
   for (const course of courses) {
     const courseCreated = course.created_date ? new Date(course.created_date).getTime() : 0;
     if (courseCreated < referenceTime) continue;
     if ((courseCreated - referenceTime) > windowMs) continue;
+    if (course.statut !== 'livree') continue; // Ignorer les courses non livrées
 
-    // Course trouvée → marquer le scénario comme converti
-    const revenue = course.prix_final || course.prix_propose_client || course.prix_propose_admin || 0;
-    const commission = course.commission_silga || 0;
-    const isDelivered = course.statut === 'livree';
-
-    await base44.asServiceRole.entities.ReactivationScenario.update(scenario.id, {
-      status: 'converted',
-      converted_at: course.created_date,
-      course_id: course.id,
-      course_completed_at: isDelivered ? (course.heure_livraison || course.colis_livre_at) : null,
-      revenue,
-      commission,
-      next_push_step: -1,
-    });
-
-    // Mettre à jour le recipient J0 (ou le plus récent) avec la conversion
-    const recipientId = scenario.j5_recipient_id || scenario.j2_recipient_id || scenario.j0_recipient_id;
-    if (recipientId) {
-      await base44.asServiceRole.entities.ReactivationCampaignRecipient.update(recipientId, {
-        course_created_at: course.created_date,
-        course_id: course.id,
-        revenue,
-        commission,
-        status: 'converted',
-        course_completed_at: isDelivered ? (course.heure_livraison || course.colis_livre_at) : null,
-      }).catch(() => null);
+    if (!convertedCourse || courseCreated < new Date(convertedCourse.created_date).getTime()) {
+      convertedCourse = course;
     }
-
-    return true;
   }
 
-  return false;
+  if (!convertedCourse) return false;
+
+  // Marquer le scénario comme converti avec la course LIVRÉE
+  const revenue = convertedCourse.prix_final || convertedCourse.prix_propose_client || convertedCourse.prix_propose_admin || 0;
+  const commission = convertedCourse.commission_silga || 0;
+
+  await base44.asServiceRole.entities.ReactivationScenario.update(scenario.id, {
+    status: 'converted',
+    converted_at: convertedCourse.created_date,
+    course_id: convertedCourse.id,
+    course_completed_at: convertedCourse.heure_livraison || convertedCourse.colis_livre_at,
+    revenue,
+    commission,
+    next_push_step: -1,
+  });
+
+  // Mettre à jour le recipient J0 (ou le plus récent) avec la conversion
+  const recipientId = scenario.j5_recipient_id || scenario.j2_recipient_id || scenario.j0_recipient_id;
+  if (recipientId) {
+    await base44.asServiceRole.entities.ReactivationCampaignRecipient.update(recipientId, {
+      course_created_at: convertedCourse.created_date,
+      course_id: convertedCourse.id,
+      revenue,
+      commission,
+      status: 'converted',
+      course_completed_at: convertedCourse.heure_livraison || convertedCourse.colis_livre_at,
+    }).catch(() => null);
+  }
+
+  return true;
 }
 
 // ── Hash déterministe pour A/B variant et groupe contrôle ──────────────────

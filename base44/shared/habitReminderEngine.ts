@@ -354,24 +354,35 @@ export async function checkHabitConversions(base44: any): Promise<number> {
       ).catch(() => []);
     }
 
+    // ── CORRECTION ATTRIBUTION : ne marquer converted QUE pour une course LIVRÉE ──
+    // Une course annulée / en cours / en attente NE DOIT PAS marquer le rappel comme converti.
+    // On parcourt TOUTES les courses dans la fenêtre et on retient la PREMIÈRE course
+    // réellement livrée (ordre chronologique = created_date le plus ancien).
+    let convertedCourse: any | null = null;
     for (const c of courses) {
       const created = c.created_date ? new Date(c.created_date).getTime() : 0;
       if (created < sentTs) continue;
       if ((created - sentTs) > windowMs) continue;
+      if (c.statut !== 'livree') continue; // Ignorer les courses non livrées
 
-      const revenue = c.prix_final || c.prix_propose_client || 0;
-      const commission = c.commission_silga || 0;
-
-      await base44.asServiceRole.entities.HabitReminder.update(r.id, {
-        status: 'converted',
-        converted_at: c.created_date,
-        course_id: c.id,
-        revenue,
-        commission,
-      });
-      converted++;
-      break;
+      if (!convertedCourse || created < new Date(convertedCourse.created_date).getTime()) {
+        convertedCourse = c;
+      }
     }
+
+    if (!convertedCourse) continue;
+
+    const revenue = convertedCourse.prix_final || convertedCourse.prix_propose_client || 0;
+    const commission = convertedCourse.commission_silga || 0;
+
+    await base44.asServiceRole.entities.HabitReminder.update(r.id, {
+      status: 'converted',
+      converted_at: convertedCourse.created_date,
+      course_id: convertedCourse.id,
+      revenue,
+      commission,
+    });
+    converted++;
   }
 
   return converted;
