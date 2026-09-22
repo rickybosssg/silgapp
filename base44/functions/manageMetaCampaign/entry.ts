@@ -14,14 +14,14 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 //
 // SÉCURITÉ :
 //   - Toutes les actions Meta API requièrent META_ACQUISITION_ENABLED = true
-//   - Le compte est verrouillé sur 2382788582549104 (whitelist hardcodée)
+//   - Le compte est verrouillé sur 234850849367733 (whitelist hardcodée)
 //   - Les campagnes sont créées en PAUSED sur Meta — admin doit resume manuellement
 //   - Toutes les actions sont journalisées dans AcquisitionLog
 //   - Les clés protégées ne peuvent pas être modifiées via set_config
 // ═══════════════════════════════════════════════════════════════════════════
 
 const META_API_BASE = 'https://graph.facebook.com/v25.0';
-const ALLOWED_AD_ACCOUNT_ID = '2382788582549104';
+const ALLOWED_AD_ACCOUNT_ID = '234850849367733';
 
 const PROTECTED_CONFIG_KEYS = new Set([
   'META_AD_ACCOUNT_LOCKED',

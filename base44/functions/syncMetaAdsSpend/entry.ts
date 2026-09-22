@@ -20,13 +20,13 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 // ═══════════════════════════════════════════════════════════════════════════
 
 const META_API_BASE = 'https://graph.facebook.com/v25.0';
-const DEFAULT_AD_ACCOUNT_ID = '2382788582549104'; // SILGAPP (Read-Only)
+const DEFAULT_AD_ACCOUNT_ID = '234850849367733'; // Eric Compaore (compte réel SILGAPP)
 
 // ── WHITELIST HARD-CODÉE : seuls ces comptes sont autorisés ──
-// Empêche toute importation de dépenses depuis Eric Compaore ou CDL
+// Empêche toute importation de dépenses depuis d'autres comptes (CDL, etc.)
 // même si META_AD_ACCOUNT_ID est modifié dans AppConfig.
 const ALLOWED_AD_ACCOUNT_IDS = new Set([
-  '2382788582549104', // SILGAPP (Read-Only)
+  '234850849367733', // Eric Compaore (compte réel SILGAPP)
 ]);
 
 function todayStr() {
@@ -48,7 +48,7 @@ async function getAdAccountId(base44) {
   // ── VERROU DE SÉCURITÉ : rejeter tout compte non whitelisté ──
   const rawId = accountId.replace(/^act_/, '').trim();
   if (!ALLOWED_AD_ACCOUNT_IDS.has(rawId)) {
-    throw new Error(`Compte publicitaire non autorisé: ${accountId}. Seul le compte SILGAPP (2382788582549104) est whitelisté.`);
+    throw new Error(`Compte publicitaire non autorisé: ${accountId}. Seul le compte Eric Compaore (234850849367733) est whitelisté.`);
   }
   return rawId;
 }
@@ -154,19 +154,20 @@ async function storeLatestMetrics(base44, accountId, campaigns, insights) {
       ctr: parseFloat(i.ctr || '0'),
       cpc: parseFloat(i.cpc || '0'),
     })),
-    campaigns: campaigns.map(c => ({
-      id: c.id,
-      name: c.name,
-      status: c.status,
-      objective: c.objective,
-      daily_budget: c.daily_budget || null,
-      spend: c.spend || 0,
-      impressions: c.impressions || 0,
-      clicks: c.clicks || 0,
-      reach: c.reach || 0,
-      ctr: c.ctr || '0',
-      cpc: c.cpc || '0',
-    })),
+    campaigns: campaigns
+      .sort((a, b) => (b.spend || 0) - (a.spend || 0))
+      .slice(0, 10)
+      .map(c => ({
+        id: c.id,
+        name: (c.name || '').substring(0, 50),
+        status: c.status,
+        objective: c.objective,
+        spend: c.spend || 0,
+        impressions: c.impressions || 0,
+        clicks: c.clicks || 0,
+        ctr: c.ctr || '0',
+        cpc: c.cpc || '0',
+      })),
   };
 
   const existing = await base44.asServiceRole.entities.AppConfig.filter({ cle: 'META_ADS_LATEST_INSIGHTS' });
