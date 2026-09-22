@@ -56,23 +56,29 @@ export default function MetaAdsKpiCards({ insights, attribution, campaigns }) {
   const totalSpend = campaignStats.reduce((s, c) => s + (c.meta_spend || 0), 0);
   const costPerFirstCourse = totalFirstCourses > 0 ? totalSpend / totalFirstCourses : null;
 
+  // fmtF : formate un montant en FCFA. null/undefined → "—" (donnée absente). 0 → "0 F" (donnée réelle = zéro).
   const fmtF = (v) => v != null ? `${Math.round(v).toLocaleString()} F` : "—";
-  const fmtN = (v) => v != null && v > 0 ? v.toLocaleString() : "—";
+  // fmtN : formate un entier. null/undefined → "—" (donnée absente). 0 → "0" (donnée réelle = zéro).
+  const fmtN = (v) => v != null ? v.toLocaleString() : "—";
+
+  // attributionLoaded = true si getAttributionStats a retourné des données (même si les valeurs sont 0)
+  const attributionLoaded = !!attribution;
+  const attrSub = (v) => (!attributionLoaded ? "Attribution en cours" : "");
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2.5">
-      <KpiCard label="Dépense aujourd'hui" value={today ? fmtF(today.spend * 600) : "0 F"} sub={today ? `≈ $${today.spend.toFixed(2)}` : ""} icon={DollarSign} accent="blue" />
+      <KpiCard label="Dépense aujourd'hui" value={today ? fmtF(today.spend * 600) : "0 F"} sub={today ? `≈ $${today.spend.toFixed(2)}` : "Aucune dépense"} icon={DollarSign} accent="blue" />
       <KpiCard label="Dépense 7 jours" value={fmtF(weekSpend * 600)} sub={`≈ $${weekSpend.toFixed(2)}`} icon={TrendingUp} accent="blue" />
       <KpiCard label="Campagnes actives" value={activeCount} icon={TrendingUp} accent="green" />
       <KpiCard label="Impressions (7j)" value={fmtN(weekImpressions)} icon={Eye} accent="purple" />
       <KpiCard label="Clics (7j)" value={fmtN(weekClicks)} icon={MousePointerClick} accent="amber" />
-      <KpiCard label="Installations attribuées" value={fmtN(totalInstalls)} sub={totalInstalls === 0 ? "Attribution en cours" : ""} icon={Smartphone} accent="blue" />
-      <KpiCard label="Nouveaux inscrits" value={fmtN(totalSignups)} sub={totalSignups === 0 ? "Attribution en cours" : ""} icon={UserPlus} accent="green" />
-      <KpiCard label="Premières courses" value={fmtN(totalFirstCourses)} sub={totalFirstCourses === 0 ? "Attribution en cours" : ""} icon={Package} accent="amber" />
-      <KpiCard label="Courses livrées" value={fmtN(totalDelivered)} sub={totalDelivered === 0 ? "Attribution en cours" : ""} icon={Truck} accent="green" />
+      <KpiCard label="Installations attribuées" value={fmtN(totalInstalls)} sub={attrSub(totalInstalls)} icon={Smartphone} accent="blue" />
+      <KpiCard label="Nouveaux inscrits" value={fmtN(totalSignups)} sub={attrSub(totalSignups)} icon={UserPlus} accent="green" />
+      <KpiCard label="Premières courses" value={fmtN(totalFirstCourses)} sub={attrSub(totalFirstCourses)} icon={Package} accent="amber" />
+      <KpiCard label="Courses livrées" value={fmtN(totalDelivered)} sub={attrSub(totalDelivered)} icon={Truck} accent="green" />
       <KpiCard label="Coût / 1ère course" value={costPerFirstCourse != null ? fmtF(costPerFirstCourse * 600) : "—"} icon={Wallet} accent="red" />
-      <KpiCard label="Revenus attribués" value={fmtF(totalRevenue)} sub={totalRevenue === 0 ? "Attribution en cours" : ""} icon={DollarSign} accent="green" />
-      <KpiCard label="Commission attribuée" value={fmtF(totalCommission)} sub={totalCommission === 0 ? "Attribution en cours" : ""} icon={Wallet} accent="blue" />
+      <KpiCard label="Revenus attribués" value={fmtF(totalRevenue)} sub={attrSub(totalRevenue)} icon={DollarSign} accent="green" />
+      <KpiCard label="Commission attribuée" value={fmtF(totalCommission)} sub={attrSub(totalCommission)} icon={Wallet} accent="blue" />
     </div>
   );
 }

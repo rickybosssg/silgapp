@@ -28,7 +28,8 @@ export default function MetaAdsFunnel({ insights, attribution }) {
   const firstCourses = campaignStats.reduce((s, c) => s + (c.first_courses || 0), 0);
   const secondCourses = campaignStats.reduce((s, c) => s + (c.second_courses || 0), 0);
 
-  const fmtN = (v) => v != null && v > 0 ? v.toLocaleString() : "—";
+  // null/undefined → "—" (donnée absente). 0 → "0" (donnée réelle = zéro).
+  const fmtN = (v) => v != null ? v.toLocaleString() : "—";
 
   return (
     <div className="bg-white rounded-xl border p-3 md:p-4">
@@ -43,7 +44,7 @@ export default function MetaAdsFunnel({ insights, attribution }) {
         <FunnelStep icon={Repeat} label="Client récurrent" value="—" isLast />
       </div>
       <p className="text-[10px] text-slate-400 mt-3">
-        Chaque étape utilise des données réelles. Les valeurs « — » indiquent une attribution en cours ou non disponible.
+        Chaque étape utilise des données réelles. « 0 » = donnée disponible et nulle. « — » = donnée non disponible.
       </p>
     </div>
   );

@@ -78,8 +78,8 @@ export default function MetaAdsCampaignDetail({ campaign, attribution, config, o
           <h4 className="text-xs font-bold text-slate-700 mb-1 mt-3">Conversion SILGAPP</h4>
           <DetailRow label="Premières courses" value={attr.first_courses || 0} />
           <DetailRow label="Courses livrées (≥2)" value={attr.second_courses || 0} />
-          <DetailRow label="Revenus attribués" value={attr.revenue ? `${Math.round(attr.revenue).toLocaleString()} F` : "Attribution en cours"} />
-          <DetailRow label="Commission attribuée" value={attr.commission ? `${Math.round(attr.commission).toLocaleString()} F` : "Attribution en cours"} />
+          <DetailRow label="Revenus attribués" value={attr.revenue != null ? `${Math.round(attr.revenue).toLocaleString()} F` : "—"} />
+          <DetailRow label="Commission attribuée" value={attr.commission != null ? `${Math.round(attr.commission).toLocaleString()} F` : "—"} />
           <DetailRow label="CPI (coût/install)" value={attr.cpi ? `${Math.round(attr.cpi * 600).toLocaleString()} F` : "—"} />
           <DetailRow label="Coût / 1re course" value={attr.cost_per_first_course ? `${Math.round(attr.cost_per_first_course * 600).toLocaleString()} F` : "—"} />
         </div>
