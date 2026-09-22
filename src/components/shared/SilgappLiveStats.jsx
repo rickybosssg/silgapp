@@ -40,7 +40,7 @@ export default function SilgappLiveStats({ countryCode }) {
     },
     {
       icon: Users,
-      label: "Clients SILGAPP",
+      label: "Utilisateurs inscrits",
       value: data?.clients_silgapp,
       color: "text-blue-600",
       bg: "bg-blue-50",
