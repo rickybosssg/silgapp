@@ -457,53 +457,223 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ═══════════════════════════════════════════════════════════════════════
+    // HELPER: Discover Ad Sets and Ads belonging to a Meta campaign
+    // Uses GET /{campaign_id}/adsets and GET /{campaign_id}/ads (dynamic, no hardcode)
+    // ═══════════════════════════════════════════════════════════════════════
+    const discoverCampaignChildren = async (token, metaCampaignId) => {
+      // Ad Sets
+      const asRes = await fetch(`${META_API_BASE}/${metaCampaignId}/adsets?fields=id,name,status,effective_status,daily_budget&limit=100`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      const asData = await asRes.json();
+      if (asData.error) throw new Error(`Liste Ad Sets: ${asData.error.message}`);
+      const adsets = asData.data || [];
+      // Ads (directly under campaign)
+      const adRes = await fetch(`${META_API_BASE}/${metaCampaignId}/ads?fields=id,name,status,effective_status&limit=100`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      const adData = await adRes.json();
+      if (adData.error) throw new Error(`Liste Ads: ${adData.error.message}`);
+      const ads = adData.data || [];
+      return { adsets, ads };
+    };
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // HELPER: Set status on a Meta object (campaign/adset/ad)
+    // ═══════════════════════════════════════════════════════════════════════
+    const setMetaObjectStatus = async (token, objectId, targetStatus) => {
+      const res = await fetch(`${META_API_BASE}/${objectId}`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: targetStatus }),
+      });
+      const data = await res.json();
+      return data.error ? { success: false, error: data.error.message } : { success: true };
+    };
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // PAUSE CAMPAIGN — pause Campaign + Ad Sets + Ads (full chain)
+    // Local status set to 'paused' only when ALL objects are PAUSED.
+    // ═══════════════════════════════════════════════════════════════════════
     if (action === 'pause_campaign') {
       if (!g.killSwitch) return Response.json({ error: 'Kill switch OFF' }, { status: 403 });
       const { campaign_id } = body;
       const campaign = await base44.asServiceRole.entities.MetaCampaign.get(campaign_id);
       if (!campaign || !campaign.meta_campaign_id) return Response.json({ error: 'Campagne/Meta ID introuvable' }, { status: 404 });
       const token = await getMetaToken();
-      const res = await fetch(`${META_API_BASE}/${campaign.meta_campaign_id}`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'PAUSED' }),
-      });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error.message);
+      const metaCampId = campaign.meta_campaign_id;
+
+      // 1. Discover children
+      let adsets, ads;
+      try {
+        ({ adsets, ads } = await discoverCampaignChildren(token, metaCampId));
+      } catch (e) {
+        await logAction('meta_api_error', 'meta_campaign', campaign_id, campaign.name, { api: 'pause_campaign', step: 'discover', error: e.message });
+        return Response.json({ error: e.message }, { status: 500 });
+      }
+
+      // 2. Pause Campaign
+      const campResult = await setMetaObjectStatus(token, metaCampId, 'PAUSED');
+      if (!campResult.success) {
+        await logAction('meta_api_error', 'meta_campaign', campaign_id, campaign.name, { api: 'pause_campaign', step: 'campaign', error: campResult.error });
+        return Response.json({ error: `Pause Campaign échouée: ${campResult.error}` }, { status: 500 });
+      }
+      await logAction('meta_api_called', 'meta_campaign', campaign_id, campaign.name, { api: 'pause_campaign', step: 'campaign', meta_id: metaCampId });
+
+      // 3. Pause Ad Sets
+      const adsetResults = [];
+      for (const as of adsets) {
+        const r = await setMetaObjectStatus(token, as.id, 'PAUSED');
+        adsetResults.push({ id: as.id, name: as.name, success: r.success, error: r.error });
+        if (!r.success) await logAction('meta_api_error', 'meta_campaign', campaign_id, campaign.name, { api: 'pause_campaign', step: 'adset', meta_id: as.id, error: r.error });
+      }
+      const failedAdsets = adsetResults.filter(r => !r.success);
+      if (failedAdsets.length > 0) {
+        await base44.asServiceRole.entities.MetaCampaign.update(campaign_id, { status: 'paused' }); // partial — campaign paused but some children may still be active
+        return Response.json({ error: `Pause Ad Set échouée pour ${failedAdsets.length}/${adsets.length}`, details: failedAdsets }, { status: 500 });
+      }
+
+      // 4. Pause Ads
+      const adResults = [];
+      for (const ad of ads) {
+        const r = await setMetaObjectStatus(token, ad.id, 'PAUSED');
+        adResults.push({ id: ad.id, name: ad.name, success: r.success, error: r.error });
+        if (!r.success) await logAction('meta_api_error', 'meta_campaign', campaign_id, campaign.name, { api: 'pause_campaign', step: 'ad', meta_id: ad.id, error: r.error });
+      }
+      const failedAds = adResults.filter(r => !r.success);
+      if (failedAds.length > 0) {
+        await base44.asServiceRole.entities.MetaCampaign.update(campaign_id, { status: 'paused' });
+        return Response.json({ error: `Pause Ad échouée pour ${failedAds.length}/${ads.length}`, details: failedAds }, { status: 500 });
+      }
+
+      // 5. All paused — update local status
       await base44.asServiceRole.entities.MetaCampaign.update(campaign_id, { status: 'paused', paused_at: new Date().toISOString() });
-      await logAction('campaign_paused', 'meta_campaign', campaign_id, campaign.name, { meta_id: campaign.meta_campaign_id });
-      return Response.json({ success: true, campaign_id, status: 'paused' });
+      await logAction('campaign_paused', 'meta_campaign', campaign_id, campaign.name, { meta_id: metaCampId, adsets: adsetResults, ads: adResults });
+      return Response.json({ success: true, campaign_id, status: 'paused', adsets: adsetResults, ads: adResults });
     }
 
+    // ═══════════════════════════════════════════════════════════════════════
+    // RESUME CAMPAIGN — activate Campaign + Ad Sets + Ads (full chain)
+    // Local status set to 'active' only when ALL objects are ACTIVE.
+    // ═══════════════════════════════════════════════════════════════════════
     if (action === 'resume_campaign') {
       if (!g.killSwitch) return Response.json({ error: 'Kill switch OFF' }, { status: 403 });
       const { campaign_id } = body;
       const campaign = await base44.asServiceRole.entities.MetaCampaign.get(campaign_id);
       if (!campaign || !campaign.meta_campaign_id) return Response.json({ error: 'Campagne/Meta ID introuvable' }, { status: 404 });
       const token = await getMetaToken();
-      const res = await fetch(`${META_API_BASE}/${campaign.meta_campaign_id}`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'ACTIVE' }),
-      });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error.message);
+      const metaCampId = campaign.meta_campaign_id;
+
+      // 1. Discover children
+      let adsets, ads;
+      try {
+        ({ adsets, ads } = await discoverCampaignChildren(token, metaCampId));
+      } catch (e) {
+        await logAction('meta_api_error', 'meta_campaign', campaign_id, campaign.name, { api: 'resume_campaign', step: 'discover', error: e.message });
+        return Response.json({ error: e.message }, { status: 500 });
+      }
+      if (adsets.length === 0) {
+        await logAction('meta_api_error', 'meta_campaign', campaign_id, campaign.name, { api: 'resume_campaign', step: 'discover', error: 'Aucun Ad Set trouvé' });
+        return Response.json({ error: 'Aucun Ad Set trouvé — activation incomplète' }, { status: 500 });
+      }
+      if (ads.length === 0) {
+        await logAction('meta_api_error', 'meta_campaign', campaign_id, campaign.name, { api: 'resume_campaign', step: 'discover', error: 'Aucune Ad trouvée' });
+        return Response.json({ error: 'Aucune Ad trouvée — activation incomplète' }, { status: 500 });
+      }
+
+      // 2. Activate Campaign
+      const campResult = await setMetaObjectStatus(token, metaCampId, 'ACTIVE');
+      if (!campResult.success) {
+        await logAction('meta_api_error', 'meta_campaign', campaign_id, campaign.name, { api: 'resume_campaign', step: 'campaign', error: campResult.error });
+        return Response.json({ error: `Activation Campaign échouée: ${campResult.error}` }, { status: 500 });
+      }
+      await logAction('meta_api_called', 'meta_campaign', campaign_id, campaign.name, { api: 'resume_campaign', step: 'campaign', meta_id: metaCampId });
+
+      // 3. Activate Ad Sets
+      const adsetResults = [];
+      for (const as of adsets) {
+        const r = await setMetaObjectStatus(token, as.id, 'ACTIVE');
+        adsetResults.push({ id: as.id, name: as.name, success: r.success, error: r.error });
+        if (!r.success) await logAction('meta_api_error', 'meta_campaign', campaign_id, campaign.name, { api: 'resume_campaign', step: 'adset', meta_id: as.id, error: r.error });
+      }
+      const failedAdsets = adsetResults.filter(r => !r.success);
+      if (failedAdsets.length > 0) {
+        return Response.json({ error: `Activation Ad Set échouée pour ${failedAdsets.length}/${adsets.length}`, details: failedAdsets, level_reached: 'adset' }, { status: 500 });
+      }
+
+      // 4. Activate Ads
+      const adResults = [];
+      for (const ad of ads) {
+        const r = await setMetaObjectStatus(token, ad.id, 'ACTIVE');
+        adResults.push({ id: ad.id, name: ad.name, success: r.success, error: r.error });
+        if (!r.success) await logAction('meta_api_error', 'meta_campaign', campaign_id, campaign.name, { api: 'resume_campaign', step: 'ad', meta_id: ad.id, error: r.error });
+      }
+      const failedAds = adResults.filter(r => !r.success);
+      if (failedAds.length > 0) {
+        return Response.json({ error: `Activation Ad échouée pour ${failedAds.length}/${ads.length}`, details: failedAds, level_reached: 'ad' }, { status: 500 });
+      }
+
+      // 5. All active — update local status
       await base44.asServiceRole.entities.MetaCampaign.update(campaign_id, { status: 'active' });
-      await logAction('campaign_activated', 'meta_campaign', campaign_id, campaign.name, { meta_id: campaign.meta_campaign_id });
-      return Response.json({ success: true, campaign_id, status: 'active' });
+      await logAction('campaign_activated', 'meta_campaign', campaign_id, campaign.name, { meta_id: metaCampId, adsets: adsetResults, ads: adResults });
+      return Response.json({ success: true, campaign_id, status: 'active', adsets: adsetResults, ads: adResults });
     }
 
+    // ═══════════════════════════════════════════════════════════════════════
+    // SYNC CAMPAIGN STATUS — read full chain from Meta, reconcile local status
+    // Returns Campaign + Ad Sets + Ads real status. Updates local MetaCampaign
+    // status to reflect reality (active only if full chain ACTIVE).
+    // ═══════════════════════════════════════════════════════════════════════
     if (action === 'sync_campaign_status') {
       const { campaign_id } = body;
       const campaign = await base44.asServiceRole.entities.MetaCampaign.get(campaign_id);
       if (!campaign || !campaign.meta_campaign_id) return Response.json({ error: 'Campagne/Meta ID introuvable' }, { status: 404 });
       const token = await getMetaToken();
-      const res = await fetch(`${META_API_BASE}/${campaign.meta_campaign_id}?fields=status,name,daily_budget,configured_status,objective`, {
+      const metaCampId = campaign.meta_campaign_id;
+
+      // 1. Read Campaign
+      const campRes = await fetch(`${META_API_BASE}/${metaCampId}?fields=id,name,status,effective_status,daily_budget,objective`, {
         headers: { 'Authorization': `Bearer ${token}` },
       });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error.message);
-      return Response.json({ success: true, meta_status: data });
+      const campData = await campRes.json();
+      if (campData.error) throw new Error(campData.error.message);
+
+      // 2. Discover + read Ad Sets and Ads
+      let adsets = [], ads = [];
+      try {
+        ({ adsets, ads } = await discoverCampaignChildren(token, metaCampId));
+      } catch (e) {
+        await logAction('meta_api_error', 'meta_campaign', campaign_id, campaign.name, { api: 'sync', step: 'discover', error: e.message });
+      }
+
+      // 3. Determine real chain status
+      const campActive = campData.status === 'ACTIVE';
+      const allAdsetsActive = adsets.length > 0 && adsets.every(a => a.status === 'ACTIVE');
+      const allAdsActive = ads.length > 0 && ads.every(a => a.status === 'ACTIVE');
+      const chainActive = campActive && allAdsetsActive && allAdsActive;
+      const chainPaused = campData.status === 'PAUSED' && adsets.every(a => a.status === 'PAUSED') && ads.every(a => a.status === 'PAUSED');
+
+      // 4. Reconcile local status — only 'active' if full chain is ACTIVE
+      let newLocalStatus = campaign.status;
+      if (chainActive) newLocalStatus = 'active';
+      else newLocalStatus = 'paused'; // partial or fully paused — not diffusing
+
+      if (newLocalStatus !== campaign.status) {
+        await base44.asServiceRole.entities.MetaCampaign.update(campaign_id, { status: newLocalStatus });
+        await logAction('config_changed', 'meta_campaign', campaign_id, campaign.name, { sync: 'status_reconciled', old: campaign.status, new: newLocalStatus, chainActive, chainPaused });
+      }
+
+      return Response.json({
+        success: true,
+        meta_status: campData,
+        adsets,
+        ads,
+        chain_active: chainActive,
+        chain_paused: chainPaused,
+        local_status: newLocalStatus,
+        partial_activation: !chainActive && !chainPaused && campData.status !== 'DELETED',
+      });
     }
 
     // ═══════════════════════════════════════════════════════════════════════
