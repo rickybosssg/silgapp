@@ -1002,15 +1002,31 @@ Deno.serve(async (req) => {
       return Response.json({ success: true, stats });
     }
 
-    // ─── 13. Marquer une course comme "vue" par le livreur ──────────────
-    // Remplace l'ancien appel frontend direct base44.entities.DispatchNotification.create()
-    // Sécurisé : résout livreur_user_email côté backend, vérifie l'identité du livreur,
-    // vérifie l'éligibilité de la course, et applique une clé d'idempotence.
+    // ─── 13. Marquer une course comme "vue" par le livreur (TRACKING) ────
+    // Tracking de vue réelle (vue_at). NE FAIT PAS partie du dispatch.
+    // Une erreur ici ne doit JAMAIS produire l'alerte "moteur de dispatch crashé".
     if (action === 'marquer_vue_course') {
       if (!course_id) return Response.json({ error: 'course_id requis' }, { status: 400 });
 
-      // 1. Récupérer l'utilisateur connecté
-      const me = await base44.auth.me();
+      // 0. Vérifier le statut terminal EN PREMIER (asServiceRole, avant auth).
+      //    Une course annulée/livrée ne nécessite pas de tracking vue_at.
+      //    Sécurisé : aucun vue_at n'est écrit sans vérification d'identité.
+      const course = await base44.asServiceRole.entities.CourseExterne.get(course_id);
+      if (!course) {
+        return Response.json({ success: false, error: 'Course introuvable' }, { status: 404 });
+      }
+      if (course.statut === 'annulee' || course.statut === 'livree') {
+        return Response.json({ success: true, ignored: true, reason: 'course_terminal' });
+      }
+
+      // 1. Récupérer l'utilisateur connecté (token expiré/invalide → 401 propre)
+      let me;
+      try {
+        me = await base44.auth.me();
+      } catch (authErr) {
+        // Token expiré/invalide — retourner 401 sans alerte critique dispatch
+        return Response.json({ success: false, error: 'Utilisateur non authentifié' }, { status: 401 });
+      }
       if (!me || !me.email) {
         return Response.json({ success: false, error: 'Utilisateur non authentifié' }, { status: 401 });
       }
@@ -1024,38 +1040,26 @@ Deno.serve(async (req) => {
         return Response.json({ success: false, error: 'Aucun profil livreur lié à ce compte' }, { status: 403 });
       }
 
-      // 3. Vérifier que la course existe et est éligible pour ce livreur
-      const course = await base44.asServiceRole.entities.CourseExterne.get(course_id);
-      if (!course) {
-        return Response.json({ success: false, error: 'Course introuvable' }, { status: 404 });
-      }
-
-      // Vérifier que le pays du livreur correspond au pays de la course
+      // 3. Vérifier que le pays du livreur correspond au pays de la course
       const courseCountry = (course.country_code || '').toUpperCase();
       const livreurCountry = (livreur.country_code || '').toUpperCase();
       if (!courseCountry || !livreurCountry || courseCountry !== livreurCountry) {
         return Response.json({ success: false, error: 'country_mismatch' }, { status: 403 });
       }
 
-      // Vérifier que la course est encore disponible (non livrée, non annulée)
-      if (course.statut === 'annulee' || course.statut === 'livree') {
-        return Response.json({ success: true, ignored: true, reason: 'course_terminal' });
-      }
-
       // 4. Tracking de vue réelle — UPDATE du champ vue_at, pas de création de doublon.
       // Le statut existant (push_tente, push_succes, etc.) n'est JAMAIS modifié ici.
-      // La "vue réelle" est mesurée par vue_at, indépendamment du cycle FCM.
       const existing = await base44.asServiceRole.entities.DispatchNotification.filter(
         { course_id: course_id, livreur_id: livreur.id }, '-date_notification', 1
       );
 
       if (existing && existing.length > 0) {
         const existingNotif = existing[0];
-        // Déjà vue → pas de mise à jour
+        // Déjà vue → idempotence
         if (existingNotif.vue_at) {
           return Response.json({ success: true, already_viewed: true });
         }
-        // UPDATE uniquement vue_at — ne pas toucher au statut existant
+        // UPDATE uniquement vue_at
         await base44.asServiceRole.entities.DispatchNotification.update(existingNotif.id, {
           vue_at: new Date().toISOString(),
         });
@@ -1063,7 +1067,6 @@ Deno.serve(async (req) => {
       }
 
       // 5. Aucun enregistrement existant — créer avec vue_at renseigné
-      // Cas rare : livreur sans token FCM (pas de DispatchNotification créée par le push)
       await base44.asServiceRole.entities.DispatchNotification.create({
         course_id: course_id,
         livreur_id: livreur.id,
@@ -1107,6 +1110,12 @@ Deno.serve(async (req) => {
     const body = parsedBody || {};
     console.error(`[DISPATCH] STEP_FAILED=dispatchExterneAuto.catch class=${errorClass} http=${httpStatus} action=${body?.action || 'unknown'} course_id=${body?.course_id || 'none'} msg="${error?.message || String(error)}"`);
 
+    // ── Ne pas créer d'alerte critique pour les erreurs de tracking de vue ──
+    // marquer_vue_course est du tracking (vue_at), pas du dispatch.
+    // Son échec ne doit pas déclencher l'alerte "moteur de dispatch crashé".
+    // Les véritables erreurs FATAL des actions de dispatch continuent d'alerter.
+    const isTrackingAction = body?.action === 'marquer_vue_course';
+    if (!isTrackingAction) {
     try {
       const base44 = createClientFromRequest(req);
       // 🛡️ Anti-spam : déduplication par deduplication_key + fenêtre temporelle.
@@ -1141,6 +1150,7 @@ Deno.serve(async (req) => {
         });
       }
     } catch (_) {}
+    } // end if (!isTrackingAction)
     return Response.json({ error: error.message }, { status: 500 });
   }
 });
