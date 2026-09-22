@@ -23,10 +23,29 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 const META_API_BASE = 'https://graph.facebook.com/v25.0';
 const ALLOWED_AD_ACCOUNT_ID = '234850849367733';
 
+// ── Taux de conversion FCFA → USD (source autoritaire backend) ──
+// 1 USD = 600 FCFA (taux métier retenu pour la conversion du budget publicitaire).
+// Ce taux sert UNIQUEMENT à la conversion du budget envoyé à Meta (FCFA → cents USD).
+// Le frontend (useMetaAdsData.js) utilise la même valeur pour l'affichage mais
+// n'est jamais la source de sécurité — le backend reste autoritaire.
+const META_USD_TO_FCFA_RATE = 600;
+
+// ── Conversion centralisée : FCFA → cents USD ──
+// Meta attend daily_budget en cents de la devise du compte (USD ici).
+// Étapes : FCFA → USD (÷ rate) → cents USD (× 100), arrondi à l'entier le plus proche.
+// Exemple : 1000 FCFA ÷ 600 = 1.6667 USD × 100 = 166.67 → 167 cents USD = $1.67/jour.
+// JAMAIS envoyer daily_budget * 100 directement (traiterait les FCFA comme des cents USD).
+function fcfaToUsdCents(budgetFcfa: number): number {
+  const usd = budgetFcfa / META_USD_TO_FCFA_RATE;
+  const cents = Math.round(usd * 100);
+  return cents;
+}
+
 const PROTECTED_CONFIG_KEYS = new Set([
   'META_AD_ACCOUNT_LOCKED',
   'META_ALLOWED_COUNTRIES',
   'META_ALLOWED_OBJECTIVES',
+  'META_USD_TO_FCFA_RATE', // taux verrouillé — modifiable uniquement via config admin
 ]);
 
 Deno.serve(async (req) => {
@@ -257,8 +276,24 @@ Deno.serve(async (req) => {
       if (!g.allowedObjectives.includes(campaign.objective)) {
         return Response.json({ error: 'Objectif non autorisé' }, { status: 400 });
       }
-      if (campaign.daily_budget > g.dailyBudgetCap) {
-        return Response.json({ error: 'Budget dépasse plafond' }, { status: 400 });
+      // Garde-fou budget : doit être > 0 et <= plafond métier (FCFA)
+      const budgetFcfa = campaign.daily_budget || 0;
+      if (budgetFcfa <= 0) {
+        return Response.json({ error: 'Budget doit être > 0 FCFA' }, { status: 400 });
+      }
+      if (budgetFcfa > g.dailyBudgetCap) {
+        return Response.json({ error: `Budget ${budgetFcfa} FCFA > plafond ${g.dailyBudgetCap} FCFA` }, { status: 400 });
+      }
+      // Conversion FCFA → cents USD (compte Meta en USD)
+      // 1000 FCFA → 167 cents USD ($1.67) — JAMAIS 100000 cents ($1000)
+      const budgetUsdCents = fcfaToUsdCents(budgetFcfa);
+      // Vérification de cohérence : le résultat ne doit jamais dépasser budgetFcfa
+      // (si rate=600, 1000 FCFA → 167 cents ; si on obtenait 100000, ce serait un bug)
+      if (budgetUsdCents > budgetFcfa) {
+        await logAction('meta_api_error', 'meta_campaign', campaign_id, campaign.name, {
+          error: `Conversion incohérente: ${budgetFcfa} FCFA → ${budgetUsdCents} cents USD (attendu < ${budgetFcfa})`,
+        });
+        return Response.json({ error: `Erreur de conversion budget: ${budgetFcfa} FCFA → ${budgetUsdCents} cents USD` }, { status: 500 });
       }
 
       // Verify account is whitelisted
@@ -308,7 +343,7 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           name: `${campaign.name} - AdSet`,
           campaign_id: metaCampaignId,
-          daily_budget: campaign.daily_budget * 100, // FCFA to centimes
+          daily_budget: budgetUsdCents, // FCFA → USD → cents USD (ex: 1000 FCFA → 167 cents = $1.67)
           billing_event: 'IMPRESSIONS',
           optimization_goal: campaign.objective === 'OUTCOME_TRAFFIC' ? 'LINK_CLICKS' : 'OFFSITE_CONVERSIONS',
           targeting: {
