@@ -266,6 +266,14 @@ Deno.serve(async (req) => {
         return Response.json({ error: `Campagne statut ${campaign.status} — doit être approved` }, { status: 400 });
       }
 
+      if (campaign.meta_campaign_id) {
+        return Response.json({
+          error: `Campagne déjà liée à Meta (meta_campaign_id=${campaign.meta_campaign_id}). Utilisez resume_campaign pour la reprendre.`,
+          reconciliation_required: true,
+          existing_meta_campaign_id: campaign.meta_campaign_id,
+        }, { status: 409 });
+      }
+
       // Check max active campaigns
       const activeCampaigns = await base44.asServiceRole.entities.MetaCampaign.filter({ status: 'active' });
       if (activeCampaigns.length >= g.maxCampaignsActive) {
@@ -321,6 +329,7 @@ Deno.serve(async (req) => {
       const accountId = `act_${g.adAccountLocked}`;
 
       // 1. Create campaign on Meta (PAUSED — admin must manually resume)
+      // Meta API v20+ requires explicit ad set budget sharing opt-out for this flow.
       const campaignRes = await fetch(`${META_API_BASE}/${accountId}/campaigns`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -329,11 +338,18 @@ Deno.serve(async (req) => {
           objective: campaign.objective,
           status: 'PAUSED',
           special_ad_categories: '[]',
+          is_adset_budget_sharing_enabled: false,
         }),
       });
       const campaignData = await campaignRes.json();
       if (campaignData.error) {
-        await logAction('meta_api_error', 'meta_campaign', campaign_id, campaign.name, { api: 'create_campaign', error: campaignData.error.message });
+        await logAction('meta_api_error', 'meta_campaign', campaign_id, campaign.name, {
+          api: 'create_campaign',
+          error: campaignData.error.message,
+          error_code: campaignData.error.code,
+          error_subcode: campaignData.error.error_subcode,
+          fbtrace_id: campaignData.error.fbtrace_id,
+        });
         throw new Error(`Meta campaign: ${campaignData.error.message}`);
       }
       const metaCampaignId = campaignData.id;
@@ -442,22 +458,85 @@ Deno.serve(async (req) => {
       });
     }
 
+    const discoverCampaignChildren = async (token, metaCampaignId) => {
+      const adsetsRes = await fetch(`${META_API_BASE}/${metaCampaignId}/adsets?fields=id,name,status,effective_status,daily_budget&limit=100`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      const adsetsData = await adsetsRes.json();
+      if (adsetsData.error) throw new Error(`Liste Ad Sets: ${adsetsData.error.message}`);
+
+      const adsRes = await fetch(`${META_API_BASE}/${metaCampaignId}/ads?fields=id,name,status,effective_status&limit=100`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      const adsData = await adsRes.json();
+      if (adsData.error) throw new Error(`Liste Ads: ${adsData.error.message}`);
+
+      return { adsets: adsetsData.data || [], ads: adsData.data || [] };
+    };
+
+    const setMetaObjectStatus = async (token, objectId, targetStatus) => {
+      const res = await fetch(`${META_API_BASE}/${objectId}`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: targetStatus }),
+      });
+      const data = await res.json();
+      return data.error ? { success: false, error: data.error.message } : { success: true };
+    };
+
     if (action === 'pause_campaign') {
       if (!g.killSwitch) return Response.json({ error: 'Kill switch OFF' }, { status: 403 });
       const { campaign_id } = body;
       const campaign = await base44.asServiceRole.entities.MetaCampaign.get(campaign_id);
       if (!campaign || !campaign.meta_campaign_id) return Response.json({ error: 'Campagne/Meta ID introuvable' }, { status: 404 });
       const token = await getMetaToken();
-      const res = await fetch(`${META_API_BASE}/${campaign.meta_campaign_id}`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'PAUSED' }),
-      });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error.message);
+      const metaCampaignId = campaign.meta_campaign_id;
+
+      let adsets, ads;
+      try {
+        ({ adsets, ads } = await discoverCampaignChildren(token, metaCampaignId));
+      } catch (e) {
+        await logAction('meta_api_error', 'meta_campaign', campaign_id, campaign.name, { api: 'pause_campaign', step: 'discover', error: e.message });
+        return Response.json({ error: e.message }, { status: 500 });
+      }
+
+      const campaignResult = await setMetaObjectStatus(token, metaCampaignId, 'PAUSED');
+      if (!campaignResult.success) {
+        await logAction('meta_api_error', 'meta_campaign', campaign_id, campaign.name, { api: 'pause_campaign', step: 'campaign', error: campaignResult.error });
+        return Response.json({ error: `Pause Campaign échouée: ${campaignResult.error}` }, { status: 500 });
+      }
+
+      const adsetResults = [];
+      for (const adset of adsets) {
+        const result = await setMetaObjectStatus(token, adset.id, 'PAUSED');
+        adsetResults.push({ id: adset.id, name: adset.name, success: result.success, error: result.error });
+        if (!result.success) {
+          await logAction('meta_api_error', 'meta_campaign', campaign_id, campaign.name, { api: 'pause_campaign', step: 'adset', meta_id: adset.id, error: result.error });
+        }
+      }
+      const failedAdsets = adsetResults.filter(r => !r.success);
+      if (failedAdsets.length > 0) {
+        await base44.asServiceRole.entities.MetaCampaign.update(campaign_id, { status: 'paused' });
+        return Response.json({ error: `Pause Ad Set échouée pour ${failedAdsets.length}/${adsets.length}`, details: failedAdsets }, { status: 500 });
+      }
+
+      const adResults = [];
+      for (const ad of ads) {
+        const result = await setMetaObjectStatus(token, ad.id, 'PAUSED');
+        adResults.push({ id: ad.id, name: ad.name, success: result.success, error: result.error });
+        if (!result.success) {
+          await logAction('meta_api_error', 'meta_campaign', campaign_id, campaign.name, { api: 'pause_campaign', step: 'ad', meta_id: ad.id, error: result.error });
+        }
+      }
+      const failedAds = adResults.filter(r => !r.success);
+      if (failedAds.length > 0) {
+        await base44.asServiceRole.entities.MetaCampaign.update(campaign_id, { status: 'paused' });
+        return Response.json({ error: `Pause Ad échouée pour ${failedAds.length}/${ads.length}`, details: failedAds }, { status: 500 });
+      }
+
       await base44.asServiceRole.entities.MetaCampaign.update(campaign_id, { status: 'paused', paused_at: new Date().toISOString() });
-      await logAction('campaign_paused', 'meta_campaign', campaign_id, campaign.name, { meta_id: campaign.meta_campaign_id });
-      return Response.json({ success: true, campaign_id, status: 'paused' });
+      await logAction('campaign_paused', 'meta_campaign', campaign_id, campaign.name, { meta_id: metaCampaignId, adsets: adsetResults, ads: adResults });
+      return Response.json({ success: true, campaign_id, status: 'paused', adsets: adsetResults, ads: adResults });
     }
 
     if (action === 'resume_campaign') {
@@ -466,16 +545,59 @@ Deno.serve(async (req) => {
       const campaign = await base44.asServiceRole.entities.MetaCampaign.get(campaign_id);
       if (!campaign || !campaign.meta_campaign_id) return Response.json({ error: 'Campagne/Meta ID introuvable' }, { status: 404 });
       const token = await getMetaToken();
-      const res = await fetch(`${META_API_BASE}/${campaign.meta_campaign_id}`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'ACTIVE' }),
-      });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error.message);
+      const metaCampaignId = campaign.meta_campaign_id;
+
+      let adsets, ads;
+      try {
+        ({ adsets, ads } = await discoverCampaignChildren(token, metaCampaignId));
+      } catch (e) {
+        await logAction('meta_api_error', 'meta_campaign', campaign_id, campaign.name, { api: 'resume_campaign', step: 'discover', error: e.message });
+        return Response.json({ error: e.message }, { status: 500 });
+      }
+      if (adsets.length === 0) {
+        await logAction('meta_api_error', 'meta_campaign', campaign_id, campaign.name, { api: 'resume_campaign', step: 'discover', error: 'Aucun Ad Set trouvé' });
+        return Response.json({ error: 'Aucun Ad Set trouvé — activation incomplète' }, { status: 500 });
+      }
+      if (ads.length === 0) {
+        await logAction('meta_api_error', 'meta_campaign', campaign_id, campaign.name, { api: 'resume_campaign', step: 'discover', error: 'Aucune Ad trouvée' });
+        return Response.json({ error: 'Aucune Ad trouvée — activation incomplète' }, { status: 500 });
+      }
+
+      const campaignResult = await setMetaObjectStatus(token, metaCampaignId, 'ACTIVE');
+      if (!campaignResult.success) {
+        await logAction('meta_api_error', 'meta_campaign', campaign_id, campaign.name, { api: 'resume_campaign', step: 'campaign', error: campaignResult.error });
+        return Response.json({ error: `Activation Campaign échouée: ${campaignResult.error}` }, { status: 500 });
+      }
+
+      const adsetResults = [];
+      for (const adset of adsets) {
+        const result = await setMetaObjectStatus(token, adset.id, 'ACTIVE');
+        adsetResults.push({ id: adset.id, name: adset.name, success: result.success, error: result.error });
+        if (!result.success) {
+          await logAction('meta_api_error', 'meta_campaign', campaign_id, campaign.name, { api: 'resume_campaign', step: 'adset', meta_id: adset.id, error: result.error });
+        }
+      }
+      const failedAdsets = adsetResults.filter(r => !r.success);
+      if (failedAdsets.length > 0) {
+        return Response.json({ error: `Activation Ad Set échouée pour ${failedAdsets.length}/${adsets.length}`, details: failedAdsets, level_reached: 'adset' }, { status: 500 });
+      }
+
+      const adResults = [];
+      for (const ad of ads) {
+        const result = await setMetaObjectStatus(token, ad.id, 'ACTIVE');
+        adResults.push({ id: ad.id, name: ad.name, success: result.success, error: result.error });
+        if (!result.success) {
+          await logAction('meta_api_error', 'meta_campaign', campaign_id, campaign.name, { api: 'resume_campaign', step: 'ad', meta_id: ad.id, error: result.error });
+        }
+      }
+      const failedAds = adResults.filter(r => !r.success);
+      if (failedAds.length > 0) {
+        return Response.json({ error: `Activation Ad échouée pour ${failedAds.length}/${ads.length}`, details: failedAds, level_reached: 'ad' }, { status: 500 });
+      }
+
       await base44.asServiceRole.entities.MetaCampaign.update(campaign_id, { status: 'active' });
-      await logAction('campaign_activated', 'meta_campaign', campaign_id, campaign.name, { meta_id: campaign.meta_campaign_id });
-      return Response.json({ success: true, campaign_id, status: 'active' });
+      await logAction('campaign_activated', 'meta_campaign', campaign_id, campaign.name, { meta_id: metaCampaignId, adsets: adsetResults, ads: adResults });
+      return Response.json({ success: true, campaign_id, status: 'active', adsets: adsetResults, ads: adResults });
     }
 
     if (action === 'sync_campaign_status') {
@@ -483,12 +605,50 @@ Deno.serve(async (req) => {
       const campaign = await base44.asServiceRole.entities.MetaCampaign.get(campaign_id);
       if (!campaign || !campaign.meta_campaign_id) return Response.json({ error: 'Campagne/Meta ID introuvable' }, { status: 404 });
       const token = await getMetaToken();
-      const res = await fetch(`${META_API_BASE}/${campaign.meta_campaign_id}?fields=status,name,daily_budget,configured_status,objective`, {
+      const metaCampaignId = campaign.meta_campaign_id;
+
+      const res = await fetch(`${META_API_BASE}/${metaCampaignId}?fields=id,name,status,effective_status,daily_budget,objective`, {
         headers: { 'Authorization': `Bearer ${token}` },
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error.message);
-      return Response.json({ success: true, meta_status: data });
+
+      let adsets = [];
+      let ads = [];
+      try {
+        ({ adsets, ads } = await discoverCampaignChildren(token, metaCampaignId));
+      } catch (e) {
+        await logAction('meta_api_error', 'meta_campaign', campaign_id, campaign.name, { api: 'sync_campaign_status', step: 'discover', error: e.message });
+      }
+
+      const campaignActive = data.status === 'ACTIVE';
+      const allAdsetsActive = adsets.length > 0 && adsets.every(a => a.status === 'ACTIVE');
+      const allAdsActive = ads.length > 0 && ads.every(a => a.status === 'ACTIVE');
+      const chainActive = campaignActive && allAdsetsActive && allAdsActive;
+      const chainPaused = data.status === 'PAUSED' && adsets.every(a => a.status === 'PAUSED') && ads.every(a => a.status === 'PAUSED');
+      const localStatus = chainActive ? 'active' : 'paused';
+
+      if (localStatus !== campaign.status) {
+        await base44.asServiceRole.entities.MetaCampaign.update(campaign_id, { status: localStatus });
+        await logAction('config_changed', 'meta_campaign', campaign_id, campaign.name, {
+          sync: 'status_reconciled',
+          old: campaign.status,
+          new: localStatus,
+          chainActive,
+          chainPaused,
+        });
+      }
+
+      return Response.json({
+        success: true,
+        meta_status: data,
+        adsets,
+        ads,
+        chain_active: chainActive,
+        chain_paused: chainPaused,
+        local_status: localStatus,
+        partial_activation: !chainActive && !chainPaused && data.status !== 'DELETED',
+      });
     }
 
     // ═══════════════════════════════════════════════════════════════════════
