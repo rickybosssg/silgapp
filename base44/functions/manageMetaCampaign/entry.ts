@@ -262,6 +262,17 @@ Deno.serve(async (req) => {
         return Response.json({ error: `Campagne statut ${campaign.status} — doit être approved` }, { status: 400 });
       }
 
+      // ── PROTECTION ANTI-DOUBLON ──
+      // Si la MetaCampaign possède déjà un meta_campaign_id valide, NE PAS recréer.
+      // Retourner une erreur indiquant qu'une réconciliation est nécessaire.
+      if (campaign.meta_campaign_id) {
+        return Response.json({
+          error: `Campagne déjà liée à Meta (meta_campaign_id=${campaign.meta_campaign_id}). Utilisez resume_campaign pour la reprendre.`,
+          reconciliation_required: true,
+          existing_meta_campaign_id: campaign.meta_campaign_id,
+        }, { status: 409 });
+      }
+
       // Check max active campaigns
       const activeCampaigns = await base44.asServiceRole.entities.MetaCampaign.filter({ status: 'active' });
       if (activeCampaigns.length >= g.maxCampaignsActive) {
@@ -317,6 +328,7 @@ Deno.serve(async (req) => {
       const accountId = `act_${g.adAccountLocked}`;
 
       // 1. Create campaign on Meta (PAUSED — admin must manually resume)
+      // is_adset_budget_sharing_enabled=false requis par Meta API v20.0 (sinon code 100, subcode 4834011)
       const campaignRes = await fetch(`${META_API_BASE}/${accountId}/campaigns`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -325,11 +337,18 @@ Deno.serve(async (req) => {
           objective: campaign.objective,
           status: 'PAUSED',
           special_ad_categories: '[]',
+          is_adset_budget_sharing_enabled: false,
         }),
       });
       const campaignData = await campaignRes.json();
       if (campaignData.error) {
-        await logAction('meta_api_error', 'meta_campaign', campaign_id, campaign.name, { api: 'create_campaign', error: campaignData.error.message });
+        await logAction('meta_api_error', 'meta_campaign', campaign_id, campaign.name, {
+          api: 'create_campaign',
+          error: campaignData.error.message,
+          error_code: campaignData.error.code,
+          error_subcode: campaignData.error.error_subcode,
+          fbtrace_id: campaignData.error.fbtrace_id,
+        });
         throw new Error(`Meta campaign: ${campaignData.error.message}`);
       }
       const metaCampaignId = campaignData.id;
