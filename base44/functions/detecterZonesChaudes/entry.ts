@@ -394,17 +394,15 @@ Deno.serve(async (req) => {
         for (const eligible of livreursEligibles) {
           const dedupKey = `ZONE_CHAUDE_${eligible.livreur.user_email}_${zone.nom}_${windowKey}`;
 
-          // 1. Vérifier si une notification avec cette clé existe déjà (anti-concurrent)
-          const existingNotif = await base44.asServiceRole.entities.Notification.filter({
-            deduplication_key: dedupKey,
-          }, '-created_date', 1).catch(() => []);
-
-          if (existingNotif && existingNotif.length > 0) {
-            // Une autre exécution a déjà créé cette notification → skip
-            continue;
-          }
-
-          // 2. Créer la notification AVANT l'envoi FCM (verrou anti-doublon)
+          // ── Anti-doublon atomique : "créer d'abord, puis vérifier" ──
+          // La plateforme n'impose PAS de contrainte d'unicité sur deduplication_key.
+          // Le pattern "check then create" est vulnérable à une race condition :
+          // deux exécutions concurrentes peuvent toutes deux vérifier, ne rien trouver,
+          // et créer chacune une notification.
+          //
+          // Solution : créer la notification D'ABORD, puis interroger la base.
+          // Le gagnant (created_date le plus ancien + id le plus petit) envoie le FCM.
+          // Les perdants se suppriment et skip l'envoi.
           const notifRecord = await base44.asServiceRole.entities.Notification.create({
             titre: pushTitre,
             message,
@@ -415,6 +413,27 @@ Deno.serve(async (req) => {
           }).catch(() => null);
 
           if (!notifRecord) continue; // skip si la création échoue
+
+          // Vérifier si D'AUTRES notifications avec la même clé existent déjà
+          const allNotifsForKey = await base44.asServiceRole.entities.Notification.filter({
+            deduplication_key: dedupKey,
+          }, 'created_date', 10).catch(() => []);
+
+          // Déterminer le gagnant : created_date le plus ancien, tiebreak sur id
+          const sortedNotifs = (allNotifsForKey || []).slice().sort((a, b) => {
+            const da = new Date(a.created_date || 0).getTime();
+            const db = new Date(b.created_date || 0).getTime();
+            if (da !== db) return da - db;
+            return (a.id || '').localeCompare(b.id || '');
+          });
+
+          const isWinner = sortedNotifs.length > 0 && sortedNotifs[0].id === notifRecord.id;
+
+          if (!isWinner) {
+            // Perdant : supprimer cette notification et skip l'envoi FCM
+            await base44.asServiceRole.entities.Notification.delete(notifRecord.id).catch(() => null);
+            continue;
+          }
 
           for (const tokenItem of eligible.tokens) {
             const isNative = !String(tokenItem.token).startsWith('web_');
