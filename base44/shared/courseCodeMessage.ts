@@ -104,18 +104,18 @@ async function attemptCreateMessage(
 export async function ensureCourseCodeMessage(
   base44: any,
   course: any,
-  livreurId: string,
+  livreurId: string | null | undefined,
   pickupPIN: string,
   deliveryPIN: string,
   logPrefix = '[CODE_MSG]'
 ): Promise<{ created: boolean; idempotent: boolean; error?: string }> {
   const courseId = course?.id;
-  if (!courseId || !livreurId || !pickupPIN || !deliveryPIN) {
+  if (!courseId || !pickupPIN || !deliveryPIN) {
     console.error(`${logPrefix} Paramètres manquants — courseId=${courseId} livreurId=${livreurId} pickup=${pickupPIN} delivery=${deliveryPIN}`);
     return { created: false, idempotent: false, error: 'missing_params' };
   }
 
-  const idempotencyKey = buildCodeMessageIdempotencyKey(courseId, livreurId);
+  const idempotencyKey = buildCodeMessageIdempotencyKey(courseId, livreurId || undefined);
 
   // 1. Vérifier si le message existe déjà
   const existing = await findExistingMessage(base44, idempotencyKey);
@@ -129,15 +129,19 @@ export async function ensureCourseCodeMessage(
     deliveryPIN,
     course.prix_propose_admin,
     course.prix_estimate,
-    course.devise
+    course.devise,
+    course.prix_final,
+    course.prix_propose_client
   );
 
   // 3. Résoudre les participants (résolution officielle existante)
+  //    livreurId optionnel : à la création, aucun livreur n'est assigné.
+  //    resolveCourseParticipantUserIds gère un livreurId null (résout client + admins uniquement).
   let participantUserIds: string[] = [];
   let securityStatus: 'secured' | 'pending' = 'pending';
   try {
     const clientId = course.expediteur_client_id || course.destinataire_client_id;
-    participantUserIds = await resolveCourseParticipantUserIds(base44, livreurId, clientId);
+    participantUserIds = await resolveCourseParticipantUserIds(base44, livreurId || undefined, clientId);
     if (participantUserIds.length > 0) {
       securityStatus = 'secured';
     } else {

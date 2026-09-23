@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
+import { ensureCourseCodeMessage } from '../../shared/courseCodeMessage.ts';
 
 /**
  * Création sécurisée d'une course administrative.
