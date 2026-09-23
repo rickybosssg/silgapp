@@ -75,11 +75,11 @@ async function sendFcm(projectId, accessToken, fcmToken, titre, message, zoneDat
       data: {
         type: 'zone_chaude',
         click_action: 'OPEN_SILGAPP',
-        zone_nom: String(fcmZoneNom || ''),
-        zone_lat: String(fcmZoneLat || ''),
-        zone_lng: String(fcmZoneLng || ''),
-        zone_nb_courses: String(fcmZoneNbCourses || 0),
-        zone_niveau: String(fcmZoneNiveau || ''),
+        zone_nom: String(zoneData.zone_nom || ''),
+        zone_lat: String(zoneData.zone_lat || ''),
+        zone_lng: String(zoneData.zone_lng || ''),
+        zone_nb_courses: String(zoneData.zone_nb_courses || 0),
+        zone_niveau: String(zoneData.zone_niveau || ''),
       },
       android: {
         priority: 'HIGH',
