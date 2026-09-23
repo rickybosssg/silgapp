@@ -67,7 +67,7 @@ async function getAccessToken(clientEmail, privateKey) {
   return result.access_token;
 }
 
-async function sendFcm(projectId, accessToken, fcmToken, titre, message) {
+async function sendFcm(projectId, accessToken, fcmToken, titre, message, zoneData = {}) {
   const payload = {
     message: {
       token: fcmToken,
@@ -75,6 +75,11 @@ async function sendFcm(projectId, accessToken, fcmToken, titre, message) {
       data: {
         type: 'zone_chaude',
         click_action: 'OPEN_SILGAPP',
+        zone_nom: String(zoneData.zone_nom || ''),
+        zone_lat: String(zoneData.zone_lat || ''),
+        zone_lng: String(zoneData.zone_lng || ''),
+        zone_nb_courses: String(zoneData.zone_nb_courses || 0),
+        zone_niveau: String(zoneData.zone_niveau || ''),
       },
       android: {
         priority: 'HIGH',
@@ -245,6 +250,7 @@ Deno.serve(async (req) => {
         nb_courses: coursesDansZone.length, nb_livreurs: livreursDansZone.length,
         temps_attente_min: tempsAttenteMin, score: Math.round(score * 10) / 10,
         niveau, emoji, label,
+        country_code: coursesDansZone[0]?.country_code || countryCode || null,
       };
     });
 
@@ -261,6 +267,7 @@ Deno.serve(async (req) => {
     const alertesCreees = [];
     const pushesEnvoyes = [];
     const historiqueEntrees = [];
+    let totalLivreursCibles = 0;
 
     // Initialiser Firebase si push actif
     let firebaseConfig = null;
@@ -378,25 +385,73 @@ Deno.serve(async (req) => {
 
         // Envoyer les push
         const message = ` ${zone.nb_courses} course${zone.nb_courses > 1 ? "s" : ""} disponible${zone.nb_courses > 1 ? "s" : ""} à ${zone.nom}. Déplacez-vous vers cette zone pour augmenter vos chances.`;
-        const pushTitre = ` Zone très demandée`;
+        const pushTitre = zone.niveau === "tres_forte" ? ` Zone très demandée` : ` Zone demandée`;
+
+        // ── Anti-doublon atomique : fenêtre de cooldown basée sur un timestamp fixe ──
+        // windowKey change toutes les `delaiMinAlertesMin` minutes. Deux exécutions
+        // concurrentes dans la même fenêtre calculent la même clé → la première crée
+        // la notification, la seconde la trouve et skip.
+        const windowKey = Math.floor(Date.now() / (delaiMinAlertesMin * 60 * 1000));
 
         for (const eligible of livreursEligibles) {
+          const dedupKey = `ZONE_CHAUDE_${eligible.livreur.user_email}_${zone.nom}_${windowKey}`;
+
+          // ── Anti-doublon atomique : "créer d'abord, puis vérifier" ──
+          // La plateforme n'impose PAS de contrainte d'unicité sur deduplication_key.
+          // Le pattern "check then create" est vulnérable à une race condition :
+          // deux exécutions concurrentes peuvent toutes deux vérifier, ne rien trouver,
+          // et créer chacune une notification.
+          //
+          // Solution : créer la notification D'ABORD, puis interroger la base.
+          // Le gagnant (created_date le plus ancien + id le plus petit) envoie le FCM.
+          // Les perdants se suppriment et skip l'envoi.
+          const notifRecord = await base44.asServiceRole.entities.Notification.create({
+            titre: pushTitre,
+            message,
+            type: 'zone_chaude',
+            destinataire_email: eligible.livreur.user_email,
+            deduplication_key: dedupKey,
+            lue: false,
+          }).catch(() => null);
+
+          if (!notifRecord) continue; // skip si la création échoue
+
+          // Vérifier si D'AUTRES notifications avec la même clé existent déjà
+          const allNotifsForKey = await base44.asServiceRole.entities.Notification.filter({
+            deduplication_key: dedupKey,
+          }, 'created_date', 10).catch(() => []);
+
+          // Déterminer le gagnant : created_date le plus ancien, tiebreak sur id
+          const sortedNotifs = (allNotifsForKey || []).slice().sort((a, b) => {
+            const da = new Date(a.created_date || 0).getTime();
+            const db = new Date(b.created_date || 0).getTime();
+            if (da !== db) return da - db;
+            return (a.id || '').localeCompare(b.id || '');
+          });
+
+          const isWinner = sortedNotifs.length > 0 && sortedNotifs[0].id === notifRecord.id;
+
+          if (!isWinner) {
+            // Perdant : supprimer cette notification et skip l'envoi FCM
+            await base44.asServiceRole.entities.Notification.delete(notifRecord.id).catch(() => null);
+            continue;
+          }
+
           for (const tokenItem of eligible.tokens) {
             const isNative = !String(tokenItem.token).startsWith('web_');
             if (!isNative) continue;
 
             try {
-              const result = await sendFcm(firebaseConfig.projectId, accessToken, tokenItem.token, pushTitre, message);
+              const result = await sendFcm(
+                firebaseConfig.projectId,
+                accessToken,
+                tokenItem.token,
+                pushTitre,
+                message,
+                { zone_nom: zone.nom, zone_lat: zone.lat, zone_lng: zone.lng, zone_nb_courses: zone.nb_courses, zone_niveau: zone.niveau }
+              );
               if (result.ok) {
                 notifsEnvoyees++;
-                // Créer notification en BDD
-                await base44.asServiceRole.entities.Notification.create({
-                  titre: pushTitre,
-                  message,
-                  type: 'zone_chaude',
-                  destinataire_email: eligible.livreur.user_email,
-                  lue: false,
-                }).catch(() => null);
 
                 // Mettre à jour le token
                 await base44.asServiceRole.entities.NotificationToken.update(tokenItem.id, {
@@ -421,17 +476,18 @@ Deno.serve(async (req) => {
             }
           }
         }
+
+        totalLivreursCibles += livreursEligibles.length;
       }
 
       pushesEnvoyes.push({ zone: zone.nom, envoyees: notifsEnvoyees, echouees: notifsEchouees });
 
       // 3. Sauvegarder historique
-      // ⚠️ Phase A — Plus de fallback "BF". Le pays doit venir du contexte d'appel.
-      // countryCode est déjà résolu plus haut dans la fonction depuis les courses analysées.
-      // Si null, on ne crée pas d'historique avec un pays approximatif.
-      const paysCode = countryCode;
+      // ⚠️ Le pays est inféré depuis les courses de la zone (country_code du premier cours
+      // correspondant) si countryCode n'est pas fourni dans l'appel. Aucun hardcodage de BF.
+      const paysCode = zone.country_code || countryCode;
       if (!paysCode) {
-        console.warn('[ZonesChaudes] ⚠️ country_code non résolu — historique zone chaude ignoré');
+        console.warn(`[ZonesChaudes] ⚠️ country_code non résolu pour zone ${zone.nom} — historique ignoré`);
         continue;
       }
       const villeNom = pays?.ville_principale || pays?.nom || "Ouagadougou";
@@ -457,7 +513,44 @@ Deno.serve(async (req) => {
       } catch (_) {}
     }
 
-    console.log(`[ZonesChaudes] Analyse terminée — ${zonesChaudes.length} zones chaudes, ${alertesCreees.length} alertes créées, ${pushesEnvoyes.reduce((s, p) => s + p.envoyees, 0)} push envoyées`);
+    const totalPushEnvoyes = pushesEnvoyes.reduce((s, p) => s + p.envoyees, 0);
+    const totalPushEchouees = pushesEnvoyes.reduce((s, p) => s + p.echouees, 0);
+    const dureeMs = Date.now() - now;
+
+    console.log(`[ZonesChaudes] Analyse terminée — ${zonesChaudes.length} zones chaudes, ${alertesCreees.length} alertes créées, ${totalPushEnvoyes} push envoyés (${dureeMs}ms)`);
+
+    // ── Cycle log pour traçabilité audit ──
+    try {
+      await base44.asServiceRole.entities.ZoneChaudeCycleLog.create({
+        date_analyse: nowIso,
+        country_code: countryCode || 'global',
+        zones_analysees: zonesAnalyse.length,
+        zones_chaudes: zonesChaudes.length,
+        livreurs_cibles: totalLivreursCibles,
+        push_envoyes: totalPushEnvoyes,
+        push_echouees: totalPushEchouees,
+        duree_ms: dureeMs,
+        erreur: null,
+        config_snapshot: JSON.stringify({
+          ZC_ACTIF: config.ZC_ACTIF,
+          ZC_PUSH_ACTIF: config.ZC_PUSH_ACTIF,
+          ZC_RAYON_KM: config.ZC_RAYON_KM,
+          ZC_MIN_COURSES: config.ZC_MIN_COURSES,
+          ZC_MIN_LIVREURS: config.ZC_MIN_LIVREURS,
+          ZC_SCORE_FAIBLE: config.ZC_SCORE_FAIBLE,
+          ZC_SCORE_MOYEN: config.ZC_SCORE_MOYEN,
+          ZC_SCORE_ELEVE: config.ZC_SCORE_ELEVE,
+          ZC_SCORE_TRES_ELEVE: config.ZC_SCORE_TRES_ELEVE,
+          ZC_DELAI_MIN_ALERTES_MIN: config.ZC_DELAI_MIN_ALERTES_MIN,
+          ZC_MAX_NOTIFS_HEURE: config.ZC_MAX_NOTIFS_HEURE,
+          ZC_DISTANCE_MAX_KM: config.ZC_DISTANCE_MAX_KM,
+        }),
+        courses_en_attente: coursesRecentes.length,
+        livreurs_disponibles: livreursDispos.length,
+      });
+    } catch (e) {
+      console.error('[ZonesChaudes] Erreur cycle log:', e.message);
+    }
 
     return Response.json({
       success: true,
@@ -479,10 +572,33 @@ Deno.serve(async (req) => {
         courses_en_attente: coursesRecentes.length,
         livreurs_disponibles: livreursDispos.length,
       },
+      cycle_log: {
+        total_push_envoyes: totalPushEnvoyes,
+        total_push_echouees: totalPushEchouees,
+        livreurs_cibles: totalLivreursCibles,
+        duree_ms: dureeMs,
+      },
     });
 
   } catch (error) {
     console.error('[ZonesChaudes] Erreur:', error.message);
+    // ── Cycle log même en cas d'erreur ──
+    try {
+      await base44.asServiceRole.entities.ZoneChaudeCycleLog.create({
+        date_analyse: new Date().toISOString(),
+        country_code: 'global',
+        zones_analysees: 0,
+        zones_chaudes: 0,
+        livreurs_cibles: 0,
+        push_envoyes: 0,
+        push_echouees: 0,
+        duree_ms: 0,
+        erreur: error.message,
+        config_snapshot: null,
+        courses_en_attente: 0,
+        livreurs_disponibles: 0,
+      });
+    } catch (_) {}
     return Response.json({ success: false, error: error.message }, { status: 500 });
   }
 });

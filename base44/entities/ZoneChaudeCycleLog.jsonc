@@ -1,0 +1,66 @@
+{
+  "name": "ZoneChaudeCycleLog",
+  "type": "object",
+  "properties": {
+    "date_analyse": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date et heure de l'ex\u00e9cution du cycle"
+    },
+    "country_code": {
+      "type": "string",
+      "description": "Code pays analys\u00e9. 'global' si countryCode non sp\u00e9cifi\u00e9 dans l'appel (analyse multi-pays)."
+    },
+    "zones_analysees": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre total de zones analys\u00e9es"
+    },
+    "zones_chaudes": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre de zones chaudes d\u00e9tect\u00e9es (niveau forte ou tres_forte)"
+    },
+    "livreurs_cibles": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre total de livreurs \u00e9ligibles cibl\u00e9s (somme par zone, peut inclure des doublons si un livreur est \u00e9ligible pour plusieurs zones)"
+    },
+    "push_envoyes": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre total de notifications push envoy\u00e9es avec succ\u00e8s"
+    },
+    "push_echouees": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre total d'\u00e9checs d'envoi FCM"
+    },
+    "duree_ms": {
+      "type": "number",
+      "description": "Dur\u00e9e d'ex\u00e9cution en millisecondes"
+    },
+    "erreur": {
+      "type": "string",
+      "description": "Message d'erreur si l'ex\u00e9cution a \u00e9chou\u00e9. Null si succ\u00e8s."
+    },
+    "config_snapshot": {
+      "type": "string",
+      "description": "JSON: instantan\u00e9 de la configuration utilis\u00e9e (seuils, rayon, etc.) pour audit"
+    },
+    "courses_en_attente": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre de courses en attente r\u00e9centes (< 2h) au moment de l'analyse"
+    },
+    "livreurs_disponibles": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre de livreurs disponibles avec GPS r\u00e9cent au moment de l'analyse"
+    }
+  },
+  "required": [
+    "date_analyse",
+    "country_code"
+  ]
+}

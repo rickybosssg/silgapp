@@ -142,7 +142,7 @@ export default function GrowthDashboard() {
         />
         <GrowthKpiCard
           label="CA généré"
-          value={overview ? `${overview.automationRevenue.toLocaleString()} F` : "—"}
+          value={overview ? (overview.automationRevenue != null ? `${overview.automationRevenue.toLocaleString()} F` : "Non disponible") : "—"}
           icon={DollarSign}
           accent="green"
         />

@@ -33,7 +33,8 @@
         "alerte_critique_dispatch",
         "message_client",
         "incident_detecte",
-        "course_modifiee"
+        "course_modifiee",
+        "zone_chaude"
       ],
       "description": "Type de notification"
     },

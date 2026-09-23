@@ -51,6 +51,7 @@ import {
 } from "@/lib/livreurCourseState";
 import CoursesDisponibles from "@/components/livreur/CoursesDisponibles";
 import CourseArrivalToast from "@/components/livreur/CourseArrivalToast";
+import ZoneChaudeAlert from "@/components/livreur/ZoneChaudeAlert";
 import { useCoursesDisponibles } from "@/hooks/useCoursesDisponibles";
 
 // haversineKm importé depuis priceEstimate (source canonique)
@@ -410,6 +411,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   const [notificationCourseId, setNotificationCourseId] = useState(null);
   const [notificationCourseCandidate, setNotificationCourseCandidate] = useState(null);
   const [courseProposeeDirecte, setCourseProposeeDirecte] = useState(null);
+  const [zoneChaudeAlert, setZoneChaudeAlert] = useState(null);
   useEffect(() => {
     if (!livreurId || !livreurEmail) return;
     registerPushToken(livreurId, {
@@ -440,6 +442,18 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   useEffect(() => {
     const handleNotificationOpened = (event) => {
       const data = event?.detail || {};
+      if (data.type === "zone_chaude") {
+        setZoneChaudeAlert({
+          nom: data.zone_nom || "",
+          lat: data.zone_lat ? parseFloat(data.zone_lat) : null,
+          lng: data.zone_lng ? parseFloat(data.zone_lng) : null,
+          nb_courses: parseInt(data.zone_nb_courses) || 0,
+          niveau: data.zone_niveau || "forte",
+        });
+        setActiveTab("courses");
+        toast.info("Zone chaude détectée", { description: "Forte demande dans une zone proche de vous." });
+        return;
+      }
       // ── Deep-link messages : ouvrir la conversation concernée ──
       if (data.type === "nouveau_message") {
         const convId = String(data.conversation_id || "").trim();
@@ -1421,6 +1435,12 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <PullToRefreshIndicator pulling={pulling} refreshing={refreshing} />
+      {zoneChaudeAlert && (
+        <ZoneChaudeAlert
+          zone={zoneChaudeAlert}
+          onClose={() => setZoneChaudeAlert(null)}
+        />
+      )}
       <AlertesLivreurModal
         livreurId={livreurProfil?.id}
         livreurNom={`${livreurProfil?.prenom || ""} ${livreurProfil?.nom || ""}`.trim()}
