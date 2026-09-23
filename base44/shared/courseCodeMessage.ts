@@ -20,8 +20,13 @@ const IDEMPOTENCY_PREFIX = 'course-codes';
  * Construit le client_message_id déterministe pour le message des codes.
  * Format : course-codes-{courseId}-{livreurId}
  */
-export function buildCodeMessageIdempotencyKey(courseId: string, livreurId: string): string {
-  return `${IDEMPOTENCY_PREFIX}-${courseId}-${livreurId}`;
+export function buildCodeMessageIdempotencyKey(courseId: string, livreurId?: string): string {
+  // livreurId optionnel : à la création, aucun livreur n'est assigné.
+  // On utilise un suffixe "creation" pour distinguer le message de création
+  // du message de dispatch (qui inclut le livreurId).
+  return livreurId
+    ? `${IDEMPOTENCY_PREFIX}-${courseId}-${livreurId}`
+    : `${IDEMPOTENCY_PREFIX}-${courseId}-creation`;
 }
 
 /**
@@ -33,14 +38,21 @@ export function buildCodeMessageContent(
   deliveryPIN: string,
   prixProposeAdmin?: number | null,
   prixEstimate?: number | null,
-  devise?: string
+  devise?: string,
+  prixFinal?: number | null,
+  prixProposeClient?: number | null
 ): string {
   const parts: string[] = [
     `🔑 Code de récupération : ${pickupPIN}`,
     `📦 Code de livraison : ${deliveryPIN}`,
   ];
-  if (prixProposeAdmin && Number(prixProposeAdmin) > 0) {
+  // Priorité : prix final (livraison) > prix admin > prix client > prix estimé
+  if (prixFinal && Number(prixFinal) > 0) {
+    parts.push(`💰 Prix de la course : ${Number(prixFinal).toLocaleString()} ${devise || 'FCFA'}`);
+  } else if (prixProposeAdmin && Number(prixProposeAdmin) > 0) {
     parts.push(`💰 Prix de la course : ${Number(prixProposeAdmin).toLocaleString()} ${devise || 'FCFA'}`);
+  } else if (prixProposeClient && Number(prixProposeClient) > 0) {
+    parts.push(`💰 Prix de la course : ${Number(prixProposeClient).toLocaleString()} ${devise || 'FCFA'}`);
   } else if (prixEstimate && Number(prixEstimate) > 0) {
     parts.push(`💰 Prix estimé : ${Number(prixEstimate).toLocaleString()} ${devise || 'FCFA'}`);
   }
