@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
+import { haversineKm } from "@/lib/priceEstimate.js";
 
 /**
  * Hook thin — appelle la fonction backend getRouteORS et retourne le résultat.
@@ -51,14 +52,17 @@ export function useRouteORS({
       })
       .catch(() => {
         // Sécurité réseau uniquement — le backend gère tous les fallbacks métier
+        // NE JAMAIS mettre distanceKm: 0 — calculer un fallback Haversine local
+        const havDist = haversineKm(fromLat, fromLng, toLat, toLng) || 0;
+        const havEta = Math.max(1, Math.round(havDist / 0.4)); // ~24 km/h moyenne urbaine
         setRoute({
           coordinates: [
             [fromLat, fromLng],
             [toLat, toLng],
           ],
-          distanceKm: 0,
-          etaMinutes: 0,
-          durationSec: 0,
+          distanceKm: havDist,
+          etaMinutes: havEta,
+          durationSec: havEta * 60,
           source: "fallback",
         });
       })

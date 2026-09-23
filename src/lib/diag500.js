@@ -134,8 +134,10 @@ export function init500Diagnostic() {
     const reason = event.reason;
     const message = reason?.message || String(reason);
     const is500 = message.includes('500') || reason?.response?.status >= 500 || reason?.status >= 500;
+    const is429 = message.includes('429') || reason?.response?.status === 429 || reason?.status === 429;
 
-    if (is500 || message.includes('Request failed with status code')) {
+    // Ne capturer que les vraies erreurs 5xx, pas les 429 (rate limiting)
+    if (is500 && !is429) {
       let stack = reason?.stack || '';
       try {
         stack = stack || new Error().stack;
