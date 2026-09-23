@@ -65,6 +65,7 @@ export default function CarteLivreursExterne() {
   const [showPartenaires, setShowPartenaires] = useState(false);
   const [correctionEnCours, setCorrectionEnCours] = useState(false);
   const [categoryDialog, setCategoryDialog] = useState(null); // { category, livreurs }
+  const [showOldPositions, setShowOldPositions] = useState(false); // 📌 positions GPS ≥ 30 min
 
   const handleCorrectionEnCourse = async () => {
     if (!confirm('Corriger les livreurs "en course" sans course active ?')) return;
@@ -293,6 +294,16 @@ export default function CarteLivreursExterne() {
     [clients]
   );
 
+  // 📌 Livreurs réellement localisés récemment (GPS < 30 min) — règle d'affichage carte
+  // ⚠️ Ne modifie ni le statut ON/OFF, ni l'éligibilité au Dispatch V2.
+  const nbLivreursLocalises = useMemo(() => {
+    const now = Date.now();
+    return livreurs.filter(l =>
+      l.latitude && l.longitude && l.derniere_position_date &&
+      (now - new Date(l.derniere_position_date).getTime()) < 30 * 60 * 1000
+    ).length;
+  }, [livreurs]);
+
   // DIAGNOSTIC - Résumé de cohérence complet
   useEffect(() => {
     const eligibles = livreurs.filter(l => l.validation === "valide" && l.actif !== false);
@@ -442,6 +453,13 @@ export default function CarteLivreursExterne() {
               <p className="text-2xl font-black text-red-400 leading-none">{coursesEnAttente.length}</p>
               <p className="text-[10px] font-bold text-white/80 mt-1">À dispatcher</p>
             </div>
+          </div>
+
+          {/* 📌 Compteur dynamique : livreurs réellement localisés récemment */}
+          <div className="flex items-center gap-2 mt-3 bg-green-500/10 border border-green-500/20 rounded-xl px-3 py-2">
+            <span className="text-sm">📍</span>
+            <span className="text-green-400 font-black text-lg leading-none">{nbLivreursLocalises}</span>
+            <span className="text-white/70 text-xs font-medium">livreur{nbLivreursLocalises !== 1 ? "s" : ""} localisé{nbLivreursLocalises !== 1 ? "s" : ""} récemment (GPS &lt; 30 min)</span>
           </div>
         </div>
       </div>
@@ -730,6 +748,18 @@ export default function CarteLivreursExterne() {
                   Partenaires
                 </button>
                 <button
+                  onClick={() => setShowOldPositions(v => !v)}
+                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[11px] font-semibold border transition-all ${
+                    showOldPositions
+                      ? "bg-gray-600 text-white border-gray-600"
+                      : "bg-white/10 text-white/70 border-white/20 hover:bg-white/20"
+                  }`}
+                  title="Afficher les livreurs dont le GPS date de plus de 30 min"
+                >
+                  <span className="w-2 h-2 rounded-full bg-gray-500 flex-shrink-0" />
+                  Positions anciennes
+                </button>
+                <button
                   onClick={() => { setShowMap(false); setSelectedMarker(null); }}
                   className="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors flex-shrink-0"
                 >
@@ -763,6 +793,7 @@ export default function CarteLivreursExterne() {
                 showLivreurs={showLivreurs}
                 showPartenaires={showPartenaires}
                 livreurIdsEnCourseReelle={livreurIdsEnCourseReelle}
+                showOldPositions={showOldPositions}
               />
             </div>
             {selectedMarker && (

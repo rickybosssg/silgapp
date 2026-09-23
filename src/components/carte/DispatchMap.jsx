@@ -33,6 +33,20 @@ import { calculateClusters, getClusterThreshold } from "@/lib/markerCluster";
 const GPS_CLIENT_ACTIF_SEUIL_MIN = 5;
 const GPS_CLIENT_RECENT_SEUIL_MIN = 15;
 
+// ── Seuil d'affichage photo = 30 min ──────────────────────────────────────────
+// Règle d'AFFICHAGE uniquement : un livreur avec GPS < 30 min est affiché
+// individuellement avec sa photo. GPS ≥ 30 min → point gris (masqué par défaut).
+// ⚠️ NE MODIFIE NI le statut ON/OFF, NI l'éligibilité au Dispatch V2, NI la
+//    réception des courses. Un livreur non affiché reste dispatchable.
+const GPS_PHOTO_SEUIL_MIN = 30;
+
+/** GPS récent pour affichage photo = dernière position < 30 min */
+function isGPSRecentForPhoto(livreur) {
+  const dt = livreur.derniere_position_date || livreur.last_seen_at;
+  if (!dt) return false;
+  return (Date.now() - new Date(dt).getTime()) < GPS_PHOTO_SEUIL_MIN * 60 * 1000;
+}
+
 /**
  * NOUVELLE RÈGLE : Disponibilité métier uniquement
  * 
@@ -582,6 +596,55 @@ function buildLivreurIcon(livreur, livreurIdsEnCourseReelle, zoom = 15) {
   });
 }
 
+/**
+ * buildLivreurPhotoIcon — Photo du livreur avec contour coloré selon le statut.
+ * Utilisé pour les livreurs dont le GPS est récent (< 30 min).
+ * Vert = disponible, Orange = en course.
+ * Si pas de photo_url, fallback sur les initiales.
+ */
+function buildLivreurPhotoIcon(livreur, livreurIdsEnCourseReelle, zoom = 15) {
+  const cat = getLivreurCategorie(livreur, livreurIdsEnCourseReelle);
+  const estEnCourse = cat === "en_course";
+  const estLibre = cat === "libre";
+  const initial = livreur.nom?.charAt(0)?.toUpperCase() || "L";
+
+  const size = zoom >= 15 ? 52 : 40;
+  const bodySize = zoom >= 15 ? 42 : 32;
+  const fontSize = zoom >= 15 ? 16 : 13;
+
+  const cssClass = estEnCourse ? "dmap-livreur-course"
+    : estLibre ? "dmap-livreur-libre"
+    : "dmap-livreur-noir";
+  const photoHtml = livreur.photo_url
+    ? `<img src="${livreur.photo_url}" alt="" class="dmap-photo" loading="lazy" />`
+    : `<div class="dmap-avatar-bg" style="font-size:${fontSize}px">${initial}</div>`;
+
+  return window.L.divIcon({
+    html: `
+      <div class="dmap-livreur-wrapper ${cssClass}" style="width:${size}px;height:${size}px">
+        <div class="dmap-ring" style="width:${size}px;height:${size}px"></div>
+        <div class="dmap-body" style="width:${bodySize}px;height:${bodySize}px">${photoHtml}</div>
+      </div>
+    `,
+    className: "dmap-livreur-container",
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+  });
+}
+
+/**
+ * buildOldLivreurIcon — Point gris pour livreurs avec GPS ancien (≥ 30 min).
+ * Ne JAMAIS donner l'impression que le livreur est actuellement présent.
+ */
+function buildOldLivreurIcon(livreur) {
+  return window.L.divIcon({
+    html: `<div class="dmap-livreur-point dmap-livreur-point-noir" style="opacity:0.45"></div>`,
+    className: "dmap-livreur-container dmap-inactif-marker",
+    iconSize: [14, 14],
+    iconAnchor: [7, 7],
+  });
+}
+
 function buildClusterIcon(count) {
   return window.L.divIcon({
     html: `<div class="dmap-cluster-wrapper">${count}</div>`,
@@ -792,6 +855,7 @@ export default function DispatchMap({
   partenaires = [], // 🏪🍽️ partenaires (boutiques + restaurants) à afficher
   showPartenaires = true, // filtre : afficher les partenaires
   livreurIdsEnCourseReelle = new Set(), // 🎯 IDs des livreurs avec course active réelle
+  showOldPositions = false, // 📌 afficher les positions anciennes (GPS ≥ 30 min) en gris
 }) {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
@@ -983,38 +1047,67 @@ export default function DispatchMap({
       markersRef.current.push(marker);
     });
 
-    // 🟢🟠🟡⚫ Livreurs (filtrés par showLivreurs) — avec clustering progressif
+    // 🟢🟠 Livreurs réellement présents (GPS < 30 min) — photos individuelles
+    // ⚠️ Règle d'AFFICHAGE uniquement — ne modifie ni le statut ON/OFF,
+    //    ni l'éligibilité au Dispatch V2, ni la réception des courses.
+    //    Un livreur non affiché reste dispatchable.
     if (showLivreurs) {
-      const livreursAvecGPS = livreurs.filter(l => l.latitude && l.longitude);
       const currentZoom = map.getZoom() || 15;
-      const useClustering = currentZoom < 15;
-      const clusters = useClustering
-        ? calculateClusters(livreursAvecGPS, map, getClusterThreshold(currentZoom))
-        : livreursAvecGPS.map(l => ({ type: "single", item: l, latitude: l.latitude, longitude: l.longitude }));
+      const livreursAvecGPS = livreurs.filter(l => l.latitude && l.longitude);
 
-      clusters.forEach(cluster => {
+      // Séparer livreurs récents (GPS < 30 min) des anciens (GPS ≥ 30 min)
+      const recentLivreurs = livreursAvecGPS.filter(l => isGPSRecentForPhoto(l));
+      const oldLivreurs = livreursAvecGPS.filter(l => !isGPSRecentForPhoto(l));
+
+      // ── Livreurs récents : photos individuelles ou clusters ──
+      // Photo individuelle si : zoom ≥ 13 ET ≤ 20 livreurs récents.
+      // Au-delà de 20 photos ou zoom < 13 → clustering pour préserver la lisibilité.
+      const useRecentClustering = currentZoom < 13 || recentLivreurs.length > 20;
+      const recentClusters = useRecentClustering
+        ? calculateClusters(recentLivreurs, map, getClusterThreshold(currentZoom))
+        : recentLivreurs.map(l => ({ type: "single", item: l, latitude: l.latitude, longitude: l.longitude }));
+
+      recentClusters.forEach(cluster => {
         if (cluster.type === "cluster" && cluster.count > 1) {
           const icon = buildClusterIcon(cluster.count);
           const marker = window.L.marker([cluster.latitude, cluster.longitude], { icon, zIndexOffset: 1300 }).addTo(map);
-          marker.bindPopup(`<div style="min-width:120px;font-family:sans-serif"><p style="font-weight:700;font-size:13px">${cluster.count} livreurs à cet endroit</p><p style="font-size:11px;color:#666">Zoomez pour voir les détails</p></div>`, { maxWidth: 200 });
+          marker.bindPopup(`<div style="min-width:120px;font-family:sans-serif"><p style="font-weight:700;font-size:13px">${cluster.count} livreurs localisés récemment</p><p style="font-size:11px;color:#666">Zoomez pour voir les visages</p></div>`, { maxWidth: 200 });
           markersRef.current.push(marker);
         } else {
           const livreur = cluster.item || cluster.items[0];
           const cat = getLivreurCategorie(livreur, livreurIdsEnCourseReelle);
-          const estNoir = cat === "hors_ligne" || cat === "gps_expire";
-          if (estNoir && masquerInactifs) return;
-          const icon = buildLivreurIcon(livreur, livreurIdsEnCourseReelle, currentZoom);
-          const [lat, lng] = addMarkerOffset(livreur.latitude, livreur.longitude, markerIndex++);
           const estEnCourse = cat === "en_course";
+          const icon = buildLivreurPhotoIcon(livreur, livreurIdsEnCourseReelle, currentZoom);
+          const [lat, lng] = addMarkerOffset(livreur.latitude, livreur.longitude, markerIndex++);
           const marker = window.L.marker([lat, lng], {
             icon,
-            zIndexOffset: estNoir ? 100 : (estEnCourse ? 1100 : 1200),
+            zIndexOffset: estEnCourse ? 1100 : 1200,
           }).addTo(map);
           marker.bindPopup(buildLivreurPopup(livreur, livreurIdsEnCourseReelle), { maxWidth: 260 });
           if (onMarkerClick) marker.on("click", () => onMarkerClick(livreur));
           markersRef.current.push(marker);
         }
       });
+
+      // ── Livreurs anciens (GPS ≥ 30 min) : points gris uniquement ──
+      // Affichés seulement si showOldPositions est activé.
+      // Ne JAMAIS donner l'impression que le livreur est actuellement présent.
+      if (showOldPositions) {
+        oldLivreurs.forEach(livreur => {
+          const cat = getLivreurCategorie(livreur, livreurIdsEnCourseReelle);
+          const estNoir = cat === "hors_ligne" || cat === "gps_expire";
+          if (estNoir && masquerInactifs) return;
+          const icon = buildOldLivreurIcon(livreur);
+          const [lat, lng] = addMarkerOffset(livreur.latitude, livreur.longitude, markerIndex++);
+          const marker = window.L.marker([lat, lng], {
+            icon,
+            zIndexOffset: 50,
+          }).addTo(map);
+          marker.bindPopup(buildLivreurPopup(livreur, livreurIdsEnCourseReelle), { maxWidth: 260 });
+          if (onMarkerClick) marker.on("click", () => onMarkerClick(livreur));
+          markersRef.current.push(marker);
+        });
+      }
     }
 
     // 🔵🟡⚫ Clients (filtrés par showClients)
@@ -1068,11 +1161,13 @@ export default function DispatchMap({
         markersRef.current.push(marker);
       });
     }
-  }, [livreurs, clients, courses, partenaires, mapLoaded, masquerInactifs, showClients, showLivreurs, showPartenaires, livreurIdsEnCourseReelle, zoomLevel]);
+  }, [livreurs, clients, courses, partenaires, mapLoaded, masquerInactifs, showClients, showLivreurs, showPartenaires, livreurIdsEnCourseReelle, zoomLevel, showOldPositions]);
 
   // 🎯 Compteurs — 5 catégories mutuellement exclusives
   const livreurCategories = livreurs.map(l => getLivreurCategorie(l, livreurIdsEnCourseReelle));
   const nbLibres = livreurCategories.filter(c => c === "libre").length;
+  // 📌 Livreurs réellement localisés récemment (GPS < 30 min) — pour la carte
+  const nbLivreursRecents = livreurs.filter(l => l.latitude && l.longitude && isGPSRecentForPhoto(l)).length;
   const nbGPSExpire = livreurCategories.filter(c => c === "gps_expire").length;
   const nbCourse = livreurCategories.filter(c => c === "en_course").length;
   const nbHorsLigne = livreurCategories.filter(c => c === "hors_ligne").length;
@@ -1124,25 +1219,31 @@ export default function DispatchMap({
       {mapLoaded && (
         <>
           {/* Overlay compact — 3 compteurs essentiels (top-left) */}
-          <div className="absolute top-3 left-3 z-[1000]">
+          <div className="absolute top-3 left-3 z-[1000] space-y-2">
             <div className="bg-[#1f2429]/95 backdrop-blur-md border border-white/10 rounded-xl px-3 py-2 shadow-lg flex items-center gap-2.5">
               <button onClick={() => onCategoryClick?.("libre")} className="flex items-center gap-1.5 hover:opacity-80 transition-opacity">
                 <span className="w-2.5 h-2.5 rounded-full bg-green-500 flex-shrink-0" />
                 <span className="text-green-400 font-bold text-sm leading-none">{nbLibres}</span>
-                <span className="text-white/60 text-[10px] leading-none hidden sm:inline">Dispo</span>
+                <span className="text-white/60 text-[10px] leading-none">Dispo</span>
               </button>
               <div className="w-px h-4 bg-white/10" />
               <button onClick={() => onCategoryClick?.("en_course")} className="flex items-center gap-1.5 hover:opacity-80 transition-opacity">
                 <span className="w-2.5 h-2.5 rounded-full bg-orange-500 flex-shrink-0" />
                 <span className="text-orange-400 font-bold text-sm leading-none">{nbCourse}</span>
-                <span className="text-white/60 text-[10px] leading-none hidden sm:inline">Mission</span>
+                <span className="text-white/60 text-[10px] leading-none">Mission</span>
               </button>
               <div className="w-px h-4 bg-white/10" />
               <div className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-red-500 flex-shrink-0" />
                 <span className="text-red-400 font-bold text-sm leading-none">{courses.length}</span>
-                <span className="text-white/60 text-[10px] leading-none hidden sm:inline">À dispo</span>
+                <span className="text-white/60 text-[10px] leading-none">Attente</span>
               </div>
+            </div>
+            {/* 📌 Compteur dynamique : livreurs réellement localisés récemment */}
+            <div className="bg-[#1f2429]/95 backdrop-blur-md border border-green-500/20 rounded-xl px-3 py-1.5 shadow-lg flex items-center gap-1.5">
+              <span className="text-xs">📍</span>
+              <span className="text-green-400 font-bold text-sm leading-none">{nbLivreursRecents}</span>
+              <span className="text-white/70 text-[10px] leading-none">livreur{nbLivreursRecents !== 1 ? "s" : ""} localisé{nbLivreursRecents !== 1 ? "s" : ""} récemment</span>
             </div>
           </div>
 
