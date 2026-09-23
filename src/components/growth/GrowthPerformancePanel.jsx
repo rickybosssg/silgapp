@@ -81,13 +81,13 @@ export default function GrowthPerformancePanel({ automationStatus, overview }) {
             <div>
               <p className="text-[10px] text-slate-400 uppercase tracking-wide">CA généré</p>
               <p className="text-lg font-extrabold text-emerald-600">
-                {overview.automationRevenue.toLocaleString()} F
+                {overview.automationRevenue != null ? `${overview.automationRevenue.toLocaleString()} F` : "Non disponible"}
               </p>
             </div>
             <div>
               <p className="text-[10px] text-slate-400 uppercase tracking-wide">Commission SILGAPP</p>
               <p className="text-lg font-extrabold text-blue-600">
-                {overview.automationCommission.toLocaleString()} F
+                {overview.automationCommission != null ? `${overview.automationCommission.toLocaleString()} F` : "Non disponible"}
               </p>
             </div>
             <div>
