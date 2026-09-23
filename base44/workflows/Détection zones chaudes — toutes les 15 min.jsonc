@@ -1,6 +1,4 @@
 {
-  "name": "D\u00e9tection zones chaudes \u2014 toutes les 15 min",
-  "description": "Analyse toutes les 15 min les quartiers avec forte demande et peu de livreurs. Cr\u00e9e automatiquement des alertes pour diriger les livreurs vers les zones chaudes.",
   "trigger": {
     "condition": null,
     "config": {
@@ -10,7 +8,7 @@
       "cron_expression": null,
       "one_time_date": null,
       "timezone": "UTC",
-      "interval_value": 30,
+      "interval_value": 15,
       "interval_unit": "minutes",
       "interval_anchor": "2026-06-02T16:46:01.408000",
       "ends_type": "never",
@@ -18,6 +16,7 @@
       "ends_after_count": null
     }
   },
+  "description": "Analyse toutes les 15 min les quartiers avec forte demande et peu de livreurs. Cr\u00e9e automatiquement des alertes pour diriger les livreurs vers les zones chaudes.",
   "definition": {
     "document": {
       "dsl": "1.0.0",
@@ -38,6 +37,7 @@
       }
     ]
   },
+  "name": "D\u00e9tection zones chaudes \u2014 toutes les 15 min",
   "x-base44-migrated-from-automation": {
     "legacy_payload_function": "detecterZonesChaudes"
   }

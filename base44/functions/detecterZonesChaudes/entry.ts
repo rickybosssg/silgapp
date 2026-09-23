@@ -67,7 +67,7 @@ async function getAccessToken(clientEmail, privateKey) {
   return result.access_token;
 }
 
-async function sendFcm(projectId, accessToken, fcmToken, titre, message) {
+async function sendFcm(projectId, accessToken, fcmToken, titre, message, zoneData = {}) {
   const payload = {
     message: {
       token: fcmToken,
@@ -75,6 +75,11 @@ async function sendFcm(projectId, accessToken, fcmToken, titre, message) {
       data: {
         type: 'zone_chaude',
         click_action: 'OPEN_SILGAPP',
+        zone_nom: String(fcmZoneNom || ''),
+        zone_lat: String(fcmZoneLat || ''),
+        zone_lng: String(fcmZoneLng || ''),
+        zone_nb_courses: String(fcmZoneNbCourses || 0),
+        zone_niveau: String(fcmZoneNiveau || ''),
       },
       android: {
         priority: 'HIGH',
@@ -378,25 +383,54 @@ Deno.serve(async (req) => {
 
         // Envoyer les push
         const message = ` ${zone.nb_courses} course${zone.nb_courses > 1 ? "s" : ""} disponible${zone.nb_courses > 1 ? "s" : ""} à ${zone.nom}. Déplacez-vous vers cette zone pour augmenter vos chances.`;
-        const pushTitre = ` Zone très demandée`;
+        const pushTitre = zone.niveau === "tres_forte" ? ` Zone très demandée` : ` Zone demandée`;
+
+        // ── Anti-doublon atomique : fenêtre de cooldown basée sur un timestamp fixe ──
+        // windowKey change toutes les `delaiMinAlertesMin` minutes. Deux exécutions
+        // concurrentes dans la même fenêtre calculent la même clé → la première crée
+        // la notification, la seconde la trouve et skip.
+        const windowKey = Math.floor(Date.now() / (delaiMinAlertesMin * 60 * 1000));
 
         for (const eligible of livreursEligibles) {
+          const dedupKey = `ZONE_CHAUDE_${eligible.livreur.user_email}_${zone.nom}_${windowKey}`;
+
+          // 1. Vérifier si une notification avec cette clé existe déjà (anti-concurrent)
+          const existingNotif = await base44.asServiceRole.entities.Notification.filter({
+            deduplication_key: dedupKey,
+          }, '-created_date', 1).catch(() => []);
+
+          if (existingNotif && existingNotif.length > 0) {
+            // Une autre exécution a déjà créé cette notification → skip
+            continue;
+          }
+
+          // 2. Créer la notification AVANT l'envoi FCM (verrou anti-doublon)
+          const notifRecord = await base44.asServiceRole.entities.Notification.create({
+            titre: pushTitre,
+            message,
+            type: 'zone_chaude',
+            destinataire_email: eligible.livreur.user_email,
+            deduplication_key: dedupKey,
+            lue: false,
+          }).catch(() => null);
+
+          if (!notifRecord) continue; // skip si la création échoue
+
           for (const tokenItem of eligible.tokens) {
             const isNative = !String(tokenItem.token).startsWith('web_');
             if (!isNative) continue;
 
             try {
-              const result = await sendFcm(firebaseConfig.projectId, accessToken, tokenItem.token, pushTitre, message);
+              const result = await sendFcm(
+                firebaseConfig.projectId,
+                accessToken,
+                tokenItem.token,
+                pushTitre,
+                message,
+                { zone_nom: zone.nom, zone_lat: zone.lat, zone_lng: zone.lng, zone_nb_courses: zone.nb_courses, zone_niveau: zone.niveau }
+              );
               if (result.ok) {
                 notifsEnvoyees++;
-                // Créer notification en BDD
-                await base44.asServiceRole.entities.Notification.create({
-                  titre: pushTitre,
-                  message,
-                  type: 'zone_chaude',
-                  destinataire_email: eligible.livreur.user_email,
-                  lue: false,
-                }).catch(() => null);
 
                 // Mettre à jour le token
                 await base44.asServiceRole.entities.NotificationToken.update(tokenItem.id, {
