@@ -126,19 +126,17 @@ export async function ensureCourseCodeMessage(
   // 1. Vérifier si le message existe déjà (idempotence au niveau COURSE)
   const existing = await findExistingMessage(base44, courseId);
   if (existing.length > 0) {
-    // Actualiser les participants : le nouveau livreur doit accéder au message existant.
+    // Remplacer les participants par la liste fraîche : seul le livreur courant
+    // (livreurId) + client + admins conservent l'accès. L'ancien livreur d'un
+    // redispatch est automatiquement retiré — il ne peut plus consulter les PIN.
     try {
       const clientId = course.expediteur_client_id || course.destinataire_client_id;
       const freshParticipants = await resolveCourseParticipantUserIds(base44, livreurId || undefined, clientId);
       if (freshParticipants.length > 0) {
-        const existingParticipants = existing[0].participant_user_ids || [];
-        const newParticipants = freshParticipants.filter((id: string) => !existingParticipants.includes(id));
-        if (newParticipants.length > 0) {
-          await base44.asServiceRole.entities.Message.update(existing[0].id, {
-            participant_user_ids: [...existingParticipants, ...newParticipants],
-          });
-          console.log(`${logPrefix} ✅ Participants actualisés pour course ${courseId} (+${newParticipants.length} nouveau(x))`);
-        }
+        await base44.asServiceRole.entities.Message.update(existing[0].id, {
+          participant_user_ids: freshParticipants,
+        });
+        console.log(`${logPrefix} ✅ Participants remplacés pour course ${courseId} (${freshParticipants.length} autorisé(s))`);
       }
     } catch (err: any) {
       console.warn(`${logPrefix} Erreur mise à jour participants course ${courseId}: ${err?.message}`);
