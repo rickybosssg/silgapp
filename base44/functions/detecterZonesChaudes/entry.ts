@@ -250,6 +250,7 @@ Deno.serve(async (req) => {
         nb_courses: coursesDansZone.length, nb_livreurs: livreursDansZone.length,
         temps_attente_min: tempsAttenteMin, score: Math.round(score * 10) / 10,
         niveau, emoji, label,
+        country_code: coursesDansZone[0]?.country_code || countryCode || null,
       };
     });
 
@@ -266,6 +267,7 @@ Deno.serve(async (req) => {
     const alertesCreees = [];
     const pushesEnvoyes = [];
     const historiqueEntrees = [];
+    let totalLivreursCibles = 0;
 
     // Initialiser Firebase si push actif
     let firebaseConfig = null;
@@ -474,17 +476,18 @@ Deno.serve(async (req) => {
             }
           }
         }
+
+        totalLivreursCibles += livreursEligibles.length;
       }
 
       pushesEnvoyes.push({ zone: zone.nom, envoyees: notifsEnvoyees, echouees: notifsEchouees });
 
       // 3. Sauvegarder historique
-      // ⚠️ Phase A — Plus de fallback "BF". Le pays doit venir du contexte d'appel.
-      // countryCode est déjà résolu plus haut dans la fonction depuis les courses analysées.
-      // Si null, on ne crée pas d'historique avec un pays approximatif.
-      const paysCode = countryCode;
+      // ⚠️ Le pays est inféré depuis les courses de la zone (country_code du premier cours
+      // correspondant) si countryCode n'est pas fourni dans l'appel. Aucun hardcodage de BF.
+      const paysCode = zone.country_code || countryCode;
       if (!paysCode) {
-        console.warn('[ZonesChaudes] ⚠️ country_code non résolu — historique zone chaude ignoré');
+        console.warn(`[ZonesChaudes] ⚠️ country_code non résolu pour zone ${zone.nom} — historique ignoré`);
         continue;
       }
       const villeNom = pays?.ville_principale || pays?.nom || "Ouagadougou";
@@ -510,7 +513,44 @@ Deno.serve(async (req) => {
       } catch (_) {}
     }
 
-    console.log(`[ZonesChaudes] Analyse terminée — ${zonesChaudes.length} zones chaudes, ${alertesCreees.length} alertes créées, ${pushesEnvoyes.reduce((s, p) => s + p.envoyees, 0)} push envoyées`);
+    const totalPushEnvoyes = pushesEnvoyes.reduce((s, p) => s + p.envoyees, 0);
+    const totalPushEchouees = pushesEnvoyes.reduce((s, p) => s + p.echouees, 0);
+    const dureeMs = Date.now() - now;
+
+    console.log(`[ZonesChaudes] Analyse terminée — ${zonesChaudes.length} zones chaudes, ${alertesCreees.length} alertes créées, ${totalPushEnvoyes} push envoyés (${dureeMs}ms)`);
+
+    // ── Cycle log pour traçabilité audit ──
+    try {
+      await base44.asServiceRole.entities.ZoneChaudeCycleLog.create({
+        date_analyse: nowIso,
+        country_code: countryCode || 'global',
+        zones_analysees: zonesAnalyse.length,
+        zones_chaudes: zonesChaudes.length,
+        livreurs_cibles: totalLivreursCibles,
+        push_envoyes: totalPushEnvoyes,
+        push_echouees: totalPushEchouees,
+        duree_ms: dureeMs,
+        erreur: null,
+        config_snapshot: JSON.stringify({
+          ZC_ACTIF: config.ZC_ACTIF,
+          ZC_PUSH_ACTIF: config.ZC_PUSH_ACTIF,
+          ZC_RAYON_KM: config.ZC_RAYON_KM,
+          ZC_MIN_COURSES: config.ZC_MIN_COURSES,
+          ZC_MIN_LIVREURS: config.ZC_MIN_LIVREURS,
+          ZC_SCORE_FAIBLE: config.ZC_SCORE_FAIBLE,
+          ZC_SCORE_MOYEN: config.ZC_SCORE_MOYEN,
+          ZC_SCORE_ELEVE: config.ZC_SCORE_ELEVE,
+          ZC_SCORE_TRES_ELEVE: config.ZC_SCORE_TRES_ELEVE,
+          ZC_DELAI_MIN_ALERTES_MIN: config.ZC_DELAI_MIN_ALERTES_MIN,
+          ZC_MAX_NOTIFS_HEURE: config.ZC_MAX_NOTIFS_HEURE,
+          ZC_DISTANCE_MAX_KM: config.ZC_DISTANCE_MAX_KM,
+        }),
+        courses_en_attente: coursesRecentes.length,
+        livreurs_disponibles: livreursDispos.length,
+      });
+    } catch (e) {
+      console.error('[ZonesChaudes] Erreur cycle log:', e.message);
+    }
 
     return Response.json({
       success: true,
@@ -532,10 +572,33 @@ Deno.serve(async (req) => {
         courses_en_attente: coursesRecentes.length,
         livreurs_disponibles: livreursDispos.length,
       },
+      cycle_log: {
+        total_push_envoyes: totalPushEnvoyes,
+        total_push_echouees: totalPushEchouees,
+        livreurs_cibles: totalLivreursCibles,
+        duree_ms: dureeMs,
+      },
     });
 
   } catch (error) {
     console.error('[ZonesChaudes] Erreur:', error.message);
+    // ── Cycle log même en cas d'erreur ──
+    try {
+      await base44.asServiceRole.entities.ZoneChaudeCycleLog.create({
+        date_analyse: new Date().toISOString(),
+        country_code: 'global',
+        zones_analysees: 0,
+        zones_chaudes: 0,
+        livreurs_cibles: 0,
+        push_envoyes: 0,
+        push_echouees: 0,
+        duree_ms: 0,
+        erreur: error.message,
+        config_snapshot: null,
+        courses_en_attente: 0,
+        livreurs_disponibles: 0,
+      });
+    } catch (_) {}
     return Response.json({ success: false, error: error.message }, { status: 500 });
   }
 });
