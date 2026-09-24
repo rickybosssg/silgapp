@@ -145,11 +145,11 @@ export default function AdminPassOffersPanel({ countryCode }) {
 function PassOfferForm({ editing, countryCode, onSave, onCancel }) {
   const [form, setForm] = useState(
     editing
-      ? { ...editing, prix: String(editing.prix ?? "") }
+      ? { ...editing, prix: String(editing.prix ?? ""), duree_jours: String(editing.duree_jours ?? "") }
       : {
           nom: "",
           description: "",
-          duree_jours: 1,
+          duree_jours: "",
           prix: "",
           country_code: countryCode || "BF",
           devise: "FCFA",
@@ -184,8 +184,11 @@ function PassOfferForm({ editing, countryCode, onSave, onCancel }) {
           <Label>Durée (jours)</Label>
           <Input
             type="number"
+            min="1"
+            step="1"
             value={form.duree_jours}
-            onChange={(e) => setForm({ ...form, duree_jours: Number(e.target.value) })}
+            onChange={(e) => setForm({ ...form, duree_jours: e.target.value })}
+            placeholder="1"
           />
         </div>
         <div>
@@ -219,14 +222,19 @@ function PassOfferForm({ editing, countryCode, onSave, onCancel }) {
       <div className="flex gap-2">
         <Button
           className="flex-1"
-          disabled={!form.nom || !form.duree_jours || form.prix === "" || isNaN(Number(form.prix)) || Number(form.prix) < 0}
+          disabled={!form.nom || form.duree_jours === "" || isNaN(Number(form.duree_jours)) || Number(form.duree_jours) < 1 || !Number.isInteger(Number(form.duree_jours)) || form.prix === "" || isNaN(Number(form.prix)) || Number(form.prix) < 0}
           onClick={() => {
+            const dureeNum = Number(form.duree_jours);
+            if (form.duree_jours === "" || isNaN(dureeNum) || dureeNum < 1 || !Number.isInteger(dureeNum)) {
+              toast.error("Durée invalide (entier ≥ 1 requis)");
+              return;
+            }
             const prixNum = Number(form.prix);
             if (isNaN(prixNum) || prixNum < 0) {
               toast.error("Prix invalide");
               return;
             }
-            onSave({ ...form, prix: prixNum });
+            onSave({ ...form, duree_jours: dureeNum, prix: prixNum });
           }}
         >
           Enregistrer
