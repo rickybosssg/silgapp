@@ -144,16 +144,18 @@ export default function AdminPassOffersPanel({ countryCode }) {
 
 function PassOfferForm({ editing, countryCode, onSave, onCancel }) {
   const [form, setForm] = useState(
-    editing || {
-      nom: "",
-      description: "",
-      duree_jours: 1,
-      prix: 1000,
-      country_code: countryCode || "BF",
-      devise: "FCFA",
-      actif: true,
-      ordre: 99,
-    }
+    editing
+      ? { ...editing, prix: String(editing.prix ?? "") }
+      : {
+          nom: "",
+          description: "",
+          duree_jours: 1,
+          prix: "",
+          country_code: countryCode || "BF",
+          devise: "FCFA",
+          actif: true,
+          ordre: 99,
+        }
   );
 
   return (
@@ -190,8 +192,10 @@ function PassOfferForm({ editing, countryCode, onSave, onCancel }) {
           <Label>Prix</Label>
           <Input
             type="number"
+            min="0"
             value={form.prix}
-            onChange={(e) => setForm({ ...form, prix: Number(e.target.value) })}
+            onChange={(e) => setForm({ ...form, prix: e.target.value })}
+            placeholder="0"
           />
         </div>
       </div>
@@ -215,8 +219,15 @@ function PassOfferForm({ editing, countryCode, onSave, onCancel }) {
       <div className="flex gap-2">
         <Button
           className="flex-1"
-          disabled={!form.nom || !form.duree_jours || !form.prix}
-          onClick={() => onSave(form)}
+          disabled={!form.nom || !form.duree_jours || form.prix === "" || isNaN(Number(form.prix)) || Number(form.prix) < 0}
+          onClick={() => {
+            const prixNum = Number(form.prix);
+            if (isNaN(prixNum) || prixNum < 0) {
+              toast.error("Prix invalide");
+              return;
+            }
+            onSave({ ...form, prix: prixNum });
+          }}
         >
           Enregistrer
         </Button>
