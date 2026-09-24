@@ -265,57 +265,82 @@ export default function AdminPassAchatsPanel({ countryCode }) {
         )}
       </div>
 
-      {annulationTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-xl">
-            <div className="flex items-center gap-2">
-              <Ban className="w-5 h-5 text-red-600" />
-              <h3 className="font-bold text-slate-900">Annuler le Pass</h3>
-            </div>
-            <p className="text-sm text-slate-600">
-              Confirmez l'annulation du Pass <strong>{annulationTarget.pass_offer_nom}</strong>.
-              L'annulation prendra effet <strong>immédiatement</strong> pour les nouvelles courses.
-              Les courses déjà acceptées à 0% ne seront pas affectées.
-            </p>
-            <div>
-              <label className="text-sm font-medium text-slate-700">Motif d'annulation *</label>
-              <textarea
-                className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm resize-none focus:ring-2 focus:ring-red-200 focus:border-red-400 outline-none"
-                rows={3}
-                placeholder="Erreur de validation, preuve incorrecte, problème opérationnel..."
-                value={motifAnnulation}
-                onChange={(e) => setMotifAnnulation(e.target.value)}
-              />
-            </div>
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                className="flex-1 bg-red-600 hover:bg-red-700"
-                disabled={!motifAnnulation.trim() || annulerMutation.isPending}
-                onClick={() =>
-                  annulerMutation.mutate({
-                    achat_id: annulationTarget.id,
-                    motif_annulation: motifAnnulation.trim(),
-                  })
-                }
-              >
-                {annulerMutation.isPending ? "Annulation..." : "Confirmer l'annulation"}
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="flex-1"
-                onClick={() => {
-                  setAnnulationTarget(null);
-                  setMotifAnnulation("");
-                }}
-              >
-                Retour
-              </Button>
+      {annulationTarget && (() => {
+        const livreur = livreursData?.[annulationTarget.livreur_id];
+        const nomComplet = livreur
+          ? `${livreur.prenom || ""} ${livreur.nom || ""}`.trim()
+          : null;
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="bg-white rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-xl">
+              <div className="flex items-center gap-2">
+                <Ban className="w-5 h-5 text-red-600" />
+                <h3 className="font-bold text-slate-900">Confirmer l'annulation du Pass ?</h3>
+              </div>
+              <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 space-y-1">
+                <p className="text-sm text-slate-700">
+                  <span className="font-semibold">Pass :</span> {annulationTarget.pass_offer_nom}
+                </p>
+                <p className="text-sm text-slate-700">
+                  <span className="font-semibold">Livreur :</span> {nomComplet || "Livreur introuvable"}
+                </p>
+                {livreur?.telephone && (
+                  <p className="text-sm text-slate-700">
+                    <span className="font-semibold">Téléphone :</span> {livreur.telephone}
+                  </p>
+                )}
+                {annulationTarget.expiration_at && (
+                  <p className="text-sm text-slate-700">
+                    <span className="font-semibold">Expiration originale :</span>{" "}
+                    {format(new Date(annulationTarget.expiration_at), "dd/MM/yyyy 'à' HH:mm", { locale: fr })}
+                  </p>
+                )}
+              </div>
+              <p className="text-sm text-slate-600">
+                L'annulation prendra effet <strong>immédiatement</strong> pour les nouvelles courses.
+                Les courses déjà acceptées à 0% ne seront pas affectées.
+              </p>
+              <div>
+                <label className="text-sm font-medium text-slate-700">Motif d'annulation *</label>
+                <textarea
+                  className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm resize-none focus:ring-2 focus:ring-red-200 focus:border-red-400 outline-none"
+                  rows={3}
+                  placeholder="Erreur de validation, preuve incorrecte, problème opérationnel..."
+                  value={motifAnnulation}
+                  onChange={(e) => setMotifAnnulation(e.target.value)}
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  className="flex-1"
+                  disabled={!motifAnnulation.trim() || annulerMutation.isPending}
+                  onClick={() =>
+                    annulerMutation.mutate({
+                      achat_id: annulationTarget.id,
+                      motif_annulation: motifAnnulation.trim(),
+                    })
+                  }
+                >
+                  {annulerMutation.isPending ? "Annulation..." : "Confirmer l'annulation"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => {
+                    setAnnulationTarget(null);
+                    setMotifAnnulation("");
+                  }}
+                >
+                  Retour
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
