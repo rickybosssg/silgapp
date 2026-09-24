@@ -144,16 +144,18 @@ export default function AdminPassOffersPanel({ countryCode }) {
 
 function PassOfferForm({ editing, countryCode, onSave, onCancel }) {
   const [form, setForm] = useState(
-    editing || {
-      nom: "",
-      description: "",
-      duree_jours: 1,
-      prix: 1000,
-      country_code: countryCode || "BF",
-      devise: "FCFA",
-      actif: true,
-      ordre: 99,
-    }
+    editing
+      ? { ...editing, prix: String(editing.prix ?? ""), duree_jours: String(editing.duree_jours ?? "") }
+      : {
+          nom: "",
+          description: "",
+          duree_jours: "",
+          prix: "",
+          country_code: countryCode || "BF",
+          devise: "FCFA",
+          actif: true,
+          ordre: 99,
+        }
   );
 
   return (
@@ -182,16 +184,21 @@ function PassOfferForm({ editing, countryCode, onSave, onCancel }) {
           <Label>Durée (jours)</Label>
           <Input
             type="number"
+            min="1"
+            step="1"
             value={form.duree_jours}
-            onChange={(e) => setForm({ ...form, duree_jours: Number(e.target.value) })}
+            onChange={(e) => setForm({ ...form, duree_jours: e.target.value })}
+            placeholder="1"
           />
         </div>
         <div>
           <Label>Prix</Label>
           <Input
             type="number"
+            min="0"
             value={form.prix}
-            onChange={(e) => setForm({ ...form, prix: Number(e.target.value) })}
+            onChange={(e) => setForm({ ...form, prix: e.target.value })}
+            placeholder="0"
           />
         </div>
       </div>
@@ -215,8 +222,20 @@ function PassOfferForm({ editing, countryCode, onSave, onCancel }) {
       <div className="flex gap-2">
         <Button
           className="flex-1"
-          disabled={!form.nom || !form.duree_jours || !form.prix}
-          onClick={() => onSave(form)}
+          disabled={!form.nom || form.duree_jours === "" || isNaN(Number(form.duree_jours)) || Number(form.duree_jours) < 1 || !Number.isInteger(Number(form.duree_jours)) || form.prix === "" || isNaN(Number(form.prix)) || Number(form.prix) < 0}
+          onClick={() => {
+            const dureeNum = Number(form.duree_jours);
+            if (form.duree_jours === "" || isNaN(dureeNum) || dureeNum < 1 || !Number.isInteger(dureeNum)) {
+              toast.error("Durée invalide (entier ≥ 1 requis)");
+              return;
+            }
+            const prixNum = Number(form.prix);
+            if (isNaN(prixNum) || prixNum < 0) {
+              toast.error("Prix invalide");
+              return;
+            }
+            onSave({ ...form, duree_jours: dureeNum, prix: prixNum });
+          }}
         >
           Enregistrer
         </Button>

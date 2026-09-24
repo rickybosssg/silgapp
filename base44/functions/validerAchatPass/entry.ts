@@ -22,7 +22,7 @@ export default async function(req: Request): Promise<Response> {
     if (!user) return Response.json({ success: false, error: 'Non autorisé' }, { status: 401 });
     if (user.role !== 'admin') return Response.json({ success: false, error: 'Admin uniquement' }, { status: 403 });
 
-    const { achat_id, action } = await req.json();
+    const { achat_id, action, motif_annulation } = await req.json();
     if (!achat_id) return Response.json({ success: false, error: 'achat_id requis' }, { status: 400 });
 
     const achat = await base44.asServiceRole.entities.PassAchat.get(achat_id);
@@ -50,9 +50,71 @@ export default async function(req: Request): Promise<Response> {
             type: 'generic',
           });
         }
-      } catch (_) {}
+      } catch (pushErr) {
+        console.error('[validerAchatPass] Échec notification refus Pass', achat_id, pushErr?.message || pushErr);
+      }
 
       return Response.json({ success: true, statut: 'refuse' });
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ANNULATION ADMIN — valide → annule (désactivation immédiate)
+    // ═══════════════════════════════════════════════════════════════════════
+    //
+    // RÈGLES :
+    //   - Transition atomique valide → annule (idempotente).
+    //   - expiration_at N'EST JAMAIS écrasé — conservé pour l'historique.
+    //   - L'inactivité immédiate est déterminée par statut=annule + annule_at.
+    //   - Les courses déjà figées (commission_locked_at) restent à 0%.
+    //   - Aucun impact sur montant_du_silga, credit_surplus, Dispatch V2.
+    // ═══════════════════════════════════════════════════════════════════════
+    if (action === 'annuler') {
+      if (achat.statut !== 'valide') {
+        return Response.json({ success: false, error: 'Seul un Pass validé peut être annulé' }, { status: 400 });
+      }
+
+      const motif = (motif_annulation || '').trim();
+      if (!motif) {
+        return Response.json({ success: false, error: 'Motif d\'annulation requis' }, { status: 400 });
+      }
+
+      // CAS atomique : valide → annule (idempotente, bloque les doubles annulations)
+      const claimResult = await base44.asServiceRole.entities.PassAchat.updateMany(
+        { id: achat_id, statut: 'valide' },
+        {
+          $set: {
+            statut: 'annule',
+            annule_par: user.email,
+            annule_at: new Date().toISOString(),
+            motif_annulation: motif,
+          }
+        }
+      );
+      if (!claimResult || claimResult.updated !== 1) {
+        return Response.json({ success: false, error: 'Déjà annulé ou statut modifié' }, { status: 409 });
+      }
+
+      // Push notification d'annulation au livreur
+      try {
+        const livreur = await base44.asServiceRole.entities.Livreur.get(achat.livreur_id).catch(() => null);
+        if (livreur?.user_email) {
+          await base44.asServiceRole.functions.invoke('envoiNotificationPush', {
+            destinataire_email: livreur.user_email,
+            livreur_id: livreur.id,
+            titre: 'Pass annulé',
+            message: `Votre Pass "${achat.pass_offer_nom}" a été annulé par l'administration. Motif : ${motif}. Les courses en cours ne sont pas affectées.`,
+            type: 'generic',
+          });
+        }
+      } catch (pushErr) {
+        console.error('[validerAchatPass] Échec notification annulation Pass', achat_id, pushErr?.message || pushErr);
+      }
+
+      return Response.json({
+        success: true,
+        statut: 'annule',
+        annule_at: new Date().toISOString(),
+      });
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -105,7 +167,9 @@ export default async function(req: Request): Promise<Response> {
           type: 'generic',
         });
       }
-    } catch (_) {}
+    } catch (pushErr) {
+      console.error('[validerAchatPass] Échec notification activation Pass', achat_id, pushErr?.message || pushErr);
+    }
 
     return Response.json({
       success: true,
