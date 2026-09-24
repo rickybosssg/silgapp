@@ -245,8 +245,8 @@ export default function AdminPassAchatsPanel({ countryCode }) {
             {achat.statut === "valide" && achat.expiration_at && new Date(achat.expiration_at) > new Date() && (
               <Button
                 size="sm"
-                variant="outline"
-                className="w-full mt-2 text-red-600 border-red-200 hover:bg-red-50"
+                variant="destructive"
+                className="w-full mt-2"
                 disabled={annulerMutation.isPending}
                 onClick={() => {
                   setAnnulationTarget(achat);
