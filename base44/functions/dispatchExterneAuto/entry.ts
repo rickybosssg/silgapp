@@ -1078,20 +1078,13 @@ Deno.serve(async (req) => {
         return Response.json({ success: true, vue_enregistree: true });
       }
 
-      // 5. Aucun enregistrement existant — créer avec vue_at renseigné
-      await base44.asServiceRole.entities.DispatchNotification.create({
-        course_id: course_id,
-        livreur_id: livreur.id,
-        livreur_user_email: livreur.user_email || me.email,
-        country_code: livreurCountry,
-        vague: 0,
-        statut: 'notifie',
-        priorite_dispatch: livreur.priorite_dispatch || 0,
-        date_notification: new Date().toISOString(),
-        vue_at: new Date().toISOString(),
-      });
-
-      return Response.json({ success: true, vue_enregistree: true });
+      // 5. Aucun enregistrement existant — le livreur a vu la course dans le fil
+      //    (disponible_push) sans recevoir de push. NE PAS créer de DispatchNotification
+      //    avec statut='notifie' : ce statut signifie qu'un push a été tenté, ce qui
+      //    serait faux et trompeur pour l'audit. Le tracking vue_at n'a de sens que
+      //    pour les livreurs réellement notifiés (DN existante → étape 4 ci-dessus).
+      //    CORRECTIF : ne rien créer. Aucun DN = aucun push envoyé = cohérence préservée.
+      return Response.json({ success: true, vue_enregistree: false, reason: 'no_dispatch_notification_tracking_only_for_notified_livreurs' });
     }
 
     return Response.json({ error: 'Action inconnue' }, { status: 400 });
