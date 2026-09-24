@@ -51,10 +51,11 @@
       "enum": [
         "en_attente",
         "valide",
-        "refuse"
+        "refuse",
+        "annule"
       ],
       "default": "en_attente",
-      "description": "Statut de l'achat. en_attente = preuve envoy\u00e9e, en attente de validation admin. valide = Pass activ\u00e9. refuse = preuve rejet\u00e9e."
+      "description": "Statut de l'achat. en_attente = preuve envoy\u00e9e, en attente de validation admin. valide = Pass activ\u00e9. refuse = preuve rejet\u00e9e. annule = Pass valid\u00e9 puis annul\u00e9 par l'admin (d\u00e9sactiv\u00e9 imm\u00e9diatement, historique conserv\u00e9)."
     },
     "valide_par": {
       "type": "string",
@@ -76,6 +77,19 @@
     "refuse_raison": {
       "type": "string"
     },
+    "annule_par": {
+      "type": "string",
+      "description": "Email de l'admin ayant annul\u00e9 le Pass apr\u00e8s validation"
+    },
+    "annule_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date/heure d'annulation du Pass par l'admin. Le Pass est imm\u00e9diatement d\u00e9sactiv\u00e9 \u00e0 partir de cette date."
+    },
+    "motif_annulation": {
+      "type": "string",
+      "description": "Motif d'annulation saisi par l'admin (erreur de validation, preuve incorrecte, probl\u00e8me op\u00e9rationnel, etc.)"
+    },
     "debut_at": {
       "type": "string",
       "format": "date-time",
@@ -84,7 +98,7 @@
     "expiration_at": {
       "type": "string",
       "format": "date-time",
-      "description": "Date/heure d'expiration du Pass = debut_at + duree_jours. Au-del\u00e0, le Pass n'est plus actif."
+      "description": "Date/heure d'expiration ORIGINALE du Pass = debut_at + duree_jours. Conserv\u00e9e m\u00eame apr\u00e8s annulation pour l'historique. Au-del\u00e0, le Pass n'est plus actif."
     },
     "date_demande": {
       "type": "string",
