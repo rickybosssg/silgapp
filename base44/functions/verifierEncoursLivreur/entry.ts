@@ -108,8 +108,15 @@ Deno.serve(async (req) => {
     }
 
     // Récupérer la commission de cette course (pour audit)
+    // ⚠️ Si la commission a été figée à l'acceptation (Pass/Happy Hour), utiliser
+    //    commission_silga tel quel, MÊME SI 0. Ne JAMAIS recalculer depuis prix_final
+    //    pour une course à commission figée — cela transformerait rétroactivement
+    //    une course 0% en commission normale.
     let commission = 0;
-    if (course.commission_silga && course.commission_silga > 0) {
+    if (course.commission_locked_at && course.commission_taux_applique != null) {
+      // Commission figée à l'acceptation — utiliser la valeur stockée (0 pour Pass/Happy Hour)
+      commission = Number(course.commission_silga) || 0;
+    } else if (course.commission_silga && course.commission_silga > 0) {
       commission = course.commission_silga;
     } else if (course.prix_final && course.prix_final > 0) {
       const countryConfig = await chargerConfigPays(base44, countryCode);
