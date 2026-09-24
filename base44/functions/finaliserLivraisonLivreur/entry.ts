@@ -24,8 +24,7 @@ import { chargerConfigPays, normalizeCommissionPct } from '../../shared/dispatch
 //
 // Sécurité :
 //   - Valide l'identité du livreur (user.email → Livreur.user_email)
-//   - Idempotent : une course livrée avec ses données financières n'est jamais réécrite.
-//     Une ancienne course Admin livrée sans répartition peut être complétée une seule fois.
+//   - Idempotent : si statut === "livree" → success sans réécriture
 //   - Protection double livraison : check statut avant update
 //   - Strip TOUS les champs sensibles non liés à la livraison
 //   - verifierEncoursLivreur appelé après chaque finalisation (comptabilisation encours)
@@ -48,6 +47,57 @@ export default async function(req: Request): Promise<Response> {
     const course = await base44.asServiceRole.entities.CourseExterne.get(course_id);
     if (!course) return Response.json({ error: 'Course introuvable' }, { status: 404 });
 
+    const isAdminCourse = course.pricing_mode === 'admin_manuel' || course.source === 'admin';
+    const hasFinancialData =
+      course.prix_final != null &&
+      course.commission_silga != null &&
+      course.montant_livreur != null;
+
+    // Idempotence: si déjà livrée, ne pas écraser le prix existant
+    if (course.statut === 'livree' && (!isAdminCourse || hasFinancialData)) {
+      // ── Garde livreur_financier_id : si manquant (course finalisée via un chemin
+      //    antérieur qui ne le set pas, ex: validateQRCode → idempotence), le fixer
+      //    une seule fois à l'identité du livreur assigné. Idempotent. ──
+      if (!course.livreur_financier_id && course.livreur_id) {
+        await base44.asServiceRole.entities.CourseExterne.update(course_id, {
+          livreur_financier_id: course.livreur_id,
+        }).catch(() => {});
+      }
+      return Response.json({ success: true, skipped: 'already_delivered', course_id });
+    }
+
+    if (course.statut === 'livree') {
+      // Courses admin : corriger le trou historique (prix_final = 0/null)
+      // en écrivant prix_propose_admin comme source de vérité.
+      if (isAdminCourse && (!course.prix_final || course.prix_final === 0) && Number(course.prix_propose_admin) > 0) {
+        const prixFix = Number(course.prix_propose_admin);
+        const countryFix = await chargerConfigPays(base44, course.country_code || '');
+        const commissionPctFix = normalizeCommissionPct(countryFix?.commission_pct);
+        if (commissionPctFix !== null) {
+          const tauxFix = (course.commission_locked_at && course.commission_taux_applique != null)
+            ? Number(course.commission_taux_applique)
+            : commissionPctFix;
+          const commissionFix = Math.round(prixFix * (tauxFix / 100));
+          const montantFix = prixFix - commissionFix;
+          await base44.asServiceRole.entities.CourseExterne.update(course_id, {
+            prix_final: prixFix,
+            commission_silga: commissionFix,
+            montant_livreur: montantFix,
+          });
+          console.warn(`[finaliserLivraisonLivreur] TROU CORRIGÉ: course ${course_id} prix_final=${prixFix} (was 0/null, source=prix_propose_admin)`);
+        }
+      }
+      return Response.json({ success: true, skipped: 'already_delivered', course_id });
+    }
+
+    // Vérifier statut finalisable
+    if (!STATUTS_FINALISABLES.includes(course.statut)) {
+      return Response.json({
+        error: `Finalisation impossible depuis le statut: ${course.statut}`,
+        statut_actuel: course.statut,
+      }, { status: 400 });
+    }
+
     // Vérifier identité livreur
     if (!course.livreur_id) return Response.json({ error: 'Aucun livreur assigné' }, { status: 403 });
     const livreur = await base44.asServiceRole.entities.Livreur.get(course.livreur_id).catch(() => null);
@@ -56,25 +106,7 @@ export default async function(req: Request): Promise<Response> {
       return Response.json({ error: 'Vous n\'êtes pas le livreur assigné' }, { status: 403 });
     }
 
-    const isAdminCourse = course.pricing_mode === 'admin_manuel' || course.source === 'admin';
     const now = new Date().toISOString();
-
-    // Le QR/PIN admin legacy peut confirmer la livraison avant la saisie du montant.
-    // Autoriser uniquement la complétion financière manquante, sans rejouer une
-    // livraison déjà comptabilisée ni écraser un prix existant.
-    const hasFinancialData = Number(course.prix_final) > 0
-      && Number.isFinite(Number(course.commission_silga))
-      && Number.isFinite(Number(course.montant_livreur));
-    if (course.statut === 'livree' && (!isAdminCourse || hasFinancialData)) {
-      return Response.json({ success: true, skipped: 'already_delivered', course_id });
-    }
-
-    if (course.statut !== 'livree' && !STATUTS_FINALISABLES.includes(course.statut)) {
-      return Response.json({
-        error: `Finalisation impossible depuis le statut: ${course.statut}`,
-        statut_actuel: course.statut,
-      }, { status: 400 });
-    }
 
     // ── CAS 1: Course admin — le livreur saisit le prix (montant brut) ──
     // Le backend calcule commission_silga et montant_livreur côté backend uniquement.
@@ -92,6 +124,11 @@ export default async function(req: Request): Promise<Response> {
       // Charger la commission du pays (source de vérité: Country.commission_pct)
       const countryConfig = await chargerConfigPays(base44, course.country_code || livreur.country_code);
       const commissionPct = normalizeCommissionPct(countryConfig?.commission_pct);
+      // ⚠️ Si la commission a été figée à l'acceptation (Pass/Happy Hour), utiliser
+      // le taux figé (commission_taux_applique) au lieu du taux normal du pays.
+      const tauxEffectif = (course.commission_locked_at && course.commission_taux_applique != null)
+        ? Number(course.commission_taux_applique)
+        : commissionPct;
       if (commissionPct === null) {
         return Response.json({
           error: `Commission non configurée pour le pays ${course.country_code}`,
@@ -99,8 +136,9 @@ export default async function(req: Request): Promise<Response> {
         }, { status: 400 });
       }
 
-      // Calcul côté backend uniquement — prix_propose_admin est la source
-      const commissionSilga = Math.round(montant * (commissionPct / 100));
+      // Calcul côté backend uniquement — prix_propose_admin est la source.
+      // Utilise le taux figé à l'acceptation si disponible (Pass/Happy Hour).
+      const commissionSilga = Math.round(montant * (tauxEffectif / 100));
       const montantLivreur = montant - commissionSilga;
 
       const updateData = {
@@ -187,14 +225,17 @@ export default async function(req: Request): Promise<Response> {
     try {
       const res = await base44.asServiceRole.functions.invoke('calculPrixCourseExterne', { course_id });
       if (res?.success) {
-        // Multi-colis: mettre à jour les colis individuels
-        if (is_multi_colis && colis_data) {
-          await handleMultiColis(base44, course_id, colis_data, now);
-        }
+        // ── Garde livreur_financier_id : calculPrixCourseExterne ne le set pas.
+        //    Le fixer une seule fois ici, après délégation. Idempotent. ──
         if (!course.livreur_financier_id && course.livreur_id) {
           await base44.asServiceRole.entities.CourseExterne.update(course_id, {
             livreur_financier_id: course.livreur_id,
           }).catch(() => {});
+        }
+
+        // Multi-colis: mettre à jour les colis individuels
+        if (is_multi_colis && colis_data) {
+          await handleMultiColis(base44, course_id, colis_data, now);
         }
         return Response.json({
           success: true,

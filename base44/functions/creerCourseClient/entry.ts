@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
+import { ensureCourseCodeMessage } from '../../shared/courseCodeMessage.ts';
 
 const CREATION_MUTEX_KEY = 'COURSE_CREATION_MUTEX';
 const LOCK_TTL_MS = 15_000;
@@ -277,6 +278,25 @@ export default async function(req: Request): Promise<Response> {
           normalizedRequestId,
           course.id
         );
+      }
+
+      // ── Messages automatiques (prix + PIN récupération + PIN livraison) ──
+      // Même mécanisme que le flux admin : ensureCourseCodeMessage (idempotent).
+      // livreurId = null à la création (aucun livreur assigné).
+      // Non-bloquant : un échec n'empêche pas la création de la course.
+      if (course?.pickup_code_4_digits && course?.delivery_code_4_digits) {
+        try {
+          await ensureCourseCodeMessage(
+            base44,
+            course,
+            null, // livreurId = null à la création
+            course.pickup_code_4_digits,
+            course.delivery_code_4_digits,
+            '[CODE_MSG_CLIENT]'
+          );
+        } catch (err: any) {
+          console.error('[creerCourseClient] Erreur message codes (non-bloquant):', err?.message || String(err));
+        }
       }
 
       return Response.json({ success: true, course });

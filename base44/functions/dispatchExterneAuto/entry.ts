@@ -8,6 +8,7 @@ import { runWatchdog } from '../../shared/dispatchWatchdog.ts';
 import { marquerRefuse, marquerAccepte, getLivreursNotifies, getLivreursRefuses, resetNotifications as resetNotifsEntity } from '../../shared/dispatchNotifications.ts';
 import { accepterCourseV2, publierCourseDansFil, isV2Enabled, secoursDispatchV2, isPilotLivreur, DISPATCH_V2_BUNDLE_VERSION } from '../../shared/dispatchV2.ts';
 import { ensureCourseCodeMessage } from '../../shared/courseCodeMessage.ts';
+import { figerCommissionAcceptation } from '../../shared/commissionAvantage.ts';
 
 // 🔖 Redéploiement forcé — 2026-08-14-simplified-3 — rappel T+5min re-notifie les mêmes livreurs libres
 console.log(`[DISPATCH_EXTERNE_AUTO] 🔖 dispatchV2 bundle version: ${DISPATCH_V2_BUNDLE_VERSION}`);
@@ -502,6 +503,16 @@ Deno.serve(async (req) => {
         return Response.json(reponseDejaPrise('race_condition_lost', courseVerifie));
       }
 
+      // ── Figer la commission à l'acceptation (Pass Zéro Commission / Happy Hour) ──
+      // Redispatch : si un nouveau livreur accepte, le taux est recalculé pour lui.
+      if (!isManual && courseVerifie.heure_acceptation && courseVerifie.country_code) {
+        await figerCommissionAcceptation(
+          base44, course_id, livreur_id, courseVerifie.country_code, courseVerifie.heure_acceptation
+        ).catch((err: any) => {
+          console.error('[DISPATCH] figerCommissionAcceptation error (non-blocking):', err?.message);
+        });
+      }
+
       if (!isManual) {
         await base44.asServiceRole.entities.Livreur.update(livreur_id, { statut: 'en_course' });
         await supprimerNotificationsCourse(base44, course_id);
@@ -976,21 +987,14 @@ Deno.serve(async (req) => {
         return Response.json({ success: true, vue_enregistree: true });
       }
 
-      // 5. Aucun enregistrement existant — créer avec vue_at renseigné
-      // Cas rare : livreur sans token FCM (pas de DispatchNotification créée par le push)
-      await base44.asServiceRole.entities.DispatchNotification.create({
-        course_id: course_id,
-        livreur_id: livreur.id,
-        livreur_user_email: livreur.user_email || me.email,
-        country_code: livreurCountry,
-        vague: 0,
-        statut: 'notifie',
-        priorite_dispatch: livreur.priorite_dispatch || 0,
-        date_notification: new Date().toISOString(),
-        vue_at: new Date().toISOString(),
+      // 5. Aucun enregistrement existant — ne PAS créer de DN artificielle.
+      // Un livreur peut ouvrir une course depuis son feed sans avoir reçu de push.
+      // Créer une DispatchNotification statut=notifie produirait un faux historique.
+      return Response.json({
+        success: true,
+        ignored: true,
+        reason: 'no_dispatch_notification_tracking_only_for_notified_livreurs',
       });
-
-      return Response.json({ success: true, vue_enregistree: true });
     }
 
     return Response.json({ error: 'Action inconnue' }, { status: 400 });

@@ -65,36 +65,26 @@ async function getRoutingConfig(base44: any) {
   };
 
   try {
-    const [enabledRes, ttlRes, recalcRes, intervalRes, cbThresholdRes, cbDurationRes] = await Promise.all([
-      base44.asServiceRole.entities.SystemConfig.filter({ cle: "routing_enabled" }).catch(() => []),
-      base44.asServiceRole.entities.SystemConfig.filter({ cle: "routing_cache_ttl_seconds" }).catch(() => []),
-      base44.asServiceRole.entities.SystemConfig.filter({ cle: "routing_recalculation_distance_meters" }).catch(() => []),
-      base44.asServiceRole.entities.SystemConfig.filter({ cle: "routing_minimum_interval_seconds" }).catch(() => []),
-      base44.asServiceRole.entities.SystemConfig.filter({ cle: "routing_circuit_breaker_threshold" }).catch(() => []),
-      base44.asServiceRole.entities.SystemConfig.filter({ cle: "routing_circuit_breaker_duration_seconds" }).catch(() => []),
-    ]);
+    // ── OPTIMISATION : un seul appel SDK au lieu de 6 (réduit le risque de 429) ──
+    const allConfigs = await base44.asServiceRole.entities.SystemConfig.filter({}, undefined, 50).catch(() => []);
+    const cfgMap = new Map((allConfigs || []).map((c: any) => [c.cle, c.valeur]));
 
-    if (enabledRes?.length > 0) config.enabled = enabledRes[0].valeur !== "false";
-    if (ttlRes?.length > 0) {
-      const v = parseInt(ttlRes[0].valeur);
-      if (!isNaN(v) && v > 0) config.cacheTtlSec = v;
-    }
-    if (recalcRes?.length > 0) {
-      const v = parseInt(recalcRes[0].valeur);
-      if (!isNaN(v) && v > 0) config.recalcDistanceM = v;
-    }
-    if (intervalRes?.length > 0) {
-      const v = parseInt(intervalRes[0].valeur);
-      if (!isNaN(v) && v >= 0) config.minIntervalSec = v;
-    }
-    if (cbThresholdRes?.length > 0) {
-      const v = parseInt(cbThresholdRes[0].valeur);
-      if (!isNaN(v) && v > 0) config.cbThreshold = v;
-    }
-    if (cbDurationRes?.length > 0) {
-      const v = parseInt(cbDurationRes[0].valeur);
-      if (!isNaN(v) && v > 0) config.cbDurationSec = v;
-    }
+    if (cfgMap.has("routing_enabled")) config.enabled = cfgMap.get("routing_enabled") !== "false";
+    const parsePos = (v: string | undefined, min: number): number | null => {
+      if (!v) return null;
+      const n = parseInt(v);
+      return !isNaN(n) && n >= min ? n : null;
+    };
+    const ttl = parsePos(cfgMap.get("routing_cache_ttl_seconds"), 1);
+    if (ttl !== null) config.cacheTtlSec = ttl;
+    const recalc = parsePos(cfgMap.get("routing_recalculation_distance_meters"), 1);
+    if (recalc !== null) config.recalcDistanceM = recalc;
+    const interval = parsePos(cfgMap.get("routing_minimum_interval_seconds"), 0);
+    if (interval !== null) config.minIntervalSec = interval;
+    const cbT = parsePos(cfgMap.get("routing_circuit_breaker_threshold"), 1);
+    if (cbT !== null) config.cbThreshold = cbT;
+    const cbD = parsePos(cfgMap.get("routing_circuit_breaker_duration_seconds"), 1);
+    if (cbD !== null) config.cbDurationSec = cbD;
   } catch (_) {}
 
   return config;
@@ -419,10 +409,26 @@ Deno.serve(async (req) => {
     });
 
   } catch (error) {
+    // ── CRITIQUE : ne JAMAIS retourner distanceKm: 0 pour une vraie course ──
+    // Si une erreur survient (y compris 429 de la plateforme Base44), utiliser
+    // le fallback Haversine plutôt que 0, pour ne pas corrompre l'affichage.
+    const safeDist = haversineKm(
+      Number(payload?.from_lat) || 0,
+      Number(payload?.from_lng) || 0,
+      Number(payload?.to_lat) || 0,
+      Number(payload?.to_lng) || 0,
+    ) || 0;
+    const safeEta = computeFallbackEta(safeDist);
     return Response.json({
-      source: "fallback", status: "error",
-      coordinates: null, distanceKm: 0, durationSec: 0, etaMinutes: 0,
+      source: "fallback", status: "fallback",
+      coordinates: safeDist > 0 ? [
+        [Number(payload?.from_lat), Number(payload?.from_lng)],
+        [Number(payload?.to_lat), Number(payload?.to_lng)],
+      ] : null,
+      distanceKm: safeDist,
+      durationSec: safeEta * 60,
+      etaMinutes: safeEta,
       error: error.message,
-    }, { status: 500 });
+    });
   }
 });

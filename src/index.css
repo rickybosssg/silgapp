@@ -203,6 +203,26 @@
     display: none !important;
   }
 
+  /* Dashboard rouge uniquement pendant Pass Zéro Commission / Happy Hour actif. */
+  .dashboard-theme-red {
+    --primary: 0 72% 51%;
+    --primary-dark: 0 72% 41%;
+    --primary-light: 0 72% 95%;
+    --ring: 0 72% 51%;
+    --accent: 0 72% 51%;
+    --chart-1: 0 72% 51%;
+    --sidebar-primary: 0 72% 51%;
+    --sidebar-accent: 0 20% 14%;
+  }
+
+  .dashboard-theme-red .from-blue-700,
+  .dashboard-theme-red .via-indigo-700,
+  .dashboard-theme-red .to-slate-900 {
+    --tw-gradient-from: 0 72% 41% var(--tw-gradient-from-position);
+    --tw-gradient-to: 0 72% 31% var(--tw-gradient-to-position);
+    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+  }
+
   /* Safe area for mobile devices */
   .safe-area-bottom {
     padding-bottom: env(safe-area-inset-bottom);

@@ -23,6 +23,10 @@ import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
 import VenusFloatingButton from "@/components/client/VenusFloatingButton";
 import AlertesLivreurModal from "@/components/livreur/AlertesLivreurModal";
 import SilgappLiveStats from "@/components/shared/SilgappLiveStats";
+import DashboardThemeProvider from "@/components/livreur/DashboardThemeProvider";
+import PassActifBadge from "@/components/livreur/PassActifBadge";
+import HappyHourBadge from "@/components/livreur/HappyHourBadge";
+import PassZeroCommissionSection from "@/components/livreur/PassZeroCommissionSection";
 
 const saveLivreur = (id, data) => base44.functions.invoke('updateLivreur', { id, data });
 
@@ -392,6 +396,10 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
   const livreurVisible = isEnLigne && gpsActif && livreurProfil.latitude && livreurProfil.longitude;
 
   return (
+    <DashboardThemeProvider
+      livreurId={livreurProfil?.id}
+      countryCode={livreurProfil?.country_code}
+    >
     <div className="min-h-screen bg-background text-foreground">
       <AlertesLivreurModal
         livreurId={livreurProfil?.id}
@@ -422,6 +430,9 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
 
         {activeTab === "courses" && (
           <div className="space-y-4">
+            <PassActifBadge />
+            <HappyHourBadge />
+
             <LivreurHeader
               livreur={livreurProfil}
               isEnLigne={isEnLigne}
@@ -482,6 +493,11 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
             {coursesActives.length === 0 && isEnLigne && (
               <ActiviteTempsReel livreurProfil={livreurProfil} mesCourses={mesCourses} isExterne={false} />
             )}
+
+            <PassZeroCommissionSection
+              livreurId={livreurProfil?.id}
+              countryCode={livreurProfil?.country_code}
+            />
           </div>
         )}
 
@@ -506,5 +522,6 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
         </div>
       )}
     </div>
+    </DashboardThemeProvider>
   );
 }

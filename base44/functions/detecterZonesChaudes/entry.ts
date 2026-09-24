@@ -116,8 +116,8 @@ function isRecentMin(dateStr, minutes) {
 async function loadConfig(base44) {
   const defaults = {
     ZC_ACTIF: 'true', ZC_PUSH_ACTIF: 'true', ZC_INTERVALLE_MIN: '15',
-    ZC_RAYON_KM: '3', ZC_MIN_COURSES: '3', ZC_MIN_LIVREURS: '1',
-    ZC_SCORE_FAIBLE: '1.5', ZC_SCORE_MOYEN: '3', ZC_SCORE_ELEVE: '6', ZC_SCORE_TRES_ELEVE: '10',
+    ZC_RAYON_KM: '3', ZC_MIN_COURSES: '2', ZC_MIN_LIVREURS: '1',
+    ZC_SCORE_FAIBLE: '1.5', ZC_SCORE_MOYEN: '3', ZC_SCORE_ELEVE: '3', ZC_SCORE_TRES_ELEVE: '6',
     ZC_DELAI_MIN_ALERTES_MIN: '30', ZC_MAX_NOTIFS_HEURE: '2', ZC_DISTANCE_MAX_KM: '10',
   };
   const configs = await base44.asServiceRole.entities.AppConfig.filter({}).catch(() => []);
@@ -131,8 +131,8 @@ async function loadConfig(base44) {
 
 function niveauFromScore(score, config) {
   const seuils = {
-    tres_forte: parseFloat(config.ZC_SCORE_TRES_ELEVE) || 10,
-    forte: parseFloat(config.ZC_SCORE_ELEVE) || 6,
+    tres_forte: parseFloat(config.ZC_SCORE_TRES_ELEVE) || 6,
+    forte: parseFloat(config.ZC_SCORE_ELEVE) || 3,
     moyenne: parseFloat(config.ZC_SCORE_MOYEN) || 3,
     faible: parseFloat(config.ZC_SCORE_FAIBLE) || 1.5,
   };
@@ -168,7 +168,7 @@ Deno.serve(async (req) => {
     }
 
     const rayonKm = parseFloat(config.ZC_RAYON_KM) || 3;
-    const minCourses = parseInt(config.ZC_MIN_COURSES) || 3;
+    const minCourses = parseInt(config.ZC_MIN_COURSES) || 2;
     const minLivreurs = parseInt(config.ZC_MIN_LIVREURS) || 1;
     const distanceMaxKm = parseFloat(config.ZC_DISTANCE_MAX_KM) || 10;
     const delaiMinAlertesMin = parseInt(config.ZC_DELAI_MIN_ALERTES_MIN) || 30;

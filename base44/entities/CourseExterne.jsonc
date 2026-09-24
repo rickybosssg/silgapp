@@ -297,6 +297,37 @@
     "livreur_id": {
       "type": "string"
     },
+    "commission_taux_normal": {
+      "type": "number",
+      "description": "Taux de commission normal du pays (Country.commission_pct) au moment de l'acceptation. Figé à l'acceptation pour garantir la traçabilité."
+    },
+    "commission_taux_applique": {
+      "type": "number",
+      "description": "Taux de commission effectivement appliqué (peut être 0 si Pass/Happy Hour actif à l'acceptation). Figé à l'acceptation. La finalisation utilise ce taux et ne le réévalue jamais."
+    },
+    "commission_mode": {
+      "type": "string",
+      "enum": [
+        "normal",
+        "pass_zero",
+        "happy_hour"
+      ],
+      "default": "normal",
+      "description": "Mode de commission appliqué. normal = taux Country. pass_zero = Pass Zéro Commission actif à l'acceptation. happy_hour = Happy Hour actif à l'acceptation. Figé à l'acceptation."
+    },
+    "pass_id": {
+      "type": "string",
+      "description": "ID du PassAchat actif au moment de l'acceptation, si commission_mode=pass_zero. Figé à l'acceptation."
+    },
+    "happy_hour_id": {
+      "type": "string",
+      "description": "ID du HappyHourConfig actif au moment de l'acceptation, si commission_mode=happy_hour. Figé à l'acceptation."
+    },
+    "commission_locked_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date/heure à laquelle la commission a été figée à l'acceptation. Une fois set, la finalisation utilise les taux figés et ne les réévalue jamais."
+    },
     "livreur_financier_id": {
       "type": "string",
       "description": "Identite financiere IMMUABLE du livreur qui a reellement realise la livraison. Renseigne cote backend au moment de la finalisation de la livraison (jamais depuis le frontend). Une fois defini sur une course livree, ce champ NE DOIT JAMAIS etre modifie, meme en cas de redispatch, annulation, nettoyage ou changement de livreur_id. C'est la cle de rattachement financier utilisee par soldeCalculator.ts pour le calcul des commissions dues. Distinct de livreur_id qui reste operationnel/dispatch et peut evoluer."

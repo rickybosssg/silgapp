@@ -53,6 +53,10 @@ import CoursesDisponibles from "@/components/livreur/CoursesDisponibles";
 import CourseArrivalToast from "@/components/livreur/CourseArrivalToast";
 import ZoneChaudeAlert from "@/components/livreur/ZoneChaudeAlert";
 import { useCoursesDisponibles } from "@/hooks/useCoursesDisponibles";
+import DashboardThemeProvider from "@/components/livreur/DashboardThemeProvider";
+import PassActifBadge from "@/components/livreur/PassActifBadge";
+import HappyHourBadge from "@/components/livreur/HappyHourBadge";
+import PassZeroCommissionSection from "@/components/livreur/PassZeroCommissionSection";
 
 // haversineKm importé depuis priceEstimate (source canonique)
 
@@ -1433,6 +1437,10 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   ];
 
   return (
+    <DashboardThemeProvider
+      livreurId={livreurProfil?.id}
+      countryCode={livreurProfil?.country_code}
+    >
     <div className="min-h-screen bg-background text-foreground">
       <PullToRefreshIndicator pulling={pulling} refreshing={refreshing} />
       {zoneChaudeAlert && (
@@ -1550,6 +1558,9 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
               userId={livreurProfil?.id}
               userType="livreur"
             />
+
+            <PassActifBadge />
+            <HappyHourBadge />
 
             <LivreurHeader
               livreur={livreurProfil}
@@ -1696,6 +1707,11 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
               <ActiviteTempsReel livreurProfil={livreurProfil} mesCourses={mesCourses} isExterne={true} />
             )}
 
+            <PassZeroCommissionSection
+              livreurId={livreurProfil?.id}
+              countryCode={livreurProfil?.country_code}
+            />
+
             {sessionExpired ? (
               <div className="rounded-2xl bg-red-500/15 border border-red-500/30 text-red-400 p-5 text-center space-y-2 shadow-lg">
                 <p className="text-2xl"></p>
@@ -1791,5 +1807,6 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         />
       </div>
     </div>
+    </DashboardThemeProvider>
   );
 }

@@ -1,0 +1,65 @@
+{
+  "name": "PassOffer",
+  "type": "object",
+  "properties": {
+    "nom": {
+      "type": "string",
+      "description": "Nom du Pass (ex: Pass 1 jour, Pass 7 jours)"
+    },
+    "description": {
+      "type": "string",
+      "description": "Description du Pass affich\u00e9e au livreur"
+    },
+    "duree_jours": {
+      "type": "number",
+      "description": "Dur\u00e9e du Pass en jours (ex: 1, 3, 7)"
+    },
+    "prix": {
+      "type": "number",
+      "description": "Prix d'achat du Pass dans la devise du pays"
+    },
+    "country_code": {
+      "type": "string",
+      "description": "Code pays ISO 2 lettres. Un Pass Offer est sp\u00e9cifique \u00e0 un pays."
+    },
+    "devise": {
+      "type": "string",
+      "default": "FCFA",
+      "description": "Devise du prix (ex: FCFA, GHS, GNF)"
+    },
+    "actif": {
+      "type": "boolean",
+      "default": true,
+      "description": "Pass disponible \u00e0 l'achat par les livreurs"
+    },
+    "ordre": {
+      "type": "number",
+      "default": 99,
+      "description": "Ordre d'affichage dans le dashboard livreur"
+    }
+  },
+  "required": [
+    "nom",
+    "duree_jours",
+    "prix",
+    "country_code"
+  ],
+  "rls": {
+    "read": {},
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

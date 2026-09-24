@@ -3,12 +3,14 @@
 // de récupération et de livraison d'une course admin/VENUS.
 //
 // Règles :
-//   1. client_message_id déterministe : course-codes-{courseId}-{livreurId}
-//   2. Vérifie l'existence avant création (idempotence).
-//   3. Retry unique avec re-vérification avant retry (anti-doublon).
-//   4. Échec définitif → console.error uniquement. N'échoue jamais l'acceptation.
-//   5. Utilise resolveCourseParticipantUserIds (résolution officielle existante).
-//   6. Contient systématiquement les deux codes + prix si disponible.
+//   1. Idempotence au niveau COURSE : course-codes-{courseId} (sans livreurId).
+//      Un seul message de codes par course, quel que soit le livreur (création, dispatch, redispatch).
+//   2. Vérifie l'existence avant création (idempotence) — backward compatible avec les anciennes clés.
+//   3. Actualise les participant_user_ids à chaque appel (le nouveau livreur accède au message existant).
+//   4. Retry unique avec re-vérification avant retry (anti-doublon).
+//   5. Échec définitif → console.error uniquement. N'échoue jamais l'acceptation.
+//   6. Utilise resolveCourseParticipantUserIds (résolution officielle existante).
+//   7. Contient systématiquement les deux codes + prix si disponible.
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { resolveCourseParticipantUserIds } from './conversationSecurity.ts';
@@ -18,10 +20,14 @@ const IDEMPOTENCY_PREFIX = 'course-codes';
 
 /**
  * Construit le client_message_id déterministe pour le message des codes.
- * Format : course-codes-{courseId}-{livreurId}
+ * Format : course-codes-{courseId}  (idempotence au niveau COURSE)
+ *
+ * Le livreurId est volontairement ignoré : un seul message de codes par course,
+ * quelle que soit l'évolution du livreur (création, dispatch, redispatch).
+ * Les participants sont actualisés à chaque appel via ensureCourseCodeMessage.
  */
-export function buildCodeMessageIdempotencyKey(courseId: string, livreurId: string): string {
-  return `${IDEMPOTENCY_PREFIX}-${courseId}-${livreurId}`;
+export function buildCodeMessageIdempotencyKey(courseId: string, _livreurId?: string): string {
+  return `${IDEMPOTENCY_PREFIX}-${courseId}`;
 }
 
 /**
@@ -33,26 +39,38 @@ export function buildCodeMessageContent(
   deliveryPIN: string,
   prixProposeAdmin?: number | null,
   prixEstimate?: number | null,
-  devise?: string
+  devise?: string,
+  prixFinal?: number | null,
+  prixProposeClient?: number | null
 ): string {
   const parts: string[] = [
     `🔑 Code de récupération : ${pickupPIN}`,
     `📦 Code de livraison : ${deliveryPIN}`,
   ];
-  if (prixProposeAdmin && Number(prixProposeAdmin) > 0) {
+  // Priorité : prix final (livraison) > prix admin > prix client > prix estimé
+  if (prixFinal && Number(prixFinal) > 0) {
+    parts.push(`💰 Prix de la course : ${Number(prixFinal).toLocaleString()} ${devise || 'FCFA'}`);
+  } else if (prixProposeAdmin && Number(prixProposeAdmin) > 0) {
     parts.push(`💰 Prix de la course : ${Number(prixProposeAdmin).toLocaleString()} ${devise || 'FCFA'}`);
+  } else if (prixProposeClient && Number(prixProposeClient) > 0) {
+    parts.push(`💰 Prix de la course : ${Number(prixProposeClient).toLocaleString()} ${devise || 'FCFA'}`);
   } else if (prixEstimate && Number(prixEstimate) > 0) {
     parts.push(`💰 Prix estimé : ${Number(prixEstimate).toLocaleString()} ${devise || 'FCFA'}`);
   }
   return parts.join('\n');
 }
 
-async function findExistingMessage(base44: any, idempotencyKey: string): Promise<any[]> {
+async function findExistingMessage(base44: any, courseId: string): Promise<any[]> {
   try {
-    const existing = await base44.asServiceRole.entities.Message.filter({
-      client_message_id: idempotencyKey,
+    const messages = await base44.asServiceRole.entities.Message.filter({
+      course_id: courseId,
     });
-    return existing || [];
+    // Backward compatible : matche les nouvelles clés (course-codes-{courseId})
+    // ET les anciennes (course-codes-{courseId}-creation, course-codes-{courseId}-{livreurId}).
+    const prefix = `${IDEMPOTENCY_PREFIX}-${courseId}`;
+    return (messages || []).filter((m: any) =>
+      m.client_message_id && m.client_message_id.startsWith(prefix)
+    );
   } catch {
     return [];
   }
@@ -61,7 +79,7 @@ async function findExistingMessage(base44: any, idempotencyKey: string): Promise
 async function attemptCreateMessage(
   base44: any,
   courseId: string,
-  livreurId: string,
+  livreurId: string | null | undefined,
   messageContent: string,
   idempotencyKey: string,
   participantUserIds: string[],
@@ -92,22 +110,37 @@ async function attemptCreateMessage(
 export async function ensureCourseCodeMessage(
   base44: any,
   course: any,
-  livreurId: string,
+  livreurId: string | null | undefined,
   pickupPIN: string,
   deliveryPIN: string,
   logPrefix = '[CODE_MSG]'
 ): Promise<{ created: boolean; idempotent: boolean; error?: string }> {
   const courseId = course?.id;
-  if (!courseId || !livreurId || !pickupPIN || !deliveryPIN) {
+  if (!courseId || !pickupPIN || !deliveryPIN) {
     console.error(`${logPrefix} Paramètres manquants — courseId=${courseId} livreurId=${livreurId} pickup=${pickupPIN} delivery=${deliveryPIN}`);
     return { created: false, idempotent: false, error: 'missing_params' };
   }
 
-  const idempotencyKey = buildCodeMessageIdempotencyKey(courseId, livreurId);
+  const idempotencyKey = buildCodeMessageIdempotencyKey(courseId, livreurId || undefined);
 
-  // 1. Vérifier si le message existe déjà
-  const existing = await findExistingMessage(base44, idempotencyKey);
+  // 1. Vérifier si le message existe déjà (idempotence au niveau COURSE)
+  const existing = await findExistingMessage(base44, courseId);
   if (existing.length > 0) {
+    // Remplacer les participants par la liste fraîche : seul le livreur courant
+    // (livreurId) + client + admins conservent l'accès. L'ancien livreur d'un
+    // redispatch est automatiquement retiré — il ne peut plus consulter les PIN.
+    try {
+      const clientId = course.expediteur_client_id || course.destinataire_client_id;
+      const freshParticipants = await resolveCourseParticipantUserIds(base44, livreurId || undefined, clientId);
+      if (freshParticipants.length > 0) {
+        await base44.asServiceRole.entities.Message.update(existing[0].id, {
+          participant_user_ids: freshParticipants,
+        });
+        console.log(`${logPrefix} ✅ Participants remplacés pour course ${courseId} (${freshParticipants.length} autorisé(s))`);
+      }
+    } catch (err: any) {
+      console.warn(`${logPrefix} Erreur mise à jour participants course ${courseId}: ${err?.message}`);
+    }
     return { created: false, idempotent: true };
   }
 
@@ -117,15 +150,19 @@ export async function ensureCourseCodeMessage(
     deliveryPIN,
     course.prix_propose_admin,
     course.prix_estimate,
-    course.devise
+    course.devise,
+    course.prix_final,
+    course.prix_propose_client
   );
 
   // 3. Résoudre les participants (résolution officielle existante)
+  //    livreurId optionnel : à la création, aucun livreur n'est assigné.
+  //    resolveCourseParticipantUserIds gère un livreurId null (résout client + admins uniquement).
   let participantUserIds: string[] = [];
   let securityStatus: 'secured' | 'pending' = 'pending';
   try {
     const clientId = course.expediteur_client_id || course.destinataire_client_id;
-    participantUserIds = await resolveCourseParticipantUserIds(base44, livreurId, clientId);
+    participantUserIds = await resolveCourseParticipantUserIds(base44, livreurId || undefined, clientId);
     if (participantUserIds.length > 0) {
       securityStatus = 'secured';
     } else {
@@ -146,7 +183,7 @@ export async function ensureCourseCodeMessage(
 
     // 5. Avant le retry : re-vérifier que le message n'a pas été créé par la première tentative
     //    (évite un doublon si l'erreur s'est produite après l'écriture en base)
-    const recheckExisting = await findExistingMessage(base44, idempotencyKey);
+    const recheckExisting = await findExistingMessage(base44, courseId);
     if (recheckExisting.length > 0) {
       console.log(`${logPrefix} ✅ Message codes retrouvé après retry check pour course ${courseId} — idempotent`);
       return { created: false, idempotent: true };
@@ -157,7 +194,7 @@ export async function ensureCourseCodeMessage(
 
     // Re-vérifier encore une fois avant le retry (au cas où le message a été créé
     // entre le premier check et le retry)
-    const recheckBeforeRetry = await findExistingMessage(base44, idempotencyKey);
+    const recheckBeforeRetry = await findExistingMessage(base44, courseId);
     if (recheckBeforeRetry.length > 0) {
       console.log(`${logPrefix} ✅ Message codes retrouvé avant retry pour course ${courseId} — idempotent`);
       return { created: false, idempotent: true };

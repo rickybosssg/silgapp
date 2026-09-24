@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
+import { figerCommissionAcceptation } from '../../shared/commissionAvantage.ts';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ASSIGNER LIVREUR ADMIN — Assignation manuelle forcée par l'admin
@@ -93,6 +94,16 @@ export default async function(req: Request): Promise<Response> {
     await base44.asServiceRole.entities.Livreur.update(livreur_id, {
       statut: 'en_course',
     });
+
+    // ── Figer la commission à l'acceptation (Pass Zéro Commission / Happy Hour) ──
+    // Redispatch : le taux est recalculé pour le nouveau livreur au nouveau timestamp.
+    if (course.country_code) {
+      await figerCommissionAcceptation(
+        base44, course_id, livreur_id, course.country_code, now
+      ).catch((err: any) => {
+        console.error('[ASSIGN_ADMIN] figerCommissionAcceptation error (non-blocking):', err?.message);
+      });
+    }
 
     // ── Notification push au livreur ──
     if (livreur.user_email) {

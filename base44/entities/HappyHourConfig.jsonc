@@ -1,0 +1,80 @@
+{
+  "name": "HappyHourConfig",
+  "type": "object",
+  "properties": {
+    "nom": {
+      "type": "string",
+      "description": "Nom de la configuration Happy Hour (ex: Happy Hour Vendredi BF)"
+    },
+    "country_code": {
+      "type": "string",
+      "description": "Code pays ISO 2 lettres. Un Happy Hour est sp\u00e9cifique \u00e0 un pays. Jamais d'effet sur les autres pays."
+    },
+    "jour_semaine": {
+      "type": "number",
+      "description": "Jour de la semaine (0=dimanche, 1=lundi, ..., 6=samedi). Utilis\u00e9 pour la r\u00e9currence hebdomadaire."
+    },
+    "date_specifique": {
+      "type": "string",
+      "format": "date",
+      "description": "Date sp\u00e9cifique (YYYY-MM-DD) pour un Happy Hour unique. Si d\u00e9fini, jour_semaine est ignor\u00e9."
+    },
+    "heure_debut": {
+      "type": "string",
+      "description": "Heure de d\u00e9but au format HH:MM (ex: 17:00)"
+    },
+    "heure_fin": {
+      "type": "string",
+      "description": "Heure de fin au format HH:MM (ex: 20:00)"
+    },
+    "fuseau_horaire": {
+      "type": "string",
+      "default": "Africa/Ouagadougou",
+      "description": "Fuseau horaire IANA (ex: Africa/Ouagadougou, Africa/Abidjan)"
+    },
+    "taux_promotionnel": {
+      "type": "number",
+      "default": 0,
+      "description": "Taux de commission promotionnel pendant le Happy Hour (0 = 0%, 5 = 5%, 10 = 10%). Ne pas hardcoder 0 pour permettre d'autres taux plus tard."
+    },
+    "recurrence": {
+      "type": "string",
+      "enum": [
+        "hebdomadaire",
+        "unique"
+      ],
+      "default": "hebdomadaire",
+      "description": "R\u00e9currence du Happy Hour. hebdomadaire = chaque semaine au jour_semaine indiqu\u00e9. unique = une seule fois \u00e0 date_specifique."
+    },
+    "actif": {
+      "type": "boolean",
+      "default": true,
+      "description": "Happy Hour actif ou non"
+    }
+  },
+  "required": [
+    "nom",
+    "country_code",
+    "heure_debut",
+    "heure_fin",
+    "taux_promotionnel"
+  ],
+  "rls": {
+    "read": {},
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
