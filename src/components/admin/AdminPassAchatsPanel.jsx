@@ -1,8 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
-import { Ticket, CheckCircle2, XCircle, Clock, Image as ImageIcon } from "lucide-react";
+import { Ticket, CheckCircle2, XCircle, Clock, Image as ImageIcon, User, Phone } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";
@@ -26,6 +26,32 @@ export default function AdminPassAchatsPanel({ countryCode }) {
       if (filtre !== "tous") filter.statut = filtre;
       return base44.entities.PassAchat.filter(filter, "-date_demande", 200);
     },
+  });
+
+  // ── Résoudre les noms/téléphones des livreurs pour chaque achat ──
+  // Utilise livreur_id (identifiant stable stocké dans PassAchat).
+  // La validation backend (validerAchatPass) utilise le même livreur_id.
+  const livreurIds = useMemo(() => {
+    const ids = (achats || []).map((a) => a.livreur_id).filter(Boolean);
+    return [...new Set(ids)];
+  }, [achats]);
+
+  const { data: livreursData } = useQuery({
+    queryKey: ["livreurs-by-ids", livreurIds],
+    queryFn: async () => {
+      if (!livreurIds.length) return {};
+      const results = {};
+      await Promise.all(
+        livreurIds.map(async (id) => {
+          try {
+            const livreur = await base44.entities.Livreur.get(id);
+            if (livreur) results[id] = livreur;
+          } catch (_) {}
+        })
+      );
+      return results;
+    },
+    enabled: livreurIds.length > 0,
   });
 
   const validerMutation = useMutation({
@@ -93,6 +119,32 @@ export default function AdminPassAchatsPanel({ countryCode }) {
                 )}
               </div>
             </div>
+
+            {(() => {
+              const livreur = livreursData?.[achat.livreur_id];
+              const nomComplet = livreur
+                ? `${livreur.prenom || ""} ${livreur.nom || ""}`.trim()
+                : null;
+              return (
+                <div className="bg-slate-50 rounded-xl p-3 mb-2 border border-slate-100">
+                  <div className="flex items-center gap-2 mb-1">
+                    <User className="w-4 h-4 text-slate-400 shrink-0" />
+                    <p className="font-semibold text-slate-800 text-sm">
+                      {nomComplet || "Livreur introuvable"}
+                    </p>
+                  </div>
+                  {livreur?.telephone && (
+                    <div className="flex items-center gap-2">
+                      <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <p className="text-xs text-slate-600">{livreur.telephone}</p>
+                    </div>
+                  )}
+                  {achat.livreur_user_email && (
+                    <p className="text-xs text-slate-400 mt-1 truncate">{achat.livreur_user_email}</p>
+                  )}
+                </div>
+              );
+            })()}
 
             {achat.date_demande && (
               <p className="text-xs text-slate-400 mb-2">
