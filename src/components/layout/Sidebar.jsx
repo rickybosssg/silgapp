@@ -3,7 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { clearPersistedToken } from "@/lib/authPersistence";
 import { 
   LayoutDashboard, MapPin, Plus, Truck, BarChart3, Bell,
-  Package, TrendingUp, ChevronLeft, ChevronRight, LogOut, Wallet, Shield, Globe, Settings, MessageCircle, Users, Megaphone, ChevronDown, Check, UserCheck, ShieldAlert, Store, UtensilsCrossed, Pill, PieChart, Sparkles, Brain, FlaskConical, Cpu, Crown, Zap, Coins, Radio, Trophy, Activity
+  Package, TrendingUp, ChevronLeft, ChevronRight, LogOut, Wallet, Shield, Globe, Settings, MessageCircle, Users, Megaphone, ChevronDown, Check, UserCheck, ShieldAlert, Store, UtensilsCrossed, Pill, PieChart, Sparkles, Brain, FlaskConical, Cpu, Crown, Zap, Coins, Radio, Trophy, Activity, Ticket
 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { cn } from "@/lib/utils";
@@ -35,6 +35,7 @@ export const navItems = [
   { path: "/admin/comptabilite", label: "Comptabilité", icon: Wallet },
   { path: "/admin/global", label: "Admin Global", icon: Globe },
   { path: "/admin/tarification", label: "Tarification", icon: Coins },
+  { path: "/admin/pass-zero-commission", label: "Pass Zéro Commission", icon: Ticket },
   { path: "/admin/gestion-pays", label: "Gestion des pays", icon: Settings },
   { path: "/admin/crm-clients", label: "CRM Clients", icon: Users },
   { path: "/admin/reactivation-clients", label: "Réactivation Clients", icon: Bell },

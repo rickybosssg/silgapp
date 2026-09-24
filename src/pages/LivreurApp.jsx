@@ -23,6 +23,10 @@ import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
 import VenusFloatingButton from "@/components/client/VenusFloatingButton";
 import AlertesLivreurModal from "@/components/livreur/AlertesLivreurModal";
 import SilgappLiveStats from "@/components/shared/SilgappLiveStats";
+import DashboardThemeProvider from "@/components/livreur/DashboardThemeProvider";
+import PassActifBadge from "@/components/livreur/PassActifBadge";
+import HappyHourBadge from "@/components/livreur/HappyHourBadge";
+import PassZeroCommissionSection from "@/components/livreur/PassZeroCommissionSection";
 
 const saveLivreur = (id, data) => base44.functions.invoke('updateLivreur', { id, data });
 
@@ -392,119 +396,131 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
   const livreurVisible = isEnLigne && gpsActif && livreurProfil.latitude && livreurProfil.longitude;
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <AlertesLivreurModal
-        livreurId={livreurProfil?.id}
-        livreurNom={`${livreurProfil?.prenom || ""} ${livreurProfil?.nom || ""}`.trim()}
-        livreurReseau="interne"
-      />
-      <VenusFloatingButton />
-      <PullToRefreshIndicator pulling={pulling} refreshing={refreshing} />
-
-      {courseEnAttente && (
-        <CourseEnAttenteModal
-          course={courseEnAttente}
-          livreurId={livreurProfil.id}
-          onAccepter={handleAccepter}
-          onRefuser={handleRefuser}
-          isPending={updateCourseMutation.isPending}
+    <DashboardThemeProvider
+      livreurId={livreurProfil?.id}
+      countryCode={livreurProfil?.country_code}
+    >
+      <div className="min-h-screen bg-background text-foreground">
+        <AlertesLivreurModal
+          livreurId={livreurProfil?.id}
+          livreurNom={`${livreurProfil?.prenom || ""} ${livreurProfil?.nom || ""}`.trim()}
+          livreurReseau="interne"
         />
-      )}
+        <VenusFloatingButton />
+        <PullToRefreshIndicator pulling={pulling} refreshing={refreshing} />
 
-      <div className="max-w-lg mx-auto p-4 pb-[calc(5rem+env(safe-area-inset-bottom))]">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
-          <TabsList className="w-full">
-            <TabsTrigger value="courses" className="flex-1 text-xs">Courses</TabsTrigger>
-            <TabsTrigger value="pause" className="flex-1 text-xs">En pause</TabsTrigger>
-            <TabsTrigger value="historique" className="flex-1 text-xs">Historique</TabsTrigger>
-          </TabsList>
-        </Tabs>
-
-        {activeTab === "courses" && (
-          <div className="space-y-4">
-            <LivreurHeader
-              livreur={livreurProfil}
-              isEnLigne={isEnLigne}
-              isUpdatingStatut={statutMutation.isPending}
-              gpsActif={gpsActif}
-              onToggleLigne={handleToggleLigne}
-              onActiverGps={handleActiverGPS}
-              onLogout={handleLogout}
-            />
-
-            {/* Indicateur GPS */}
-            {gpsActif && (
-              <div className="flex items-center justify-between">
-                <GPSIndicateur
-                  indicateur={
-                    !gpsLastUpdate ? null
-                    : (Date.now() - gpsLastUpdate) < 2 * 60000 ? "recent"
-                    : (Date.now() - gpsLastUpdate) < 10 * 60000 ? "ancien"
-                    : "perdu"
-                  }
-                  ageMinutes={gpsLastUpdate ? (Date.now() - gpsLastUpdate) / 60000 : null}
-                  onActualiser={handleActiverGPS}
-                />
-              </div>
-            )}
-
-            {isEnLigne && !livreurVisible && (
-              <div className="rounded-2xl bg-amber-50 border border-amber-200 px-4 py-3 flex items-center gap-3">
-                <span className="text-xl"></span>
-                <p className="text-sm text-amber-700 font-medium leading-tight">
-                  Activez votre GPS pour être visible sur la carte
-                </p>
-              </div>
-            )}
-
-            <LivreurStatsBanner mesCourses={mesCourses} totalEncaisse={totalEncaisse} />
-            <LivreurStatutCard statut={livreurProfil.statut} livreur={livreurProfil} />
-
-            {/* ── SILGAPP EN DIRECT — activité globale du réseau ── */}
-            <SilgappLiveStats countryCode={livreurProfil?.country_code} />
-
-            {coursesActives.length > 0 && (
-              <div className="space-y-3">
-                {coursesActives.map(course => (
-                  <CourseActiveCard
-                    key={course.id}
-                    course={course}
-                    onColisRecupere={handleColisRecupere}
-                    onColisLivre={handleColisLivre}
-                    onClientAnnule={handleClientAnnule}
-                    onMettrePause={handleMettrePause}
-                    isPending={updateCourseMutation.isPending}
-                  />
-                ))}
-              </div>
-            )}
-
-            {coursesActives.length === 0 && isEnLigne && (
-              <ActiviteTempsReel livreurProfil={livreurProfil} mesCourses={mesCourses} isExterne={false} />
-            )}
-          </div>
-        )}
-
-        {activeTab === "pause" && (
-          <CoursesEnPauseTab
-            courses={coursesEnPause}
-            onReprendre={handleReprendreCourse}
+        {courseEnAttente && (
+          <CourseEnAttenteModal
+            course={courseEnAttente}
+            livreurId={livreurProfil.id}
+            onAccepter={handleAccepter}
+            onRefuser={handleRefuser}
+            isPending={updateCourseMutation.isPending}
           />
         )}
 
-        {activeTab === "historique" && (
-          <LivreurHistorique mesCourses={mesCourses} livreurProfil={livreurProfil} />
+        <div className="max-w-lg mx-auto p-4 pb-[calc(5rem+env(safe-area-inset-bottom))]">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
+            <TabsList className="w-full">
+              <TabsTrigger value="courses" className="flex-1 text-xs">Courses</TabsTrigger>
+              <TabsTrigger value="pause" className="flex-1 text-xs">En pause</TabsTrigger>
+              <TabsTrigger value="historique" className="flex-1 text-xs">Historique</TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          {activeTab === "courses" && (
+            <div className="space-y-4">
+              <PassActifBadge />
+              <HappyHourBadge />
+              <LivreurHeader
+                livreur={livreurProfil}
+                isEnLigne={isEnLigne}
+                isUpdatingStatut={statutMutation.isPending}
+                gpsActif={gpsActif}
+                onToggleLigne={handleToggleLigne}
+                onActiverGps={handleActiverGPS}
+                onLogout={handleLogout}
+              />
+
+              {/* Indicateur GPS */}
+              {gpsActif && (
+                <div className="flex items-center justify-between">
+                  <GPSIndicateur
+                    indicateur={
+                      !gpsLastUpdate ? null
+                      : (Date.now() - gpsLastUpdate) < 2 * 60000 ? "recent"
+                      : (Date.now() - gpsLastUpdate) < 10 * 60000 ? "ancien"
+                      : "perdu"
+                    }
+                    ageMinutes={gpsLastUpdate ? (Date.now() - gpsLastUpdate) / 60000 : null}
+                    onActualiser={handleActiverGPS}
+                  />
+                </div>
+              )}
+
+              {isEnLigne && !livreurVisible && (
+                <div className="rounded-2xl bg-amber-50 border border-amber-200 px-4 py-3 flex items-center gap-3">
+                  <span className="text-xl"></span>
+                  <p className="text-sm text-amber-700 font-medium leading-tight">
+                    Activez votre GPS pour être visible sur la carte
+                  </p>
+                </div>
+              )}
+
+              <LivreurStatsBanner mesCourses={mesCourses} totalEncaisse={totalEncaisse} />
+              <LivreurStatutCard statut={livreurProfil.statut} livreur={livreurProfil} />
+
+              {/* ── SILGAPP EN DIRECT — activité globale du réseau ── */}
+              <SilgappLiveStats countryCode={livreurProfil?.country_code} />
+
+              {coursesActives.length > 0 && (
+                <div className="space-y-3">
+                  {coursesActives.map(course => (
+                    <CourseActiveCard
+                      key={course.id}
+                      course={course}
+                      onColisRecupere={handleColisRecupere}
+                      onColisLivre={handleColisLivre}
+                      onClientAnnule={handleClientAnnule}
+                      onMettrePause={handleMettrePause}
+                      isPending={updateCourseMutation.isPending}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {coursesActives.length === 0 && isEnLigne && (
+                <ActiviteTempsReel livreurProfil={livreurProfil} mesCourses={mesCourses} isExterne={false} />
+              )}
+
+              <PassZeroCommissionSection
+                livreurId={livreurProfil?.id}
+                countryCode={livreurProfil?.country_code}
+              />
+            </div>
+          )}
+
+          {activeTab === "pause" && (
+            <CoursesEnPauseTab
+              courses={coursesEnPause}
+              onReprendre={handleReprendreCourse}
+            />
+          )}
+
+          {activeTab === "historique" && (
+            <LivreurHistorique mesCourses={mesCourses} livreurProfil={livreurProfil} />
+          )}
+        </div>
+
+        {/* Bilan du jour - visible sur tous les onglets */}
+        {totalEncaisse > 0 && activeTab === "courses" && (
+          <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-3xl p-5 border border-amber-100 shadow-sm mt-4 max-w-lg mx-auto">
+            <p className="text-xs text-warning font-bold uppercase tracking-wide mb-1">Bilan du jour</p>
+            <p className="text-3xl font-black text-amber-700">{totalEncaisse.toLocaleString()} <span className="text-base font-semibold text-amber-500">FCFA</span></p>
+            <p className="text-xs text-amber-500 mt-1">Montant à reverser à SILGAPP Livraison</p>
+          </div>
         )}
       </div>
-
-      {/* Bilan du jour - visible sur tous les onglets */}
-      {totalEncaisse > 0 && activeTab === "courses" && (
-        <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-3xl p-5 border border-amber-100 shadow-sm mt-4 max-w-lg mx-auto">
-          <p className="text-xs text-warning font-bold uppercase tracking-wide mb-1">Bilan du jour</p>
-          <p className="text-3xl font-black text-amber-700">{totalEncaisse.toLocaleString()} <span className="text-base font-semibold text-amber-500">FCFA</span></p>
-          <p className="text-xs text-amber-500 mt-1">Montant à reverser à SILGAPP Livraison</p>
-        </div>
-      )}
-    </div>
+    </DashboardThemeProvider>
   );
 }
