@@ -87,9 +87,6 @@ export default function AdminPassAchatsPanel({ countryCode }) {
       <div className="flex items-center gap-2">
         <Ticket className="w-5 h-5 text-primary" />
         <h2 className="font-black text-lg">Achats Pass — Validation</h2>
-        <span className="ml-auto text-[10px] font-mono px-2 py-0.5 rounded bg-slate-200 text-slate-600">
-          UI PASS VERSION : IDENTITY-FIX-1
-        </span>
       </div>
 
       <div className="flex gap-2">
