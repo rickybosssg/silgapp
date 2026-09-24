@@ -114,6 +114,11 @@ export default async function(req: Request): Promise<Response> {
       // Charger la commission du pays (source de vérité: Country.commission_pct)
       const countryConfig = await chargerConfigPays(base44, course.country_code || livreur.country_code);
       const commissionPct = normalizeCommissionPct(countryConfig?.commission_pct);
+      // ⚠️ Si la commission a été figée à l'acceptation (Pass/Happy Hour), utiliser
+      // le taux figé (commission_taux_applique) au lieu du taux normal du pays.
+      const tauxEffectif = (course.commission_locked_at && course.commission_taux_applique != null)
+        ? Number(course.commission_taux_applique)
+        : commissionPct;
       if (commissionPct === null) {
         return Response.json({
           error: `Commission non configurée pour le pays ${course.country_code}`,
@@ -121,8 +126,9 @@ export default async function(req: Request): Promise<Response> {
         }, { status: 400 });
       }
 
-      // Calcul côté backend uniquement — prix_propose_admin est la source
-      const commissionSilga = Math.round(montant * (commissionPct / 100));
+      // Calcul côté backend uniquement — prix_propose_admin est la source.
+      // Utilise le taux figé à l'acceptation si disponible (Pass/Happy Hour).
+      const commissionSilga = Math.round(montant * (tauxEffectif / 100));
       const montantLivreur = montant - commissionSilga;
 
       const updateData = {

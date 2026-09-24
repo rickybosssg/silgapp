@@ -203,6 +203,30 @@
     display: none !important;
   }
 
+  /* ───────────────────────────────────────────────────────────────────────
+     DASHBOARD ROUGE — Pass Zéro Commission / Happy Hour actif
+     Activé via la classe .dashboard-theme-red sur le conteneur racine.
+     Le rouge remplace le bleu SILGAPP (primary) sur les éléments dominants.
+     Contraste blanc conservé. Retour automatique au bleu quand l'avantage expire.
+     ─────────────────────────────────────────────────────────────────────── */
+  .dashboard-theme-red {
+    --primary: 0 72% 51%;           /* #DC2626 — rouge dominant */
+    --primary-dark: 0 72% 41%;      /* hover rouge foncé */
+    --primary-light: 0 72% 95%;     /* fond rouge clair */
+    --ring: 0 72% 51%;
+    --accent: 0 72% 51%;
+    --chart-1: 0 72% 51%;
+    --sidebar-primary: 0 72% 51%;
+    --sidebar-accent: 0 20% 14%;
+  }
+  .dashboard-theme-red .from-blue-700,
+  .dashboard-theme-red .via-indigo-700,
+  .dashboard-theme-red .to-slate-900 {
+    --tw-gradient-from: 0 72% 41% var(--tw-gradient-from-position);
+    --tw-gradient-to: 0 72% 31% var(--tw-gradient-to-position);
+    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+  }
+
   /* Safe area for mobile devices */
   .safe-area-bottom {
     padding-bottom: env(safe-area-inset-bottom);

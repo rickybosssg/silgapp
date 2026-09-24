@@ -9,6 +9,7 @@ import { marquerRefuse, marquerAccepte, getLivreursNotifies, getLivreursRefuses,
 import { accepterCourseV2, publierCourseDansFil, isV2Enabled, secoursDispatchV2, isPilotLivreur, DISPATCH_V2_BUNDLE_VERSION } from '../../shared/dispatchV2.ts';
 import { resolveCourseParticipantUserIds } from '../../shared/conversationSecurity.ts';
 import { ensureCourseCodeMessage } from '../../shared/courseCodeMessage.ts';
+import { figerCommissionAcceptation } from '../../shared/commissionAvantage.ts';
 
 // 🔖 Redéploiement forcé — 2026-08-14-simplified-3 — rappel T+5min re-notifie les mêmes livreurs libres
 console.log(`[DISPATCH_EXTERNE_AUTO] 🔖 dispatchV2 bundle version: ${DISPATCH_V2_BUNDLE_VERSION}`);
@@ -581,6 +582,17 @@ Deno.serve(async (req) => {
       if (!isMyCourse) {
         console.warn(`[DISPATCH] 🏁 Race condition perdue — livreur ${livreur_id} n'a pas obtenu la course ${course_id} (attribuée à ${courseVerifie.livreur_id || courseVerifie.accepted_by_livreur_id || '?'})`);
         return Response.json(reponseDejaPrise('race_condition_lost', courseVerifie));
+      }
+
+      // ── Figer la commission à l'acceptation (Pass Zéro Commission / Happy Hour) ──
+      // Le taux est déterminé au moment exact de l'acceptation et figé sur la course.
+      // Redispatch : si un nouveau livreur accepte, le taux est recalculé pour lui.
+      if (!isManual && courseVerifie.heure_acceptation && courseVerifie.country_code) {
+        await figerCommissionAcceptation(
+          base44, course_id, livreur_id, courseVerifie.country_code, courseVerifie.heure_acceptation
+        ).catch((err: any) => {
+          console.error('[DISPATCH] figerCommissionAcceptation error (non-blocking):', err?.message);
+        });
       }
 
       if (!isManual) {

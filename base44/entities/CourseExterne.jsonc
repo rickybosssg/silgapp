@@ -302,6 +302,37 @@
     "livreur_id": {
       "type": "string"
     },
+    "commission_taux_normal": {
+      "type": "number",
+      "description": "Taux de commission normal du pays (Country.commission_pct) au moment de l'acceptation. Fig\u00e9 \u00e0 l'acceptation pour garantir la tra\u00e7abilit\u00e9."
+    },
+    "commission_taux_applique": {
+      "type": "number",
+      "description": "Taux de commission effectivement appliqu\u00e9 (peut \u00eatre 0 si Pass/Happy Hour actif \u00e0 l'acceptation). Fig\u00e9 \u00e0 l'acceptation. La finalisation utilise ce taux et ne le r\u00e9\u00e9value jamais."
+    },
+    "commission_mode": {
+      "type": "string",
+      "enum": [
+        "normal",
+        "pass_zero",
+        "happy_hour"
+      ],
+      "default": "normal",
+      "description": "Mode de commission appliqu\u00e9. normal = taux Country. pass_zero = Pass Z\u00e9ro Commission actif \u00e0 l'acceptation. happy_hour = Happy Hour actif \u00e0 l'acceptation. Fig\u00e9 \u00e0 l'acceptation."
+    },
+    "pass_id": {
+      "type": "string",
+      "description": "ID du PassAchat actif au moment de l'acceptation, si commission_mode=pass_zero. Fig\u00e9 \u00e0 l'acceptation."
+    },
+    "happy_hour_id": {
+      "type": "string",
+      "description": "ID du HappyHourConfig actif au moment de l'acceptation, si commission_mode=happy_hour. Fig\u00e9 \u00e0 l'acceptation."
+    },
+    "commission_locked_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date/heure \u00e0 laquelle la commission a \u00e9t\u00e9 fig\u00e9e \u00e0 l'acceptation. Une fois set, la finalisation utilise les taux fig\u00e9s et ne les r\u00e9\u00e9value jamais."
+    },
     "livreur_financier_id": {
       "type": "string",
       "description": "Identite financiere IMMUABLE du livreur qui a reellement realise la livraison. Renseigne cote backend au moment de la finalisation de la livraison (jamais depuis le frontend). Une fois defini sur une course livree, ce champ NE DOIT JAMAIS etre modifie, meme en cas de redispatch, annulation, nettoyage ou changement de livreur_id. C'est la cle de rattachement financier utilisee par soldeCalculator.ts pour le calcul des commissions dues. Distinct de livreur_id qui reste operationnel/dispatch et peut evoluer."

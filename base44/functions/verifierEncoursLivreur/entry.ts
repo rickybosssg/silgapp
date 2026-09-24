@@ -124,11 +124,33 @@ Deno.serve(async (req) => {
       commission = Math.round(course.prix_final * (pct / 100));
     }
 
-    if (commission <= 0) {
-      return Response.json({ success: true, skipped: true, reason: 'commission_nulle' });
-    }
-
+    // ── FIX: course à 0% (Pass Zéro Commission / Happy Hour) ──
+    // Une course avec commission=0 doit QUAND MÊME gagner le CAS atomique et être
+    // marquée comme comptabilisée (encours_comptabilise_at set, montant=0).
+    // Cela empêche toute recomptabilisation ultérieure si le Pass/Happy Hour expire
+    // et que la course est re-finalisée (le CAS ne matchera plus).
+    // Le dû SILGAPP n'est PAS réduit — la course ajoute simplement 0 F au solde.
     const now = new Date().toISOString();
+
+    if (commission <= 0) {
+      // CAS atomique : marquer la course comme comptabilisée même si commission = 0
+      const claimResultZero = await base44.asServiceRole.entities.CourseExterne.updateMany(
+        { id: courseId, encours_comptabilise_at: null },
+        { $set: { encours_comptabilise_at: now, encours_comptabilise_montant: 0 } }
+      );
+      if (claimResultZero && claimResultZero.updated === 1) {
+        // Recalculer le solde (idempotent — la commission 0 n'ajoute rien)
+        await recalculerSoldeLivreur(base44, livreurId).catch(() => null);
+        console.log(`[ENCOURS] Course ${courseId} commission=0 marquée comme comptabilisée (Pass/Happy Hour) — dû inchangé`);
+      }
+      return Response.json({
+        success: true,
+        skipped: true,
+        reason: 'commission_nulle_comptabilisee',
+        encours_comptabilise_at: now,
+        encours_comptabilise_montant: 0,
+      });
+    }
 
     // ── Prise de possession atomique (CAS — Compare-And-Set) ──
     // updateMany avec filtre conditionnel: ne matche QUE si encours_comptabilise_at
