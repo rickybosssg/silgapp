@@ -38,7 +38,7 @@ export default function AdminPassAchatsPanel({ countryCode }) {
     return [...new Set(ids)];
   }, [achats]);
 
-  const { data: livreursData } = useQuery({
+  const { data: livreursData, isLoading: livreursLoading } = useQuery({
     queryKey: ["livreurs-by-ids", livreurIds],
     queryFn: async () => {
       if (!livreurIds.length) return {};
@@ -48,7 +48,9 @@ export default function AdminPassAchatsPanel({ countryCode }) {
           try {
             const livreur = await base44.entities.Livreur.get(id);
             if (livreur) results[id] = livreur;
-          } catch (_) {}
+          } catch (e) {
+            console.error("[AdminPassAchatsPanel] Erreur chargement livreur", id, e?.message || e);
+          }
         })
       );
       return results;
@@ -145,12 +147,13 @@ export default function AdminPassAchatsPanel({ countryCode }) {
               const nomComplet = livreur
                 ? `${livreur.prenom || ""} ${livreur.nom || ""}`.trim()
                 : null;
+              const livreurIntrouvable = !livreursLoading && !livreur;
               return (
-                <div className="bg-slate-50 rounded-xl p-3 mb-2 border border-slate-100">
+                <div className={`rounded-xl p-3 mb-2 border ${livreurIntrouvable ? "bg-red-50 border-red-200" : "bg-slate-50 border-slate-100"}`}>
                   <div className="flex items-center gap-2 mb-1">
                     <User className="w-4 h-4 text-slate-400 shrink-0" />
-                    <p className="font-semibold text-slate-800 text-sm">
-                      {nomComplet || "Livreur introuvable"}
+                    <p className={`font-semibold text-sm ${livreurIntrouvable ? "text-red-700" : "text-slate-800"}`}>
+                      {livreursLoading ? "Chargement..." : (nomComplet || "⚠️ Livreur introuvable")}
                     </p>
                   </div>
                   {livreur?.telephone && (
@@ -189,31 +192,40 @@ export default function AdminPassAchatsPanel({ countryCode }) {
               />
             )}
 
-            {achat.statut === "en_attente" && (
-              <div className="flex gap-2 mt-2">
-                <Button
-                  size="sm"
-                  className="flex-1 bg-green-600 hover:bg-green-700"
-                  disabled={validerMutation.isPending}
-                  onClick={() =>
-                    validerMutation.mutate({ achat_id: achat.id, action: "valider" })
-                  }
-                >
-                  <CheckCircle2 className="w-4 h-4 mr-1" /> Valider
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="flex-1 text-red-600 border-red-200"
-                  disabled={validerMutation.isPending}
-                  onClick={() =>
-                    validerMutation.mutate({ achat_id: achat.id, action: "refuser" })
-                  }
-                >
-                  <XCircle className="w-4 h-4 mr-1" /> Refuser
-                </Button>
-              </div>
-            )}
+            {achat.statut === "en_attente" && (() => {
+              const livreur = livreursData?.[achat.livreur_id];
+              const livreurBloqueValidation = !livreursLoading && !livreur;
+              return (
+                <div className="flex gap-2 mt-2">
+                  {livreurBloqueValidation && (
+                    <p className="text-xs text-red-600 w-full mb-1 text-center">
+                      ⚠️ Validation bloquée — profil livreur introuvable
+                    </p>
+                  )}
+                  <Button
+                    size="sm"
+                    className="flex-1 bg-green-600 hover:bg-green-700"
+                    disabled={validerMutation.isPending || livreurBloqueValidation || livreursLoading}
+                    onClick={() =>
+                      validerMutation.mutate({ achat_id: achat.id, action: "valider" })
+                    }
+                  >
+                    <CheckCircle2 className="w-4 h-4 mr-1" /> Valider
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="flex-1 text-red-600 border-red-200"
+                    disabled={validerMutation.isPending || livreursLoading}
+                    onClick={() =>
+                      validerMutation.mutate({ achat_id: achat.id, action: "refuser" })
+                    }
+                  >
+                    <XCircle className="w-4 h-4 mr-1" /> Refuser
+                  </Button>
+                </div>
+              );
+            })()}
 
             {achat.statut === "valide" && achat.expiration_at && (
               <p className="text-xs text-green-600">
