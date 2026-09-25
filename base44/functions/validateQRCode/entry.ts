@@ -293,6 +293,7 @@ Deno.serve(async (req) => {
       // CORRECTION PRIX MANUEL : Si la course utilise un prix manuel accepté,
       // ce montant devient le prix officiel. Ne JAMAIS recalculer.
       const isPrixManuel = course.pricing_mode === "manual" && course.manual_price_status === "accepted" && Number(course.manual_price) > 0;
+      const isPrixClient = Number(course.prix_propose_client) > 0;
 
       const latRecup = course.latitude_recuperation;
       const lngRecup = course.longitude_recuperation;
@@ -353,8 +354,37 @@ Deno.serve(async (req) => {
 
       const PRIX_MINIMUM_GLOBAL = 1000;
 
-      if (isPrixManuel) {
-        // ── MODE PRIX MANUEL : utiliser le prix accepté par le client ──
+      if (isPrixClient) {
+        // ── MODE PRIX CLIENT : prix_propose_client est la source de vérité ──
+        // RÈGLE ABSOLUE : un prix explicitement proposé par le client NE DOIT JAMAIS
+        // être écrasé par PRIX_MINIMUM_GLOBAL, distance × km, ou prix_minimum pays.
+        // Le minimum tarifaire concerne uniquement les courses sans prix client explicite.
+        const prixFinal = Number(course.prix_propose_client);
+
+        // Utiliser le taux figé à l'acceptation si disponible (Pass/Happy Hour), sinon taux normal
+        let tauxEffectif = commissionPct;
+        if (course.commission_locked_at && course.commission_taux_applique != null) {
+          tauxEffectif = Number(course.commission_taux_applique);
+        }
+
+        const commission = Math.round(prixFinal * (tauxEffectif / 100));
+        const montantLivreur = prixFinal - commission;
+
+        updateData.prix_final = prixFinal;
+        updateData.commission_silga = commission;
+        updateData.montant_livreur = montantLivreur;
+
+        // Distance réelle pour stats — privilégier distTarifaire (adresse) si distReelle indispo
+        if (distTarifaire != null) {
+          updateData.distance_reelle_km = Math.max(Number(distTarifaire) || 0, 0.01);
+        } else if (distReelle != null) {
+          updateData.distance_reelle_km = Math.max(Number(distReelle) || 0, 0.01);
+        }
+
+        updateData.latitude_arrivee_livraison = gpsLat || null;
+        updateData.longitude_arrivee_livraison = gpsLng || null;
+      } else if (isPrixManuel) {
+        // ── MODE PRIX MANUEL LIVREUR : utiliser le prix accepté par le client ──
         const prixFinal = Number(course.manual_price);
         const commission = Math.round(prixFinal * (commissionPct / 100));
         const montantLivreur = prixFinal - commission;
