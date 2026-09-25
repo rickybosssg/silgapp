@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import {
   Building2, Plus, Users, Wallet, TrendingUp, Eye, Ban, CheckCircle,
   Percent, Truck, Package, ArrowLeft, UserMinus, UserPlus, Power,
+  Clock, Zap,
 } from "lucide-react";
 
 /**
@@ -87,6 +88,8 @@ export default function SuperAdminEntreprises() {
         <StatCard icon={Users} label="Total encaissé" value={`${totalPaid.toLocaleString("fr-FR")} F`} color="text-emerald-600" bg="bg-emerald-50" />
         <StatCard icon={Building2} label="Total entreprises" value={enterprises.length} color="text-gray-600" bg="bg-gray-100" />
       </div>
+
+      <AutoCloseConfigCard />
 
       <div className="space-y-2">
         {enterprises.length === 0 ? (
@@ -767,5 +770,150 @@ function RateModal({ enterprise, onClose, onDone }) {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+// ── Carte de configuration : Clôture automatique des courses ──
+function AutoCloseConfigCard() {
+  const [enabled, setEnabled] = useState(null);
+  const [delay, setDelay] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const loadConfig = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const entries = await base44.entities.SystemConfig.filter({
+        $or: [
+          { cle: "auto_close_courses_enabled" },
+          { cle: "auto_close_courses_delay_minutes" },
+        ],
+      });
+      const map = {};
+      for (const e of entries || []) map[e.cle] = e.valeur;
+      setEnabled(map.auto_close_courses_enabled !== undefined ? map.auto_close_courses_enabled === "true" : true);
+      setDelay(map.auto_close_courses_delay_minutes ? parseInt(map.auto_close_courses_delay_minutes, 10) : 120);
+    } catch (err) {
+      setError(err?.message || "Erreur");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadConfig(); }, []);
+
+  const updateConfig = async (newEnabled, newDelay) => {
+    setSaving(true);
+    setError("");
+    try {
+      const entries = await base44.entities.SystemConfig.filter({
+        $or: [
+          { cle: "auto_close_courses_enabled" },
+          { cle: "auto_close_courses_delay_minutes" },
+        ],
+      });
+      const existing = {};
+      for (const e of entries || []) existing[e.cle] = e;
+
+      const updates = [];
+      const enabledVal = String(newEnabled);
+      const delayVal = String(newDelay);
+
+      if (existing.auto_close_courses_enabled) {
+        if (existing.auto_close_courses_enabled.valeur !== enabledVal) {
+          await base44.entities.SystemConfig.update(existing.auto_close_courses_enabled.id, { valeur: enabledVal });
+        }
+      } else {
+        updates.push({ cle: "auto_close_courses_enabled", valeur: enabledVal, description: "Clôture automatique des courses après timeout d'acceptation (ON/OFF)." });
+      }
+
+      if (existing.auto_close_courses_delay_minutes) {
+        if (existing.auto_close_courses_delay_minutes.valeur !== delayVal) {
+          await base44.entities.SystemConfig.update(existing.auto_close_courses_delay_minutes.id, { valeur: delayVal });
+        }
+      } else {
+        updates.push({ cle: "auto_close_courses_delay_minutes", valeur: delayVal, description: "Délai en minutes après acceptation avant clôture automatique. Défaut: 120." });
+      }
+
+      if (updates.length > 0) {
+        await base44.entities.SystemConfig.bulkCreate(updates);
+      }
+
+      setEnabled(newEnabled);
+      setDelay(newDelay);
+    } catch (err) {
+      setError(err?.message || "Erreur");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) return <Card><CardContent className="p-4 text-sm text-gray-500">Chargement config clôture auto...</CardContent></Card>;
+
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center">
+            <Clock className="w-4 h-4 text-indigo-600" />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-gray-900">Clôture automatique des courses</p>
+            <p className="text-[10px] text-gray-500">Clôture les courses acceptées depuis trop longtemps</p>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-700">Activé</p>
+              <p className="text-[10px] text-gray-400">Clôture auto après le délai configuré</p>
+            </div>
+            <button
+              onClick={() => updateConfig(!enabled, delay)}
+              disabled={saving}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${enabled ? "bg-emerald-500" : "bg-gray-300"}`}
+            >
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${enabled ? "translate-x-6" : "translate-x-1"}`} />
+            </button>
+          </div>
+
+          <div>
+            <Label className="text-xs">Délai (minutes)</Label>
+            <div className="flex items-center gap-2 mt-1">
+              <Input
+                type="number"
+                min="30"
+                value={delay ?? ""}
+                onChange={(e) => setDelay(Number(e.target.value))}
+                className="w-24"
+                disabled={saving}
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={saving || !delay || delay < 30}
+                onClick={() => updateConfig(enabled, delay)}
+              >
+                {saving ? "..." : "Enregistrer"}
+              </Button>
+            </div>
+            <p className="text-[10px] text-gray-400 mt-1">
+              Délai recommandé: 120 min (2h). Minimum: 30 min.
+              {enabled ? " ✅ Actif" : " ⏸️ Désactivé"}
+            </p>
+          </div>
+
+          <div className="flex items-start gap-1.5 text-[10px] text-gray-400">
+            <Zap className="w-3 h-3 mt-0.5 flex-shrink-0" />
+            <span>Workflow: toutes les 10 min. Réutilise le mécanisme officiel (calculPrixCourseExterne, verifierEncoursLivreur). Marque <code>auto_completed=true</code> pour traçabilité.</span>
+          </div>
+
+          {error && <p className="text-xs text-red-500">{error}</p>}
+        </div>
+      </CardContent>
+    </Card>
   );
 }

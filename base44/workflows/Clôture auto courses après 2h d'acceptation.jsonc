@@ -1,0 +1,44 @@
+{
+  "description": "Recherche les courses accept\u00e9es depuis plus de 2h (configurable) encore actives et les cl\u00f4ture automatiquement comme livr\u00e9es. R\u00e9utilise le m\u00e9canisme officiel de finalisation SILGAPP (calculPrixCourseExterne, verifierEncoursLivreur, comptabiliserCommissionEnterprise). Idempotent. Marque auto_completed=true pour tra\u00e7abilit\u00e9.",
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "recurring",
+      "cron_expression": "*/10 * * * *",
+      "one_time_date": null,
+      "timezone": "Africa/Ouagadougou",
+      "interval_value": null,
+      "interval_unit": null,
+      "interval_anchor": null,
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  },
+  "name": "Cl\u00f4ture auto courses apr\u00e8s 2h d'acceptation",
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "cloturer_courses_auto_timeout",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "cloturer": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "cloturerCoursesAutoTimeout"
+          },
+          "then": "end",
+          "x-base44": {
+            "title": "Cl\u00f4turer les courses en timeout",
+            "description": "Finalise les courses accept\u00e9es depuis >2h via le m\u00e9canisme officiel"
+          }
+        }
+      }
+    ]
+  }
+}

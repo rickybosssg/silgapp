@@ -524,8 +524,10 @@
       "enum": [
         "qr",
         "manual_code",
-        "admin"
-      ]
+        "admin",
+        "auto_timeout"
+      ],
+      "description": "M\u00e9thode de confirmation de livraison. auto_timeout = cl\u00f4ture automatique par le syst\u00e8me apr\u00e8s timeout d'acceptation."
     },
     "pickup_confirmed_at": {
       "type": "string",
@@ -674,6 +676,24 @@
     "prix_confirme_par_admin_id": {
       "type": "string",
       "description": "Email de l'admin ayant confirme le prix."
+    },
+    "auto_completed": {
+      "type": "boolean",
+      "default": false,
+      "description": "True si la course a \u00e9t\u00e9 cl\u00f4tur\u00e9e automatiquement par le syst\u00e8me (timeout, etc.) et non confirm\u00e9e par PIN/QR. Permet de distinguer une livraison r\u00e9ellement confirm\u00e9e d'une cl\u00f4ture automatique pour audit et contestations clients."
+    },
+    "auto_completed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date/heure de la cl\u00f4ture automatique."
+    },
+    "auto_completed_reason": {
+      "type": "string",
+      "enum": [
+        "accepted_timeout_2h",
+        "admin_manual"
+      ],
+      "description": "Raison de la cl\u00f4ture automatique. accepted_timeout_2h = course non termin\u00e9e apr\u00e8s 2h d'acceptation. admin_manual = cl\u00f4ture manuelle par l'admin."
     }
   },
   "required": [
