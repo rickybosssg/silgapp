@@ -52,7 +52,8 @@
     },
     "enterprise_id": {
       "type": "string",
-      "description": "ID financier IMMUABLE de l'entreprise \u00e0 laquelle cet utilisateur est rattach\u00e9. R\u00e9solu c\u00f4t\u00e9 backend UNIQUEMENT (jamais fourni par le frontend). Un Admin Entreprise ne peut pas changer son enterprise_id. Un Super Admin SILGAPP n'a pas d'enterprise_id (null = r\u00e9seau public). Permet la RLS pour isoler les donn\u00e9es par entreprise."
+      "default": null,
+      "description": "ID financier IMMUABLE de l'entreprise \u00e0 laquelle cet utilisateur est rattach\u00e9. Null = utilisateur du r\u00e9seau public SILGAPP. R\u00e9solu c\u00f4t\u00e9 backend UNIQUEMENT (jamais fourni par le frontend). Un Admin Entreprise ne peut pas changer son enterprise_id. Un Super Admin SILGAPP n'a pas d'enterprise_id (null = r\u00e9seau public). Permet la RLS pour isoler les donn\u00e9es par entreprise. DEFAULT null obligatoire \u2014 sans cette valeur explicite, la RLS CourseExterne (data.enterprise_id = {{user.data.enterprise_id}}) ne r\u00e9sout pas vers null pour les users publics, rendant les courses publiques invisibles."
     }
   }
 }
