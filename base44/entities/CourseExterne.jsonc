@@ -623,7 +623,7 @@
         "urgente"
       ],
       "default": "normal",
-      "description": "Niveau de priorite de dispatch"
+      "description": "Niveau de priorit\u00e9 de dispatch"
     },
     "commande_boutique_id": {
       "type": "string",
@@ -690,10 +690,14 @@
     "auto_completed_reason": {
       "type": "string",
       "enum": [
-        "accepted_timeout_2h",
+        "accepted_timeout",
         "admin_manual"
       ],
-      "description": "Raison de la cl\u00f4ture automatique. accepted_timeout_2h = course non termin\u00e9e apr\u00e8s 2h d'acceptation. admin_manual = cl\u00f4ture manuelle par l'admin."
+      "description": "Raison de la cl\u00f4ture automatique. accepted_timeout = course non termin\u00e9e apr\u00e8s le d\u00e9lai configur\u00e9. admin_manual = cl\u00f4ture manuelle par l'admin."
+    },
+    "auto_completed_delay_minutes": {
+      "type": "number",
+      "description": "D\u00e9lai r\u00e9ellement appliqu\u00e9 (en minutes) au moment de la cl\u00f4ture automatique. Permet de conserver l'historique exact m\u00eame si le d\u00e9lai configur\u00e9 change ult\u00e9rieurement."
     }
   },
   "required": [

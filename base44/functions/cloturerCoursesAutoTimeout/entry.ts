@@ -3,7 +3,7 @@ import { chargerConfigPays, normalizeCommissionPct } from '../../shared/dispatch
 import { comptabiliserCommissionEnterprise } from '../../shared/enterpriseFinance.ts';
 
 // ═══════════════════════════════════════════════════════════════════════════
-// CLOTURER COURSES AUTO TIMEOUT — Clôture automatique des courses après 2h
+// CLOTURER COURSES AUTO TIMEOUT — Clôture automatique des courses après timeout
 // ═══════════════════════════════════════════════════════════════════════════
 //
 // RÈGLE MÉTIER :
@@ -18,24 +18,30 @@ import { comptabiliserCommissionEnterprise } from '../../shared/enterpriseFinanc
 //   - pas de date_souhaitee future (course programmée)
 //   - auto_completed != true (idempotence — pas déjà clôturée auto)
 //
+// SÉCURITÉ PRIX :
+//   Une course dont le prix final ne peut pas être déterminé de manière fiable
+//   n'est PAS clôturée automatiquement. Elle reste pour intervention admin et
+//   une alerte AUTO_CLOSE_BLOCKED_MISSING_PRICE est créée (idempotente).
+//
 // FINALISATION :
 //   Réutilise le mécanisme officiel de finaliserLivraisonLivreur :
 //   - Courses admin : prix_propose_admin → prix_final
 //   - Courses standard : délègue à calculPrixCourseExterne
-//   - Courses prix à confirmer : pas de commission
 //   Puis appelle verifierEncoursLivreur (CAS atomique idempotent)
 //   Puis appelle comptabiliserCommissionEnterprise (si enterprise_id)
 //
 // TRAÇABILITÉ :
 //   auto_completed = true
 //   auto_completed_at = now
-//   auto_completed_reason = "accepted_timeout_2h"
+//   auto_completed_reason = "accepted_timeout"
+//   auto_completed_delay_minutes = <délai réellement appliqué>
 //   delivery_confirmed_by = "auto_timeout"
 //
 // IDEMPOTENCE :
 //   - auto_completed true → skip (déjà clôturée)
 //   - encours_comptabilise_at → skip (déjà comptabilisée)
 //   - enterprise_encours_comptabilise_at → skip (déjà comptabilisée entreprise)
+//   - Alerte AUTO_CLOSE_BLOCKED_MISSING_PRICE → deduplication_key (une seule fois)
 //
 // NE MODIFIE PAS : Dispatch V2, FCM, ORS, TarifZone, Pass, Happy Hour, PIN/QR
 // ═══════════════════════════════════════════════════════════════════════════
@@ -100,13 +106,11 @@ export default async function(req: Request): Promise<Response> {
       }, { status: 400 });
     }
 
-    // ── 2. Calculer le seuil temporel ──
+    const delayMs = delayMinutes * 60 * 1000;
     const now = new Date();
     const nowIso = now.toISOString();
-    const thresholdMs = now.getTime() - (delayMinutes * 60 * 1000);
 
-    // ── 3. Rechercher les courses éligibles ──
-    // On filtre par statuts actifs + livreur assigné + pas déjà auto-complétée
+    // ── 2. Rechercher les courses éligibles ──
     const candidates: any[] = [];
     for (const statut of ACTIVE_STATUTS) {
       const courses = await base44.asServiceRole.entities.CourseExterne.filter(
@@ -120,7 +124,6 @@ export default async function(req: Request): Promise<Response> {
       ).catch(() => []);
 
       for (const course of courses || []) {
-        // ── Conditions d'éligibilité ──
         if (!course.heure_acceptation) continue;
         if (course.auto_completed) continue;
 
@@ -128,7 +131,8 @@ export default async function(req: Request): Promise<Response> {
         if (!Number.isFinite(acceptTime)) continue;
 
         const elapsed = now.getTime() - acceptTime;
-        if (elapsed < delayMinutes * 60 * 1000) continue;
+        // >= delayMs → éligible ; < delayMs → pas encore
+        if (elapsed < delayMs) continue;
 
         // Pas de course programmée future
         if (course.date_souhaitee) {
@@ -138,7 +142,7 @@ export default async function(req: Request): Promise<Response> {
           }
         }
 
-        // Pas déjà livrée ou annulée (double-check)
+        // Double-check statut
         if (course.statut === 'livree' || course.statut === 'annulee') continue;
 
         candidates.push(course);
@@ -155,17 +159,20 @@ export default async function(req: Request): Promise<Response> {
       });
     }
 
-    // ── 4. Finaliser chaque course ──
+    // ── 3. Finaliser chaque course ──
     const results: any[] = [];
     let processed = 0;
     let skipped = 0;
+    let blocked = 0;
     let errors = 0;
 
     for (const course of candidates.slice(0, MAX_COURSES_PER_RUN)) {
       try {
-        const result = await finalizeOneCourse(base44, course, nowIso);
+        const result = await finalizeOneCourse(base44, course, nowIso, delayMinutes);
         results.push(result);
-        if (result.skipped) {
+        if (result.blocked) {
+          blocked++;
+        } else if (result.skipped) {
           skipped++;
         } else {
           processed++;
@@ -184,6 +191,7 @@ export default async function(req: Request): Promise<Response> {
       success: true,
       processed,
       skipped,
+      blocked,
       errors,
       total_candidates: candidates.length,
       delay_minutes: delayMinutes,
@@ -199,7 +207,7 @@ export default async function(req: Request): Promise<Response> {
 // Finaliser une seule course — réutilise le mécanisme officiel
 // ═══════════════════════════════════════════════════════════════════════════
 
-async function finalizeOneCourse(base44: any, course: any, nowIso: string): Promise<any> {
+async function finalizeOneCourse(base44: any, course: any, nowIso: string, delayMinutes: number): Promise<any> {
   const courseId = course.id;
 
   // ── Idempotence : déjà auto-complétée ──
@@ -214,25 +222,31 @@ async function finalizeOneCourse(base44: any, course: any, nowIso: string): Prom
 
   const isAdminCourse = course.pricing_mode === 'admin_manuel' || course.source === 'admin';
 
-  // ── CAS 1: Course admin — prix_propose_admin est la source de vérité ──
+  // ── CAS 1: Course "prix à confirmer" — BLOCAGE (ne pas clôturer) ──
+  // Le prix ne peut pas être déterminé de manière fiable. On ne clôture pas.
+  // On crée une alerte admin idempotente.
+  if (course.prix_a_confirmer) {
+    await createBlockedAlert(base44, course, nowIso, 'prix_a_confirmer');
+    return {
+      course_id: courseId,
+      blocked: true,
+      reason: 'AUTO_CLOSE_BLOCKED_MISSING_PRICE',
+      detail: 'prix_a_confirmer — prix final indéterminable sans intervention admin',
+    };
+  }
+
+  // ── CAS 2: Course admin — prix_propose_admin est la source de vérité ──
   if (isAdminCourse) {
     const montant = Number(course.prix_propose_admin);
     if (!Number.isFinite(montant) || montant <= 0) {
-      // Pas de prix admin valide — clôturer sans commission (sera à confirmer)
-      await base44.asServiceRole.entities.CourseExterne.update(courseId, {
-        statut: 'livree',
-        heure_livraison: nowIso,
-        colis_livre_at: nowIso,
-        auto_completed: true,
-        auto_completed_at: nowIso,
-        auto_completed_reason: 'accepted_timeout_2h',
-        delivery_confirmed_at: nowIso,
-        delivery_confirmed_by: 'auto_timeout',
-        ...(course.livreur_financier_id ? {} : { livreur_financier_id: course.livreur_id }),
-      });
-
-      await libererLivreur(base44, course.livreur_id);
-      return { course_id: courseId, auto_completed: true, prix_source: 'admin_no_price' };
+      // Pas de prix admin valide — BLOCAGE (ne pas clôturer)
+      await createBlockedAlert(base44, course, nowIso, 'admin_missing_prix_propose_admin');
+      return {
+        course_id: courseId,
+        blocked: true,
+        reason: 'AUTO_CLOSE_BLOCKED_MISSING_PRICE',
+        detail: 'admin course sans prix_propose_admin valide',
+      };
     }
 
     // Charger la commission du pays
@@ -245,21 +259,14 @@ async function finalizeOneCourse(base44: any, course: any, nowIso: string): Prom
       : commissionPct;
 
     if (commissionPct === null) {
-      // Commission non configurée — clôturer sans commission
-      await base44.asServiceRole.entities.CourseExterne.update(courseId, {
-        statut: 'livree',
-        heure_livraison: nowIso,
-        colis_livre_at: nowIso,
-        prix_final: montant,
-        auto_completed: true,
-        auto_completed_at: nowIso,
-        auto_completed_reason: 'accepted_timeout_2h',
-        delivery_confirmed_at: nowIso,
-        delivery_confirmed_by: 'auto_timeout',
-        ...(course.livreur_financier_id ? {} : { livreur_financier_id: course.livreur_id }),
-      });
-      await libererLivreur(base44, course.livreur_id);
-      return { course_id: courseId, auto_completed: true, prix_source: 'admin_no_commission' };
+      // Commission non configurée — BLOCAGE (ne pas clôturer sans commission)
+      await createBlockedAlert(base44, course, nowIso, 'missing_country_commission_pct');
+      return {
+        course_id: courseId,
+        blocked: true,
+        reason: 'AUTO_CLOSE_BLOCKED_MISSING_PRICE',
+        detail: `commission_pct non configuré pour le pays ${course.country_code}`,
+      };
     }
 
     const commissionSilga = Math.round(montant * (tauxEffectif / 100));
@@ -274,7 +281,8 @@ async function finalizeOneCourse(base44: any, course: any, nowIso: string): Prom
       montant_livreur: montantLivreur,
       auto_completed: true,
       auto_completed_at: nowIso,
-      auto_completed_reason: 'accepted_timeout_2h',
+      auto_completed_reason: 'accepted_timeout',
+      auto_completed_delay_minutes: delayMinutes,
       delivery_confirmed_at: nowIso,
       delivery_confirmed_by: 'auto_timeout',
       ...(course.livreur_financier_id ? {} : { livreur_financier_id: course.livreur_id }),
@@ -309,43 +317,17 @@ async function finalizeOneCourse(base44: any, course: any, nowIso: string): Prom
     };
   }
 
-  // ── CAS 2: Course "prix à confirmer" — pas de commission ──
-  if (course.prix_a_confirmer) {
-    await base44.asServiceRole.entities.CourseExterne.update(courseId, {
-      statut: 'livree',
-      heure_livraison: nowIso,
-      colis_livre_at: nowIso,
-      auto_completed: true,
-      auto_completed_at: nowIso,
-      auto_completed_reason: 'accepted_timeout_2h',
-      delivery_confirmed_at: nowIso,
-      delivery_confirmed_by: 'auto_timeout',
-      ...(course.livreur_financier_id ? {} : { livreur_financier_id: course.livreur_id }),
-    });
-
-    // Enterprise accounting même pour prix à confirmer
-    try {
-      if (course.enterprise_id) {
-        await comptabiliserCommissionEnterprise(base44.asServiceRole, { ...course, statut: 'livree' });
-      }
-    } catch (e: any) {
-      console.error(`[cloturerAutoTimeout] enterprise accounting error (prix à confirmer) for ${courseId}:`, e?.message);
-    }
-
-    await libererLivreur(base44, course.livreur_id);
-    return { course_id: courseId, auto_completed: true, prix_source: 'prix_a_confirmer' };
-  }
-
   // ── CAS 3: Course standard — déléguer à calculPrixCourseExterne ──
   try {
     const res = await base44.asServiceRole.functions.invoke('calculPrixCourseExterne', { course_id: courseId });
 
-    // Marquer comme auto-complétée APRÈS le calcul (qui met déjà statut=livree)
-    if (res?.success || res?.prix_a_confirmer) {
+    // Si le calcul a réussi avec un prix déterminable
+    if (res?.success && res?.prix_final != null && Number(res.prix_final) > 0) {
       await base44.asServiceRole.entities.CourseExterne.update(courseId, {
         auto_completed: true,
         auto_completed_at: nowIso,
-        auto_completed_reason: 'accepted_timeout_2h',
+        auto_completed_reason: 'accepted_timeout',
+        auto_completed_delay_minutes: delayMinutes,
         delivery_confirmed_at: nowIso,
         delivery_confirmed_by: 'auto_timeout',
         ...(course.livreur_financier_id ? {} : { livreur_financier_id: course.livreur_id }),
@@ -373,43 +355,87 @@ async function finalizeOneCourse(base44: any, course: any, nowIso: string): Prom
       return {
         course_id: courseId,
         auto_completed: true,
-        prix_final: res?.prix_final,
-        commission_silga: res?.commission_silga,
-        montant_livreur: res?.montant_livreur,
-        prix_source: res?.prix_source || 'calcul_delegated',
+        prix_final: res.prix_final,
+        commission_silga: res.commission_silga,
+        montant_livreur: res.montant_livreur,
+        prix_source: res.prix_source || 'calcul_delegated',
       };
-    } else {
-      // calculPrixCourseExterne a échoué — clôturer sans commission
-      await base44.asServiceRole.entities.CourseExterne.update(courseId, {
-        statut: 'livree',
-        heure_livraison: nowIso,
-        colis_livre_at: nowIso,
-        auto_completed: true,
-        auto_completed_at: nowIso,
-        auto_completed_reason: 'accepted_timeout_2h',
-        delivery_confirmed_at: nowIso,
-        delivery_confirmed_by: 'auto_timeout',
-        ...(course.livreur_financier_id ? {} : { livreur_financier_id: course.livreur_id }),
-      });
-      await libererLivreur(base44, course.livreur_id);
-      return { course_id: courseId, auto_completed: true, prix_source: 'calc_failed_no_commission', error: res?.error };
     }
+
+    // ── Le prix n'a pas pu être déterminé (prix_a_confirmer ou échec calcul) ──
+    // BLOCAGE : ne pas clôturer, créer une alerte admin
+    const detail = res?.prix_a_confirmer
+      ? 'calculPrixCourseExterne a retourné prix_a_confirmer'
+      : (res?.error || 'calculPrixCourseExterne n\'a pas retourné de prix_final valide');
+
+    await createBlockedAlert(base44, course, nowIso, 'calc_undeterminable', detail);
+    return {
+      course_id: courseId,
+      blocked: true,
+      reason: 'AUTO_CLOSE_BLOCKED_MISSING_PRICE',
+      detail,
+    };
   } catch (calcErr: any) {
-    // En cas d'erreur de calcul, clôturer sans commission
-    console.error(`[cloturerAutoTimeout] calculPrixCourseExterne error for ${courseId}:`, calcErr?.message);
-    await base44.asServiceRole.entities.CourseExterne.update(courseId, {
-      statut: 'livree',
-      heure_livraison: nowIso,
-      colis_livre_at: nowIso,
-      auto_completed: true,
-      auto_completed_at: nowIso,
-      auto_completed_reason: 'accepted_timeout_2h',
-      delivery_confirmed_at: nowIso,
-      delivery_confirmed_by: 'auto_timeout',
-      ...(course.livreur_financier_id ? {} : { livreur_financier_id: course.livreur_id }),
+    // Erreur de calcul — BLOCAGE (ne pas clôturer sans prix)
+    const detail = `calculPrixCourseExterne error: ${calcErr?.message || String(calcErr)}`;
+    await createBlockedAlert(base44, course, nowIso, 'calc_error', detail);
+    return {
+      course_id: courseId,
+      blocked: true,
+      reason: 'AUTO_CLOSE_BLOCKED_MISSING_PRICE',
+      detail,
+    };
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Créer une alerte admin idempotente pour course bloquée
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function createBlockedAlert(base44: any, course: any, nowIso: string, subReason: string, extraDetail?: string): Promise<void> {
+  const courseId = course.id;
+  const deduplicationKey = `AUTO_CLOSE_BLOCKED_${courseId}`;
+
+  // Idempotence : vérifier si une alerte existe déjà pour cette course
+  try {
+    const existing = await base44.asServiceRole.entities.Notification.filter({
+      deduplication_key: deduplicationKey,
+    }).catch(() => []);
+
+    if (existing && existing.length > 0) {
+      // Alerte déjà créée — ne pas recréer
+      return;
+    }
+  } catch (e: any) {
+    // Non bloquant — on tente quand même la création
+  }
+
+  const livreurNom = course.livreur_nom || 'N/A';
+  const livreurTel = course.livreur_telephone || 'N/A';
+  const acceptTime = course.heure_acceptation
+    ? new Date(course.heure_acceptation).toLocaleString('fr-FR')
+    : 'N/A';
+
+  const detail = extraDetail || subReason;
+
+  const titre = 'AUTO_CLOSE_BLOCKED_MISSING_PRICE';
+  const message = `Course ${courseId} bloquée en clôture auto (prix indéterminable).
+Raison: ${detail}
+Livreur: ${livreurNom} (${livreurTel})
+Statut: ${course.statut}
+Heure d'acceptation: ${acceptTime}
+Course conservée pour intervention admin.`;
+
+  try {
+    await base44.asServiceRole.entities.Notification.create({
+      titre,
+      message,
+      type: 'alerte_critique_dispatch',
+      course_id: courseId,
+      deduplication_key: deduplicationKey,
     });
-    await libererLivreur(base44, course.livreur_id);
-    return { course_id: courseId, auto_completed: true, prix_source: 'calc_error_no_commission', error: calcErr?.message };
+  } catch (e: any) {
+    console.error(`[cloturerAutoTimeout] Failed to create blocked alert for ${courseId}:`, e?.message);
   }
 }
 
