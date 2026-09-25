@@ -124,6 +124,10 @@ const MetaAdsDashboard = lazy(() => import('./pages/MetaAdsDashboard.jsx'));
 const PassZeroCommissionAdmin = lazy(() => import('./pages/PassZeroCommissionAdmin.jsx'));
 import Diag500Panel from './components/admin/Diag500Panel.jsx';
 
+const EntrepriseApp = lazy(() => import('./pages/EntrepriseApp.jsx'));
+const SuperAdminEntreprises = lazy(() => import('./pages/SuperAdminEntreprises.jsx'));
+const InscriptionLivreurEntreprise = lazy(() => import('./pages/InscriptionLivreurEntreprise.jsx'));
+
 function AnimatedRoutes({ children }) {
   // Variables définies DANS la fonction pour éviter init issues
   const location = useLocation();
@@ -264,10 +268,20 @@ function AppContent() {
   // Ces routes doivent être vérifiées AVANT toute logique d'authentification
   // 🌍 ROUTES PUBLIQUES - PRIORITÉ ABSOLUE (vérification avant tout)
   const currentPath = location.pathname || window.location.pathname;
+
+  if (currentPath === '/entreprise' || currentPath.startsWith('/entreprise/')) {
+    return (
+      <Suspense fallback={<LoadingScreen />}>
+        <EntrepriseApp />
+      </Suspense>
+    );
+  }
+
   const isPublicRoute = currentPath === '/telecharger' || 
                         currentPath === '/privacy-policy' ||
                         currentPath.startsWith('/suivi-public/') ||
-                        currentPath.startsWith('/demo/');
+                        currentPath.startsWith('/demo/') ||
+                        currentPath.startsWith('/inscription-livreur');
 
   // /demo/ : rendu DIRECT sans passer par le Router pour éviter toute ingérence
   if (currentPath.startsWith('/demo/')) {
@@ -287,6 +301,7 @@ function AppContent() {
           <Route path="/telecharger" element={<TelechargerSILGAPP />} />
           {/* Route publique de suivi de course */}
           <Route path="/suivi-public/:token" element={<PublicSuiviCourse />} />
+          <Route path="/inscription-livreur" element={<InscriptionLivreurEntreprise />} />
           {/* Politique de confidentialité — requise Google Play */}
           <Route path="/privacy-policy" element={<PolitiqueConfidentialite />} />
           <Route path="*" element={<PageNotFound />} />
@@ -486,6 +501,7 @@ function AppContent() {
           <Route path="/admin/growth" element={<AnimatedRoutes><GrowthDashboard /></AnimatedRoutes>} />
           <Route path="/admin/meta-ads" element={<AnimatedRoutes><MetaAdsDashboard /></AnimatedRoutes>} />
           <Route path="/admin/pass-zero-commission" element={<AnimatedRoutes><PassZeroCommissionAdmin /></AnimatedRoutes>} />
+          <Route path="/admin/entreprises" element={<AnimatedRoutes><SuperAdminEntreprises /></AnimatedRoutes>} />
           <Route path="/admin/messages" element={<AnimatedRoutes><AdminMessages /></AnimatedRoutes>} />
           <Route path="/admin/whatsapp" element={<AnimatedRoutes><WhatsAppAdmin /></AnimatedRoutes>} />
           <Route path="/admin/venus" element={<AnimatedRoutes><VenusAdminCenter /></AnimatedRoutes>} />

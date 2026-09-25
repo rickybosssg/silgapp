@@ -15,9 +15,8 @@
 import { STATUTS_ACTIFS_COURSE, STATUTS_ACTIFS_VERIF } from './dispatchConstants.ts';
 import { journaliserDispatch } from './dispatchUtils.ts';
 import { getLivreursNotifies } from './dispatchNotifications.ts';
-import { lancerDispatchMulti } from './dispatchEngine.ts';
 import { chargerConfigDispatch, chargerConfigVaguesGPS } from './dispatchConfig.ts';
-import { isV2Enabled, secoursDispatchV2 } from './dispatchV2.ts';
+import { isV2Enabled, publierCourseDansFil, secoursDispatchV2 } from './dispatchV2.ts';
 import { gererPushGeneralT10 } from './pushGeneralT10.ts';
 
 /** Crée une alerte admin si aucune alerte récente n'existe pour la même course. */
@@ -116,7 +115,7 @@ export async function runWatchdog(base44, body = {}) {
     anomalies.push({ course_id: course.id, type: 'nouvelle_jamais_traitee', severity: 'critique', description: `Course nouvelle depuis ${ageMin}min sans notification` });
 
     try {
-      const result = await lancerDispatchMulti(base44, course.id, [], cachedConfig);
+      const result = await publierCourseDansFil(base44, course);
       corrections.push({ course_id: course.id, action: 'force_dispatch_nouvelle', result });
     } catch (err) {
       corrections.push({ course_id: course.id, action: 'force_dispatch_nouvelle', error: err.message });
@@ -144,7 +143,7 @@ export async function runWatchdog(base44, body = {}) {
     anomalies.push({ course_id: course.id, type: 'recherche_sans_vague', severity: 'critique', description: `Course en_attente depuis ${ageMin}min sans vague` });
 
     try {
-      const result = await lancerDispatchMulti(base44, course.id, [], cachedConfig);
+      const result = await publierCourseDansFil(base44, course);
       corrections.push({ course_id: course.id, action: 'force_dispatch_recherche', result });
     } catch (err) {
       corrections.push({ course_id: course.id, action: 'force_dispatch_recherche', error: err.message });
@@ -204,7 +203,7 @@ export async function runWatchdog(base44, body = {}) {
     }
 
     try {
-      const result = await lancerDispatchMulti(base44, course.id, [], cachedConfig);
+      const result = await publierCourseDansFil(base44, { ...course, statut: 'recherche_livreur', dispatch_status: 'en_attente' });
       corrections.push({ course_id: course.id, action: 'redispatch_propose_timeout', result });
     } catch (err) {
       corrections.push({ course_id: course.id, action: 'redispatch_propose_timeout', error: err.message });

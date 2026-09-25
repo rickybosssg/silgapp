@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 import { haversineKm } from '../../shared/geoUtils.ts';
+import { comptabiliserCommissionEnterprise, normalizeEnterpriseId } from '../../shared/enterpriseFinance.ts';
 
 function normalizeCommissionPct(value) {
   const pct = Number(value);
@@ -242,8 +243,17 @@ Deno.serve(async (req) => {
         if (distAdmin != null) {
           adminUpdateData.distance_reelle_km = Math.max(Number(distAdmin) || 0, 0.01);
         }
+        if (normalizeEnterpriseId(course.enterprise_id)) {
+          adminUpdateData.commission_silga = 0;
+          adminUpdateData.montant_livreur = prixFinalAdmin;
+        }
 
         await base44.asServiceRole.entities.CourseExterne.update(course_id, adminUpdateData);
+        if (normalizeEnterpriseId(course.enterprise_id)) {
+          await comptabiliserCommissionEnterprise(base44.asServiceRole, { ...course, ...adminUpdateData }).catch((err) => {
+            console.error('[validateQRCode][comptabiliserCommissionEnterprise admin]', err?.message);
+          });
+        }
 
         return Response.json({
           success: true,
@@ -281,6 +291,7 @@ Deno.serve(async (req) => {
       // CORRECTION PRIX MANUEL : Si la course utilise un prix manuel accepté,
       // ce montant devient le prix officiel. Ne JAMAIS recalculer.
       const isPrixManuel = course.pricing_mode === "manual" && course.manual_price_status === "accepted" && Number(course.manual_price) > 0;
+      const isPrixClient = Number(course.prix_propose_client) > 0;
 
       const latRecup = course.latitude_recuperation;
       const lngRecup = course.longitude_recuperation;
@@ -341,7 +352,28 @@ Deno.serve(async (req) => {
 
       const PRIX_MINIMUM_GLOBAL = 1000;
 
-      if (isPrixManuel) {
+      if (isPrixClient) {
+        const prixFinal = Number(course.prix_propose_client);
+        let tauxEffectif = commissionPct;
+        if (course.commission_locked_at && course.commission_taux_applique != null) {
+          tauxEffectif = Number(course.commission_taux_applique);
+        }
+        const commission = Math.round(prixFinal * (tauxEffectif / 100));
+        const montantLivreur = prixFinal - commission;
+
+        updateData.prix_final = prixFinal;
+        updateData.commission_silga = commission;
+        updateData.montant_livreur = montantLivreur;
+
+        if (distTarifaire != null) {
+          updateData.distance_reelle_km = Math.max(Number(distTarifaire) || 0, 0.01);
+        } else if (distReelle != null) {
+          updateData.distance_reelle_km = Math.max(Number(distReelle) || 0, 0.01);
+        }
+
+        updateData.latitude_arrivee_livraison = gpsLat || null;
+        updateData.longitude_arrivee_livraison = gpsLng || null;
+      } else if (isPrixManuel) {
         // ── MODE PRIX MANUEL : utiliser le prix accepté par le client ──
         const prixFinal = Number(course.manual_price);
         const commission = Math.round(prixFinal * (commissionPct / 100));
@@ -396,7 +428,17 @@ Deno.serve(async (req) => {
         }
       }
 
+      if (normalizeEnterpriseId(course.enterprise_id)) {
+        updateData.commission_silga = 0;
+        updateData.montant_livreur = updateData.prix_final;
+      }
+
       await base44.asServiceRole.entities.CourseExterne.update(course_id, updateData);
+      if (normalizeEnterpriseId(course.enterprise_id)) {
+        await comptabiliserCommissionEnterprise(base44.asServiceRole, { ...course, ...updateData }).catch((err) => {
+          console.error('[validateQRCode][comptabiliserCommissionEnterprise]', err?.message);
+        });
+      }
 
       // Mettre à jour le livreur : courses_du_jour + statut
       // ⚠️ montant_du_silga est géré par verifierEncoursLivreur (source unique, idempotente)

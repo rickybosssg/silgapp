@@ -38,6 +38,7 @@ import { notifierLivreursUnifie } from './dispatchPushUnifie.ts';
 import { chargerConfigDispatch } from './dispatchConfig.ts';
 import { ensureCourseCodeMessage, buildCodeMessageContent } from './courseCodeMessage.ts';
 import { figerCommissionAcceptation } from './commissionAvantage.ts';
+import { normalizeEnterpriseId, checkEnterpriseActive } from './enterpriseFinance.ts';
 
 // ── Version du bundle (pour vérifier que la production charge la dernière version) ──
 export const DISPATCH_V2_BUNDLE_VERSION = '2026-09-25-fix-commission-lock-happy-hour';
@@ -98,7 +99,10 @@ async function notifierLivreursEligiblesV2(base44: any, course: any, options: an
   }
 
   const exclus = new Set([...(dejaNotifies || []), ...(refuses || [])]);
-  let candidats = (livreurs || []).filter((livreur: any) => livreur.user_email && !exclus.has(livreur.id));
+  const courseEnterpriseId = normalizeEnterpriseId(course.enterprise_id);
+  let candidats = (livreurs || [])
+    .filter((livreur: any) => normalizeEnterpriseId(livreur.enterprise_id) === courseEnterpriseId)
+    .filter((livreur: any) => livreur.user_email && !exclus.has(livreur.id));
 
   // 🚫 Exclure les livreurs déjà en course (même définition que aCourseActive)
   const livreursEnCourse = await getLivreursEnCourse(base44, course.country_code);
@@ -177,6 +181,17 @@ export async function publierCourseDansFil(base44: any, course: any) {
 
   // 🔖 Log de version bundle — pour vérifier que la production charge la dernière version
   dispatchLog(`[V2] 🔖 publierCourseDansFil — bundle version: ${DISPATCH_V2_BUNDLE_VERSION} — course ${course.id}`);
+
+  const courseEnterpriseId = normalizeEnterpriseId(course.enterprise_id);
+  const enterpriseGuard = await checkEnterpriseActive(base44.asServiceRole, courseEnterpriseId);
+  if (!enterpriseGuard.active) {
+    return {
+      success: false,
+      blocked: true,
+      reason: enterpriseGuard.suspended ? 'enterprise_suspended' : 'enterprise_not_found',
+      error: 'Cette entreprise ne peut pas recevoir de nouvelles courses actuellement.',
+    };
+  }
 
   // 🛡️ GARDE IDEMPOTENTE ATOMIQUE ANTI-CASCADE
   // Utilise updateMany conditionnel : ne met à jour QUE si dispatch_status n'est pas
@@ -307,6 +322,21 @@ export async function accepterCourseV2(base44: any, courseId: string, livreurId:
   const livreurCountry = (livreur.country_code || '').trim().toUpperCase();
   if (!courseCountry || !livreurCountry || courseCountry !== livreurCountry) {
     return { success: false, error: 'country_mismatch' };
+  }
+
+  const courseEnterpriseId = normalizeEnterpriseId(course.enterprise_id);
+  const livreurEnterpriseId = normalizeEnterpriseId(livreur.enterprise_id);
+  if (courseEnterpriseId !== livreurEnterpriseId) {
+    return { success: false, accepted: false, reason: 'enterprise_mismatch', error: 'Cette course appartient à un autre périmètre.' };
+  }
+  const enterpriseGuard = await checkEnterpriseActive(base44.asServiceRole, courseEnterpriseId);
+  if (!enterpriseGuard.active) {
+    return {
+      success: false,
+      accepted: false,
+      reason: enterpriseGuard.suspended ? 'enterprise_suspended' : 'enterprise_not_found',
+      error: 'Cette entreprise est temporairement suspendue.',
+    };
   }
 
   // 4. Check bloque_encours
@@ -533,6 +563,7 @@ export async function secoursDispatchV2(base44: any, course: any, nbLivreurs: nu
   if (!course?.id || !course.country_code) return { pushed: 0 };
 
   // 1. Get eligible livreurs
+  const courseEnterpriseId = normalizeEnterpriseId(course.enterprise_id);
   const livreurs = await base44.asServiceRole.entities.Livreur.filter({
     type_livreur: 'externe',
     validation: 'valide',
@@ -544,6 +575,9 @@ export async function secoursDispatchV2(base44: any, course: any, nbLivreurs: nu
   }, '-last_seen_at', 50);
 
   if (!livreurs || livreurs.length === 0) return { pushed: 0 };
+  const livreursMemePerimetre = (livreurs || []).filter((l: any) =>
+    normalizeEnterpriseId(l.enterprise_id) === courseEnterpriseId
+  );
 
   // 2. Exclude livreurs in course (fresh check)
   const coursesActives = await base44.asServiceRole.entities.CourseExterne.filter(
@@ -564,7 +598,7 @@ export async function secoursDispatchV2(base44: any, course: any, nbLivreurs: nu
   }
 
   // 4. Score + sort + slice top N
-  const candidats = livreurs
+  const candidats = livreursMemePerimetre
     .filter((l: any) => !livreursEnCourse.has(l.id) && !refused.includes(l.id) && !dejaNotifies.includes(l.id))
     .map((l: any) => ({ ...l, score: calculerScore(l, course) }))
     .sort((a: any, b: any) => b.score - a.score)

@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
 import { chargerConfigPays, normalizeCommissionPct } from '../../shared/dispatchConstants.ts';
+import { comptabiliserCommissionEnterprise } from '../../shared/enterpriseFinance.ts';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // FINALISER LIVRAISON LIVREUR — Source de vérité pour la livraison
@@ -167,6 +168,14 @@ export default async function(req: Request): Promise<Response> {
       } catch (encoursErr: any) {
         console.error('[finaliserLivraisonLivreur] verifierEncoursLivreur error:', encoursErr?.message);
       }
+      try {
+        const entCourse = await base44.asServiceRole.entities.CourseExterne.get(course_id);
+        if (entCourse?.enterprise_id) {
+          await comptabiliserCommissionEnterprise(base44.asServiceRole, entCourse);
+        }
+      } catch (entErr: any) {
+        console.error('[finaliserLivraisonLivreur] enterprise accounting error:', entErr?.message);
+      }
 
       return Response.json({
         success: true,
@@ -224,7 +233,7 @@ export default async function(req: Request): Promise<Response> {
 
     try {
       const res = await base44.asServiceRole.functions.invoke('calculPrixCourseExterne', { course_id });
-      if (res?.success) {
+        if (res?.success) {
         // ── Garde livreur_financier_id : calculPrixCourseExterne ne le set pas.
         //    Le fixer une seule fois ici, après délégation. Idempotent. ──
         if (!course.livreur_financier_id && course.livreur_id) {
@@ -234,10 +243,18 @@ export default async function(req: Request): Promise<Response> {
         }
 
         // Multi-colis: mettre à jour les colis individuels
-        if (is_multi_colis && colis_data) {
-          await handleMultiColis(base44, course_id, colis_data, now);
-        }
-        return Response.json({
+          if (is_multi_colis && colis_data) {
+            await handleMultiColis(base44, course_id, colis_data, now);
+          }
+          try {
+            const entCourse = await base44.asServiceRole.entities.CourseExterne.get(course_id);
+            if (entCourse?.enterprise_id) {
+              await comptabiliserCommissionEnterprise(base44.asServiceRole, entCourse);
+            }
+          } catch (entErr: any) {
+            console.error('[finaliserLivraisonLivreur] enterprise accounting error (standard):', entErr?.message);
+          }
+          return Response.json({
           success: true,
           course: res.course,
           delegated: 'calculPrixCourseExterne',

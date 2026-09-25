@@ -56,6 +56,26 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ── SILGAPP ENTREPRISE ────────────────────────────────────────────────
+    // Une course Enterprise ne doit jamais incrémenter le montant_du_silga
+    // public du livreur. La dette Enterprise est comptabilisée séparément dans
+    // EnterpriseLedger. On marque toutefois la course comme traitée côté public
+    // avec un montant 0 afin d'empêcher toute recomptabilisation ultérieure.
+    if (course.enterprise_id) {
+      const nowEnterprise = new Date().toISOString();
+      const claimEnterprise = await base44.asServiceRole.entities.CourseExterne.updateMany(
+        { id: courseId, encours_comptabilise_at: null },
+        { $set: { encours_comptabilise_at: nowEnterprise, encours_comptabilise_montant: 0 } }
+      );
+      return Response.json({
+        success: true,
+        skipped: true,
+        reason: claimEnterprise?.updated === 1 ? 'enterprise_course_public_encours_zero' : 'course_deja_comptabilisee_cas',
+        encours_comptabilise_at: nowEnterprise,
+        encours_comptabilise_montant: 0,
+      });
+    }
+
     // Vérifier qu'un livreur est assigné
     if (!course.livreur_id) {
       return Response.json({ success: true, skipped: true, reason: 'pas_de_livreur' });

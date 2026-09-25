@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
 import { ensureCourseCodeMessage } from '../../shared/courseCodeMessage.ts';
+import { normalizeEnterpriseId, isEnterpriseAdmin } from '../../shared/enterpriseFinance.ts';
 
 /**
  * Création sécurisée d'une course administrative.
@@ -43,6 +44,23 @@ export default async function(req) {
           code: 'CLIENT_PHONE_REQUIRED'
         }, { status: 400 });
       }
+    }
+
+    const enterpriseAdmin = isEnterpriseAdmin(user);
+    if (enterpriseAdmin) {
+      courseData.enterprise_id = normalizeEnterpriseId(user.enterprise_id);
+      const entList = await base44.asServiceRole.entities.Enterprise.filter({
+        enterprise_financier_id: courseData.enterprise_id,
+      }).catch(() => []);
+      const ent = entList?.[0];
+      if (ent && (ent.actif === false || ent.statut !== 'actif')) {
+        return Response.json({
+          error: 'Votre entreprise est temporairement suspendue. Veuillez contacter SILGAPP.',
+          code: 'ENTERPRISE_SUSPENDED',
+        }, { status: 403 });
+      }
+    } else {
+      courseData.enterprise_id = null;
     }
 
     const course = await base44.entities.CourseExterne.create(courseData);

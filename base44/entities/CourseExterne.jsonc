@@ -6,6 +6,32 @@
       "type": "string",
       "description": "Code pays ISO 2 lettres (ex: BF, CI, TG). Dynamique : aucun pays cod\u00e9 en dur."
     },
+    "enterprise_id": {
+      "type": "string",
+      "description": "ID financier IMMUABLE de l'entreprise propri\u00e9taire de cette course. Null = course du r\u00e9seau public SILGAPP. R\u00e9solu c\u00f4t\u00e9 backend uniquement."
+    },
+    "enterprise_commission_rate_locked": {
+      "type": "number",
+      "description": "Taux de commission SILGAPP entreprise verrouill\u00e9 au moment de l'acceptation."
+    },
+    "enterprise_commission_locked_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date/heure de verrouillage du taux entreprise."
+    },
+    "enterprise_commission_amount": {
+      "type": "number",
+      "description": "Montant de la commission SILGAPP entreprise calcul\u00e9 \u00e0 la livraison."
+    },
+    "enterprise_encours_comptabilise_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date \u00e0 laquelle la commission entreprise a \u00e9t\u00e9 comptabilis\u00e9e dans le EnterpriseLedger."
+    },
+    "enterprise_encours_comptabilise_montant": {
+      "type": "number",
+      "description": "Montant de la commission entreprise comptabilis\u00e9e dans le EnterpriseLedger."
+    },
     "source": {
       "type": "string",
       "enum": [
@@ -225,7 +251,7 @@
         "programmee",
         "recherche_livreur",
         "livreur_en_route",
-        "client_contacto",
+        "client_contacte",
         "en_route_expediteur",
         "arrive_prise_en_charge",
         "colis_recupere",
@@ -237,7 +263,7 @@
         "annulee"
       ],
       "default": "nouvelle",
-      "description": "Statut de la course. en_attente = course suspendue (dispatch NON declenche) \u2014 l'admin doit la repasser en 'nouvelle' pour lancer le dispatch. client_contacto et en_route_expediteur sont specifiques au workflow des courses administratives (source=admin, colis) : etapes intermediaires entre l'acceptation et le depart vers l'expediteur."
+      "description": "Statut de la course. en_attente = course suspendue (dispatch NON declenche) \u2014 l'admin doit la repasser en 'nouvelle' pour lancer le dispatch. client_contacte et en_route_expediteur sont specifiques au workflow des courses administratives (source=admin, colis) : etapes intermediaires entre l'acceptation et le depart vers l'expediteur."
     },
     "dispatch_status": {
       "type": "string",
@@ -275,6 +301,11 @@
       "type": "string",
       "format": "date-time",
       "description": "Date a laquelle la course a ete couverte par un push general recent du meme pays (cooldown), SANS avoir declenche d'envoi propre. Permet de distinguer les courses ayant benefici d'un rappel de celles ayant participe a un envoi."
+    },
+    "push_rappel_t20_envoye": {
+      "type": "boolean",
+      "default": false,
+      "description": "True si le rappel push tardif T+20 min a ete envoye pour cette course."
     },
     "dispatch_wave_started_at": {
       "type": "string",
@@ -493,8 +524,10 @@
       "enum": [
         "qr",
         "manual_code",
-        "admin"
-      ]
+        "admin",
+        "auto_timeout"
+      ],
+      "description": "M\u00e9thode de confirmation de livraison. auto_timeout = cl\u00f4ture automatique par le syst\u00e8me apr\u00e8s timeout."
     },
     "pickup_confirmed_at": {
       "type": "string",
@@ -643,6 +676,28 @@
     "prix_confirme_par_admin_id": {
       "type": "string",
       "description": "Email de l'admin ayant confirme le prix."
+    },
+    "auto_completed": {
+      "type": "boolean",
+      "default": false,
+      "description": "True si la course a \u00e9t\u00e9 cl\u00f4tur\u00e9e automatiquement par le syst\u00e8me."
+    },
+    "auto_completed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date/heure de la cl\u00f4ture automatique."
+    },
+    "auto_completed_reason": {
+      "type": "string",
+      "enum": [
+        "accepted_timeout",
+        "admin_manual"
+      ],
+      "description": "Raison de la cl\u00f4ture automatique."
+    },
+    "auto_completed_delay_minutes": {
+      "type": "number",
+      "description": "D\u00e9lai appliqu\u00e9 en minutes au moment de la cl\u00f4ture automatique."
     }
   },
   "required": [
