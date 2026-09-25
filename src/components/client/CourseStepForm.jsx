@@ -7,7 +7,7 @@ import {
   ArrowLeft, ArrowRight, MapPin, Navigation, Package,
   User, FileText, CheckCircle, Truck, AlertCircle,
   Loader2, Search, Send, Inbox, Sparkles, Car, DollarSign,
-  Pencil, ChevronDown, ChevronUp, Info
+  Pencil, ChevronDown, ChevronUp, Info, Flame
 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
@@ -205,6 +205,7 @@ export default function CourseStepForm({
   onColisChange,
   savedLat,
   savedLng,
+  forteDemande = false,
 }) {
   const activeCountry = countryCode || "";
   const phonePlaceholder = activeCountry ? getPhonePlaceholder(activeCountry) : "";
@@ -1205,6 +1206,17 @@ export default function CourseStepForm({
         {/* Prix proposé — sauf multi-colis */}
         {!isMulti && (
           <>
+            {forteDemande && (
+              <div className="rounded-xl border border-red-300 bg-red-50 p-3 flex items-start gap-2">
+                <Flame className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs font-bold text-red-700">🔥 Forte demande actuellement</p>
+                  <p className="text-xs text-red-600 mt-0.5 leading-relaxed">
+                    Une offre attractive peut augmenter vos chances de trouver rapidement un livreur.
+                  </p>
+                </div>
+              </div>
+            )}
             <div className="space-y-2">
               <Label className="text-sm font-semibold" style={{ color: COLORS.textLabel }}>
                 Prix proposé <span className="text-red-500">*</span>

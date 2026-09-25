@@ -1018,6 +1018,7 @@ export default function CourseExterneFormSync() {
               onColisChange={handleColisChange}
               savedLat={savedLat}
               savedLng={savedLng}
+              forteDemande={forteDemande}
             />
           </form>
         </Card>

@@ -6,6 +6,7 @@ import { Link } from "react-router-dom";
 import { ArrowLeft, Globe, Plus, Save, ToggleLeft, ToggleRight, Loader2, MapPin, Percent, DollarSign, Edit3, Store, Utensils, Pill } from "lucide-react";
 import { toast } from "sonner";
 import { invalidateCountryCache } from "@/lib/countryService";
+import ForteDemandeAdminPanel from "@/components/admin/ForteDemandeAdminPanel";
 
 export default function GestionPays() {
   const queryClient = useQueryClient();
@@ -460,6 +461,9 @@ export default function GestionPays() {
                       </div>
                     )}
                   </div>
+
+                  {/* ── FORTE DEMANDE CLIENTS ── */}
+                  <ForteDemandeAdminPanel country={p} />
                 </div>
               )}
             </div>
