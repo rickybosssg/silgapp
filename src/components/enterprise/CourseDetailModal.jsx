@@ -1,7 +1,8 @@
-import React from "react";
+import React, { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Phone, MapPin, User, Truck, Calendar, Wallet, Navigation } from "lucide-react";
+import { Phone, MapPin, User, Truck, Calendar, Wallet, Navigation, MessageSquare } from "lucide-react";
 import { STATUS_LABELS, PROGRESSION_STEPS, getProgressionStep } from "./courseStatus.js";
+import EnterpriseCourseMessages from "./EnterpriseCourseMessages.jsx";
 
 const DISPATCH_LABELS = {
   en_attente: "En attente",
@@ -14,6 +15,7 @@ const DISPATCH_LABELS = {
 };
 
 export default function CourseDetailModal({ course, open, onClose }) {
+  const [showMessages, setShowMessages] = useState(false);
   if (!course) return null;
 
   const currentStep = getProgressionStep(course);
@@ -157,8 +159,25 @@ export default function CourseDetailModal({ course, open, onClose }) {
               <p className="text-xs text-gray-600">{course.notes}</p>
             </div>
           )}
+
+          {/* Messagerie — supervision lecture seule */}
+          <div className="border-t pt-3">
+            <button
+              onClick={() => setShowMessages(true)}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-blue-50 text-blue-600 text-sm font-semibold hover:bg-blue-100 transition"
+            >
+              <MessageSquare className="w-4 h-4" />
+              Messagerie
+            </button>
+          </div>
         </div>
       </DialogContent>
+
+      <EnterpriseCourseMessages
+        courseId={course.id}
+        open={showMessages}
+        onClose={() => setShowMessages(false)}
+      />
     </Dialog>
   );
 }
