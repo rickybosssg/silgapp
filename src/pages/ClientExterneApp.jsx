@@ -43,6 +43,17 @@ import MultiCourseSelector from "@/components/client/MultiCourseSelector";
 import QuickOrderPanel from "@/components/client/QuickOrderPanel";
 import QuickOrderProPanel from "@/components/client/QuickOrderProPanel";
 import { haversineKm as haversineDistance } from "@/lib/priceEstimate";
+import { STATUTS_ACTIFS_COURSE, COURSE_STATUSES } from "@/lib/courseStatuses";
+
+// ── Statuts réellement suivables par le client (liste positive) ──
+// Inclut la phase de recherche (nouvelle, recherche_livreur) + tous les statuts
+// actifs (livreur engagé). Exclut en_attente (suspendue), programmee (non démarrée),
+// livree et annulee (terminaux).
+const STATUTS_SUIVABLES_CLIENT = [
+  COURSE_STATUSES.NOUVELLE,
+  COURSE_STATUSES.RECHERCHE_LIVREUR,
+  ...STATUTS_ACTIFS_COURSE,
+];
 
 function GPSBadge({ profil, onForceSync }) {
   const hasCoords = !!(profil?.latitude && profil?.longitude);
@@ -760,14 +771,14 @@ export default function ClientExterneApp() {
 
       // 1. Courses créées par l'utilisateur
       const coursesClient = await base44.entities.CourseExterne.filter({ created_by_id: currentUserId }, "-created_date", 20);
-      const actives = (coursesClient || []).filter(c => !["livree", "annulee"].includes(c.statut));
+      const actives = (coursesClient || []).filter(c => STATUTS_SUIVABLES_CLIENT.includes(c.statut));
 
       // 2. Courses où l'utilisateur est destinataire
       let activesDestinataire = [];
       if (profil?.id) {
         const coursesDestinataire = await base44.entities.CourseExterne.filter({ destinataire_client_id: profil.id }, "-created_date", 20);
         activesDestinataire = (coursesDestinataire || []).filter(c =>
-          !["livree", "annulee"].includes(c.statut) &&
+          STATUTS_SUIVABLES_CLIENT.includes(c.statut) &&
           c.created_by_id !== currentUserId
         );
       }
@@ -777,7 +788,7 @@ export default function ClientExterneApp() {
       if (profil?.id) {
         const coursesExpediteur = await base44.entities.CourseExterne.filter({ expediteur_client_id: profil.id }, "-created_date", 20);
         activesExpediteur = (coursesExpediteur || []).filter(c =>
-          !["livree", "annulee"].includes(c.statut) &&
+          STATUTS_SUIVABLES_CLIENT.includes(c.statut) &&
           c.created_by_id !== currentUserId && // ne pas dupliquer
           c.type_course === "recevoir" // seulement mode recevoir
         );
@@ -790,7 +801,7 @@ export default function ClientExterneApp() {
 
       // ── Enrichir avec GPS temps réel du livreur (_livreur) ──
       // Évite le polling Livreur.get() redondant dans SuiviCourseFullscreen
-      const livreurIds = [...new Set(toutes.filter(c => c.livreur_id && !["livree", "annulee"].includes(c.statut)).map(c => c.livreur_id))];
+      const livreurIds = [...new Set(toutes.filter(c => c.livreur_id).map(c => c.livreur_id))];
       let coursesEnrichies = toutes;
       if (livreurIds.length > 0) {
         const livreursData = await Promise.all(
