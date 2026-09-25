@@ -137,10 +137,13 @@ export async function calculerSoldeLivreur(base44: any, livreurId: string): Prom
     if (!seenIds.has(c.id)) { seenIds.add(c.id); allCourses.push(c); }
   }
 
-  // Filtrer par base comptable
+  // Filtrer par base comptable + EXCLURE les courses Enterprise
+  // RÈGLE : Les courses Enterprise (enterprise_id non null) ont leur commission
+  // comptabilisée dans le EnterpriseLedger, payée par l'entreprise — JAMAIS par le livreur.
+  // Les courses publiques (enterprise_id null/undefined) restent inchangées.
   const coursesForCalc = allCourses.filter((c: any) => {
     const d = c.heure_livraison || c.colis_livre_at || c.created_date;
-    return d && new Date(d) >= new Date(baseDate);
+    return d && new Date(d) >= new Date(baseDate) && !c.enterprise_id;
   });
 
   // 2. Paiements traités
@@ -248,6 +251,8 @@ export async function calculerSoldesLivreursBatch(
   const eventsByDriver: Record<string, { type: 'commission' | 'payment'; date: string; amount: number; encours_comptabilise_at?: string | null }[]> = {};
 
   (allCourses || []).forEach((c: any) => {
+    // ── EXCLURE les courses Enterprise — commission payée par l'entreprise, pas le livreur ──
+    if (c.enterprise_id) return;
     const fid = getLivreurFinancierId(c);
     if (!fid) return;
     const base = livreursAvecBase[fid];

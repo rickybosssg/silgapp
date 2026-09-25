@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 import { haversineKm } from '../../shared/geoUtils.ts';
+import { comptabiliserCommissionEnterprise, normalizeEnterpriseId } from '../../shared/enterpriseFinance.ts';
 
 function normalizeCommissionPct(value) {
   const pct = Number(value);
@@ -257,6 +258,15 @@ Deno.serve(async (req) => {
 
         await base44.asServiceRole.entities.CourseExterne.update(course_id, adminUpdateData);
 
+        // ── Comptabiliser la commission Enterprise (uniquement pour les courses entreprise) ──
+        // Le chemin public (enterprise_id null) n'est JAMAIS affecté par cette logique.
+        if (normalizeEnterpriseId(course.enterprise_id)) {
+          const entCourse = { ...course, ...adminUpdateData };
+          await comptabiliserCommissionEnterprise(base44.asServiceRole, entCourse).catch((err) => {
+            console.error('[validateQRCode][comptabiliserCommissionEnterprise admin]', err?.message);
+          });
+        }
+
         return Response.json({
           success: true,
           message: 'Livraison confirmée',
@@ -439,6 +449,15 @@ Deno.serve(async (req) => {
       }
 
       await base44.asServiceRole.entities.CourseExterne.update(course_id, updateData);
+
+      // ── Comptabiliser la commission Enterprise (uniquement pour les courses entreprise) ──
+      // Le chemin public (enterprise_id null) n'est JAMAIS affecté par cette logique.
+      if (normalizeEnterpriseId(course.enterprise_id)) {
+        const entCourse = { ...course, ...updateData };
+        await comptabiliserCommissionEnterprise(base44.asServiceRole, entCourse).catch((err) => {
+          console.error('[validateQRCode][comptabiliserCommissionEnterprise]', err?.message);
+        });
+      }
 
       // Mettre à jour le livreur : courses_du_jour + statut
       // ⚠️ montant_du_silga est géré par verifierEncoursLivreur (source unique, idempotente)
