@@ -102,11 +102,14 @@ Deno.serve(async (req) => {
     }
 
     // ── Garde-fou Client : prix_propose_client est la source de vérité si défini ──
-    // Le prix Client/Admin retenu reste intact ; seule la commission et le
-    // montant livreur sont calculés dessus.
+    // Le prix proposé par le client (ou VENUS agissant pour un client) est la
+    // référence commerciale de la course. Il NE DOIT JAMAIS être écrasé par un
+    // recalcul distance × tarif à la finalisation, quel que soit le pricing_mode.
+    // Les courses admin (source=admin / pricing_mode=admin_manuel) sont déjà
+    // traitées par le bloc admin ci-dessus et n'atteignent jamais ce garde-fou.
     // ⚠️ Si la commission a été figée à l'acceptation (Pass/Happy Hour), utiliser
     // le taux figé (commission_taux_applique) au lieu du taux normal du pays.
-    if (course.pricing_mode === 'manual' && course.prix_propose_client && course.prix_propose_client > 0) {
+    if (course.prix_propose_client && course.prix_propose_client > 0) {
       const prixRetenu = course.prix_final || course.prix_propose_client;
       // Utiliser le taux figé à l'acceptation si disponible, sinon le taux normal du pays
       let tauxEffectif = commissionPct;

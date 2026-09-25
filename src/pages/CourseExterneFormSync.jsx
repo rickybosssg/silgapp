@@ -15,6 +15,7 @@ import { normalizePhone, phoneVariants } from "@/lib/phoneUtils";
 import { resolveGpsForCourse, GPS_BLOCK_MESSAGE } from "@/lib/gpsResolution";
 import { isPaysTarificationGrandOuaga, calculerTarifGrandOuagaAsync } from "@/lib/tarifGrandOuaga";
 import { useForteDemande } from "@/hooks/useForteDemande";
+import { useCountryPricing } from "@/hooks/useCountryPricing";
 
 // Génère les IDs de colis : A, B, C...
 const COLIS_LETTERS = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"];
@@ -66,6 +67,9 @@ export default function CourseExterneFormSync() {
   const [invitationModal, setInvitationModal] = useState(null); // { telephone, nom } ou null
   const [gpsLoading, setGpsLoading] = useState({ depart: false, arrivee: false });
   const { forteDemande } = useForteDemande(clientProfil?.country_code);
+  const { country: countryConfig } = useCountryPricing(clientProfil?.country_code);
+  // Source tarifaire unique : Country.prix_minimum (jamais codé en dur)
+  const prixMinimum = countryConfig?.prix_minimum || 500;
 
   // Lire brouillon (données pures, sans fonctions)
   const getDraftFromStorage = () => {
@@ -665,7 +669,7 @@ export default function CourseExterneFormSync() {
             formData.gps_depart_lat, formData.gps_depart_lng,
             formData.gps_arrivee_lat, formData.gps_arrivee_lng
           );
-          prixEstime = Math.max(Math.round(distance * 100), 1000);
+          prixEstime = Math.max(Math.round(distance * 100), prixMinimum);
           distanceTarifaireSource = "haversine_fallback";
         }
       } else {
@@ -673,8 +677,8 @@ export default function CourseExterneFormSync() {
           formData.gps_depart_lat, formData.gps_depart_lng,
           formData.gps_arrivee_lat, formData.gps_arrivee_lng
         );
-        // Règle : prix minimum SILGAPP = 1 000 F CFA
-        prixEstime = Math.max(Math.round(distance * 100), 1000);
+        // Source tarifaire unique : Country.prix_minimum (jamais codé en dur)
+        prixEstime = Math.max(Math.round(distance * 100), prixMinimum);
       }
     }
 
@@ -854,7 +858,10 @@ export default function CourseExterneFormSync() {
       prix_propose_client: isMulti ? 0 : (formData.prix_propose || prixEstime),
       distance_tarifaire_km: isMulti ? null : distanceTarifaireKm,
       distance_tarifaire_source: isMulti ? null : distanceTarifaireSource,
-      pricing_mode: isMulti ? "automatic" : (formData.prix_propose && formData.prix_propose !== prixEstime ? "manual" : "automatic"),
+      // Un prix explicitement saisi par le client est TOUJOURS 'manual',
+      // même s'il est numériquement égal à l'estimation. L'égalité ne signifie
+      // pas que le client n'a pas validé ce prix.
+      pricing_mode: isMulti ? "automatic" : (formData.prix_propose ? "manual" : "automatic"),
       statut: formData.date_souhaitee ? "programmee" : "recherche_livreur",
       dispatch_status: "en_attente",
       date_souhaitee: formData.date_souhaitee || null,
