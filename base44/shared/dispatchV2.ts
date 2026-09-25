@@ -410,6 +410,28 @@ export async function accepterCourseV2(base44: any, courseId: string, livreurId:
     ).catch((err: any) => {
       console.error('[V2] figerCommissionAcceptation error (non-blocking):', err?.message);
     });
+
+    // 10c. Vérification post-lock : le verrouillage doit être effectif.
+    //     figerCommissionAcceptation peut échouer silencieusement (retourne null
+    //     en cas d'erreur interne). Le .catch() ci-dessus ne se déclenche pas car
+    //     la promesse ne rejette jamais. On vérifie donc la DB après l'appel.
+    //     Le livreur a déjà gagné la course — on ne rejette PAS l'acceptation.
+    //     On crée une alerte critique exploitable pour intervention manuelle.
+    const coursePostLock = await base44.asServiceRole.entities.CourseExterne.get(courseId);
+    if (!coursePostLock?.commission_locked_at ||
+        coursePostLock.commission_taux_normal == null ||
+        coursePostLock.commission_taux_applique == null ||
+        !coursePostLock.commission_mode) {
+      console.error(`[V2][COMMISSION_LOCK_FAILED] Course ${courseId} acceptée par ${livreurId} (country=${courseVerifie.country_code}) mais commission non verrouillée — intervention requise`);
+      base44.asServiceRole.entities.Notification.create({
+        titre: '🚨 Commission non verrouillée à l\'acceptation',
+        message: `Course ${courseId} acceptée par livreur ${livreurId} (pays=${courseVerifie.country_code}, heure=${courseVerifie.heure_acceptation}) mais commission_locked_at est null. Intervention requise pour vérifier le taux applicable.`,
+        type: 'alerte_critique_dispatch',
+        course_id: courseId,
+        lue: false,
+        deduplication_key: `COMMISSION_LOCK_FAILED_${courseId}`,
+      }).catch(() => {});
+    }
   }
 
   // 11. V2 : Trigger WebSocket via update single (déclenche la disparition du fil)
