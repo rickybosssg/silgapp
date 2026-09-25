@@ -44,6 +44,8 @@ import QuickOrderPanel from "@/components/client/QuickOrderPanel";
 import QuickOrderProPanel from "@/components/client/QuickOrderProPanel";
 import { haversineKm as haversineDistance } from "@/lib/priceEstimate";
 import { STATUTS_ACTIFS_COURSE, COURSE_STATUSES } from "@/lib/courseStatuses";
+import { useForteDemande } from "@/hooks/useForteDemande";
+import ForteDemandeBanner from "@/components/client/ForteDemandeBanner";
 
 // ── Statuts réellement suivables par le client (liste positive) ──
 // Inclut la phase de recherche (nouvelle, recherche_livreur) + tous les statuts
@@ -111,6 +113,9 @@ export default function ClientExterneApp() {
   const [showMultiCourseSelector, setShowMultiCourseSelector] = useState(false);
   const lastRechercheCourseId = useRef(null);
   const prevHadRecherche = useRef(false);
+
+  // ── Forte Demande — comptage backend par pays, hystérésis, actualisation 30s ──
+  const { forteDemande, config: forteDemandeConfig } = useForteDemande(clientProfil?.country_code);
 
   const [userId, setUserId] = useState(null);
   const userIdRef = useRef(null);
@@ -998,7 +1003,7 @@ export default function ClientExterneApp() {
   const prenom = (clientProfil?.prenom || (clientProfil?.nom || "").split(" ")[0] || "Client").trim() || "Client";
 
   return (
-    <div className="min-h-screen bg-[#f5f5f7] text-[#1d1d1f]">
+    <div className={`min-h-screen bg-[#f5f5f7] text-[#1d1d1f] ${forteDemande ? "dashboard-theme-red" : ""}`}>
       <PullToRefreshIndicator pulling={pulling} refreshing={refreshing} />
 
       {/* ── COURSE ACTIVE UNIQUE — bannière flottante ─────── */}
@@ -1140,8 +1145,13 @@ export default function ClientExterneApp() {
               {/* ── PUBLICITÉS CARROUSEL ──────────── */}
               <PubliciteCarousel cible="clients" userId={clientProfil?.id} userType="client" />
 
+              {/* ── FORTE DEMANDE — bannière rouge si active ── */}
+              {forteDemande && forteDemandeConfig && (
+                <ForteDemandeBanner config={forteDemandeConfig} />
+              )}
+
               {/* ── HERO HEADER ───────────────────── */}
-              <div className="relative overflow-hidden rounded-3xl bg-[#0879e8] p-5 shadow-[0_18px_45px_rgba(0,122,255,0.24)] border border-white/20">
+              <div className={`relative overflow-hidden rounded-3xl p-5 border border-white/20 ${forteDemande ? "bg-[#DC2626] shadow-[0_18px_45px_rgba(220,38,38,0.24)]" : "bg-[#0879e8] shadow-[0_18px_45px_rgba(0,122,255,0.24)]"}`}>
                 <div className="absolute inset-x-0 bottom-0 h-1 bg-white/25" />
                 <div className="relative">
                   <div className="flex items-start justify-between">
@@ -1200,7 +1210,7 @@ export default function ClientExterneApp() {
               <div className="space-y-3">
                 {/* 1. COMMANDER — action principale */}
                 <button
-                  className="w-full flex items-center gap-4 rounded-2xl bg-[#007aff] p-5 shadow-[0_12px_30px_rgba(0,122,255,0.25)] active:scale-[0.98] transition-all text-left"
+                  className={`w-full flex items-center gap-4 rounded-2xl p-5 active:scale-[0.98] transition-all text-left ${forteDemande ? "bg-[#DC2626] shadow-[0_12px_30px_rgba(220,38,38,0.25)]" : "bg-[#007aff] shadow-[0_12px_30px_rgba(0,122,255,0.25)]"}`}
                   onClick={() => navigate("/client/course/expedier", { state: { position, clientProfil } })}
                 >
                   <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center flex-shrink-0">

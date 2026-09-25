@@ -190,6 +190,31 @@
       "type": "number",
       "default": 99,
       "description": "Ordre d'affichage dans les listes"
+    },
+    "forte_demande_client_actif": {
+      "type": "boolean",
+      "default": false,
+      "description": "Active le mode Forte Demande pour les clients de ce pays. Si false, le dashboard reste toujours bleu m\u00eame avec \u22655 courses actives."
+    },
+    "forte_demande_seuil_activation": {
+      "type": "number",
+      "default": 5,
+      "description": "Nombre de courses actives simultan\u00e9es \u00e0 partir duquel le dashboard client passe en rouge (Forte Demande). Valeur initiale BF: 5."
+    },
+    "forte_demande_seuil_retour": {
+      "type": "number",
+      "default": 3,
+      "description": "Nombre de courses actives en-dessous duquel le dashboard client revient au bleu. Doit \u00eatre < seuil_activation pour cr\u00e9er une hyst\u00e9r\u00e9sis anti-clignotement. Valeur initiale BF: 3."
+    },
+    "forte_demande_titre": {
+      "type": "string",
+      "default": "\ud83d\udd25 FORTE DEMANDE EN COURS",
+      "description": "Titre affich\u00e9 en haut du dashboard client en mode Forte Demande. Modifiable sans rebuild APK."
+    },
+    "forte_demande_message": {
+      "type": "string",
+      "default": "Plusieurs commandes sont en cours. Proposez un prix attractif pour augmenter vos chances de trouver rapidement un livreur.",
+      "description": "Message affich\u00e9 sous le titre Forte Demande. Modifiable sans rebuild APK."
     }
   },
   "required": [

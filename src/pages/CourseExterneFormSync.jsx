@@ -14,6 +14,7 @@ import InvitationWhatsAppModal from "@/components/client/InvitationWhatsAppModal
 import { normalizePhone, phoneVariants } from "@/lib/phoneUtils";
 import { resolveGpsForCourse, GPS_BLOCK_MESSAGE } from "@/lib/gpsResolution";
 import { isPaysTarificationGrandOuaga, calculerTarifGrandOuagaAsync } from "@/lib/tarifGrandOuaga";
+import { useForteDemande } from "@/hooks/useForteDemande";
 
 // Génère les IDs de colis : A, B, C...
 const COLIS_LETTERS = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"];
@@ -64,6 +65,7 @@ export default function CourseExterneFormSync() {
   const [isSubmitting, setIsSubmitting] = useState(false); // verrou anti-double-clic
   const [invitationModal, setInvitationModal] = useState(null); // { telephone, nom } ou null
   const [gpsLoading, setGpsLoading] = useState({ depart: false, arrivee: false });
+  const { forteDemande } = useForteDemande(clientProfil?.country_code);
 
   // Lire brouillon (données pures, sans fonctions)
   const getDraftFromStorage = () => {
