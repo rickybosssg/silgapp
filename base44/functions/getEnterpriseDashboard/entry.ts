@@ -55,6 +55,13 @@ export default async function(req: Request): Promise<Response> {
       !['livree', 'annulee'].includes(c.statut)
     );
     const coursesCompleted = (allCourses || []).filter((c: any) => c.statut === 'livree');
+    const coursesCompletedToday = (allCourses || []).filter((c: any) =>
+      c.statut === 'livree' && c.created_date && new Date(c.created_date) >= new Date(startOfDay)
+    );
+    const coursesPending = (allCourses || []).filter((c: any) =>
+      ['nouvelle', 'en_attente', 'recherche_livreur'].includes(c.statut)
+    );
+    const coursesCancelled = (allCourses || []).filter((c: any) => c.statut === 'annulee');
 
     // ── Livreurs de l'entreprise ──
     const livreurs = await base44.asServiceRole.entities.Livreur.filter(
@@ -62,9 +69,13 @@ export default async function(req: Request): Promise<Response> {
       '-created_date',
       200
     );
+    const livreursValides = (livreurs || []).filter((l: any) => l.validation === 'valide');
     const livreursDisponibles = (livreurs || []).filter((l: any) =>
       l.statut === 'disponible' && l.actif !== false
     );
+    const livreursEnCourse = (livreurs || []).filter((l: any) => l.statut === 'en_course');
+    const livreursHorsLigne = (livreurs || []).filter((l: any) => l.statut === 'hors_ligne');
+    const candidatsEnAttente = (livreurs || []).filter((l: any) => l.validation === 'en_attente');
 
     // ── Comptabilité depuis le ledger ──
     const ledger = await base44.asServiceRole.entities.EnterpriseLedger.filter(
@@ -103,15 +114,23 @@ export default async function(req: Request): Promise<Response> {
         country_code: enterprise.country_code,
         commission_silgapp_pct: enterprise.commission_silgapp_pct,
         statut: enterprise.statut,
+        actif: enterprise.actif,
         date_creation: enterprise.date_creation,
       },
       stats: {
         courses_today: coursesToday.length,
         courses_in_progress: coursesInProgress.length,
         courses_completed: coursesCompleted.length,
+        courses_completed_today: coursesCompletedToday.length,
+        courses_pending: coursesPending.length,
+        courses_cancelled: coursesCancelled.length,
         courses_this_month: coursesThisMonth.length,
         livreurs_total: (livreurs || []).length,
+        livreurs_actifs: livreursValides.length,
         livreurs_disponibles: livreursDisponibles.length,
+        livreurs_en_course: livreursEnCourse.length,
+        livreurs_hors_ligne: livreursHorsLigne.length,
+        candidats_en_attente: candidatsEnAttente.length,
         volume_courses: volumeTotal,
         total_commissions: commissionsTotal,
         total_paiements: paiementsTotal,

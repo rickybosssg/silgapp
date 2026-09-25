@@ -65,18 +65,29 @@ export default function PendingDriversTab() {
         <Card key={l.id}>
           <CardContent className="p-3">
             <div className="flex items-start justify-between gap-2">
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-gray-900">{l.prenom} {l.nom}</p>
-                <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
-                  <Phone className="w-3 h-3" /> {l.telephone}
-                </p>
-                <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
-                  <Mail className="w-3 h-3" /> {l.user_email || "—"}
-                </p>
-                <p className="text-[10px] text-gray-400 mt-1">
-                  Inscrit le {l.created_date ? new Date(l.created_date).toLocaleDateString("fr-FR") : "—"}
-                </p>
-                <p className="text-[10px] text-gray-400">{l.vehicule || "moto"} · {l.ville || l.quartier || "—"}</p>
+              <div className="flex items-start gap-2 flex-1 min-w-0">
+                <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden shrink-0">
+                  {l.photo_url ? (
+                    <img src={l.photo_url} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-sm font-bold text-gray-500">
+                      {(l.prenom?.[0] || "") + (l.nom?.[0] || "")}
+                    </span>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-900">{l.prenom} {l.nom}</p>
+                  <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
+                    <Phone className="w-3 h-3" /> {l.telephone}
+                  </p>
+                  <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
+                    <Mail className="w-3 h-3" /> {l.user_email || "—"}
+                  </p>
+                  <p className="text-[10px] text-gray-400 mt-1">
+                    Inscrit le {l.created_date ? new Date(l.created_date).toLocaleDateString("fr-FR") : "—"}
+                  </p>
+                  <p className="text-[10px] text-gray-400">{l.vehicule || l.type_vehicule || "moto"} · {l.ville || l.quartier || "—"}</p>
+                </div>
               </div>
               <div className="flex flex-col gap-1">
                 <Button

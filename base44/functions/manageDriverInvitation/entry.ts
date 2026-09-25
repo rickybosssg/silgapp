@@ -470,6 +470,69 @@ export default async function(req: Request): Promise<Response> {
         return Response.json({ success: true, enterprise: updated });
       }
 
+      // ═══════════════════════════════════════════════════════════════════
+      // 10. SUSPENDRE UN LIVREUR (Admin Entreprise)
+      // ═══════════════════════════════════════════════════════════════════
+      case 'suspend_driver': {
+        const { livreur_id, motif } = body;
+        const user = await base44.auth.me();
+        if (!user) return Response.json({ error: 'Non autorisé' }, { status: 401 });
+        if (user.silgapp_role !== 'admin_entreprise' || !user.enterprise_id) {
+          return Response.json({ error: 'Réservé aux administrateurs d\'entreprise' }, { status: 403 });
+        }
+
+        const livreur = await base44.asServiceRole.entities.Livreur.get(livreur_id).catch(() => null);
+        if (!livreur) return Response.json({ error: 'Livreur introuvable' }, { status: 404 });
+
+        const livreurEntId = normalizeEnterpriseId(livreur.enterprise_id);
+        const adminEntId = normalizeEnterpriseId(user.enterprise_id);
+        if (livreurEntId !== adminEntId) {
+          return Response.json({ error: 'Ce livreur n\'appartient pas à votre agence' }, { status: 403 });
+        }
+
+        await base44.asServiceRole.entities.Livreur.update(livreur_id, {
+          actif: false,
+          statut: 'hors_ligne',
+          admin_hors_ligne: true,
+          admin_statut_log: `Suspendu par ${user.email} le ${new Date().toISOString()} — ${motif || 'Aucun motif'}`,
+        });
+
+        return Response.json({ success: true, message: 'Livreur suspendu' });
+      }
+
+      // ═══════════════════════════════════════════════════════════════════
+      // 11. RÉACTIVER UN LIVREUR (Admin Entreprise)
+      // ═══════════════════════════════════════════════════════════════════
+      case 'reactivate_driver': {
+        const { livreur_id } = body;
+        const user = await base44.auth.me();
+        if (!user) return Response.json({ error: 'Non autorisé' }, { status: 401 });
+        if (user.silgapp_role !== 'admin_entreprise' || !user.enterprise_id) {
+          return Response.json({ error: 'Réservé aux administrateurs d\'entreprise' }, { status: 403 });
+        }
+
+        const livreur = await base44.asServiceRole.entities.Livreur.get(livreur_id).catch(() => null);
+        if (!livreur) return Response.json({ error: 'Livreur introuvable' }, { status: 404 });
+
+        const livreurEntId = normalizeEnterpriseId(livreur.enterprise_id);
+        const adminEntId = normalizeEnterpriseId(user.enterprise_id);
+        if (livreurEntId !== adminEntId) {
+          return Response.json({ error: 'Ce livreur n\'appartient pas à votre agence' }, { status: 403 });
+        }
+
+        if (livreur.validation !== 'valide') {
+          return Response.json({ error: 'Ce livreur n\'est pas validé. Validez-le d\'abord.' }, { status: 400 });
+        }
+
+        await base44.asServiceRole.entities.Livreur.update(livreur_id, {
+          actif: true,
+          admin_hors_ligne: false,
+          admin_statut_log: `Réactivé par ${user.email} le ${new Date().toISOString()}`,
+        });
+
+        return Response.json({ success: true, message: 'Livreur réactivé' });
+      }
+
       default:
         return Response.json({ error: 'Action inconnue: ' + action }, { status: 400 });
     }

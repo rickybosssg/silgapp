@@ -1,29 +1,21 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { base44 } from "@/api/base44Client";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Building2, Users, Package, TrendingUp, Wallet, LogOut, RefreshCw, Truck, MapPin, Palette, UserPlus, Clock } from "lucide-react";
+import { Building2, Users, Package, TrendingUp, Wallet, LogOut, RefreshCw, Truck, MapPin, Palette, UserPlus, Clock, Plus, Map } from "lucide-react";
 import BrandingTab from "@/components/enterprise/BrandingTab.jsx";
 import InvitationsTab from "@/components/enterprise/InvitationsTab.jsx";
 import PendingDriversTab from "@/components/enterprise/PendingDriversTab.jsx";
+import CourseCreateTab from "@/components/enterprise/CourseCreateTab.jsx";
+import CourseDetailModal from "@/components/enterprise/CourseDetailModal.jsx";
+import LivreurFicheModal from "@/components/enterprise/LivreurFicheModal.jsx";
+import CarteDispatchTab from "@/components/enterprise/CarteDispatchTab.jsx";
 
-/**
- * EntrepriseApp — Dashboard de l'Admin Entreprise.
- *
- * L'Admin Entreprise voit UNIQUEMENT les données de son entreprise.
- * L'enterprise_id est résolu côté backend depuis l'utilisateur authentifié.
- *
- * Fonctionnalités:
- *   - Vue d'ensemble (stats, courses, livreurs, comptabilité)
- *   - Courses (aujourd'hui, en cours, récentes)
- *   - Livreurs (liste, statut)
- *   - Comptabilité SILGAPP (dû, commissions, paiements, ledger)
- */
 export default function EntrepriseApp() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("overview");
+  const [selectedCourse, setSelectedCourse] = useState(null);
+  const [selectedLivreur, setSelectedLivreur] = useState(null);
 
   const loadDashboard = useCallback(async () => {
     setLoading(true);
@@ -63,7 +55,7 @@ export default function EntrepriseApp() {
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
         <div className="text-center space-y-3 max-w-sm">
           <p className="text-sm text-red-500">{error}</p>
-          <Button onClick={loadDashboard}>Réessayer</Button>
+          <button onClick={loadDashboard} className="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm">Réessayer</button>
         </div>
       </div>
     );
@@ -75,7 +67,7 @@ export default function EntrepriseApp() {
         <div className="text-center space-y-3 max-w-sm">
           <Building2 className="w-12 h-12 text-gray-400 mx-auto" />
           <p className="text-sm text-gray-500">Aucune entreprise rattachée à ce compte.</p>
-          <Button onClick={handleLogout} variant="outline">Se déconnecter</Button>
+          <button onClick={handleLogout} className="px-4 py-2 border rounded-lg text-sm">Se déconnecter</button>
         </div>
       </div>
     );
@@ -87,6 +79,8 @@ export default function EntrepriseApp() {
   const tabs = [
     { id: "overview", label: "Tableau de bord", icon: TrendingUp },
     { id: "courses", label: "Courses", icon: Package },
+    { id: "create", label: "Nouvelle course", icon: Plus },
+    { id: "carte", label: "Carte", icon: Map },
     { id: "livreurs", label: "Livreurs", icon: Truck },
     { id: "pending", label: "Candidats", icon: Clock },
     { id: "invitations", label: "Invitations", icon: UserPlus },
@@ -96,7 +90,7 @@ export default function EntrepriseApp() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* ── Header ── */}
+      {/* Header */}
       <header
         className="sticky top-0 z-40 text-white shadow-lg"
         style={{ background: `linear-gradient(135deg, ${primaryColor}, ${primaryColor}DD)` }}
@@ -121,7 +115,7 @@ export default function EntrepriseApp() {
         </div>
       </header>
 
-      {/* ── Tabs ── */}
+      {/* Tabs */}
       <nav className="sticky top-[56px] z-30 bg-white border-b shadow-sm">
         <div className="max-w-4xl mx-auto flex overflow-x-auto scrollbar-hide">
           {tabs.map((tab) => {
@@ -145,18 +139,43 @@ export default function EntrepriseApp() {
         </div>
       </nav>
 
-      {/* ── Content ── */}
+      {/* Content */}
       <main className="max-w-4xl mx-auto px-4 py-4 pb-20">
         {activeTab === "overview" && (
           <OverviewTab stats={stats} enterprise={enterprise} courses={courses} />
         )}
-        {activeTab === "courses" && <CoursesTab courses={courses} stats={stats} />}
-        {activeTab === "livreurs" && <LivreursTab livreurs={livreurs} />}
+        {activeTab === "courses" && (
+          <CoursesTab courses={courses} stats={stats} onCourseClick={setSelectedCourse} />
+        )}
+        {activeTab === "create" && <CourseCreateTab enterprise={enterprise} onCreated={loadDashboard} />}
+        {activeTab === "carte" && (
+          <CarteDispatchTab
+            enterprise={enterprise}
+            onCourseClick={setSelectedCourse}
+            onLivreurClick={setSelectedLivreur}
+          />
+        )}
+        {activeTab === "livreurs" && (
+          <LivreursTab livreurs={livreurs} onLivreurClick={setSelectedLivreur} />
+        )}
         {activeTab === "pending" && <PendingDriversTab />}
         {activeTab === "invitations" && <InvitationsTab />}
         {activeTab === "branding" && <BrandingTab enterprise={enterprise} onRefresh={loadDashboard} />}
         {activeTab === "comptabilite" && <ComptabiliteTab stats={stats} ledger={ledger} enterprise={enterprise} />}
       </main>
+
+      {/* Modals */}
+      <CourseDetailModal
+        course={selectedCourse}
+        open={!!selectedCourse}
+        onClose={() => setSelectedCourse(null)}
+      />
+      <LivreurFicheModal
+        livreur={selectedLivreur}
+        open={!!selectedLivreur}
+        onClose={() => setSelectedLivreur(null)}
+        onAction={loadDashboard}
+      />
     </div>
   );
 }
@@ -165,52 +184,68 @@ export default function EntrepriseApp() {
 function OverviewTab({ stats, enterprise, courses }) {
   const statCards = [
     { icon: Package, label: "Courses aujourd'hui", value: stats?.courses_today || 0, color: "text-blue-600", bg: "bg-blue-50" },
-    { icon: Truck, label: "En cours", value: stats?.courses_in_progress || 0, color: "text-amber-600", bg: "bg-amber-50" },
-    { icon: Users, label: "Livreurs dispos", value: stats?.livreurs_disponibles || 0, color: "text-emerald-600", bg: "bg-emerald-50" },
-    { icon: Wallet, label: "Dû SILGAPP", value: `${(stats?.montant_du_silgapp || 0).toLocaleString("fr-FR")} F`, color: "text-red-600", bg: "bg-red-50" },
+    { icon: Clock, label: "En attente", value: stats?.courses_pending || 0, color: "text-amber-600", bg: "bg-amber-50" },
+    { icon: Truck, label: "En cours", value: stats?.courses_in_progress || 0, color: "text-purple-600", bg: "bg-purple-50" },
+    { icon: Package, label: "Livrées aujourd'hui", value: stats?.courses_completed_today || 0, color: "text-emerald-600", bg: "bg-emerald-50" },
+    { icon: Users, label: "Livreurs actifs", value: stats?.livreurs_actifs || 0, color: "text-emerald-600", bg: "bg-emerald-50" },
+    { icon: Truck, label: "Disponibles", value: stats?.livreurs_disponibles || 0, color: "text-green-600", bg: "bg-green-50" },
+    { icon: Truck, label: "En course", value: stats?.livreurs_en_course || 0, color: "text-amber-600", bg: "bg-amber-50" },
+    { icon: Users, label: "Hors ligne", value: stats?.livreurs_hors_ligne || 0, color: "text-gray-600", bg: "bg-gray-50" },
   ];
+
+  const isAgenceActive = enterprise?.actif !== false && enterprise?.statut === "actif";
 
   return (
     <div className="space-y-4">
+      {/* Statut agence */}
+      <div className={`rounded-xl p-3 flex items-center gap-2 ${isAgenceActive ? "bg-emerald-50" : "bg-red-50"}`}>
+        <div className={`w-2.5 h-2.5 rounded-full ${isAgenceActive ? "bg-emerald-500" : "bg-red-500"}`} />
+        <span className="text-sm font-bold text-gray-900">{isAgenceActive ? "Agence active" : "Agence suspendue"}</span>
+      </div>
+
+      {/* Candidats */}
+      {(stats?.candidats_en_attente || 0) > 0 && (
+        <div className="rounded-xl bg-amber-50 p-3 flex items-center justify-between">
+          <span className="text-sm text-amber-700">Candidats en attente</span>
+          <span className="text-sm font-bold text-amber-700">{stats?.candidats_en_attente}</span>
+        </div>
+      )}
+
       {/* Stats grid */}
       <div className="grid grid-cols-2 gap-3">
         {statCards.map((stat, i) => {
           const Icon = stat.icon;
           return (
-            <Card key={i} className="overflow-hidden">
-              <CardContent className="p-3">
-                <div className={`w-8 h-8 rounded-lg ${stat.bg} flex items-center justify-center mb-2`}>
-                  <Icon className={`w-4 h-4 ${stat.color}`} />
-                </div>
-                <p className="text-xl font-bold text-gray-900 tabular-nums">{stat.value}</p>
-                <p className="text-[10px] text-gray-500 leading-tight">{stat.label}</p>
-              </CardContent>
-            </Card>
+            <div key={i} className="bg-white rounded-xl border p-3 shadow-sm">
+              <div className={`w-8 h-8 rounded-lg ${stat.bg} flex items-center justify-center mb-2`}>
+                <Icon className={`w-4 h-4 ${stat.color}`} />
+              </div>
+              <p className="text-xl font-bold text-gray-900 tabular-nums">{stat.value}</p>
+              <p className="text-[10px] text-gray-500 leading-tight">{stat.label}</p>
+            </div>
           );
         })}
       </div>
 
       {/* Taux et volume */}
-      <Card>
-        <CardContent className="p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-500">Taux SILGAPP</span>
-            <span className="text-sm font-bold text-gray-900">{stats?.taux_silgapp || 0}%</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-500">Volume courses (livrées)</span>
-            <span className="text-sm font-bold text-gray-900">{(stats?.volume_courses || 0).toLocaleString("fr-FR")} F</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-500">Commissions générées</span>
-            <span className="text-sm font-bold text-gray-900">{(stats?.total_commissions || 0).toLocaleString("fr-FR")} F</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-500">Total payé</span>
-            <span className="text-sm font-bold text-emerald-600">{(stats?.total_paiements || 0).toLocaleString("fr-FR")} F</span>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="bg-white rounded-xl border p-4 space-y-3 shadow-sm">
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-gray-500">Taux SILGAPP</span>
+          <span className="text-sm font-bold text-gray-900">{stats?.taux_silgapp || 0}%</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-gray-500">Volume courses (livrées)</span>
+          <span className="text-sm font-bold text-gray-900">{(stats?.volume_courses || 0).toLocaleString("fr-FR")} F</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-gray-500">Commissions générées</span>
+          <span className="text-sm font-bold text-gray-900">{(stats?.total_commissions || 0).toLocaleString("fr-FR")} F</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-gray-500">Total payé</span>
+          <span className="text-sm font-bold text-emerald-600">{(stats?.total_paiements || 0).toLocaleString("fr-FR")} F</span>
+        </div>
+      </div>
 
       {/* Courses récentes */}
       <div>
@@ -230,22 +265,40 @@ function OverviewTab({ stats, enterprise, courses }) {
 }
 
 // ── Onglet Courses ──
-function CoursesTab({ courses, stats }) {
-  const [subTab, setSubTab] = useState("recent");
+function CoursesTab({ courses, stats, onCourseClick }) {
+  const [subTab, setSubTab] = useState("all");
+
+  const allCourses = courses?.recent || [];
+  const filtered = {
+    all: allCourses,
+    nouvelles: allCourses.filter((c) => c.statut === "nouvelle"),
+    recherche: allCourses.filter((c) => ["recherche_livreur", "en_attente"].includes(c.statut)),
+    acceptees: allCourses.filter((c) => ["livreur_en_route", "client_contacte", "en_route_expediteur", "arrive_prise_en_charge"].includes(c.statut)),
+    en_cours: allCourses.filter((c) => ["pris_en_charge", "en_livraison", "colis_recupere", "passager_embarque", "arrivee"].includes(c.statut)),
+    terminees: allCourses.filter((c) => c.statut === "livree"),
+    annulees: allCourses.filter((c) => c.statut === "annulee"),
+  };
+
   const subTabs = [
-    { id: "recent", label: "Récentes", data: courses?.recent || [] },
-    { id: "today", label: "Aujourd'hui", data: courses?.today || [] },
-    { id: "in_progress", label: "En cours", data: courses?.in_progress || [] },
+    { id: "all", label: "Toutes", data: filtered.all },
+    { id: "nouvelles", label: "Nouvelles", data: filtered.nouvelles },
+    { id: "recherche", label: "En recherche", data: filtered.recherche },
+    { id: "acceptees", label: "Acceptées", data: filtered.acceptees },
+    { id: "en_cours", label: "En cours", data: filtered.en_cours },
+    { id: "terminees", label: "Terminées", data: filtered.terminees },
+    { id: "annulees", label: "Annulées", data: filtered.annulees },
   ];
+
+  const currentData = subTabs.find((t) => t.id === subTab)?.data || [];
 
   return (
     <div className="space-y-3">
-      <div className="flex gap-2">
+      <div className="flex gap-1.5 overflow-x-auto scrollbar-hide pb-1">
         {subTabs.map((t) => (
           <button
             key={t.id}
             onClick={() => setSubTab(t.id)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap ${
               subTab === t.id ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-600"
             }`}
           >
@@ -254,9 +307,9 @@ function CoursesTab({ courses, stats }) {
         ))}
       </div>
       <div className="space-y-2">
-        {subTabs.find((t) => t.id === subTab)?.data.length > 0 ? (
-          subTabs.find((t) => t.id === subTab).data.map((c) => (
-            <CourseRow key={c.id} course={c} />
+        {currentData.length > 0 ? (
+          currentData.map((c) => (
+            <CourseRow key={c.id} course={c} onClick={() => onCourseClick?.(c)} />
           ))
         ) : (
           <p className="text-sm text-gray-400 text-center py-4">Aucune course</p>
@@ -267,50 +320,56 @@ function CoursesTab({ courses, stats }) {
 }
 
 // ── Onglet Livreurs ──
-function LivreursTab({ livreurs }) {
+function LivreursTab({ livreurs, onLivreurClick }) {
   if (!livreurs || livreurs.length === 0) {
     return <p className="text-sm text-gray-400 text-center py-4">Aucun livreur</p>;
   }
   return (
     <div className="space-y-2">
       {livreurs.map((l) => (
-        <Card key={l.id}>
-          <CardContent className="p-3 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
-              {l.photo_url ? (
-                <img src={l.photo_url} alt="" className="w-full h-full object-cover" />
-              ) : (
-                <span className="text-sm font-bold text-gray-500">
-                  {(l.prenom?.[0] || "") + (l.nom?.[0] || "")}
-                </span>
-              )}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-gray-900 truncate">
-                {l.prenom} {l.nom}
-              </p>
-              <p className="text-xs text-gray-500">{l.telephone}</p>
-              {l.user_email && <p className="text-[10px] text-gray-400 truncate">{l.user_email}</p>}
-            </div>
-            <div className="flex flex-col items-end gap-1">
-              {l.validation === "en_attente" && (
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700">En attente</span>
-              )}
-              {l.validation === "valide" && (
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                  l.statut === "disponible" ? "bg-emerald-100 text-emerald-700" :
-                  l.statut === "en_course" ? "bg-amber-100 text-amber-700" :
-                  "bg-gray-100 text-gray-500"
-                }`}>
-                  {l.statut === "disponible" ? "Dispo" : l.statut === "en_course" ? "En course" : "Hors ligne"}
-                </span>
-              )}
-              {l.validation === "refuse" && (
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700">Refusé</span>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+        <button
+          key={l.id}
+          onClick={() => onLivreurClick?.(l)}
+          className="w-full text-left bg-white rounded-xl border p-3 flex items-center gap-3 shadow-sm hover:shadow-md transition"
+        >
+          <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden shrink-0">
+            {l.photo_url ? (
+              <img src={l.photo_url} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-sm font-bold text-gray-500">
+                {(l.prenom?.[0] || "") + (l.nom?.[0] || "")}
+              </span>
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-gray-900 truncate">{l.prenom} {l.nom}</p>
+            <p className="text-xs text-gray-500">{l.telephone}</p>
+            {l.user_email && <p className="text-[10px] text-gray-400 truncate">{l.user_email}</p>}
+            <p className="text-[10px] text-gray-400">{l.vehicule || l.type_vehicule || "moto"} · {l.courses_du_jour || 0} courses aujourd'hui</p>
+          </div>
+          <div className="flex flex-col items-end gap-1">
+            {l.validation === "en_attente" && (
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700">En attente</span>
+            )}
+            {l.validation === "valide" && (
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                l.actif === false ? "bg-red-100 text-red-700" :
+                l.statut === "disponible" ? "bg-emerald-100 text-emerald-700" :
+                l.statut === "en_course" ? "bg-amber-100 text-amber-700" :
+                "bg-gray-100 text-gray-500"
+              }`}>
+                {l.actif === false ? "Suspendu" :
+                 l.statut === "disponible" ? "Dispo" :
+                 l.statut === "en_course" ? "En course" :
+                 "Hors ligne"}
+              </span>
+            )}
+            {l.validation === "refuse" && (
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700">Refusé</span>
+            )}
+            <span className="text-[10px] text-blue-500">Voir fiche →</span>
+          </div>
+        </button>
       ))}
     </div>
   );
@@ -320,35 +379,33 @@ function LivreursTab({ livreurs }) {
 function ComptabiliteTab({ stats, ledger, enterprise }) {
   return (
     <div className="space-y-4">
-      <Card>
-        <CardContent className="p-4 space-y-3">
-          <h3 className="text-sm font-bold text-gray-900">Synthèse financière</h3>
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-500">Volume courses (livrées)</span>
-            <span className="text-sm font-bold text-gray-900">{(stats?.volume_courses || 0).toLocaleString("fr-FR")} F</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-500">Nombre de courses comptabilisées</span>
-            <span className="text-sm font-bold text-gray-900">{stats?.courses_completed || 0}</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-500">Taux SILGAPP actuel</span>
-            <span className="text-sm font-bold text-gray-900">{stats?.taux_silgapp || 0}%</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-500">Commissions SILGAPP générées</span>
-            <span className="text-sm font-bold text-gray-900">{(stats?.total_commissions || 0).toLocaleString("fr-FR")} F</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-500">Total payé</span>
-            <span className="text-sm font-bold text-emerald-600">{(stats?.total_paiements || 0).toLocaleString("fr-FR")} F</span>
-          </div>
-          <div className="border-t pt-3 flex items-center justify-between">
-            <span className="text-sm font-bold text-gray-900">Reste dû à SILGAPP</span>
-            <span className="text-lg font-bold text-red-600">{(stats?.montant_du_silgapp || 0).toLocaleString("fr-FR")} F</span>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="bg-white rounded-xl border p-4 space-y-3 shadow-sm">
+        <h3 className="text-sm font-bold text-gray-900">Synthèse financière</h3>
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-gray-500">Volume courses (livrées)</span>
+          <span className="text-sm font-bold text-gray-900">{(stats?.volume_courses || 0).toLocaleString("fr-FR")} F</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-gray-500">Nombre de courses livrées</span>
+          <span className="text-sm font-bold text-gray-900">{stats?.courses_completed || 0}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-gray-500">Taux SILGAPP actuel</span>
+          <span className="text-sm font-bold text-gray-900">{stats?.taux_silgapp || 0}%</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-gray-500">Commissions SILGAPP générées</span>
+          <span className="text-sm font-bold text-gray-900">{(stats?.total_commissions || 0).toLocaleString("fr-FR")} F</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-gray-500">Total payé</span>
+          <span className="text-sm font-bold text-emerald-600">{(stats?.total_paiements || 0).toLocaleString("fr-FR")} F</span>
+        </div>
+        <div className="border-t pt-3 flex items-center justify-between">
+          <span className="text-sm font-bold text-gray-900">Reste dû à SILGAPP</span>
+          <span className="text-lg font-bold text-red-600">{(stats?.montant_du_silgapp || 0).toLocaleString("fr-FR")} F</span>
+        </div>
+      </div>
 
       {/* Ledger */}
       <div>
@@ -356,72 +413,81 @@ function ComptabiliteTab({ stats, ledger, enterprise }) {
         {ledger && ledger.length > 0 ? (
           <div className="space-y-2">
             {ledger.slice(0, 20).map((entry) => (
-              <Card key={entry.id}>
-                <CardContent className="p-3">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className={`text-xs font-bold ${
-                      entry.type === "commission_course" ? "text-blue-600" :
-                      entry.type === "paiement" ? "text-emerald-600" :
-                      "text-gray-600"
-                    }`}>
-                      {entry.type === "commission_course" ? "Commission" :
-                       entry.type === "paiement" ? "Paiement" :
-                       "Ajustement"}
-                    </span>
-                    <span className="text-sm font-bold text-gray-900">
-                      {entry.montant > 0 ? "+" : ""}{entry.montant.toLocaleString("fr-FR")} F
-                    </span>
-                  </div>
-                  <p className="text-[10px] text-gray-400">
-                    {new Date(entry.created_date).toLocaleString("fr-FR")}
-                    {entry.taux ? ` · Taux: ${entry.taux}%` : ""}
-                    {entry.reference ? ` · Réf: ${entry.reference}` : ""}
-                  </p>
-                  {entry.motif && <p className="text-[10px] text-gray-500 mt-1">{entry.motif}</p>}
-                </CardContent>
-              </Card>
+              <div key={entry.id} className="bg-white rounded-xl border p-3 shadow-sm">
+                <div className="flex items-center justify-between mb-1">
+                  <span className={`text-xs font-bold ${
+                    entry.type === "commission_course" ? "text-blue-600" :
+                    entry.type === "paiement" ? "text-emerald-600" :
+                    "text-gray-600"
+                  }`}>
+                    {entry.type === "commission_course" ? "Commission" :
+                     entry.type === "paiement" ? "Paiement" :
+                     "Ajustement"}
+                  </span>
+                  <span className="text-sm font-bold text-gray-900">
+                    {entry.montant > 0 ? "+" : ""}{entry.montant.toLocaleString("fr-FR")} F
+                  </span>
+                </div>
+                <p className="text-[10px] text-gray-400">
+                  {new Date(entry.created_date).toLocaleString("fr-FR")}
+                  {entry.taux ? ` · Taux: ${entry.taux}%` : ""}
+                  {entry.reference ? ` · Réf: ${entry.reference}` : ""}
+                </p>
+                {entry.motif && <p className="text-[10px] text-gray-500 mt-1">{entry.motif}</p>}
+              </div>
             ))}
           </div>
         ) : (
           <p className="text-sm text-gray-400 text-center py-4">Aucune écriture financière</p>
         )}
       </div>
+
+      <p className="text-[10px] text-gray-400 text-center">
+        La commission SILGAPP et les paiements sont gérés par le Super Admin.
+      </p>
     </div>
   );
 }
 
 // ── Composant: ligne de course ──
-function CourseRow({ course }) {
+function CourseRow({ course, onClick }) {
   const statusColors = {
     nouvelle: "bg-blue-100 text-blue-700",
     livree: "bg-emerald-100 text-emerald-700",
     annulee: "bg-red-100 text-red-700",
     en_livraison: "bg-amber-100 text-amber-700",
     pris_en_charge: "bg-purple-100 text-purple-700",
+    recherche_livreur: "bg-orange-100 text-orange-700",
   };
 
   return (
-    <Card>
-      <CardContent className="p-3">
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-sm font-semibold text-gray-900 truncate flex-1">
-            {course.adresse_depart || "—"} → {course.adresse_arrivee || "—"}
-          </span>
-          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ml-2 ${
-            statusColors[course.statut] || "bg-gray-100 text-gray-500"
-          }`}>
-            {course.statut}
-          </span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-gray-500">
-            {course.client_nom || "Client"} · {new Date(course.created_date).toLocaleDateString("fr-FR")}
-          </span>
-          {course.prix_final > 0 && (
-            <span className="text-xs font-bold text-gray-900">{course.prix_final.toLocaleString("fr-FR")} F</span>
+    <button
+      onClick={onClick}
+      className="w-full text-left bg-white rounded-xl border p-3 shadow-sm hover:shadow-md transition"
+    >
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-sm font-semibold text-gray-900 truncate flex-1">
+          {course.adresse_depart || "—"} → {course.adresse_arrivee || "—"}
+        </span>
+        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ml-2 ${
+          statusColors[course.statut] || "bg-gray-100 text-gray-500"
+        }`}>
+          {course.statut}
+        </span>
+      </div>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-500">{course.client_nom || "Client"}</span>
+          {course.livreur_nom ? (
+            <span className="text-xs text-blue-600">· {course.livreur_nom}</span>
+          ) : (
+            <span className="text-xs text-amber-600 italic">· En attente d'un livreur</span>
           )}
         </div>
-      </CardContent>
-    </Card>
+        {course.prix_final > 0 && (
+          <span className="text-xs font-bold text-gray-900">{course.prix_final.toLocaleString("fr-FR")} F</span>
+        )}
+      </div>
+    </button>
   );
 }

@@ -2,7 +2,8 @@ import React, { useState, useCallback, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { UserPlus, QrCode, Copy, Ban, RefreshCw, Clock, CheckCircle, XCircle } from "lucide-react";
+import { UserPlus, Copy, Ban, RefreshCw, Clock, CheckCircle, XCircle } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 
 export default function InvitationsTab() {
   const [invitations, setInvitations] = useState([]);
@@ -67,16 +68,19 @@ export default function InvitationsTab() {
       {newInvitation?.url && (
         <Card className="border-blue-200 bg-blue-50">
           <CardContent className="p-4 space-y-3">
+            <div className="text-center">
+              <p className="text-sm font-bold text-gray-900 mb-2">Scanner pour rejoindre l'agence</p>
+              <div className="bg-white rounded-xl p-4 inline-block shadow-sm">
+                <QRCodeSVG value={newInvitation.url} size={180} level="M" />
+              </div>
+              <p className="text-[10px] text-gray-400 mt-2">Ce QR contient uniquement le lien d'inscription. Aucune donnée privilégiée.</p>
+            </div>
             <div>
-              <p className="text-sm font-bold text-gray-900">Lien d'inscription</p>
-              <p className="text-xs text-gray-500 break-all bg-white rounded-lg p-2 mt-1 border">{newInvitation.url}</p>
+              <p className="text-xs text-gray-500 break-all bg-white rounded-lg p-2 border">{newInvitation.url}</p>
             </div>
             <div className="flex gap-2">
               <Button size="sm" variant="outline" className="flex-1" onClick={() => copyUrl(newInvitation.url)}>
-                <Copy className="w-4 h-4" /> Copier
-              </Button>
-              <Button size="sm" variant="outline" className="flex-1" onClick={() => window.open(newInvitation.url, "_blank")}>
-                <QrCode className="w-4 h-4" /> Ouvrir
+                <Copy className="w-4 h-4" /> Copier le lien
               </Button>
             </div>
             <p className="text-[10px] text-gray-400">Ce lien expire dans 7 jours. Partagez-le au candidat ou affichez le QR code.</p>
@@ -96,7 +100,10 @@ export default function InvitationsTab() {
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-mono text-gray-500 truncate">{inv.token?.slice(0, 16)}...</p>
                   <p className="text-[10px] text-gray-400 mt-0.5">
-                    {new Date(inv.created_at).toLocaleDateString("fr-FR")}
+                    Créée le {inv.created_at ? new Date(inv.created_at).toLocaleDateString("fr-FR") : "—"}
+                  </p>
+                  <p className="text-[10px] text-gray-400">
+                    Expire le {inv.expires_at ? new Date(inv.expires_at).toLocaleDateString("fr-FR") : "—"}
                   </p>
                   {inv.used_by_user_email && (
                     <p className="text-xs text-emerald-600 mt-1">✓ {inv.used_by_user_email}</p>
