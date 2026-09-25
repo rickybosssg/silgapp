@@ -10,6 +10,7 @@ import { accepterCourseV2, publierCourseDansFil, isV2Enabled, secoursDispatchV2,
 import { resolveCourseParticipantUserIds } from '../../shared/conversationSecurity.ts';
 import { ensureCourseCodeMessage } from '../../shared/courseCodeMessage.ts';
 import { figerCommissionAcceptation } from '../../shared/commissionAvantage.ts';
+import { normalizeEnterpriseId } from '../../shared/enterpriseFinance.ts';
 
 // 🔖 Redéploiement forcé — 2026-08-14-simplified-3 — rappel T+5min re-notifie les mêmes livreurs libres
 console.log(`[DISPATCH_EXTERNE_AUTO] 🔖 dispatchV2 bundle version: ${DISPATCH_V2_BUNDLE_VERSION}`);
@@ -335,6 +336,12 @@ Deno.serve(async (req) => {
 
       // 🔥 Course en disponible_push → visible par tous les livreurs éligibles (Push-to-Bid)
       if (course.dispatch_status === 'disponible_push') {
+        // [ENTERPRISE] Vérification backend : course.enterprise_id === livreur.enterprise_id
+        const courseEntId = normalizeEnterpriseId(course.enterprise_id);
+        const livreurEntId = normalizeEnterpriseId(countryGuard.livreur?.enterprise_id);
+        if (courseEntId !== livreurEntId) {
+          return Response.json({ found: false, enterprise_mismatch: true, error: 'Cette course appartient à un autre périmètre.' });
+        }
         const expired = !!(course.timeout_expires_at && new Date(course.timeout_expires_at) < new Date());
         return Response.json({ found: true, course, expired, disponible_push: true, timeout_expires_at: course.timeout_expires_at });
       }
@@ -357,6 +364,13 @@ Deno.serve(async (req) => {
       const countryGuard = await verifierPaysCourseLivreur(base44, course, livreur_id, 'accepter_course');
       if (!countryGuard.ok) return Response.json(countryGuard.response, { status: countryGuard.status });
       const livreur = countryGuard.livreur;
+
+      // [ENTERPRISE] Vérification backend : course.enterprise_id === livreur.enterprise_id
+      const courseEntId = normalizeEnterpriseId(course.enterprise_id);
+      const livreurEntId = normalizeEnterpriseId(livreur.enterprise_id);
+      if (courseEntId !== livreurEntId) {
+        return Response.json({ success: false, accepted: false, reason: 'enterprise_mismatch', error: 'Cette course appartient à un autre périmètre.' });
+      }
 
       // 🚫 Vérifier blocage encours
       if (livreur.bloque_encours) {

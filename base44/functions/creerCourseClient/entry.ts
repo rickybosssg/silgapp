@@ -172,6 +172,8 @@ const FORBIDDEN_FIELDS = [
   'livreur_photo_url', 'livreur_vehicule', 'livreur_note_moyenne', 'livreur_nombre_avis',
   'prix_final', 'commission_silga', 'montant_livreur', 'statut_paiement_livreur',
   'client_user_email', 'livreur_user_email',
+  'enterprise_id', 'enterprise_commission_rate_locked', 'enterprise_commission_locked_at',
+  'enterprise_commission_amount', 'enterprise_encours_comptabilise_at', 'enterprise_encours_comptabilise_montant',
   'dispatch_notified_ids', 'dispatch_wave_notified_ids', 'dispatch_refused_ids',
   'dispatch_locked_until', 'dispatch_cycle_count', 'dispatch_wave',
   'dispatch_v2_secours_phase', 'dispatch_wave_started_at', 'dispatch_next_wave_at',

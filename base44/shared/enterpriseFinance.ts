@@ -23,6 +23,22 @@
  * RÈGLE DE SÉCURITÉ : Le frontend ne peut JAMAIS fournir un enterprise_id.
  * Il est TOUJOURS résolu côté backend depuis l'utilisateur authentifié.
  */
+/**
+ * Normalise un enterprise_id pour la comparaison canonique.
+ * null/undefined/"" → null (réseau public SILGAPP).
+ * Toute autre valeur → string non vide (entreprise privée).
+ *
+ * RÈGLE : normalizeEnterpriseId(course.enterprise_id) === normalizeEnterpriseId(livreur.enterprise_id)
+ * public(null) + public(absent) = MATCH
+ * Enterprise A + Enterprise A = MATCH
+ * Enterprise A + public = MISMATCH
+ * Enterprise A + Enterprise B = MISMATCH
+ */
+export function normalizeEnterpriseId(value: any): string | null {
+  if (value === null || value === undefined || value === "") return null;
+  return String(value).trim();
+}
+
 export function resolveEnterpriseId(user: any): string | null {
   if (!user) return null;
   // enterprise_id est stocké sur le User entity

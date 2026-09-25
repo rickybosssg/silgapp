@@ -39,6 +39,7 @@ import { chargerConfigDispatch } from './dispatchConfig.ts';
 import { resolveCourseParticipantUserIds } from './conversationSecurity.ts';
 import { ensureCourseCodeMessage, buildCodeMessageContent } from './courseCodeMessage.ts';
 import { figerCommissionAcceptation } from './commissionAvantage.ts';
+import { normalizeEnterpriseId } from './enterpriseFinance.ts';
 
 // ── Version du bundle (pour vérifier que la production charge la dernière version) ──
 export const DISPATCH_V2_BUNDLE_VERSION = '2026-09-25-fix-commission-lock-happy-hour';
@@ -70,6 +71,11 @@ async function notifierLivreursEligiblesV2(base44: any, course: any, options: an
   const { priorityOnly = false, skipAlreadyPublishedCheck = false } = options;
   if (!course?.id || !course?.country_code) return { notified: 0 };
 
+  // [ENTERPRISE] Filtre enterprise_id : course Enterprise → livreurs même entreprise uniquement.
+  // Course publique (enterprise_id null/absent) → livreurs publics uniquement.
+  // normalizeEnterpriseId(null) === normalizeEnterpriseId(null) = true (canonique).
+  const courseEnterpriseId = normalizeEnterpriseId(course.enterprise_id);
+
   // 📦 LECTURE UNIFIÉE : 1 Livreur.filter + 1 DispatchNotification.filter
   // (remplace getLivreursNotifies + getLivreursRefuses → économise 1 read redondant)
   const [livreurs, allDnRecords] = await Promise.all([
@@ -82,6 +88,12 @@ async function notifierLivreursEligiblesV2(base44: any, course: any, options: an
       bloque_encours: false,
       manual_hors_ligne: { $ne: true },
       admin_hors_ligne: { $ne: true },
+      // [ENTERPRISE] Isolation : ne proposer que les livreurs du même périmètre.
+      // Pour les courses publiques, on filtre enterprise_id: null qui matche
+      // à la fois null et absent (undefined) en MongoDB.
+      ...(courseEnterpriseId
+        ? { enterprise_id: courseEnterpriseId }
+        : { enterprise_id: null }),
     }, '-last_seen_at', 500).catch(() => []),
     base44.asServiceRole.entities.DispatchNotification.filter(
       { course_id: course.id }, '-date_notification', 500
@@ -104,7 +116,7 @@ async function notifierLivreursEligiblesV2(base44: any, course: any, options: an
   let candidats = (livreurs || []).filter((livreur: any) => livreur.user_email && !exclus.has(livreur.id));
 
   // 🚫 Exclure les livreurs déjà en course (même définition que aCourseActive)
-  const livreursEnCourse = await getLivreursEnCourse(base44, course.country_code);
+  const livreursEnCourse = await getLivreursEnCourse(base44, course.country_code, courseEnterpriseId);
   candidats = candidats.filter((l: any) => !livreursEnCourse.has(l.id));
 
   // 🎯 Priorité : si priorityOnly=true, ne notifier que les livreurs prioritaires (priorite_dispatch > 0)
@@ -124,14 +136,14 @@ async function notifierLivreursEligiblesV2(base44: any, course: any, options: an
 }
 
 // ── Helper : liste des livreurs en course (même définition que aCourseActive) ──
-async function getLivreursEnCourse(base44: any, countryCode: string): Promise<Set<string>> {
+async function getLivreursEnCourse(base44: any, countryCode: string, courseEnterpriseId: string | null = null): Promise<Set<string>> {
   if (!countryCode) return new Set();
   const [courses, coursesAccepted] = await Promise.all([
     base44.asServiceRole.entities.CourseExterne.filter(
-      { country_code: countryCode, livreur_id: { $ne: null } }, '-created_date', 200
+      { country_code: countryCode, livreur_id: { $ne: null }, ...(courseEnterpriseId ? { enterprise_id: courseEnterpriseId } : { enterprise_id: null }) }, '-created_date', 200
     ).catch(() => []),
     base44.asServiceRole.entities.CourseExterne.filter(
-      { country_code: countryCode, accepted_by_livreur_id: { $ne: null } }, '-created_date', 200
+      { country_code: countryCode, accepted_by_livreur_id: { $ne: null }, ...(courseEnterpriseId ? { enterprise_id: courseEnterpriseId } : { enterprise_id: null }) }, '-created_date', 200
     ).catch(() => []),
   ]);
   const ids = new Set<string>();
@@ -311,6 +323,19 @@ export async function accepterCourseV2(base44: any, courseId: string, livreurId:
   const livreurCountry = (livreur.country_code || '').trim().toUpperCase();
   if (!courseCountry || !livreurCountry || courseCountry !== livreurCountry) {
     return { success: false, error: 'country_mismatch' };
+  }
+
+  // [ENTERPRISE] Vérification backend obligatoire : course.enterprise_id === livreur.enterprise_id
+  // Comparaison canonique via normalizeEnterpriseId (null === null = match pour le réseau public).
+  // Empêche un livreur Enterprise B d'accepter une course Enterprise A, et inversement.
+  // Empêche un livreur Enterprise d'accepter une course publique, et inversement.
+  const courseEnterpriseId = normalizeEnterpriseId(course.enterprise_id);
+  const livreurEnterpriseId = normalizeEnterpriseId(livreur.enterprise_id);
+  if (courseEnterpriseId !== livreurEnterpriseId) {
+    return {
+      success: false, accepted: false, reason: 'enterprise_mismatch',
+      error: 'Cette course appartient à un autre périmètre.',
+    };
   }
 
   // 4. Check bloque_encours
@@ -537,6 +562,7 @@ export async function secoursDispatchV2(base44: any, course: any, nbLivreurs: nu
   if (!course?.id || !course.country_code) return { pushed: 0 };
 
   // 1. Get eligible livreurs
+  const courseEnterpriseId = normalizeEnterpriseId(course.enterprise_id);
   const livreurs = await base44.asServiceRole.entities.Livreur.filter({
     type_livreur: 'externe',
     validation: 'valide',
@@ -545,6 +571,10 @@ export async function secoursDispatchV2(base44: any, course: any, nbLivreurs: nu
     country_code: course.country_code,
     bloque_encours: false,
     manual_hors_ligne: { $ne: true },
+    // [ENTERPRISE] Isolation secours : même périmètre que la course.
+    ...(courseEnterpriseId
+      ? { enterprise_id: courseEnterpriseId }
+      : { enterprise_id: null }),
   }, '-last_seen_at', 50);
 
   if (!livreurs || livreurs.length === 0) return { pushed: 0 };

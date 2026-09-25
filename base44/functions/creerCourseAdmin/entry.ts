@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
 import { ensureCourseCodeMessage } from '../../shared/courseCodeMessage.ts';
+import { normalizeEnterpriseId, isEnterpriseAdmin } from '../../shared/enterpriseFinance.ts';
 
 /**
  * Création sécurisée d'une course administrative.
@@ -43,6 +44,18 @@ export default async function(req) {
           code: 'CLIENT_PHONE_REQUIRED'
         }, { status: 400 });
       }
+    }
+
+    // [ENTERPRISE] Résolution backend de enterprise_id depuis l'utilisateur authentifié.
+    // - Admin Entreprise (silgapp_role=admin_entreprise) : enterprise_id forcé depuis son compte.
+    //   Il ne peut pas créer de course publique ni de course pour une autre entreprise.
+    // - Super Admin (role=admin, silgapp_role != admin_entreprise) : enterprise_id = null (course publique).
+    // Toute valeur enterprise_id envoyée par le frontend est ignorée (anti-falsification).
+    const enterpriseAdmin = isEnterpriseAdmin(user);
+    if (enterpriseAdmin) {
+      courseData.enterprise_id = normalizeEnterpriseId(user.enterprise_id);
+    } else {
+      courseData.enterprise_id = null;
     }
 
     const course = await base44.entities.CourseExterne.create(courseData);
