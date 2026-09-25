@@ -227,6 +227,11 @@ function AppContent() {
   const [isPartenaire, setIsPartenaire] = useState(false);
   const [reseau, setReseau] = useState(null);
 
+  // 🌍 ROUTES PUBLIQUES - ACCESSIBLES SANS AUTHENTIFICATION (PRIORITÉ ABSOLUE)
+  // Ces routes doivent être vérifiées AVANT toute logique d'authentification
+  // 🌍 ROUTES PUBLIQUES - PRIORITÉ ABSOLUE (vérification avant tout)
+  const currentPath = location.pathname || window.location.pathname;
+
   // ── /entreprise → Admin Entreprise dashboard (auth required, handled by EntrepriseApp) ──
   if (currentPath === '/entreprise' || currentPath.startsWith('/entreprise/')) {
     return (
@@ -235,11 +240,6 @@ function AppContent() {
       </Suspense>
     );
   }
-
-  // 🌍 ROUTES PUBLIQUES - ACCESSIBLES SANS AUTHENTIFICATION (PRIORITÉ ABSOLUE)
-  // Ces routes doivent être vérifiées AVANT toute logique d'authentification
-  // 🌍 ROUTES PUBLIQUES - PRIORITÉ ABSOLUE (vérification avant tout)
-  const currentPath = location.pathname || window.location.pathname;
   const isPublicRoute = currentPath === '/telecharger' || 
                         currentPath === '/privacy-policy' ||
                         currentPath.startsWith('/suivi-public/') ||
