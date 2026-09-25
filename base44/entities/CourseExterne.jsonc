@@ -704,5 +704,75 @@
     "country_code",
     "type_course",
     "adresse_depart"
-  ]
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "$and": [
+            {
+              "data.enterprise_id": null
+            },
+            {
+              "data.enterprise_id": "{{user.data.enterprise_id}}"
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "$and": [
+            {
+              "data.enterprise_id": "{{user.data.enterprise_id}}"
+            },
+            {
+              "data.enterprise_id": {
+                "$ne": null
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "create": {},
+    "update": {
+      "$or": [
+        {
+          "$and": [
+            {
+              "data.enterprise_id": null
+            },
+            {
+              "data.enterprise_id": "{{user.data.enterprise_id}}"
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "$and": [
+            {
+              "data.enterprise_id": "{{user.data.enterprise_id}}"
+            },
+            {
+              "data.enterprise_id": {
+                "$ne": null
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
 }
