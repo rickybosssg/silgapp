@@ -38,9 +38,10 @@ import { notifierLivreursUnifie } from './dispatchPushUnifie.ts';
 import { chargerConfigDispatch } from './dispatchConfig.ts';
 import { resolveCourseParticipantUserIds } from './conversationSecurity.ts';
 import { ensureCourseCodeMessage, buildCodeMessageContent } from './courseCodeMessage.ts';
+import { figerCommissionAcceptation } from './commissionAvantage.ts';
 
 // ── Version du bundle (pour vérifier que la production charge la dernière version) ──
-export const DISPATCH_V2_BUNDLE_VERSION = '2026-08-17-fix-en-attente-accept';
+export const DISPATCH_V2_BUNDLE_VERSION = '2026-09-25-fix-commission-lock-happy-hour';
 
 // ── Feature flag cache (TTL 2 min) ──
 let V2_FLAG_CACHE: { enabled: boolean; expires: number } | null = null;
@@ -397,6 +398,18 @@ export async function accepterCourseV2(base44: any, courseId: string, livreurId:
       raison_passage: `Perdu par ${livreurId} — gagnant: ${courseVerifie.livreur_id || courseVerifie.accepted_by_livreur_id || '?'}`,
     });
     return reponseDejaPrise('race_condition_lost', courseVerifie);
+  }
+
+  // 10b. V2 : Figer la commission à l'acceptation (Pass Zéro Commission / Happy Hour)
+  // Le taux est déterminé au moment exact de l'acceptation et figé sur la course.
+  // Redispatch : si un nouveau livreur accepte, le taux est recalculé pour lui.
+  // Non-bloquant : l'acceptation réussit même si le figement échoue (cohérent avec V1).
+  if (!isManual && courseVerifie.heure_acceptation && courseVerifie.country_code) {
+    await figerCommissionAcceptation(
+      base44, courseId, livreurId, courseVerifie.country_code, courseVerifie.heure_acceptation
+    ).catch((err: any) => {
+      console.error('[V2] figerCommissionAcceptation error (non-blocking):', err?.message);
+    });
   }
 
   // 11. V2 : Trigger WebSocket via update single (déclenche la disparition du fil)
