@@ -1202,7 +1202,52 @@ export default function ClientExterneApp() {
                   <ChevronRight className="w-6 h-6 text-white/70" />
                 </button>
 
-                {/* 2. REFAIRE — historique */}
+                {/* 2. SUIVRE MA COURSE — course active en cours (carte jaune) */}
+                {coursesActives.length > 0 && (
+                  <button
+                    className="w-full flex items-center gap-4 rounded-2xl bg-amber-400 border border-amber-300 shadow-[0_12px_30px_rgba(245,158,11,0.30)] p-5 active:scale-[0.98] transition-all text-left hover:shadow-lg"
+                    onClick={() => {
+                      if (coursesActives.length > 1) {
+                        setShowMultiCourseSelector(true);
+                      } else {
+                        navigate("/client/suivi", { state: { course_id: coursesActives[0].id } });
+                      }
+                    }}
+                  >
+                    <div className="w-14 h-14 rounded-2xl bg-amber-500/30 flex items-center justify-center flex-shrink-0">
+                      <Navigation className="w-7 h-7 text-amber-900" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-lg font-black text-gray-900">
+                        {coursesActives.length > 1 ? "Suivre mes courses" : "Suivre ma course"}
+                      </p>
+                      <p className="text-sm text-gray-800/80">
+                        {coursesActives.length > 1
+                          ? `${coursesActives.length} courses en cours`
+                          : "Voir le livreur et l'avancement en direct"}
+                      </p>
+                    </div>
+                    {coursesActives.length > 1 ? (
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        {coursesActives.slice(0, 3).map((c, i) => (
+                          <span
+                            key={c.id}
+                            className={`w-2.5 h-2.5 rounded-full ${
+                              c.livreur_id ? "bg-green-600" :
+                              c.statut === "recherche_livreur" ? "bg-orange-600" : "bg-gray-600"
+                            }`}
+                            style={{ marginLeft: i === 0 ? 0 : -4 }}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="w-2.5 h-2.5 bg-green-600 rounded-full animate-pulse flex-shrink-0" />
+                    )}
+                    <ChevronRight className="w-6 h-6 text-gray-700 flex-shrink-0" />
+                  </button>
+                )}
+
+                {/* 3. REFAIRE — historique */}
                 <button
                   className="w-full flex items-center gap-4 rounded-2xl bg-white border border-black/5 shadow-[0_8px_24px_rgba(15,23,42,0.07)] p-5 active:scale-[0.98] transition-all text-left hover:shadow-md"
                   onClick={() => navigate("/client/suivi")}
@@ -1216,47 +1261,6 @@ export default function ClientExterneApp() {
                   </div>
                   <ChevronRight className="w-6 h-6 text-gray-400" />
                 </button>
-
-                {/* 3. SUIVRE — course en cours */}
-                {coursesActives.length > 0 && (
-                  <button
-                    className="w-full flex items-center gap-4 rounded-2xl bg-white border border-black/5 shadow-[0_8px_24px_rgba(15,23,42,0.07)] p-5 active:scale-[0.98] transition-all text-left hover:shadow-md"
-                    onClick={() => {
-                      if (coursesActives.length > 1) {
-                        setShowMultiCourseSelector(true);
-                      } else {
-                        navigate("/client/suivi");
-                      }
-                    }}
-                  >
-                    <div className="w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center flex-shrink-0">
-                      <Navigation className="w-7 h-7 text-blue-600" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-lg font-black text-gray-900">Suivre</p>
-                      <p className="text-sm text-gray-500">
-                        {coursesActives.length} course{coursesActives.length > 1 ? "s" : ""} en cours
-                      </p>
-                    </div>
-                    {coursesActives.length > 1 && (
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        {coursesActives.slice(0, 3).map((c, i) => (
-                          <span
-                            key={c.id}
-                            className={`w-2 h-2 rounded-full ${
-                              c.livreur_id ? "bg-green-400" :
-                              c.statut === "recherche_livreur" ? "bg-amber-400" : "bg-gray-300"
-                            }`}
-                            style={{ marginLeft: i === 0 ? 0 : -4 }}
-                          />
-                        ))}
-                      </div>
-                    )}
-                    {coursesActives.length === 1 && (
-                      <div className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse" />
-                    )}
-                  </button>
-                )}
               </div>
 
               {/* ── ACTIONS SECONDAIRES — accessibles mais moins proéminentes ── */}
