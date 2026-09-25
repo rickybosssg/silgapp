@@ -247,6 +247,20 @@ export default async function(req: Request): Promise<Response> {
         // Charger les admins
         const admins = await base44.asServiceRole.entities.User.filter({ enterprise_id: enterprise.enterprise_financier_id });
 
+        // Charger les livreurs
+        const livreurs = await base44.asServiceRole.entities.Livreur.filter(
+          { enterprise_id: enterprise.enterprise_financier_id },
+          '-created_date',
+          200
+        );
+
+        // Charger les courses
+        const courses = await base44.asServiceRole.entities.CourseExterne.filter(
+          { enterprise_id: enterprise.enterprise_financier_id },
+          '-created_date',
+          100
+        );
+
         // Charger le ledger
         const ledger = await base44.asServiceRole.entities.EnterpriseLedger.filter(
           { enterprise_financier_id: enterprise.enterprise_financier_id },
@@ -254,7 +268,94 @@ export default async function(req: Request): Promise<Response> {
           50
         );
 
-        return Response.json({ success: true, enterprise, admins, ledger });
+        return Response.json({ success: true, enterprise, admins, livreurs, courses, ledger });
+      }
+
+      // ── Retirer un admin d'une entreprise ──
+      case 'remove_admin': {
+        const { user_email } = body;
+        if (!user_email) return Response.json({ error: 'user_email requis' }, { status: 400 });
+
+        const users = await base44.asServiceRole.entities.User.filter({ email: user_email });
+        if (!users || users.length === 0) return Response.json({ error: 'Utilisateur introuvable' }, { status: 404 });
+
+        const targetUser = users[0];
+        if (targetUser.silgapp_role !== 'admin_entreprise') {
+          return Response.json({ error: 'Cet utilisateur n\'est pas un Admin Entreprise' }, { status: 400 });
+        }
+
+        const oldEnterpriseId = targetUser.enterprise_id;
+
+        await base44.asServiceRole.entities.User.update(targetUser.id, {
+          enterprise_id: null,
+          silgapp_role: null,
+        });
+
+        // Décrémenter le compteur d'admins
+        if (oldEnterpriseId) {
+          const entList = await base44.asServiceRole.entities.Enterprise.filter({ enterprise_financier_id: oldEnterpriseId });
+          if (entList?.[0]) {
+            await base44.asServiceRole.entities.Enterprise.update(entList[0].id, {
+              nb_admins: Math.max(0, Number(entList[0].nb_admins || 0) - 1),
+            });
+          }
+        }
+
+        return Response.json({ success: true });
+      }
+
+      // ── Ajouter un livreur à une entreprise ──
+      case 'add_livreur': {
+        const { enterprise_id, nom, prenom, telephone, vehicule, ville, quartier } = body;
+        if (!enterprise_id || !nom || !telephone) {
+          return Response.json({ error: 'enterprise_id, nom et telephone requis' }, { status: 400 });
+        }
+
+        const enterprises = await base44.asServiceRole.entities.Enterprise.filter({ enterprise_financier_id: enterprise_id });
+        const enterprise = enterprises?.[0];
+        if (!enterprise) return Response.json({ error: 'Entreprise introuvable' }, { status: 404 });
+
+        const livreur = await base44.asServiceRole.entities.Livreur.create({
+          nom,
+          prenom: prenom || '',
+          telephone,
+          type_livreur: 'externe',
+          reseau: 'externe',
+          country_code: enterprise.country_code,
+          ville: ville || '',
+          quartier: quartier || '',
+          vehicule: vehicule || 'moto',
+          type_vehicule: vehicule || 'moto',
+          enterprise_id: enterprise.enterprise_financier_id,
+          validation: 'valide',
+          valide_at: new Date().toISOString(),
+          valide_par: user.email,
+          actif: true,
+          statut: 'hors_ligne',
+        });
+
+        // Incrémenter le compteur de livreurs
+        await base44.asServiceRole.entities.Enterprise.update(enterprise.id, {
+          nb_livreurs: Number(enterprise.nb_livreurs || 0) + 1,
+        });
+
+        return Response.json({ success: true, livreur });
+      }
+
+      // ── Activer/désactiver un livreur ──
+      case 'toggle_livreur': {
+        const { livreur_id, active } = body;
+        if (!livreur_id) return Response.json({ error: 'livreur_id requis' }, { status: 400 });
+
+        const livreur = await base44.asServiceRole.entities.Livreur.get(livreur_id).catch(() => null);
+        if (!livreur) return Response.json({ error: 'Livreur introuvable' }, { status: 404 });
+
+        await base44.asServiceRole.entities.Livreur.update(livreur_id, {
+          actif: active,
+          statut: active ? 'hors_ligne' : 'hors_ligne',
+        });
+
+        return Response.json({ success: true, active });
       }
 
       default:
