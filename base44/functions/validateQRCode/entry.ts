@@ -256,6 +256,15 @@ Deno.serve(async (req) => {
           adminUpdateData.distance_reelle_km = Math.max(Number(distAdmin) || 0, 0.01);
         }
 
+        // ── Enterprise: la commission est payée par l'entreprise, pas le livreur ──
+        // commission_silga = 0 sur la course → le livreur n'est jamais débité.
+        // La commission Enterprise (5%) est comptabilisée dans EnterpriseLedger.
+        // Le chemin public (enterprise_id null) n'est JAMAIS affecté.
+        if (normalizeEnterpriseId(course.enterprise_id)) {
+          adminUpdateData.commission_silga = 0;
+          adminUpdateData.montant_livreur = prixFinalAdmin;
+        }
+
         await base44.asServiceRole.entities.CourseExterne.update(course_id, adminUpdateData);
 
         // ── Comptabiliser la commission Enterprise (uniquement pour les courses entreprise) ──
@@ -446,6 +455,15 @@ Deno.serve(async (req) => {
         } else if (distReelle != null) {
           updateData.distance_reelle_km = Math.max(Number(distReelle) || 0, 0.01);
         }
+      }
+
+      // ── Enterprise: la commission est payée par l'entreprise, pas le livreur ──
+      // commission_silga = 0 sur la course → le livreur n'est jamais débité.
+      // La commission Enterprise (5%) est comptabilisée dans EnterpriseLedger.
+      // Le chemin public (enterprise_id null) n'est JAMAIS affecté.
+      if (normalizeEnterpriseId(course.enterprise_id)) {
+        updateData.commission_silga = 0;
+        updateData.montant_livreur = updateData.prix_final;
       }
 
       await base44.asServiceRole.entities.CourseExterne.update(course_id, updateData);
