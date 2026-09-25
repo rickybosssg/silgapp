@@ -6,7 +6,7 @@ import { base44 } from "@/api/base44Client";
 import { getNativeCurrentPosition, scanNativeQrCode } from "@/lib/nativeAndroid";
 import { normalizeFourDigitPin } from "@/lib/livreurCourseState";
 
-export default function QRScannerModal({ course, type, onSuccess, onClose, livreurLat, livreurLng, initialMode = "camera" }) {
+export default function QRScannerModal({ course, type, onSuccess, onClose, livreurLat, livreurLng, initialMode = "camera", onDeliveryVictory }) {
   const [mode, setMode] = useState(initialMode);
   const [code4, setCode4] = useState("");
   const [scanning, setScanning] = useState(false);
@@ -113,6 +113,12 @@ export default function QRScannerModal({ course, type, onSuccess, onClose, livre
       if (data?.success) {
         setErrorMessage("");
         setResult("success");
+        // ── Animation de victoire livreur — UNIQUEMENT pour la livraison (pas récupération) ──
+        // Déclenchée après confirmation backend du succès du PIN/QR de livraison.
+        // Strictement visuelle — n'effectue aucune opération métier.
+        if (type === "delivery" && onDeliveryVictory) {
+          onDeliveryVictory(course.id);
+        }
         const gpsData = type === "pickup"
           ? {
               latitude_recuperation: gps.latitude,

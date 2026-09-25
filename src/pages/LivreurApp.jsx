@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { clearPersistedToken } from "@/lib/authPersistence";
@@ -27,6 +27,7 @@ import DashboardThemeProvider from "@/components/livreur/DashboardThemeProvider"
 import PassActifBadge from "@/components/livreur/PassActifBadge";
 import HappyHourBadge from "@/components/livreur/HappyHourBadge";
 import PassZeroCommissionSection from "@/components/livreur/PassZeroCommissionSection";
+import LivreurVictoryOverlay from "@/components/livreur/LivreurVictoryOverlay";
 
 const saveLivreur = (id, data) => base44.functions.invoke('updateLivreur', { id, data });
 
@@ -41,6 +42,9 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
   const [gpsActif, setGpsActif] = useState(false);
   const [gpsRequis, setGpsRequis] = useState(true);
   const [gpsLastUpdate, setGpsLastUpdate] = useState(null);
+  // ── Animation de victoire livreur (livraison validée par PIN/QR) ──
+  const [victoryCourseId, setVictoryCourseId] = useState(null);
+  const celebratedCourseIdsRef = useRef(new Set());
 
   // Recharger le profil livreur en temps réel
   const { data: livreurProfil } = useQuery({
@@ -484,6 +488,11 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
                       onClientAnnule={handleClientAnnule}
                       onMettrePause={handleMettrePause}
                       isPending={updateCourseMutation.isPending}
+                      onDeliveryVictory={(courseId) => {
+                        if (celebratedCourseIdsRef.current.has(courseId)) return;
+                        celebratedCourseIdsRef.current.add(courseId);
+                        setVictoryCourseId(courseId);
+                      }}
                     />
                   ))}
                 </div>
@@ -521,6 +530,12 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
           </div>
         )}
       </div>
+
+      {/* ── Animation de victoire livreur — 3 secondes, purement visuelle ── */}
+      <LivreurVictoryOverlay
+        courseId={victoryCourseId}
+        onClose={() => setVictoryCourseId(null)}
+      />
     </DashboardThemeProvider>
   );
 }
