@@ -83,6 +83,11 @@
       "default": 0,
       "description": "Nombre de livreurs rattach\u00e9s \u00e0 cette entreprise (cache d\u00e9riv\u00e9)"
     },
+    "nb_courses": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre de courses rattach\u00e9es \u00e0 cette entreprise (cache d\u00e9riv\u00e9)"
+    },
     "volume_courses_total": {
       "type": "number",
       "default": 0,

@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import {
   Building2, Plus, Users, Wallet, TrendingUp, Eye, Ban, CheckCircle,
   Percent, Truck, Package, ArrowLeft, UserMinus, UserPlus, Power,
-  Clock, Zap,
+  Clock, Zap, Send,
 } from "lucide-react";
 
 /**
@@ -47,6 +47,8 @@ export default function SuperAdminEntreprises() {
   const totalPaid = enterprises.reduce((s, e) => s + Number(e.total_paiements || 0), 0);
   const totalVolume = enterprises.reduce((s, e) => s + Number(e.volume_courses_total || 0), 0);
   const activeCount = enterprises.filter((e) => e.statut === "actif").length;
+  const totalLivreurs = enterprises.reduce((s, e) => s + Number(e.nb_livreurs || 0), 0);
+  const totalCourses = enterprises.reduce((s, e) => s + Number(e.nb_courses || 0), 0);
 
   if (loading) {
     return <div className="p-6 text-center text-sm text-gray-500">Chargement des entreprises...</div>;
@@ -79,13 +81,15 @@ export default function SuperAdminEntreprises() {
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatCard icon={Building2} label="Entreprises actives" value={activeCount} color="text-blue-600" bg="bg-blue-50" />
+        <StatCard icon={Truck} label="Livreurs Enterprise" value={totalLivreurs} color="text-indigo-600" bg="bg-indigo-50" />
+        <StatCard icon={Package} label="Courses Enterprise" value={totalCourses} color="text-cyan-600" bg="bg-cyan-50" />
         <StatCard icon={TrendingUp} label="Volume total" value={`${totalVolume.toLocaleString("fr-FR")} F`} color="text-purple-600" bg="bg-purple-50" />
-        <StatCard icon={Wallet} label="Commissions SILGAPP" value={`${totalCommissions.toLocaleString("fr-FR")} F`} color="text-amber-600" bg="bg-amber-50" />
-        <StatCard icon={Wallet} label="Total dû SILGAPP" value={`${totalDue.toLocaleString("fr-FR")} F`} color="text-red-600" bg="bg-red-50" />
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard icon={Users} label="Total encaissé" value={`${totalPaid.toLocaleString("fr-FR")} F`} color="text-emerald-600" bg="bg-emerald-50" />
+        <StatCard icon={Wallet} label="Commissions SILGAPP" value={`${totalCommissions.toLocaleString("fr-FR")} F`} color="text-amber-600" bg="bg-amber-50" />
+        <StatCard icon={Wallet} label="Total encaissé" value={`${totalPaid.toLocaleString("fr-FR")} F`} color="text-emerald-600" bg="bg-emerald-50" />
+        <StatCard icon={Wallet} label="Total restant dû" value={`${totalDue.toLocaleString("fr-FR")} F`} color="text-red-600" bg="bg-red-50" />
         <StatCard icon={Building2} label="Total entreprises" value={enterprises.length} color="text-gray-600" bg="bg-gray-100" />
       </div>
 
@@ -103,36 +107,59 @@ export default function SuperAdminEntreprises() {
             </CardContent>
           </Card>
         ) : (
-          enterprises.map((ent) => (
-            <Card key={ent.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => setSelectedEnterprise(ent.enterprise_financier_id)}>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg flex items-center justify-center text-white" style={{ background: ent.couleur_primaire || "#007AFF" }}>
-                    {ent.logo_url ? <img src={ent.logo_url} alt="" className="w-full h-full object-cover rounded-lg" /> : <Building2 className="w-5 h-5" />}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-gray-900 truncate">{ent.nom}</p>
-                    <p className="text-xs text-gray-500">{ent.country_code} · {ent.nb_admins || 0} admin(s) · {ent.nb_livreurs || 0} livreur(s)</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-bold text-gray-900">{(ent.montant_du_silgapp || 0).toLocaleString("fr-FR")} F</p>
-                    <p className="text-[10px] text-gray-500">Dû SILGAPP</p>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${ent.statut === "actif" ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>
-                      {ent.statut}
-                    </span>
-                    <Eye className="w-4 h-4 text-gray-400" />
-                  </div>
-                </div>
-                <div className="mt-2 flex items-center gap-4 text-xs text-gray-500">
-                  <span>Taux: <strong>{ent.commission_silgapp_pct}%</strong></span>
-                  <span>Volume: <strong>{(ent.volume_courses_total || 0).toLocaleString("fr-FR")} F</strong></span>
-                  <span>Payé: <strong className="text-emerald-600">{(ent.total_paiements || 0).toLocaleString("fr-FR")} F</strong></span>
-                </div>
-              </CardContent>
-            </Card>
-          ))
+          <Card className="overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead className="bg-gray-50 border-b">
+                  <tr>
+                    <th className="text-left px-3 py-2 font-semibold text-gray-600 whitespace-nowrap">Entreprise</th>
+                    <th className="text-center px-2 py-2 font-semibold text-gray-600 whitespace-nowrap">Pays</th>
+                    <th className="text-center px-2 py-2 font-semibold text-gray-600 whitespace-nowrap">Admins</th>
+                    <th className="text-center px-2 py-2 font-semibold text-gray-600 whitespace-nowrap">Livreurs</th>
+                    <th className="text-center px-2 py-2 font-semibold text-gray-600 whitespace-nowrap">Courses</th>
+                    <th className="text-right px-2 py-2 font-semibold text-gray-600 whitespace-nowrap">Volume</th>
+                    <th className="text-center px-2 py-2 font-semibold text-gray-600 whitespace-nowrap">Taux</th>
+                    <th className="text-right px-2 py-2 font-semibold text-gray-600 whitespace-nowrap">Commissions</th>
+                    <th className="text-right px-2 py-2 font-semibold text-gray-600 whitespace-nowrap">Payé</th>
+                    <th className="text-right px-2 py-2 font-semibold text-gray-600 whitespace-nowrap">Reste dû</th>
+                    <th className="text-center px-2 py-2 font-semibold text-gray-600 whitespace-nowrap">Statut</th>
+                    <th className="text-center px-2 py-2 font-semibold text-gray-600 whitespace-nowrap">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {enterprises.map((ent) => (
+                    <tr key={ent.id} className="border-b hover:bg-blue-50/50 cursor-pointer transition-colors" onClick={() => setSelectedEnterprise(ent.enterprise_financier_id)}>
+                      <td className="px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-lg flex items-center justify-center text-white flex-shrink-0" style={{ background: ent.couleur_primaire || "#007AFF" }}>
+                            {ent.logo_url ? <img src={ent.logo_url} alt="" className="w-full h-full object-cover rounded-lg" /> : <Building2 className="w-3.5 h-3.5" />}
+                          </div>
+                          <span className="font-bold text-gray-900 truncate max-w-[120px]">{ent.nom}</span>
+                        </div>
+                      </td>
+                      <td className="text-center px-2 py-2 text-gray-600">{ent.country_code}</td>
+                      <td className="text-center px-2 py-2 text-gray-600 tabular-nums">{ent.nb_admins || 0}</td>
+                      <td className="text-center px-2 py-2 text-gray-600 tabular-nums">{ent.nb_livreurs || 0}</td>
+                      <td className="text-center px-2 py-2 text-gray-600 tabular-nums">{ent.nb_courses || 0}</td>
+                      <td className="text-right px-2 py-2 text-gray-600 tabular-nums whitespace-nowrap">{(ent.volume_courses_total || 0).toLocaleString("fr-FR")} F</td>
+                      <td className="text-center px-2 py-2 text-gray-600 tabular-nums">{ent.commission_silgapp_pct}%</td>
+                      <td className="text-right px-2 py-2 text-amber-600 tabular-nums whitespace-nowrap">{(ent.total_commissions_silgapp || 0).toLocaleString("fr-FR")} F</td>
+                      <td className="text-right px-2 py-2 text-emerald-600 tabular-nums whitespace-nowrap">{(ent.total_paiements || 0).toLocaleString("fr-FR")} F</td>
+                      <td className="text-right px-2 py-2 text-red-600 font-bold tabular-nums whitespace-nowrap">{(ent.montant_du_silgapp || 0).toLocaleString("fr-FR")} F</td>
+                      <td className="text-center px-2 py-2">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${ent.statut === "actif" ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>
+                          {ent.statut}
+                        </span>
+                      </td>
+                      <td className="text-center px-2 py-2">
+                        <Eye className="w-4 h-4 text-gray-400 inline-block" />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
         )}
       </div>
 
@@ -392,30 +419,51 @@ function AdminsTab({ admins, enterprise, onRefresh }) {
               <div>
                 <p className="text-sm font-medium text-gray-900">{a.full_name || a.email}</p>
                 <p className="text-xs text-gray-500">{a.email}</p>
-                <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${a.silgapp_role === "admin_entreprise" ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-500"}`}>
-                  {a.silgapp_role === "admin_entreprise" ? "Actif" : "Désactivé"}
-                </span>
+                {a.status === "pending" ? (
+                  <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700">
+                    En attente d'activation
+                  </span>
+                ) : a.silgapp_role === "admin_entreprise" ? (
+                  <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700">
+                    Actif
+                  </span>
+                ) : (
+                  <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-500">
+                    Désactivé
+                  </span>
+                )}
               </div>
               <div className="flex gap-1">
-                <Button size="sm" variant="ghost" onClick={async () => {
-                  await base44.functions.invoke("manageEnterprise", {
-                    action: "toggle_admin",
-                    user_email: a.email,
-                    active: a.silgapp_role !== "admin_entreprise",
-                  });
-                  onRefresh();
-                }}>
-                  <Power className="w-4 h-4" />
-                  {a.silgapp_role === "admin_entreprise" ? "Désactiver" : "Activer"}
-                </Button>
-                <Button size="sm" variant="ghost" className="text-red-500" onClick={async () => {
-                  if (confirm(`Retirer ${a.email} de cette entreprise ? Il perdra l'accès au dashboard entreprise.`)) {
-                    await base44.functions.invoke("manageEnterprise", { action: "remove_admin", user_email: a.email });
+                {a.status === "pending" ? (
+                  <Button size="sm" variant="ghost" title="Renvoyer l'invitation" onClick={async () => {
+                    await base44.functions.invoke("manageEnterprise", { action: "resend_invitation", email: a.email });
                     onRefresh();
-                  }
-                }}>
-                  <UserMinus className="w-4 h-4" />
-                </Button>
+                  }}>
+                    <Send className="w-4 h-4" /> Renvoyer
+                  </Button>
+                ) : (
+                  <>
+                    <Button size="sm" variant="ghost" onClick={async () => {
+                      await base44.functions.invoke("manageEnterprise", {
+                        action: "toggle_admin",
+                        user_email: a.email,
+                        active: a.silgapp_role !== "admin_entreprise",
+                      });
+                      onRefresh();
+                    }}>
+                      <Power className="w-4 h-4" />
+                      {a.silgapp_role === "admin_entreprise" ? "Désactiver" : "Activer"}
+                    </Button>
+                    <Button size="sm" variant="ghost" className="text-red-500" onClick={async () => {
+                      if (confirm(`Retirer ${a.email} de cette entreprise ? Il perdra l'accès au dashboard entreprise.`)) {
+                        await base44.functions.invoke("manageEnterprise", { action: "remove_admin", user_email: a.email });
+                        onRefresh();
+                      }
+                    }}>
+                      <UserMinus className="w-4 h-4" />
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
           </CardContent>

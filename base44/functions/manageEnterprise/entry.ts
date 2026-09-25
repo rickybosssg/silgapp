@@ -210,17 +210,51 @@ export default async function(req: Request): Promise<Response> {
         if (!users || users.length === 0) return Response.json({ error: 'Utilisateur introuvable' }, { status: 404 });
 
         const targetUser = users[0];
-        if (targetUser.silgapp_role !== 'admin_entreprise') {
-          return Response.json({ error: 'Cet utilisateur n\'est pas un Admin Entreprise' }, { status: 400 });
-        }
 
         if (active) {
+          // Réactivation : l'utilisateur doit avoir un enterprise_id rattaché
+          if (!targetUser.enterprise_id) {
+            return Response.json({ error: 'Cet utilisateur n\'a pas d\'entreprise rattachée' }, { status: 400 });
+          }
           await base44.asServiceRole.entities.User.update(targetUser.id, { silgapp_role: 'admin_entreprise' });
         } else {
+          // Désactivation : l'utilisateur doit être admin_entreprise
+          if (targetUser.silgapp_role !== 'admin_entreprise') {
+            return Response.json({ error: 'Cet utilisateur n\'est pas un Admin Entreprise actif' }, { status: 400 });
+          }
           await base44.asServiceRole.entities.User.update(targetUser.id, { silgapp_role: null });
         }
 
         return Response.json({ success: true, active });
+      }
+
+      // ── Renvoyer l'invitation à un admin en attente ──
+      case 'resend_invitation': {
+        const { email } = body;
+        if (!email) return Response.json({ error: 'email requis' }, { status: 400 });
+
+        // Vérifier qu'un pending existe pour cet email
+        const pendings = await base44.asServiceRole.entities.PendingEnterpriseAdmin.filter({ email, status: 'pending' });
+        if (!pendings || pendings.length === 0) {
+          return Response.json({ error: 'Aucune invitation en attente pour cet email' }, { status: 404 });
+        }
+
+        // Mettre à jour la date d'invitation
+        await base44.asServiceRole.entities.PendingEnterpriseAdmin.update(pendings[0].id, {
+          invited_at: new Date().toISOString(),
+          invited_by: user.email,
+        });
+
+        // Renvoyer l'invitation via le système Auth
+        try {
+          await base44.users.inviteUser(email, 'user');
+        } catch (inviteErr: any) {
+          if (!String(inviteErr?.message || '').includes('already')) {
+            return Response.json({ error: 'Impossible de renvoyer l\'invitation: ' + (inviteErr?.message || '') }, { status: 500 });
+          }
+        }
+
+        return Response.json({ success: true, email });
       }
 
       // ── Modifier le taux SILGAPP d'une entreprise ──
@@ -264,7 +298,31 @@ export default async function(req: Request): Promise<Response> {
       // ── Lister toutes les entreprises ──
       case 'list_enterprises': {
         const enterprises = await base44.asServiceRole.entities.Enterprise.list('-date_creation', 200);
-        return Response.json({ success: true, enterprises });
+
+        // ── Compter les courses par entreprise ──
+        const enterpriseIds = (enterprises || []).map((e: any) => e.enterprise_financier_id).filter(Boolean);
+        let courseCountMap: Record<string, number> = {};
+        if (enterpriseIds.length > 0) {
+          // Charger les courses enterprise (batch)
+          const allCourses = await base44.asServiceRole.entities.CourseExterne.filter(
+            { enterprise_id: { $in: enterpriseIds } },
+            '-created_date',
+            500
+          );
+          for (const c of allCourses || []) {
+            if (c.enterprise_id) {
+              courseCountMap[c.enterprise_id] = (courseCountMap[c.enterprise_id] || 0) + 1;
+            }
+          }
+        }
+
+        // ── Enrichir chaque entreprise avec nb_courses réel ──
+        const enriched = (enterprises || []).map((e: any) => ({
+          ...e,
+          nb_courses: courseCountMap[e.enterprise_financier_id] || 0,
+        }));
+
+        return Response.json({ success: true, enterprises: enriched });
       }
 
       // ── Détail d'une entreprise ──
@@ -409,7 +467,7 @@ export default async function(req: Request): Promise<Response> {
 
         await base44.asServiceRole.entities.Livreur.update(livreur_id, {
           actif: active,
-          statut: active ? 'hors_ligne' : 'hors_ligne',
+          statut: active ? 'disponible' : 'hors_ligne',
           admin_hors_ligne: !active,
         });
 
