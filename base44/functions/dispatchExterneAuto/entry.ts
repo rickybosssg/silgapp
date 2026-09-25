@@ -609,7 +609,8 @@ Deno.serve(async (req) => {
         // ── Message système des codes (récupération + livraison + prix) ──
         // Helper idempotent : vérifie l'existence, retry une fois, jamais d'échec bloquant.
         // Utilise le même helper que le path V2 pour garantir un contenu identique.
-        if ((course.source === 'admin' || course.created_by_venus === true) && pickupPIN) {
+        // Corrigé : appelé pour toute course disposant du PIN, indépendamment de la source.
+        if (pickupPIN) {
           await ensureCourseCodeMessage(
             base44, course, livreur_id, pickupPIN, deliveryPIN, '[V1]'
           ).catch((err: any) => {

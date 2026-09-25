@@ -1022,6 +1022,17 @@ export function subscribeToNotifications(onNotification, userEmail, options = {}
       maybeStartLivreurCourseAlert(data, "realtime");
     }
 
+    // ── Rattrapage messagerie interne : dispatcher un événement pour ChatWindow ──
+    // Quand un push de type nouveau_message arrive, ChatWindow ou peut refetcher
+    // immédiatement les messages (filet de sécurité en plus du polling 5s).
+    if (notification.type === "nouveau_message" || notification.type === "message_client") {
+      try {
+        window.dispatchEvent(new CustomEvent("silgapp:chat_refetch", {
+          detail: { type: notification.type, course_id: notification.course_id || "" }
+        }));
+      } catch (_) {}
+    }
+
     if (onNotification) onNotification(notification);
   });
 

@@ -422,10 +422,11 @@ export async function accepterCourseV2(base44: any, courseId: string, livreurId:
     await base44.asServiceRole.entities.Livreur.update(livreurId, { statut: 'en_course' });
     await marquerAccepte(base44, courseId, livreurId);
 
-    // 13. Message code récupération + push notification (courses admin/VENUS)
+    // 13. Message code récupération + push notification (TOUTES courses avec PIN)
     //     Délégué au helper idempotent ensureCourseCodeMessage (retry + anti-doublon).
     //     ⚠️ Effet secondaire uniquement — n'échoue jamais l'acceptation.
-    if ((course.source === 'admin' || course.created_by_venus === true) && pickupPIN) {
+    //     Corrigé : appelé pour toute course disposant du PIN, indépendamment de la source.
+    if (pickupPIN) {
       const codeMsgResult = await ensureCourseCodeMessage(
         base44, course, livreurId, pickupPIN, deliveryPIN, '[V2]'
       ).catch((err: any) => {

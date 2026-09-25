@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Send, Loader2, MessageCircle, ImagePlus, X } from "lucide-react";
@@ -24,22 +24,28 @@ export default function ChatWindow({ courseId, senderType, senderId, senderName,
   const sendingRef = useRef(false);
   const knownIdsRef = useRef(new Set());
 
+  // ── Refetch réutilisable : charge les messages depuis la DB et fusionne avec l'état courant ──
+  // Utilisé par : chargement initial, polling 5s, refetch foreground, refetch sur push.
+  // La déduplication via getMessageKey garantit zéro doublon ni scintillement.
+  const refetchMessages = useCallback(async () => {
+    if (!courseId) return;
+    try {
+      const msgs = await base44.entities.Message.filter({ course_id: courseId }, "created_date", 100);
+      const list = dedupeAndSortMessages(msgs || []);
+      const profiles = await buildSenderProfiles(base44, list);
+      const enriched = enrichMessagesWithProfiles(list, profiles);
+      enriched.forEach(m => knownIdsRef.current.add(getMessageKey(m)));
+      setMessages(prev => dedupeAndSortMessages([...prev, ...enriched]));
+    } catch (_) {}
+  }, [courseId]);
+
   // Charger les messages existants
   useEffect(() => {
     if (!courseId || !open) return;
-    base44.entities.Message.filter({ course_id: courseId }, "created_date", 100)
-      .then(async (msgs) => {
-        const list = dedupeAndSortMessages(msgs || []);
-        const profiles = await buildSenderProfiles(base44, list);
-        const enriched = enrichMessagesWithProfiles(list, profiles);
-        // ── Fix: fusionner au lieu d'écraser — ne pas perdre les messages reçus via subscription ──
-        enriched.forEach(m => knownIdsRef.current.add(getMessageKey(m)));
-        setMessages(prev => dedupeAndSortMessages([...prev, ...enriched]));
-      })
-      .catch(() => setMessages([]));
-  }, [courseId, open]);
+    refetchMessages();
+  }, [courseId, open, refetchMessages]);
 
-  // Subscription temps réel + son notification
+  // Subscription temps réel + son notification (WebSocket = instantané)
   useEffect(() => {
     if (!courseId || !open) return;
     const unsub = base44.entities.Message.subscribe((event) => {
@@ -60,25 +66,63 @@ export default function ChatWindow({ courseId, senderType, senderId, senderName,
     return () => unsub?.();
   }, [courseId, open, senderType, senderId]);
 
-  // ── Refetch au retour au premier plan (rattrapage si WebSocket a raté des messages) ──
+  // ── Polling de sécurité 5s + refetch foreground + refetch sur push ──
+  // Architecture : WebSocket (instantané) + polling 5s (filet) + foreground (resync) + push (rattrapage)
+  // Le polling ne tourne QUE quand le chat est ouvert ET l'app au premier plan.
+  // Aucun timer orphelin : nettoyé au démontage, au changement de course, et en arrière-plan.
   useEffect(() => {
     if (!courseId || !open) return;
-    const handleVisibility = () => {
-      if (document.visibilityState === "visible") {
-        base44.entities.Message.filter({ course_id: courseId }, "created_date", 100)
-          .then(async (msgs) => {
-            const list = dedupeAndSortMessages(msgs || []);
-            const profiles = await buildSenderProfiles(base44, list);
-            const enriched = enrichMessagesWithProfiles(list, profiles);
-            enriched.forEach(m => knownIdsRef.current.add(getMessageKey(m)));
-            setMessages(prev => dedupeAndSortMessages([...prev, ...enriched]));
-          })
-          .catch(() => {});
+
+    let intervalId = null;
+
+    const startPolling = () => {
+      if (intervalId) return;
+      intervalId = setInterval(refetchMessages, 5000);
+    };
+
+    const stopPolling = () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+        intervalId = null;
       }
     };
+
+    // Démarrer le polling si l'app est déjà au premier plan
+    if (document.visibilityState === "visible") {
+      startPolling();
+    }
+
+    // Gérer le passage au premier plan / arrière-plan
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        // Refetch immédiat au retour au premier plan (rattrapage)
+        refetchMessages();
+        // Reprendre le polling
+        startPolling();
+      } else {
+        // Arrêter le polling en arrière-plan (économie batterie)
+        stopPolling();
+      }
+    };
+
+    // Refetch déclenché par un push de type nouveau_message
+    // Le push peut être dispatché par le hook de notifications ou la couche native.
+    const handlePushRefetch = (event) => {
+      const detail = event?.detail || {};
+      if (detail.course_id === courseId || detail.type === "nouveau_message") {
+        refetchMessages();
+      }
+    };
+
     document.addEventListener("visibilitychange", handleVisibility);
-    return () => document.removeEventListener("visibilitychange", handleVisibility);
-  }, [courseId, open]);
+    window.addEventListener("silgapp:chat_refetch", handlePushRefetch);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("silgapp:chat_refetch", handlePushRefetch);
+      stopPolling();
+    };
+  }, [courseId, open, refetchMessages]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
