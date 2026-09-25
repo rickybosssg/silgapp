@@ -279,6 +279,22 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
         if (!mounted) return;
       }
 
+      // 0b. Vérifier s'il y a un Livreur Enterprise en attente d'activation
+      //     (inscrit via invitation agence, User créé après acceptation email)
+      if (!user.enterprise_id || user.silgapp_role !== "livreur") {
+        try {
+          const res = await base44.functions.invoke("activateEnterpriseDriver", {});
+          if (res?.activated) {
+            const updatedUser = await base44.auth.me();
+            if (updatedUser) {
+              user.silgapp_role = updatedUser.silgapp_role;
+              user.enterprise_id = updatedUser.enterprise_id;
+            }
+          }
+        } catch (_) {}
+        if (!mounted) return;
+      }
+
       // 1. Agent de saisie → accès LIMITÉ au formulaire de création de course uniquement
       //    Pas de dashboard admin, pas de sélection de réseau.
       //    L'employé est redirigé vers /admin/creer-course s'il n'y est pas déjà.

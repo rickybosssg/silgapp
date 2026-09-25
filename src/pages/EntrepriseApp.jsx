@@ -2,7 +2,10 @@ import React, { useState, useEffect, useCallback } from "react";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Building2, Users, Package, TrendingUp, Wallet, LogOut, RefreshCw, Truck, MapPin } from "lucide-react";
+import { Building2, Users, Package, TrendingUp, Wallet, LogOut, RefreshCw, Truck, MapPin, Palette, UserPlus, Clock } from "lucide-react";
+import BrandingTab from "@/components/enterprise/BrandingTab.jsx";
+import InvitationsTab from "@/components/enterprise/InvitationsTab.jsx";
+import PendingDriversTab from "@/components/enterprise/PendingDriversTab.jsx";
 
 /**
  * EntrepriseApp — Dashboard de l'Admin Entreprise.
@@ -84,7 +87,10 @@ export default function EntrepriseApp() {
   const tabs = [
     { id: "overview", label: "Tableau de bord", icon: TrendingUp },
     { id: "courses", label: "Courses", icon: Package },
-    { id: "livreurs", label: "Livreurs", icon: Users },
+    { id: "livreurs", label: "Livreurs", icon: Truck },
+    { id: "pending", label: "Candidats", icon: Clock },
+    { id: "invitations", label: "Invitations", icon: UserPlus },
+    { id: "branding", label: "Identité", icon: Palette },
     { id: "comptabilite", label: "Comptabilité", icon: Wallet },
   ];
 
@@ -146,6 +152,9 @@ export default function EntrepriseApp() {
         )}
         {activeTab === "courses" && <CoursesTab courses={courses} stats={stats} />}
         {activeTab === "livreurs" && <LivreursTab livreurs={livreurs} />}
+        {activeTab === "pending" && <PendingDriversTab />}
+        {activeTab === "invitations" && <InvitationsTab />}
+        {activeTab === "branding" && <BrandingTab enterprise={enterprise} onRefresh={loadDashboard} />}
         {activeTab === "comptabilite" && <ComptabiliteTab stats={stats} ledger={ledger} enterprise={enterprise} />}
       </main>
     </div>
@@ -281,14 +290,25 @@ function LivreursTab({ livreurs }) {
                 {l.prenom} {l.nom}
               </p>
               <p className="text-xs text-gray-500">{l.telephone}</p>
+              {l.user_email && <p className="text-[10px] text-gray-400 truncate">{l.user_email}</p>}
             </div>
-            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-              l.statut === "disponible" ? "bg-emerald-100 text-emerald-700" :
-              l.statut === "en_course" ? "bg-amber-100 text-amber-700" :
-              "bg-gray-100 text-gray-500"
-            }`}>
-              {l.statut === "disponible" ? "Dispo" : l.statut === "en_course" ? "En course" : "Hors ligne"}
-            </span>
+            <div className="flex flex-col items-end gap-1">
+              {l.validation === "en_attente" && (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700">En attente</span>
+              )}
+              {l.validation === "valide" && (
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                  l.statut === "disponible" ? "bg-emerald-100 text-emerald-700" :
+                  l.statut === "en_course" ? "bg-amber-100 text-amber-700" :
+                  "bg-gray-100 text-gray-500"
+                }`}>
+                  {l.statut === "disponible" ? "Dispo" : l.statut === "en_course" ? "En course" : "Hors ligne"}
+                </span>
+              )}
+              {l.validation === "refuse" && (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700">Refusé</span>
+              )}
+            </div>
           </CardContent>
         </Card>
       ))}

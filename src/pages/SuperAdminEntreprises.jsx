@@ -629,68 +629,17 @@ function AddAdminModal({ enterpriseId, onClose, onAdded }) {
 }
 
 function AddLivreurModal({ enterpriseId, countryCode, onClose, onAdded }) {
-  const [form, setForm] = useState({ nom: "", prenom: "", telephone: "", vehicule: "moto", ville: "", quartier: "" });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
-    try {
-      await base44.functions.invoke("manageEnterprise", {
-        action: "add_livreur",
-        enterprise_id: enterpriseId,
-        ...form,
-      });
-      onAdded();
-    } catch (err) {
-      setError(err?.message || "Erreur");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
       <Card className="w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
         <CardHeader><CardTitle className="text-sm">+ Ajouter un livreur</CardTitle></CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-3">
-            <div>
-              <Label className="text-xs">Prénom</Label>
-              <Input value={form.prenom} onChange={(e) => setForm({ ...form, prenom: e.target.value })} />
-            </div>
-            <div>
-              <Label className="text-xs">Nom *</Label>
-              <Input value={form.nom} onChange={(e) => setForm({ ...form, nom: e.target.value })} required />
-            </div>
-            <div>
-              <Label className="text-xs">Téléphone *</Label>
-              <Input value={form.telephone} onChange={(e) => setForm({ ...form, telephone: e.target.value })} required />
-            </div>
-            <div>
-              <Label className="text-xs">Véhicule</Label>
-              <select value={form.vehicule} onChange={(e) => setForm({ ...form, vehicule: e.target.value })} className="w-full rounded-md border border-gray-200 p-2 text-sm">
-                <option value="moto">Moto</option>
-                <option value="velo">Vélo</option>
-                <option value="voiture">Voiture</option>
-              </select>
-            </div>
-            <div>
-              <Label className="text-xs">Ville</Label>
-              <Input value={form.ville} onChange={(e) => setForm({ ...form, ville: e.target.value })} />
-            </div>
-            <div>
-              <Label className="text-xs">Quartier</Label>
-              <Input value={form.quartier} onChange={(e) => setForm({ ...form, quartier: e.target.value })} />
-            </div>
-            {error && <p className="text-sm text-red-500">{error}</p>}
-            <div className="flex gap-2">
-              <Button type="button" variant="outline" className="flex-1" onClick={onClose}>Annuler</Button>
-              <Button type="submit" className="flex-1" disabled={loading}>{loading ? "..." : "Ajouter"}</Button>
-            </div>
-          </form>
+        <CardContent className="space-y-3">
+          <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 text-xs text-blue-700">
+            <p className="font-semibold mb-1">💡 Système d'invitation</p>
+            <p>Pour un parcours complet avec compte utilisateur et email, utilisez le système d'invitation depuis le dashboard entreprise.</p>
+            <p className="mt-1">L'admin entreprise peut générer un lien/QR d'inscription depuis son onglet "Invitations".</p>
+          </div>
+          <Button type="button" variant="outline" className="w-full" onClick={onClose}>Fermer</Button>
         </CardContent>
       </Card>
     </div>

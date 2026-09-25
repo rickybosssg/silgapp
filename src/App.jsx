@@ -126,6 +126,7 @@ import Diag500Panel from './components/admin/Diag500Panel.jsx';
 // ── SILGAPP ENTREPRISE — Module multi-tenant ──
 const EntrepriseApp = lazy(() => import('./pages/EntrepriseApp.jsx'));
 const SuperAdminEntreprises = lazy(() => import('./pages/SuperAdminEntreprises.jsx'));
+const InscriptionLivreurEntreprise = lazy(() => import('./pages/InscriptionLivreurEntreprise.jsx'));
 
 function AnimatedRoutes({ children }) {
   // Variables définies DANS la fonction pour éviter init issues
@@ -243,7 +244,8 @@ function AppContent() {
   const isPublicRoute = currentPath === '/telecharger' || 
                         currentPath === '/privacy-policy' ||
                         currentPath.startsWith('/suivi-public/') ||
-                        currentPath.startsWith('/demo/');
+                        currentPath.startsWith('/demo/') ||
+                        currentPath.startsWith('/inscription-livreur');
 
   // /demo/ : rendu DIRECT sans passer par le Router pour éviter toute ingérence
   if (currentPath.startsWith('/demo/')) {
@@ -263,6 +265,8 @@ function AppContent() {
           <Route path="/telecharger" element={<TelechargerSILGAPP />} />
           {/* Route publique de suivi de course */}
           <Route path="/suivi-public/:token" element={<PublicSuiviCourse />} />
+          {/* Route publique d'inscription livreur entreprise (via token invitation) */}
+          <Route path="/inscription-livreur" element={<InscriptionLivreurEntreprise />} />
           {/* Politique de confidentialité — requise Google Play */}
           <Route path="/privacy-policy" element={<PolitiqueConfidentialite />} />
           <Route path="*" element={<PageNotFound />} />

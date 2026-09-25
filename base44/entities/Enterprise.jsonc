@@ -23,6 +23,14 @@
       "default": "#007AFF",
       "description": "Hex code pour branding de l'entreprise dans son dashboard"
     },
+    "nom_commercial": {
+      "type": "string",
+      "description": "Nom commercial de l'agence pour l'affichage public (page d'inscription livreur). Si vide, utilise 'nom'."
+    },
+    "whatsapp": {
+      "type": "string",
+      "description": "Num\u00e9ro WhatsApp de l'agence pour le contact livreur."
+    },
     "telephone": {
       "type": "string",
       "description": "Num\u00e9ro de t\u00e9l\u00e9phone de l'entreprise"
