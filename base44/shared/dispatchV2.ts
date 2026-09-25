@@ -42,7 +42,7 @@ import { figerCommissionAcceptation } from './commissionAvantage.ts';
 import { normalizeEnterpriseId } from './enterpriseFinance.ts';
 
 // ── Version du bundle (pour vérifier que la production charge la dernière version) ──
-export const DISPATCH_V2_BUNDLE_VERSION = '2026-09-25-fix-commission-lock-happy-hour';
+export const DISPATCH_V2_BUNDLE_VERSION = '2026-09-25-v2-only-unique-moteur';
 
 // ── Feature flag cache (TTL 2 min) ──
 let V2_FLAG_CACHE: { enabled: boolean; expires: number } | null = null;
@@ -99,6 +99,7 @@ async function notifierLivreursEligiblesV2(base44: any, course: any, options: an
       { course_id: course.id }, '-date_notification', 500
     ).catch(() => []),
   ]);
+
 
   // Split DN records en mémoire (évite 2 reads séparés pour notifiés vs refusés)
   const dejaNotifies = (allDnRecords || []).filter((n: any) => n.statut !== 'refuse').map((n: any) => n.livreur_id);
