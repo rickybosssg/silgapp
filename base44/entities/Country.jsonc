@@ -196,6 +196,11 @@
       "default": false,
       "description": "Active le mode Forte Demande pour les clients de ce pays. Si false, le dashboard reste toujours bleu m\u00eame avec \u22655 courses actives."
     },
+    "forte_demande_active": {
+      "type": "boolean",
+      "default": false,
+      "description": "\u00c9tat hyst\u00e9r\u00e9sis persistant du mode Forte Demande pour ce pays. Mis \u00e0 jour par getForteDemandeStatus uniquement lors d'une transition de seuil. True = dashboard rouge, False = dashboard bleu. Survit aux red\u00e9marrages et est partag\u00e9 par tous les clients du pays."
+    },
     "forte_demande_seuil_activation": {
       "type": "number",
       "default": 5,

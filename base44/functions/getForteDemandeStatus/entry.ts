@@ -26,9 +26,13 @@ const STATUTS_ACTIFS_FORTE_DEMANDE = [
  *   - count <= seuil_retour → forte_demande = false
  *   - entre les deux → conserve l'état précédent (anti-clignotement)
  *
- * L'état précédent est stocké en mémoire (Map par country_code).
- * En cas de redémarrage, un count entre les seuils utilise le seuil d'activation
- * comme déclencheur (état par défaut = normal/bleu).
+ * L'état précédent est PERSISTÉ sur le champ Country.forte_demande_active.
+ * Cela garantit :
+ *   - Unicité de l'état par pays (tous les clients voient le même résultat)
+ *   - Survie aux redémarrages (pas de perte d'état)
+ *   - Cohérence multi-workers (pas d'état divergent entre isolates)
+ *
+ * Écriture uniquement lors d'une transition de seuil (rare) — pas à chaque appel.
  *
  * Multi-pays strict : chaque pays est compté indépendamment.
  */
@@ -82,13 +86,8 @@ export default async function(req) {
 
     const activeCount = (allCourses || []).length;
 
-    // ── 3. Appliquer l'hystérésis ──
-    // État précédent stocké en mémoire (par worker instance).
-    // En cas de redémarrage, l'état par défaut est "normal" (bleu).
-    if (!globalThis._forteDemandeState) {
-      globalThis._forteDemandeState = {};
-    }
-    const prevState = globalThis._forteDemandeState[countryCode] || false;
+    // ── 3. Appliquer l'hystérésis avec état persisté sur Country ──
+    const prevState = !!country.forte_demande_active;
 
     let forteDemande;
     if (activeCount >= seuilActivation) {
@@ -96,11 +95,18 @@ export default async function(req) {
     } else if (activeCount <= seuilRetour) {
       forteDemande = false;
     } else {
-      // Entre les seuils : conserver l'état précédent
+      // Entre les seuils : conserver l'état précédent persisté
       forteDemande = prevState;
     }
 
-    globalThis._forteDemandeState[countryCode] = forteDemande;
+    // ── 4. Persister uniquement si l'état a changé (transition de seuil) ──
+    // Écriture rare : uniquement lors du franchissement d'un seuil.
+    // Pas d'écriture à chaque appel → pas de charge DB inutile.
+    if (forteDemande !== prevState) {
+      await base44.asServiceRole.entities.Country.update(country.id, {
+        forte_demande_active: forteDemande,
+      });
+    }
 
     return Response.json({
       country_code: countryCode,
