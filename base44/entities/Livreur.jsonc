@@ -350,18 +350,6 @@
           "user_condition": {
             "role": "admin"
           }
-        },
-        {
-          "$and": [
-            {
-              "data.enterprise_id": "{{user.data.enterprise_id}}"
-            },
-            {
-              "data.enterprise_id": {
-                "$ne": null
-              }
-            }
-          ]
         }
       ]
     },
