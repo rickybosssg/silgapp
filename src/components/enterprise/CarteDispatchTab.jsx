@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { base44 } from "@/api/base44Client";
+import React from "react";
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from "react-leaflet";
 import { RefreshCw, Truck, Package, Users } from "lucide-react";
 import L from "leaflet";
@@ -31,43 +30,11 @@ function courseIcon() {
   });
 }
 
-const ACTIVE_STATUSES = ["nouvelle", "en_attente", "recherche_livreur", "livreur_en_route", "client_contacte", "en_route_expediteur", "arrive_prise_en_charge", "colis_recupere", "pris_en_charge", "en_livraison", "arrivee"];
-
-export default function CarteDispatchTab({ enterprise, onCourseClick, onLivreurClick }) {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const res = await base44.functions.invoke("getEnterpriseDashboard", {});
-      setData(res?.data || res);
-    } catch (err) {
-      setError(err?.message || "Erreur");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    load();
-    const interval = setInterval(load, 30000);
-    return () => clearInterval(interval);
-  }, [load]);
-
-  if (loading && !data) {
+export default function CarteDispatchTab({ enterprise, data, onRefresh, onCourseClick, onLivreurClick }) {
+  // Les données proviennent du parent (EntrepriseApp) — polling centralisé 30s
+  // Aucun polling interne pour éviter les requêtes dupliquées.
+  if (!data) {
     return <div className="text-center py-8"><RefreshCw className="w-5 h-5 animate-spin mx-auto text-gray-400" /></div>;
-  }
-
-  if (error) {
-    return (
-      <div className="text-center py-8">
-        <p className="text-sm text-red-500">{error}</p>
-        <button onClick={load} className="text-xs text-blue-500 mt-2">Réessayer</button>
-      </div>
-    );
   }
 
   const livreurs = (data?.livreurs || []).filter(
@@ -178,7 +145,7 @@ export default function CarteDispatchTab({ enterprise, onCourseClick, onLivreurC
         </MapContainer>
       </div>
 
-      <button onClick={load} className="w-full text-xs text-blue-500 flex items-center justify-center gap-1 py-2">
+      <button onClick={onRefresh} className="w-full text-xs text-blue-500 flex items-center justify-center gap-1 py-2">
         <RefreshCw className="w-3 h-3" /> Rafraîchir (auto 30s)
       </button>
 

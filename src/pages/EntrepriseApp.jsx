@@ -8,6 +8,7 @@ import CourseCreateTab from "@/components/enterprise/CourseCreateTab.jsx";
 import CourseDetailModal from "@/components/enterprise/CourseDetailModal.jsx";
 import LivreurFicheModal from "@/components/enterprise/LivreurFicheModal.jsx";
 import CarteDispatchTab from "@/components/enterprise/CarteDispatchTab.jsx";
+import { EN_TRAITEMENT_STATUSES, STATUS_BADGE } from "@/components/enterprise/courseStatus.js";
 
 export default function EntrepriseApp() {
   const [data, setData] = useState(null);
@@ -17,21 +18,26 @@ export default function EntrepriseApp() {
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [selectedLivreur, setSelectedLivreur] = useState(null);
 
-  const loadDashboard = useCallback(async () => {
-    setLoading(true);
+  const loadDashboard = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     setError("");
     try {
       const res = await base44.functions.invoke("getEnterpriseDashboard", {});
       setData(res?.data || res);
     } catch (err) {
-      setError(err?.message || "Erreur lors du chargement");
+      if (!silent) setError(err?.message || "Erreur lors du chargement");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 
+  // ── Polling centralisé 30s — LECTURE SEULE (getEnterpriseDashboard ne fait que des filter()).
+  //    Aucun GPS, heartbeat, dispatch, notification ni écriture déclenché.
+  //    CarteDispatchTab et CoursesTab utilisent les mêmes données → pas de double polling.
   useEffect(() => {
     loadDashboard();
+    const interval = setInterval(() => loadDashboard(true), 30000);
+    return () => clearInterval(interval);
   }, [loadDashboard]);
 
   const handleLogout = () => {
@@ -39,7 +45,7 @@ export default function EntrepriseApp() {
     base44.auth.logout();
   };
 
-  if (loading) {
+  if (loading && !data) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center space-y-3">
@@ -151,6 +157,8 @@ export default function EntrepriseApp() {
         {activeTab === "carte" && (
           <CarteDispatchTab
             enterprise={enterprise}
+            data={data}
+            onRefresh={() => loadDashboard()}
             onCourseClick={setSelectedCourse}
             onLivreurClick={setSelectedLivreur}
           />
@@ -266,12 +274,14 @@ function OverviewTab({ stats, enterprise, courses }) {
 
 // ── Onglet Courses ──
 function CoursesTab({ courses, stats, onCourseClick }) {
-  const [subTab, setSubTab] = useState("all");
+  const [subTab, setSubTab] = useState("en_traitement");
 
   const allCourses = courses?.recent || [];
   const filtered = {
     all: allCourses,
+    en_traitement: allCourses.filter((c) => EN_TRAITEMENT_STATUSES.includes(c.statut)),
     nouvelles: allCourses.filter((c) => c.statut === "nouvelle"),
+    programmee: allCourses.filter((c) => c.statut === "programmee"),
     recherche: allCourses.filter((c) => ["recherche_livreur", "en_attente"].includes(c.statut)),
     acceptees: allCourses.filter((c) => ["livreur_en_route", "client_contacte", "en_route_expediteur", "arrive_prise_en_charge"].includes(c.statut)),
     en_cours: allCourses.filter((c) => ["pris_en_charge", "en_livraison", "colis_recupere", "passager_embarque", "arrivee"].includes(c.statut)),
@@ -281,7 +291,9 @@ function CoursesTab({ courses, stats, onCourseClick }) {
 
   const subTabs = [
     { id: "all", label: "Toutes", data: filtered.all },
+    { id: "en_traitement", label: "En traitement", data: filtered.en_traitement },
     { id: "nouvelles", label: "Nouvelles", data: filtered.nouvelles },
+    { id: "programmee", label: "Programmées", data: filtered.programmee },
     { id: "recherche", label: "En recherche", data: filtered.recherche },
     { id: "acceptees", label: "Acceptées", data: filtered.acceptees },
     { id: "en_cours", label: "En cours", data: filtered.en_cours },
@@ -451,41 +463,39 @@ function ComptabiliteTab({ stats, ledger, enterprise }) {
 
 // ── Composant: ligne de course ──
 function CourseRow({ course, onClick }) {
-  const statusColors = {
-    nouvelle: "bg-blue-100 text-blue-700",
-    livree: "bg-emerald-100 text-emerald-700",
-    annulee: "bg-red-100 text-red-700",
-    en_livraison: "bg-amber-100 text-amber-700",
-    pris_en_charge: "bg-purple-100 text-purple-700",
-    recherche_livreur: "bg-orange-100 text-orange-700",
-  };
+  const badge = STATUS_BADGE[course.statut] || { label: course.statut, cls: "bg-gray-100 text-gray-500" };
 
   return (
     <button
       onClick={onClick}
       className="w-full text-left bg-white rounded-xl border p-3 shadow-sm hover:shadow-md transition"
     >
-      <div className="flex items-center justify-between mb-1">
-        <span className="text-sm font-semibold text-gray-900 truncate flex-1">
-          {course.adresse_depart || "—"} → {course.adresse_arrivee || "—"}
+      {/* #COURSE */}
+      <span className="text-[10px] font-mono text-gray-400">#{course.id?.slice(-6) || "—"}</span>
+      {/* Client */}
+      <p className="text-sm font-semibold text-gray-900 truncate mt-0.5">{course.client_nom || "Client"}</p>
+      {/* Départ → Destination */}
+      <p className="text-xs text-gray-500 truncate">{course.adresse_depart || "—"} → {course.adresse_arrivee || "—"}</p>
+      {/* Livreur • Statut */}
+      <div className="flex items-center gap-1 mt-1">
+        <span className="text-xs text-gray-500 truncate flex-1">
+          {course.livreur_nom ? (
+            <>🛵 {course.livreur_nom}</>
+          ) : (
+            <span className="text-amber-600 italic">Recherche d'un livreur</span>
+          )}
         </span>
-        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ml-2 ${
-          statusColors[course.statut] || "bg-gray-100 text-gray-500"
-        }`}>
-          {course.statut}
+        <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold whitespace-nowrap ${badge.cls}`}>
+          {badge.label}
         </span>
       </div>
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-500">{course.client_nom || "Client"}</span>
-          {course.livreur_nom ? (
-            <span className="text-xs text-blue-600">· {course.livreur_nom}</span>
-          ) : (
-            <span className="text-xs text-amber-600 italic">· En attente d'un livreur</span>
-          )}
-        </div>
-        {course.prix_final > 0 && (
-          <span className="text-xs font-bold text-gray-900">{course.prix_final.toLocaleString("fr-FR")} F</span>
+      {/* Prix • Heure */}
+      <div className="flex items-center justify-between mt-1">
+        <span className="text-xs font-bold text-gray-900">
+          {course.prix_final > 0 ? `${course.prix_final.toLocaleString("fr-FR")} F` : "—"}
+        </span>
+        {course.created_date && (
+          <span className="text-[10px] text-gray-400">{new Date(course.created_date).toLocaleString("fr-FR")}</span>
         )}
       </div>
     </button>

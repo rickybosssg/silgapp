@@ -1,24 +1,7 @@
 import React from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Phone, MapPin, User, Truck, Calendar, Wallet, Navigation } from "lucide-react";
-
-const STATUS_LABELS = {
-  nouvelle: "Nouvelle",
-  en_attente: "En attente",
-  programmee: "Programmée",
-  recherche_livreur: "Recherche livreur",
-  livreur_en_route: "Livreur en route",
-  client_contacte: "Client contacté",
-  en_route_expediteur: "En route expéditeur",
-  arrive_prise_en_charge: "Arrivé prise en charge",
-  colis_recupere: "Colis récupéré",
-  passager_embarque: "Passager embarqué",
-  pris_en_charge: "Pris en charge",
-  en_livraison: "En livraison",
-  arrivee: "Arrivée",
-  livree: "Livrée",
-  annulee: "Annulée",
-};
+import { STATUS_LABELS, PROGRESSION_STEPS, getProgressionStep } from "./courseStatus.js";
 
 const DISPATCH_LABELS = {
   en_attente: "En attente",
@@ -33,6 +16,8 @@ const DISPATCH_LABELS = {
 export default function CourseDetailModal({ course, open, onClose }) {
   if (!course) return null;
 
+  const currentStep = getProgressionStep(course);
+
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
@@ -44,6 +29,40 @@ export default function CourseDetailModal({ course, open, onClose }) {
         </DialogHeader>
 
         <div className="space-y-3">
+          {/* Progression visuelle */}
+          {course.statut === "annulee" ? (
+            <div className="bg-red-50 rounded-lg p-3 text-center">
+              <span className="text-sm font-bold text-red-600">❌ Course annulée</span>
+            </div>
+          ) : course.statut === "programmee" ? (
+            <div className="bg-indigo-50 rounded-lg p-3 text-center">
+              <span className="text-sm font-bold text-indigo-600">📅 Course programmée</span>
+            </div>
+          ) : (
+            <div className="bg-gray-50 rounded-lg p-3">
+              <div className="flex items-start justify-between">
+                {PROGRESSION_STEPS.map((step, idx) => {
+                  const isDone = idx <= currentStep;
+                  const isCurrent = idx === currentStep;
+                  return (
+                    <div key={step.key} className="flex flex-col items-center gap-1" style={{ flex: 1 }}>
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                        isDone ? "bg-blue-500 text-white" : "bg-gray-200 text-gray-400"
+                      } ${isCurrent ? "ring-2 ring-blue-300 ring-offset-1" : ""}`}>
+                        {isDone ? "✓" : idx + 1}
+                      </div>
+                      <span className={`text-[8px] text-center leading-tight ${
+                        isDone ? "text-gray-700 font-semibold" : "text-gray-400"
+                      }`}>
+                        {step.label}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Statut */}
           <div className="flex items-center justify-between bg-gray-50 rounded-lg p-2">
             <span className="text-xs text-gray-500">Statut</span>
