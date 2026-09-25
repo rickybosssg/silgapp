@@ -14,6 +14,8 @@ import InvitationWhatsAppModal from "@/components/client/InvitationWhatsAppModal
 import { normalizePhone, phoneVariants } from "@/lib/phoneUtils";
 import { resolveGpsForCourse, GPS_BLOCK_MESSAGE } from "@/lib/gpsResolution";
 import { isPaysTarificationGrandOuaga } from "@/lib/tarifGrandOuaga";
+import { useForteDemande } from "@/hooks/useForteDemande";
+import { useCountryPricing } from "@/hooks/useCountryPricing";
 
 // Génère les IDs de colis : A, B, C...
 const COLIS_LETTERS = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"];
@@ -65,6 +67,10 @@ export default function CourseExterneFormSync() {
   const submissionSafetyTimerRef = useRef(null);
   const [invitationModal, setInvitationModal] = useState(null); // { telephone, nom } ou null
   const [gpsLoading, setGpsLoading] = useState({ depart: false, arrivee: false });
+  const { forteDemande } = useForteDemande(clientProfil?.country_code);
+  const { country: countryConfig } = useCountryPricing(clientProfil?.country_code);
+  // Source tarifaire unique : Country.prix_minimum (jamais codé en dur)
+  const prixMinimum = countryConfig?.prix_minimum || 500;
 
   useEffect(() => () => {
     if (submissionSafetyTimerRef.current) clearTimeout(submissionSafetyTimerRef.current);
@@ -189,10 +195,16 @@ export default function CourseExterneFormSync() {
     localStorage.setItem(STEP_KEY, String(currentStep));
   }, [currentStep]);
 
-  // Helper geocoding inverse
+  // Helper geocoding inverse — NON BLOQUANT (timeout 5s, AbortController, jamais d'erreur affichée)
   const reverseGeocode = async (lat, lng) => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
     try {
-      const resp = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=fr`);
+      const resp = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=fr`,
+        { signal: controller.signal }
+      );
+      if (!resp.ok) return { adresse: "Position GPS", quartier: "" };
       const geo = await resp.json();
       const quartier = geo?.address?.suburb || geo?.address?.neighbourhood || geo?.address?.quarter || geo?.address?.city_district || geo?.address?.village || "";
       const ville = geo?.address?.city || geo?.address?.town || geo?.address?.municipality || "";
@@ -200,115 +212,109 @@ export default function CourseExterneFormSync() {
         adresse: geo?.display_name || [quartier, ville].filter(Boolean).join(", ") || "Position GPS",
         quartier,
       };
-    } catch (_) { return { adresse: "Position GPS", quartier: "" }; }
+    } catch (_) {
+      return { adresse: "Position GPS", quartier: "" };
+    } finally {
+      clearTimeout(timeoutId);
+    }
   };
 
-  const getGPSPosition = async () => {
+  // Helper GPS — protection anti-blocage avec timeout de sécurité global
+  const getGPSPosition = () => {
     if (!navigator.geolocation) {
-      throw new Error("no_geolocation");
+      return Promise.reject(new Error("no_geolocation"));
     }
 
-    const getPosition = (options) => new Promise((resolve, reject) => {
-      navigator.geolocation.getCurrentPosition(resolve, reject, options);
-    });
-
-    try {
-      return await getPosition({
-        enableHighAccuracy: true,
-        timeout: 12000,
-        maximumAge: 15000,
+    const getPosition = (options) =>
+      new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, options);
       });
-    } catch (firstError) {
-      if (firstError?.code === 1) {
+
+    const withSafetyTimeout = (promise, ms) => {
+      let timer;
+      const timeout = new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error("GPS_TIMEOUT_SAFETY")), ms);
+      });
+      return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+    };
+
+    // 1re tentative : haute précision (timeout 12s + safety 15s)
+    return withSafetyTimeout(
+      getPosition({ enableHighAccuracy: true, timeout: 12000, maximumAge: 15000 }),
+      15000
+    ).catch((firstError) => {
+      if (firstError?.code === 1 || firstError?.message === "GPS_TIMEOUT_SAFETY") {
         throw firstError;
       }
-      return getPosition({
-        enableHighAccuracy: false,
-        timeout: 10000,
-        maximumAge: 60000,
-      });
-    }
+      // 2e tentative : basse précision (timeout 10s + safety 12s)
+      return withSafetyTimeout(
+        getPosition({ enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }),
+        12000
+      );
+    });
+  };
+
+  // Helper commun : enregistre les coordonnées IMMÉDIATEMENT, lance le reverse geocoding en arrière-plan
+  const handleGPSSuccess = (side, lat, lng) => {
+    const isDepart = side === "depart";
+    // 1. Enregistrer les coordonnées immédiatement + marquer comme récupéré
+    setFormData((prev) => ({
+      ...prev,
+      [isDepart ? "gps_depart_lat" : "gps_arrivee_lat"]: lat,
+      [isDepart ? "gps_depart_lng" : "gps_arrivee_lng"]: lng,
+      [isDepart ? "recuperationGPS" : "livraisonGPS"]: true,
+      [isDepart ? "adresse_depart" : "adresse_arrivee"]: prev[isDepart ? "adresse_depart" : "adresse_arrivee"] || "Position GPS",
+    }));
+    // 2. Arrêter le loading immédiatement — le client peut continuer
+    setGpsLoading((prev) => ({ ...prev, [side]: false }));
+    toast.success("Position récupérée");
+    // 3. Reverse geocoding en arrière-plan (non bloquant)
+    reverseGeocode(lat, lng).then(({ adresse, quartier }) => {
+      setFormData((prev) => ({
+        ...prev,
+        [isDepart ? "adresse_depart" : "adresse_arrivee"]: adresse || prev[isDepart ? "adresse_depart" : "adresse_arrivee"],
+        [isDepart ? "quartier_depart" : "quartier_arrivee"]: quartier || prev[isDepart ? "quartier_depart" : "quartier_arrivee"],
+      }));
+    });
   };
 
   const gpsHandlers = {
     onGetGPSDepart: async () => {
       if (gpsLoading.depart) return;
-      setGpsLoading(prev => ({ ...prev, depart: true }));
-
+      setGpsLoading((prev) => ({ ...prev, depart: true }));
       try {
-        let lat;
-        let lng;
-        try {
-          const pos = await getGPSPosition();
-          lat = pos.coords.latitude;
-          lng = pos.coords.longitude;
-        } catch (gpsError) {
-          if (savedLat && savedLng) {
-            lat = savedLat;
-            lng = savedLng;
-          } else {
-            if (gpsError?.code === 1) {
-              toast.error("Permission GPS refusee. Autorisez la localisation dans les parametres.");
-            } else if (gpsError?.code === 2) {
-              toast.error("Position GPS indisponible. Verifiez le GPS ou saisissez l'adresse manuellement.");
-            } else {
-              toast.error("Impossible de detecter votre position. Saisissez l'adresse manuellement.");
-            }
-            return;
-          }
+        const pos = await getGPSPosition();
+        handleGPSSuccess("depart", pos.coords.latitude, pos.coords.longitude);
+      } catch (gpsError) {
+        setGpsLoading((prev) => ({ ...prev, depart: false }));
+        if (gpsError?.code === 1) {
+          toast.error("Permission GPS refusée. Autorisez la localisation dans les paramètres.");
+          return;
         }
-
-        const { adresse, quartier } = await reverseGeocode(lat, lng);
-        setFormData((prev) => ({
-          ...prev,
-          gps_depart_lat: lat,
-          gps_depart_lng: lng,
-          recuperationGPS: true,
-          adresse_depart: adresse || "Position GPS",
-          quartier_depart: quartier || prev.quartier_depart,
-        }));
-        toast.success("Position detectee avec succes");
-      } finally {
-        setGpsLoading(prev => ({ ...prev, depart: false }));
+        if (savedLat && savedLng) {
+          handleGPSSuccess("depart", savedLat, savedLng);
+        } else {
+          toast.error("Position GPS indisponible. Saisissez l'adresse manuellement.");
+        }
       }
     },
     onGetGPSArrivee: async () => {
       if (gpsLoading.arrivee) return;
-      setGpsLoading(prev => ({ ...prev, arrivee: true }));
-
+      setGpsLoading((prev) => ({ ...prev, arrivee: true }));
       try {
-        let lat;
-        let lng;
-        try {
-          const pos = await getGPSPosition();
-          lat = pos.coords.latitude;
-          lng = pos.coords.longitude;
-        } catch (gpsError) {
-          if (savedLat && savedLng) {
-            lat = savedLat;
-            lng = savedLng;
-          } else {
-            if (gpsError?.code === 1) {
-              toast.error("Permission GPS refusee. Autorisez la localisation dans les parametres.");
-            } else {
-              toast.error("Impossible de detecter votre position. Verifiez le GPS ou saisissez l'adresse manuellement.");
-            }
-            return;
-          }
+        const pos = await getGPSPosition();
+        handleGPSSuccess("arrivee", pos.coords.latitude, pos.coords.longitude);
+      } catch (gpsError) {
+        setGpsLoading((prev) => ({ ...prev, arrivee: false }));
+        if (gpsError?.code === 1) {
+          toast.error("Permission GPS refusée. Autorisez la localisation dans les paramètres.");
+          return;
         }
-
-        const { adresse, quartier } = await reverseGeocode(lat, lng);
-        setFormData((prev) => ({
-          ...prev,
-          gps_arrivee_lat: lat,
-          gps_arrivee_lng: lng,
-          livraisonGPS: true,
-          adresse_arrivee: prev.adresse_arrivee || adresse,
-          quartier_arrivee: quartier || prev.quartier_arrivee,
-        }));
-        toast.success("Position detectee avec succes");
-      } finally {
-        setGpsLoading(prev => ({ ...prev, arrivee: false }));
+        if (savedLat && savedLng) {
+          handleGPSSuccess("arrivee", savedLat, savedLng);
+        } else {
+          toast.error("Position GPS indisponible. Saisissez l'adresse manuellement.");
+        }
       }
     },
   };
@@ -674,7 +680,7 @@ export default function CourseExterneFormSync() {
             formData.gps_depart_lat, formData.gps_depart_lng,
             formData.gps_arrivee_lat, formData.gps_arrivee_lng
           );
-          prixEstime = Math.max(Math.round(distance * 100), 1000);
+          prixEstime = Math.max(Math.round(distance * 100), prixMinimum);
           distanceTarifaireSource = "haversine_fallback";
         }
       } else {
@@ -682,8 +688,8 @@ export default function CourseExterneFormSync() {
           formData.gps_depart_lat, formData.gps_depart_lng,
           formData.gps_arrivee_lat, formData.gps_arrivee_lng
         );
-        // Règle : prix minimum SILGAPP = 1 000 F CFA
-        prixEstime = Math.max(Math.round(distance * 100), 1000);
+        // Source tarifaire unique : Country.prix_minimum (jamais codé en dur)
+        prixEstime = Math.max(Math.round(distance * 100), prixMinimum);
       }
     }
 
@@ -866,7 +872,10 @@ export default function CourseExterneFormSync() {
       prix_propose_client: isMulti ? 0 : (formData.prix_propose || prixEstime),
       distance_tarifaire_km: isMulti ? null : distanceTarifaireKm,
       distance_tarifaire_source: isMulti ? null : distanceTarifaireSource,
-      pricing_mode: isMulti ? "automatic" : (formData.prix_propose && formData.prix_propose !== prixEstime ? "manual" : "automatic"),
+      // Un prix explicitement saisi par le client est TOUJOURS 'manual',
+      // même s'il est numériquement égal à l'estimation. L'égalité ne signifie
+      // pas que le client n'a pas validé ce prix.
+      pricing_mode: isMulti ? "automatic" : (formData.prix_propose ? "manual" : "automatic"),
       statut: formData.date_souhaitee ? "programmee" : "recherche_livreur",
       dispatch_status: "en_attente",
       date_souhaitee: formData.date_souhaitee || null,
@@ -1044,6 +1053,7 @@ export default function CourseExterneFormSync() {
               onColisChange={handleColisChange}
               savedLat={savedLat}
               savedLng={savedLng}
+              forteDemande={forteDemande}
             />
           </form>
         </Card>

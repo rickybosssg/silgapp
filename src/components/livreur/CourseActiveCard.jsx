@@ -138,7 +138,7 @@ function ProgressBar({ statut, isDeplacement, isAdminColis }) {
   );
 }
 
-export default function CourseActiveCard({ course, onColisRecupere, onColisLivre, onClientAnnule, onMettrePause, isPending, isExterne = false, livreurLat, livreurLng, livreurId, livreurNom }) {
+export default function CourseActiveCard({ course, onColisRecupere, onColisLivre, onClientAnnule, onMettrePause, isPending, isExterne = false, livreurLat, livreurLng, livreurId, livreurNom, onDeliveryVictory }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [prixReel, setPrixReel] = useState("");
@@ -526,6 +526,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
             onClose={() => setShowQRScanner(null)}
             livreurLat={livreurLat}
             livreurLng={livreurLng}
+            onDeliveryVictory={onDeliveryVictory}
           />
         );
       })()}

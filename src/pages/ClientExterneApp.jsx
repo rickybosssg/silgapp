@@ -42,6 +42,19 @@ import EcranFinCourse from "@/components/client/EcranFinCourse";
 import MultiCourseSelector from "@/components/client/MultiCourseSelector";
 import QuickOrderPanel from "@/components/client/QuickOrderPanel";
 import QuickOrderProPanel from "@/components/client/QuickOrderProPanel";
+import { STATUTS_ACTIFS_COURSE, COURSE_STATUSES } from "@/lib/courseStatuses";
+import { useForteDemande } from "@/hooks/useForteDemande";
+import ForteDemandeBanner from "@/components/client/ForteDemandeBanner";
+
+// ── Statuts réellement suivables par le client (liste positive) ──
+// Inclut la phase de recherche (nouvelle, recherche_livreur) + tous les statuts
+// actifs (livreur engagé). Exclut en_attente (suspendue), programmee (non démarrée),
+// livree et annulee (terminaux).
+const STATUTS_SUIVABLES_CLIENT = [
+  COURSE_STATUSES.NOUVELLE,
+  COURSE_STATUSES.RECHERCHE_LIVREUR,
+  ...STATUTS_ACTIFS_COURSE,
+];
 
 function GPSBadge({ profil, onForceSync }) {
   const hasCoords = !!(profil?.latitude && profil?.longitude);
@@ -99,6 +112,9 @@ export default function ClientExterneApp() {
   const [showMultiCourseSelector, setShowMultiCourseSelector] = useState(false);
   const lastRechercheCourseId = useRef(null);
   const prevHadRecherche = useRef(false);
+
+  // ── Forte Demande — comptage backend par pays, hystérésis, actualisation 30s ──
+  const { forteDemande, config: forteDemandeConfig } = useForteDemande(clientProfil?.country_code);
 
   const [userId, setUserId] = useState(null);
   const userIdRef = useRef(null);
@@ -759,14 +775,14 @@ export default function ClientExterneApp() {
 
       // 1. Courses créées par l'utilisateur
       const coursesClient = await base44.entities.CourseExterne.filter({ created_by_id: currentUserId }, "-created_date", 20);
-      const actives = (coursesClient || []).filter(c => !["livree", "annulee"].includes(c.statut));
+      const actives = (coursesClient || []).filter(c => STATUTS_SUIVABLES_CLIENT.includes(c.statut));
 
       // 2. Courses où l'utilisateur est destinataire
       let activesDestinataire = [];
       if (profil?.id) {
         const coursesDestinataire = await base44.entities.CourseExterne.filter({ destinataire_client_id: profil.id }, "-created_date", 20);
         activesDestinataire = (coursesDestinataire || []).filter(c =>
-          !["livree", "annulee"].includes(c.statut) &&
+          STATUTS_SUIVABLES_CLIENT.includes(c.statut) &&
           c.created_by_id !== currentUserId
         );
       }
@@ -776,7 +792,7 @@ export default function ClientExterneApp() {
       if (profil?.id) {
         const coursesExpediteur = await base44.entities.CourseExterne.filter({ expediteur_client_id: profil.id }, "-created_date", 20);
         activesExpediteur = (coursesExpediteur || []).filter(c =>
-          !["livree", "annulee"].includes(c.statut) &&
+          STATUTS_SUIVABLES_CLIENT.includes(c.statut) &&
           c.created_by_id !== currentUserId && // ne pas dupliquer
           c.type_course === "recevoir" // seulement mode recevoir
         );
@@ -789,7 +805,7 @@ export default function ClientExterneApp() {
 
       // ── Enrichir avec GPS temps réel du livreur (_livreur) ──
       // Évite le polling Livreur.get() redondant dans SuiviCourseFullscreen
-      const livreurIds = [...new Set(toutes.filter(c => c.livreur_id && !["livree", "annulee"].includes(c.statut)).map(c => c.livreur_id))];
+      const livreurIds = [...new Set(toutes.filter(c => c.livreur_id).map(c => c.livreur_id))];
       let coursesEnrichies = toutes;
       if (livreurIds.length > 0) {
         const livreursData = await Promise.all(
@@ -986,7 +1002,7 @@ export default function ClientExterneApp() {
   const prenom = (clientProfil?.prenom || (clientProfil?.nom || "").split(" ")[0] || "Client").trim() || "Client";
 
   return (
-    <div className="min-h-screen bg-[#f5f5f7] text-[#1d1d1f]">
+    <div className={`min-h-screen bg-[#f5f5f7] text-[#1d1d1f] ${forteDemande ? "dashboard-theme-red" : ""}`}>
       <PullToRefreshIndicator pulling={pulling} refreshing={refreshing} />
 
       {/* ── COURSE ACTIVE UNIQUE — bannière flottante ─────── */}
@@ -1128,8 +1144,13 @@ export default function ClientExterneApp() {
               {/* ── PUBLICITÉS CARROUSEL ──────────── */}
               <PubliciteCarousel cible="clients" userId={clientProfil?.id} userType="client" />
 
+              {/* ── FORTE DEMANDE — bannière rouge si active ── */}
+              {forteDemande && forteDemandeConfig && (
+                <ForteDemandeBanner config={forteDemandeConfig} />
+              )}
+
               {/* ── HERO HEADER ───────────────────── */}
-              <div className="relative overflow-hidden rounded-3xl bg-[#0879e8] p-5 shadow-[0_18px_45px_rgba(0,122,255,0.24)] border border-white/20">
+              <div className={`relative overflow-hidden rounded-3xl p-5 border border-white/20 ${forteDemande ? "bg-[#DC2626] shadow-[0_18px_45px_rgba(220,38,38,0.24)]" : "bg-[#0879e8] shadow-[0_18px_45px_rgba(0,122,255,0.24)]"}`}>
                 <div className="absolute inset-x-0 bottom-0 h-1 bg-white/25" />
                 <div className="relative">
                   <div className="flex items-start justify-between">
@@ -1188,7 +1209,7 @@ export default function ClientExterneApp() {
               <div className="space-y-3">
                 {/* 1. COMMANDER — action principale */}
                 <button
-                  className="w-full flex items-center gap-4 rounded-2xl bg-[#007aff] p-5 shadow-[0_12px_30px_rgba(0,122,255,0.25)] active:scale-[0.98] transition-all text-left"
+                  className={`w-full flex items-center gap-4 rounded-2xl p-5 active:scale-[0.98] transition-all text-left ${forteDemande ? "bg-[#DC2626] shadow-[0_12px_30px_rgba(220,38,38,0.25)]" : "bg-[#007aff] shadow-[0_12px_30px_rgba(0,122,255,0.25)]"}`}
                   onClick={() => navigate("/client/course/expedier", { state: { position, clientProfil } })}
                 >
                   <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center flex-shrink-0">
@@ -1201,7 +1222,52 @@ export default function ClientExterneApp() {
                   <ChevronRight className="w-6 h-6 text-white/70" />
                 </button>
 
-                {/* 2. REFAIRE — historique */}
+                {/* 2. SUIVRE MA COURSE — course active en cours (carte jaune) */}
+                {coursesActives.length > 0 && (
+                  <button
+                    className="w-full flex items-center gap-4 rounded-2xl bg-amber-400 border border-amber-300 shadow-[0_12px_30px_rgba(245,158,11,0.30)] p-5 active:scale-[0.98] transition-all text-left hover:shadow-lg"
+                    onClick={() => {
+                      if (coursesActives.length > 1) {
+                        setShowMultiCourseSelector(true);
+                      } else {
+                        navigate("/client/suivi", { state: { course_id: coursesActives[0].id } });
+                      }
+                    }}
+                  >
+                    <div className="w-14 h-14 rounded-2xl bg-amber-500/30 flex items-center justify-center flex-shrink-0">
+                      <Navigation className="w-7 h-7 text-amber-900" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-lg font-black text-gray-900">
+                        {coursesActives.length > 1 ? "Suivre mes courses" : "Suivre ma course"}
+                      </p>
+                      <p className="text-sm text-gray-800/80">
+                        {coursesActives.length > 1
+                          ? `${coursesActives.length} courses en cours`
+                          : "Voir le livreur et l'avancement en direct"}
+                      </p>
+                    </div>
+                    {coursesActives.length > 1 ? (
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        {coursesActives.slice(0, 3).map((c, i) => (
+                          <span
+                            key={c.id}
+                            className={`w-2.5 h-2.5 rounded-full ${
+                              c.livreur_id ? "bg-green-600" :
+                              c.statut === "recherche_livreur" ? "bg-orange-600" : "bg-gray-600"
+                            }`}
+                            style={{ marginLeft: i === 0 ? 0 : -4 }}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="w-2.5 h-2.5 bg-green-600 rounded-full animate-pulse flex-shrink-0" />
+                    )}
+                    <ChevronRight className="w-6 h-6 text-gray-700 flex-shrink-0" />
+                  </button>
+                )}
+
+                {/* 3. REFAIRE — historique */}
                 <button
                   className="w-full flex items-center gap-4 rounded-2xl bg-white border border-black/5 shadow-[0_8px_24px_rgba(15,23,42,0.07)] p-5 active:scale-[0.98] transition-all text-left hover:shadow-md"
                   onClick={() => navigate("/client/suivi")}
@@ -1215,47 +1281,6 @@ export default function ClientExterneApp() {
                   </div>
                   <ChevronRight className="w-6 h-6 text-gray-400" />
                 </button>
-
-                {/* 3. SUIVRE — course en cours */}
-                {coursesActives.length > 0 && (
-                  <button
-                    className="w-full flex items-center gap-4 rounded-2xl bg-white border border-black/5 shadow-[0_8px_24px_rgba(15,23,42,0.07)] p-5 active:scale-[0.98] transition-all text-left hover:shadow-md"
-                    onClick={() => {
-                      if (coursesActives.length > 1) {
-                        setShowMultiCourseSelector(true);
-                      } else {
-                        navigate("/client/suivi");
-                      }
-                    }}
-                  >
-                    <div className="w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center flex-shrink-0">
-                      <Navigation className="w-7 h-7 text-blue-600" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-lg font-black text-gray-900">Suivre</p>
-                      <p className="text-sm text-gray-500">
-                        {coursesActives.length} course{coursesActives.length > 1 ? "s" : ""} en cours
-                      </p>
-                    </div>
-                    {coursesActives.length > 1 && (
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        {coursesActives.slice(0, 3).map((c, i) => (
-                          <span
-                            key={c.id}
-                            className={`w-2 h-2 rounded-full ${
-                              c.livreur_id ? "bg-green-400" :
-                              c.statut === "recherche_livreur" ? "bg-amber-400" : "bg-gray-300"
-                            }`}
-                            style={{ marginLeft: i === 0 ? 0 : -4 }}
-                          />
-                        ))}
-                      </div>
-                    )}
-                    {coursesActives.length === 1 && (
-                      <div className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse" />
-                    )}
-                  </button>
-                )}
               </div>
 
               {/* ── ACTIONS SECONDAIRES — accessibles mais moins proéminentes ── */}

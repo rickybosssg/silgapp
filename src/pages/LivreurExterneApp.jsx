@@ -57,6 +57,7 @@ import DashboardThemeProvider from "@/components/livreur/DashboardThemeProvider"
 import PassActifBadge from "@/components/livreur/PassActifBadge";
 import HappyHourBadge from "@/components/livreur/HappyHourBadge";
 import PassZeroCommissionSection from "@/components/livreur/PassZeroCommissionSection";
+import LivreurVictoryOverlay from "@/components/livreur/LivreurVictoryOverlay";
 
 // haversineKm importé depuis priceEstimate (source canonique)
 
@@ -136,6 +137,9 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   const initialTabSetRef = useRef(false);
   const tabListRef = useRef(null);
   const tabButtonRefs = useRef(new Map());
+  // ── Animation de victoire livreur (livraison validée par PIN/QR) ──
+  const [victoryCourseId, setVictoryCourseId] = useState(null);
+  const celebratedCourseIdsRef = useRef(new Set());
 
   const [sessionId, setSessionId] = useState(() => {
     try { return localStorage.getItem("silgapp_livreur_session_id") || null; } catch { return null; }
@@ -1698,6 +1702,12 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
                     livreurLng={livreurProfil?.longitude}
                     livreurId={livreurProfil?.id}
                     livreurNom={`${livreurProfil?.prenom || ""} ${livreurProfil?.nom || ""}`.trim()}
+                    onDeliveryVictory={(courseId) => {
+                      // Anti-doublon : un même courseId ne déclenche qu'une seule célébration
+                      if (celebratedCourseIdsRef.current.has(courseId)) return;
+                      celebratedCourseIdsRef.current.add(courseId);
+                      setVictoryCourseId(courseId);
+                    }}
                   />
                 ))}
               </div>
@@ -1807,6 +1817,12 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         />
       </div>
     </div>
+
+      {/* ── Animation de victoire livreur — 3 secondes, purement visuelle ── */}
+      <LivreurVictoryOverlay
+        courseId={victoryCourseId}
+        onClose={() => setVictoryCourseId(null)}
+      />
     </DashboardThemeProvider>
   );
 }

@@ -97,6 +97,20 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, part
     refetchInterval: 30000,
   });
 
+  // ── Badge demandes Pass en attente (validation admin) ──
+  const { data: passAchatsEnAttente = 0 } = useQuery({
+    queryKey: ["pass-achats-en-attente", effectiveCountry],
+    queryFn: async () => {
+      try {
+        const filter = { statut: "en_attente" };
+        if (effectiveCountry) filter.country_code = effectiveCountry;
+        const items = await base44.entities.PassAchat.filter(filter, "-date_demande", 200);
+        return items?.length || 0;
+      } catch { return 0; }
+    },
+    refetchInterval: 30000,
+  });
+
 
   return (
     <aside className={cn(
@@ -181,9 +195,14 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, part
                       {inboxUnread > 99 ? "99+" : inboxUnread}
                     </Badge>
                   )}
+                  {item.path === "/admin/pass-zero-commission" && passAchatsEnAttente > 0 && (
+                    <Badge className="bg-destructive text-white text-[10px] h-5 min-w-5 flex items-center justify-center px-1">
+                      {passAchatsEnAttente > 9 ? "9+" : passAchatsEnAttente}
+                    </Badge>
+                  )}
                 </>
               )}
-              {(item.path === "/notifications" && notificationCount > 0) || (item.path === "/admin/demandes-livreurs" && demandesCount > 0) || (["/admin/boutiques", "/admin/restaurants", "/admin/pharmacies"].includes(item.path) && partenaireDemandesCount > 0) || (item.path === "/admin/neo" && neoCount > 0) || (item.path === "/admin/messages" && messageCount > 0) || (item.path === "/admin/whatsapp" && whatsappMessageCount > 0) || (item.path === "/admin/livreurs-bloques" && livreursBloquesCount > 0) || (item.path === "/admin/centre-notifications" && inboxUnread > 0) ? (
+              {(item.path === "/notifications" && notificationCount > 0) || (item.path === "/admin/demandes-livreurs" && demandesCount > 0) || (["/admin/boutiques", "/admin/restaurants", "/admin/pharmacies"].includes(item.path) && partenaireDemandesCount > 0) || (item.path === "/admin/neo" && neoCount > 0) || (item.path === "/admin/messages" && messageCount > 0) || (item.path === "/admin/whatsapp" && whatsappMessageCount > 0) || (item.path === "/admin/livreurs-bloques" && livreursBloquesCount > 0) || (item.path === "/admin/centre-notifications" && inboxUnread > 0) || (item.path === "/admin/pass-zero-commission" && passAchatsEnAttente > 0) ? (
                 collapsed && (
                   <span className="absolute right-1 top-1 w-2 h-2 rounded-full bg-destructive" />
                 )

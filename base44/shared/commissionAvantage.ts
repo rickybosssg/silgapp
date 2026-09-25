@@ -201,7 +201,7 @@ export async function figerCommissionAcceptation(
   heureAcceptation: string
 ): Promise<AvantageCommission | null> {
   if (!courseId || !livreurId || !countryCode || !heureAcceptation) {
-    console.warn('[COMMISSION_LOCK] Paramètres manquants — figement ignoré');
+    console.warn(`[COMMISSION_LOCK] Paramètres manquants — course=${courseId || 'null'} livreur=${livreurId || 'null'} country=${countryCode || 'null'} heure=${heureAcceptation || 'null'}`);
     return null;
   }
 
@@ -225,7 +225,7 @@ export async function figerCommissionAcceptation(
     console.log(`[COMMISSION_LOCK] Course ${courseId} figée: mode=${avantage.mode} taux=${avantage.taux_applique}% (normal=${avantage.taux_normal}%) livreur=${livreurId}`);
     return avantage;
   } catch (err: any) {
-    console.error(`[COMMISSION_LOCK] Erreur figement course ${courseId}:`, err?.message);
+    console.error(`[COMMISSION_LOCK] ÉCHEC figement — course=${courseId} livreur=${livreurId} country=${countryCode} heure_acceptation=${heureAcceptation} erreur="${err?.message || String(err)}"`);
     return null;
   }
 }

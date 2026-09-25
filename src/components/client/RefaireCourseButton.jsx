@@ -12,6 +12,13 @@ export default function RefaireCourseButton({ course, clientProfil, position, on
 
   const handleClick = () => {
     const route = `/client/course/${course.type_course || "expedier"}`;
+    // ── GPS : ne PAS propager les coordonnées "quartier" comme GPS exact ──
+    // Une ancienne course dont le GPS provenait du centre du quartier (fallback)
+    // ne doit pas être recopiée avec ces coordonnées approximatives. Le nouveau
+    // formulaire acquerra un GPS frais (client exact ou géocodage) à la création.
+    const gpsDepartExact = course.gps_depart_source === "exact" || course.gps_depart_source === "geocodage";
+    const gpsArriveeExact = course.gps_arrivee_source === "exact" || course.gps_arrivee_source === "geocodage";
+
     const prefillData = {
       type_course: course.type_course,
       adresse_depart: course.adresse_depart || "",
@@ -20,12 +27,12 @@ export default function RefaireCourseButton({ course, clientProfil, position, on
       quartier_arrivee: course.quartier_arrivee || "",
       ville_depart: course.ville_depart || "",
       ville_arrivee: course.ville_arrivee || "",
-      gps_depart_lat: course.gps_depart_lat || null,
-      gps_depart_lng: course.gps_depart_lng || null,
-      gps_arrivee_lat: course.gps_arrivee_lat || null,
-      gps_arrivee_lng: course.gps_arrivee_lng || null,
-      gps_depart_source: course.gps_depart_source || null,
-      gps_arrivee_source: course.gps_arrivee_source || null,
+      gps_depart_lat: gpsDepartExact ? (course.gps_depart_lat || null) : null,
+      gps_depart_lng: gpsDepartExact ? (course.gps_depart_lng || null) : null,
+      gps_arrivee_lat: gpsArriveeExact ? (course.gps_arrivee_lat || null) : null,
+      gps_arrivee_lng: gpsArriveeExact ? (course.gps_arrivee_lng || null) : null,
+      gps_depart_source: gpsDepartExact ? course.gps_depart_source : null,
+      gps_arrivee_source: gpsArriveeExact ? course.gps_arrivee_source : null,
       expediteur_nom: course.expediteur_nom || "",
       expediteur_telephone: course.expediteur_telephone || "",
       destinataire_nom: course.destinataire_nom || "",

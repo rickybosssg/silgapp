@@ -37,9 +37,10 @@ import { getLivreursNotifies, getLivreursRefuses, marquerAccepte } from './dispa
 import { notifierLivreursUnifie } from './dispatchPushUnifie.ts';
 import { chargerConfigDispatch } from './dispatchConfig.ts';
 import { ensureCourseCodeMessage, buildCodeMessageContent } from './courseCodeMessage.ts';
+import { figerCommissionAcceptation } from './commissionAvantage.ts';
 
 // ── Version du bundle (pour vérifier que la production charge la dernière version) ──
-export const DISPATCH_V2_BUNDLE_VERSION = '2026-08-17-fix-en-attente-accept';
+export const DISPATCH_V2_BUNDLE_VERSION = '2026-09-25-fix-commission-lock-happy-hour';
 
 // ── Feature flag cache (TTL 2 min) ──
 let V2_FLAG_CACHE: { enabled: boolean; expires: number } | null = null;
@@ -395,9 +396,43 @@ export async function accepterCourseV2(base44: any, courseId: string, livreurId:
     return reponseDejaPrise('race_condition_lost', courseVerifie);
   }
 
+  // 10b. V2 : Figer la commission à l'acceptation (Pass Zéro Commission / Happy Hour)
+  // Le taux est déterminé au moment exact de l'acceptation et figé sur la course.
+  // Redispatch : si un nouveau livreur accepte, le taux est recalculé pour lui.
+  // Non-bloquant : l'acceptation réussit même si le figement échoue (cohérent avec V1).
+  if (!isManual && courseVerifie.heure_acceptation && courseVerifie.country_code) {
+    await figerCommissionAcceptation(
+      base44, courseId, livreurId, courseVerifie.country_code, courseVerifie.heure_acceptation
+    ).catch((err: any) => {
+      console.error('[V2] figerCommissionAcceptation error (non-blocking):', err?.message);
+    });
+
+    // 10c. Vérification post-lock : le verrouillage doit être effectif.
+    //     figerCommissionAcceptation peut échouer silencieusement (retourne null
+    //     en cas d'erreur interne). Le .catch() ci-dessus ne se déclenche pas car
+    //     la promesse ne rejette jamais. On vérifie donc la DB après l'appel.
+    //     Le livreur a déjà gagné la course — on ne rejette PAS l'acceptation.
+    //     On crée une alerte critique exploitable pour intervention manuelle.
+    const coursePostLock = await base44.asServiceRole.entities.CourseExterne.get(courseId);
+    if (!coursePostLock?.commission_locked_at ||
+        coursePostLock.commission_taux_normal == null ||
+        coursePostLock.commission_taux_applique == null ||
+        !coursePostLock.commission_mode) {
+      console.error(`[V2][COMMISSION_LOCK_FAILED] Course ${courseId} acceptée par ${livreurId} (country=${courseVerifie.country_code}) mais commission non verrouillée — intervention requise`);
+      base44.asServiceRole.entities.Notification.create({
+        titre: '🚨 Commission non verrouillée à l\'acceptation',
+        message: `Course ${courseId} acceptée par livreur ${livreurId} (pays=${courseVerifie.country_code}, heure=${courseVerifie.heure_acceptation}) mais commission_locked_at est null. Intervention requise pour vérifier le taux applicable.`,
+        type: 'alerte_critique_dispatch',
+        course_id: courseId,
+        lue: false,
+        deduplication_key: `COMMISSION_LOCK_FAILED_${courseId}`,
+      }).catch((err: any) => console.error('[V2][COMMISSION_LOCK_FAILED] Notification alert error:', err?.message || String(err)));
+    }
+  }
+
   // 11. V2 : Trigger WebSocket via update single (déclenche la disparition du fil)
   await base44.asServiceRole.entities.CourseExterne.update(courseId, {
-    dispatch_status: 'acceptee',
+    heure_acceptation: courseVerifie.heure_acceptation,
   });
 
   // 12. Update livreur status
@@ -405,8 +440,11 @@ export async function accepterCourseV2(base44: any, courseId: string, livreurId:
     await base44.asServiceRole.entities.Livreur.update(livreurId, { statut: 'en_course' });
     await marquerAccepte(base44, courseId, livreurId);
 
-    // 13. Message code récupération + push notification (courses admin/VENUS)
-    if ((course.source === 'admin' || course.created_by_venus === true) && pickupPIN) {
+    // 13. Message code récupération + push notification (TOUTES courses avec PIN)
+    //     Délégué au helper idempotent ensureCourseCodeMessage (retry + anti-doublon).
+    //     ⚠️ Effet secondaire uniquement — n'échoue jamais l'acceptation.
+    //     Corrigé : appelé pour toute course disposant du PIN, indépendamment de la source.
+    if (pickupPIN) {
       const codeMsgResult = await ensureCourseCodeMessage(
         base44, course, livreurId, pickupPIN, deliveryPIN, '[V2]'
       ).catch((err: any) => {
