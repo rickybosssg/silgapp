@@ -8,11 +8,11 @@ import confetti from "canvas-confetti";
  * Déclenchée UNIQUEMENT après confirmation backend du succès du PIN/QR de LIVRAISON.
  * Jamais sur la récupération, jamais sur erreur, jamais sur ouverture/rafraîchissement.
  *
- * Durée : 3 secondes exactement.
- *  0.0→0.5s  : le mot apparaît rapidement au centre
- *  0.5→1.8s  : le mot grandit de façon spectaculaire (rebond + glow)
- *  1.8→2.5s  : le mot reste visible avec l'effet de victoire
- *  2.5→3.0s  : "✓ +1 COURSE RÉUSSIE" apparaît, puis fondu de sortie
+ * Durée : 6 secondes exactement.
+ *  0.0→1.0s  : le mot apparaît au centre
+ *  1.0→4.0s  : le mot grandit de façon spectaculaire (rebond + glow + confettis)
+ *  4.0→5.0s  : le mot reste visible à grande taille
+ *  5.0→6.0s  : "✓ +1 COURSE RÉUSSIE" apparaît, puis fondu de sortie
  *
  * Anti-doublon : le composant mémorise le dernier courseId célébré.
  * Un même courseId ne rejoue jamais l'animation.
@@ -29,7 +29,7 @@ const VICTORY_WORDS = [
   "CHAMPION !",
 ];
 
-const DURATION_MS = 3000;
+const DURATION_MS = 6000;
 
 export default function LivreurVictoryOverlay({ courseId, onClose }) {
   const [visible, setVisible] = useState(false);
@@ -60,7 +60,7 @@ export default function LivreurVictoryOverlay({ courseId, onClose }) {
     // ── Confettis légers (seulement si motion autorisé) ──
     if (!prefersReducedMotion && typeof confetti === "function") {
       const colors = ["#34C759", "#007AFF", "#FFD60A", "#FF9500", "#AF52DE"];
-      const end = Date.now() + 1200;
+      const end = Date.now() + 2500;
       (function frame() {
         confetti({
           particleCount: 2,
@@ -86,7 +86,7 @@ export default function LivreurVictoryOverlay({ courseId, onClose }) {
       })();
     }
 
-    // ── Fermeture automatique à 3 secondes ──
+    // ── Fermeture automatique à 6 secondes ──
     const timer = setTimeout(() => {
       setVisible(false);
       onClose?.();
@@ -131,8 +131,8 @@ export default function LivreurVictoryOverlay({ courseId, onClose }) {
               prefersReducedMotion
                 ? { duration: 0.3 }
                 : {
-                    duration: 1.8,
-                    times: [0, 0.28, 0.72, 0.86, 1],
+                    duration: 3.0,
+                    times: [0, 0.33, 0.72, 0.86, 1],
                     ease: "easeOut",
                   }
             }
@@ -156,7 +156,7 @@ export default function LivreurVictoryOverlay({ courseId, onClose }) {
             className="absolute bottom-[20%] left-0 right-0 text-center px-4"
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 2.5, duration: 0.4 }}
+            transition={{ delay: 5.0, duration: 0.5 }}
           >
             <p
               className="font-bold text-white"
@@ -166,12 +166,12 @@ export default function LivreurVictoryOverlay({ courseId, onClose }) {
             </p>
           </motion.div>
 
-          {/* ── Fondu de sortie global (2.7→3.0s) ── */}
+          {/* ── Fondu de sortie global (5.7→6.0s) ── */}
           <motion.div
             className="absolute inset-0 bg-black pointer-events-none"
             initial={{ opacity: 0 }}
             animate={{ opacity: [0, 0, 1] }}
-            transition={{ duration: 0.3, delay: 2.7 }}
+            transition={{ duration: 0.3, delay: 5.7 }}
           />
         </motion.div>
       )}
