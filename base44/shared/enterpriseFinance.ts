@@ -275,6 +275,38 @@ export async function modifierTauxEnterprise(
  * Génère un identifiant financier IMMUABLE pour une enterprise.
  * Ne dépend pas du nom de l'entreprise.
  */
+/**
+ * Vérifie qu'une entreprise est active (non suspendue).
+ * Si enterprise_id est null (réseau public), ne fait rien (toujours actif).
+ * Utilisé par creerCourseAdmin, publierCourseDansFil, accepterCourseV2,
+ * check_course_pour_livreur, accepter_course V1 pour bloquer les nouvelles
+ * opérations commerciales d'une entreprise suspendue.
+ *
+ * Les courses déjà acceptées (en cours) ne passent pas par ces points de contrôle
+ * et peuvent donc être terminées normalement (finalisation, PIN/QR, comptabilité).
+ */
+export async function checkEnterpriseActive(
+  base44: any,
+  enterpriseId: string | null
+): Promise<{ active: boolean; suspended: boolean; enterprise?: any }> {
+  if (!enterpriseId) return { active: true, suspended: false };
+  try {
+    const enterprises = await base44.entities.Enterprise.filter({
+      enterprise_financier_id: enterpriseId,
+    });
+    const enterprise = enterprises?.[0];
+    if (!enterprise) return { active: false, suspended: false };
+    const isActive = enterprise.actif === true && enterprise.statut === 'actif';
+    return { active: isActive, suspended: !isActive, enterprise };
+  } catch {
+    return { active: false, suspended: false };
+  }
+}
+
+/**
+ * Génère un identifiant financier IMMUABLE pour une enterprise.
+ * Ne dépend pas du nom de l'entreprise.
+ */
 export function generateEnterpriseFinancierId(): string {
   return "ent_" + crypto.randomUUID().replace(/-/g, "").slice(0, 16);
 }

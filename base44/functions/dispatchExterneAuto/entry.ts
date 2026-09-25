@@ -342,6 +342,16 @@ Deno.serve(async (req) => {
         if (courseEntId !== livreurEntId) {
           return Response.json({ found: false, enterprise_mismatch: true, error: 'Cette course appartient à un autre périmètre.' });
         }
+        // [ENTERPRISE_SUSPENSION] Masquer la course si l'entreprise est suspendue.
+        if (courseEntId) {
+          const entList = await base44.asServiceRole.entities.Enterprise.filter({
+            enterprise_financier_id: courseEntId,
+          }).catch(() => []);
+          const ent = entList?.[0];
+          if (ent && (ent.actif === false || ent.statut !== 'actif')) {
+            return Response.json({ found: false, enterprise_suspended: true, error: 'Cette entreprise est suspendue.' });
+          }
+        }
         const expired = !!(course.timeout_expires_at && new Date(course.timeout_expires_at) < new Date());
         return Response.json({ found: true, course, expired, disponible_push: true, timeout_expires_at: course.timeout_expires_at });
       }
@@ -370,6 +380,20 @@ Deno.serve(async (req) => {
       const livreurEntId = normalizeEnterpriseId(livreur.enterprise_id);
       if (courseEntId !== livreurEntId) {
         return Response.json({ success: false, accepted: false, reason: 'enterprise_mismatch', error: 'Cette course appartient à un autre périmètre.' });
+      }
+
+      // [ENTERPRISE_SUSPENSION] Bloquer l'acceptation si l'entreprise est suspendue.
+      if (courseEntId) {
+        const entList = await base44.asServiceRole.entities.Enterprise.filter({
+          enterprise_financier_id: courseEntId,
+        }).catch(() => []);
+        const ent = entList?.[0];
+        if (ent && (ent.actif === false || ent.statut !== 'actif')) {
+          return Response.json({
+            success: false, accepted: false, reason: 'enterprise_suspended',
+            error: 'Votre entreprise est temporairement suspendue. Veuillez contacter SILGAPP.',
+          });
+        }
       }
 
       // 🚫 Vérifier blocage encours

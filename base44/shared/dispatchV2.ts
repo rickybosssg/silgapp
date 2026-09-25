@@ -194,6 +194,20 @@ export async function publierCourseDansFil(base44: any, course: any) {
   // 🔖 Log de version bundle — pour vérifier que la production charge la dernière version
   dispatchLog(`[V2] 🔖 publierCourseDansFil — bundle version: ${DISPATCH_V2_BUNDLE_VERSION} — course ${course.id}`);
 
+  // [ENTERPRISE_SUSPENSION] Bloquer le dispatch si l'entreprise est suspendue.
+  // Les courses déjà acceptées (en cours) ne passent pas par cette fonction.
+  const suspendCheckEntId = normalizeEnterpriseId(course.enterprise_id);
+  if (suspendCheckEntId) {
+    const entList = await base44.asServiceRole.entities.Enterprise.filter({
+      enterprise_financier_id: suspendCheckEntId,
+    }).catch(() => []);
+    const ent = entList?.[0];
+    if (ent && (ent.actif === false || ent.statut !== 'actif')) {
+      dispatchLog(`[V2] 🚫 Enterprise ${suspendCheckEntId} suspendue — dispatch bloqué pour course ${course.id}`);
+      return { success: false, enterprise_suspended: true, error: 'Entreprise suspendue' };
+    }
+  }
+
   // 🛡️ GARDE IDEMPOTENTE ATOMIQUE ANTI-CASCADE
   // Utilise updateMany conditionnel : ne met à jour QUE si dispatch_status n'est pas
   // déjà 'disponible_push'. Cela empêche la cascade CREATE → UPDATE de l'orchestrateur
@@ -336,6 +350,20 @@ export async function accepterCourseV2(base44: any, courseId: string, livreurId:
       success: false, accepted: false, reason: 'enterprise_mismatch',
       error: 'Cette course appartient à un autre périmètre.',
     };
+  }
+
+  // [ENTERPRISE_SUSPENSION] Bloquer l'acceptation si l'entreprise est suspendue.
+  if (courseEnterpriseId) {
+    const entList = await base44.asServiceRole.entities.Enterprise.filter({
+      enterprise_financier_id: courseEnterpriseId,
+    }).catch(() => []);
+    const ent = entList?.[0];
+    if (ent && (ent.actif === false || ent.statut !== 'actif')) {
+      return {
+        success: false, accepted: false, reason: 'enterprise_suspended',
+        error: 'Votre entreprise est temporairement suspendue. Veuillez contacter SILGAPP.',
+      };
+    }
   }
 
   // 4. Check bloque_encours

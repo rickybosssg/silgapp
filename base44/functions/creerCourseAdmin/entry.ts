@@ -54,6 +54,17 @@ export default async function(req) {
     const enterpriseAdmin = isEnterpriseAdmin(user);
     if (enterpriseAdmin) {
       courseData.enterprise_id = normalizeEnterpriseId(user.enterprise_id);
+      // [ENTERPRISE_SUSPENSION] Bloquer la création si l'entreprise est suspendue.
+      const entList = await base44.asServiceRole.entities.Enterprise.filter({
+        enterprise_financier_id: courseData.enterprise_id,
+      }).catch(() => []);
+      const ent = entList?.[0];
+      if (ent && (ent.actif === false || ent.statut !== 'actif')) {
+        return Response.json({
+          error: 'Votre entreprise est temporairement suspendue. Veuillez contacter SILGAPP.',
+          code: 'ENTERPRISE_SUSPENDED',
+        }, { status: 403 });
+      }
     } else {
       courseData.enterprise_id = null;
     }
