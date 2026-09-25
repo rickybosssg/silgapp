@@ -139,34 +139,66 @@ export default async function(req: Request): Promise<Response> {
         const enterprise = enterprises?.[0];
         if (!enterprise) return Response.json({ error: 'Entreprise introuvable' }, { status: 404 });
 
+        // Vérifier si l'utilisateur existe déjà (a déjà accepté une invitation)
+        const existingUsers = await base44.asServiceRole.entities.User.filter({ email });
+        const existingUser = existingUsers?.[0];
+
+        if (existingUser) {
+          // L'utilisateur existe déjà → mise à jour immédiate
+          await base44.asServiceRole.entities.User.update(existingUser.id, {
+            enterprise_id: enterprise.enterprise_financier_id,
+            silgapp_role: 'admin_entreprise',
+          });
+
+          // Mettre à jour le compteur d'admins (uniquement si ce n'était pas déjà un admin_entreprise)
+          if (existingUser.silgapp_role !== 'admin_entreprise') {
+            await base44.asServiceRole.entities.Enterprise.update(enterprise.id, {
+              nb_admins: Number(enterprise.nb_admins || 0) + 1,
+            });
+          }
+
+          // Marquer tout pending précédent comme activé
+          const pendingOld = await base44.asServiceRole.entities.PendingEnterpriseAdmin.filter({ email, status: 'pending' });
+          for (const p of pendingOld || []) {
+            await base44.asServiceRole.entities.PendingEnterpriseAdmin.update(p.id, { status: 'activated', activated_at: new Date().toISOString() });
+          }
+
+          return Response.json({ success: true, user_email: email, enterprise_id: enterprise.enterprise_financier_id, mode: 'immediate' });
+        }
+
+        // L'utilisateur n'existe pas encore → créer un pending + inviter
+        // Vérifier qu'il n'y a pas déjà un pending pour cet email
+        const existingPending = await base44.asServiceRole.entities.PendingEnterpriseAdmin.filter({ email, status: 'pending' });
+        if (existingPending?.length > 0) {
+          // Mettre à jour le pending existant avec la nouvelle entreprise
+          await base44.asServiceRole.entities.PendingEnterpriseAdmin.update(existingPending[0].id, {
+            enterprise_id: enterprise.enterprise_financier_id,
+            enterprise_name: enterprise.nom,
+            invited_by: user.email,
+            invited_at: new Date().toISOString(),
+          });
+        } else {
+          await base44.asServiceRole.entities.PendingEnterpriseAdmin.create({
+            email,
+            enterprise_id: enterprise.enterprise_financier_id,
+            enterprise_name: enterprise.nom,
+            status: 'pending',
+            invited_by: user.email,
+            invited_at: new Date().toISOString(),
+          });
+        }
+
         // Inviter l'utilisateur via le système d'invitation Base44
         try {
-          await base44.asServiceRole.users.inviteUser(email, 'user');
+          await base44.users.inviteUser(email, 'user');
         } catch (inviteErr: any) {
-          // Si l'utilisateur existe déjà, continuer
+          // Si l'utilisateur existe déjà (déjà invité), continuer
           if (!String(inviteErr?.message || '').includes('already')) {
             return Response.json({ error: 'Impossible d\'inviter l\'utilisateur: ' + (inviteErr?.message || '') }, { status: 500 });
           }
         }
 
-        // Mettre à jour le User avec enterprise_id et silgapp_role
-        const users = await base44.asServiceRole.entities.User.filter({ email });
-        if (!users || users.length === 0) {
-          return Response.json({ error: 'Utilisateur introuvable après invitation' }, { status: 404 });
-        }
-
-        const targetUser = users[0];
-        await base44.asServiceRole.entities.User.update(targetUser.id, {
-          enterprise_id: enterprise.enterprise_financier_id,
-          silgapp_role: 'admin_entreprise',
-        });
-
-        // Incrémenter le compteur d'admins
-        await base44.asServiceRole.entities.Enterprise.update(enterprise.id, {
-          nb_admins: Number(enterprise.nb_admins || 0) + 1,
-        });
-
-        return Response.json({ success: true, user_email: email, enterprise_id: enterprise.enterprise_financier_id });
+        return Response.json({ success: true, user_email: email, enterprise_id: enterprise.enterprise_financier_id, mode: 'pending' });
       }
 
       // ── Activer/désactiver un Admin Entreprise ──
@@ -244,8 +276,33 @@ export default async function(req: Request): Promise<Response> {
         const enterprise = enterprises?.[0];
         if (!enterprise) return Response.json({ error: 'Entreprise introuvable' }, { status: 404 });
 
-        // Charger les admins
+        // Charger les admins (déjà activés)
         const admins = await base44.asServiceRole.entities.User.filter({ enterprise_id: enterprise.enterprise_financier_id });
+
+        // Charger les admins en attente (invitation pas encore acceptée)
+        const pendingAdmins = await base44.asServiceRole.entities.PendingEnterpriseAdmin.filter(
+          { enterprise_id: enterprise.enterprise_financier_id, status: 'pending' },
+          '-invited_at',
+          50
+        );
+
+        // Fusionner les admins activés et en attente
+        const allAdmins = [
+          ...(admins || []).map((a: any) => ({
+            id: a.id,
+            email: a.email,
+            full_name: a.full_name || '',
+            silgapp_role: a.silgapp_role,
+            status: 'activated',
+          })),
+          ...(pendingAdmins || []).map((p: any) => ({
+            id: p.id,
+            email: p.email,
+            full_name: '',
+            silgapp_role: 'admin_entreprise',
+            status: 'pending',
+          })),
+        ];
 
         // Charger les livreurs
         const livreurs = await base44.asServiceRole.entities.Livreur.filter(
@@ -268,7 +325,7 @@ export default async function(req: Request): Promise<Response> {
           50
         );
 
-        return Response.json({ success: true, enterprise, admins, livreurs, courses, ledger });
+        return Response.json({ success: true, enterprise, admins: allAdmins, livreurs, courses, ledger });
       }
 
       // ── Retirer un admin d'une entreprise ──
@@ -353,6 +410,7 @@ export default async function(req: Request): Promise<Response> {
         await base44.asServiceRole.entities.Livreur.update(livreur_id, {
           actif: active,
           statut: active ? 'hors_ligne' : 'hors_ligne',
+          admin_hors_ligne: !active,
         });
 
         return Response.json({ success: true, active });

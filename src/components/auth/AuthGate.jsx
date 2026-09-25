@@ -262,6 +262,23 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
         return;
       }
 
+      // 0. Vérifier s'il y a un pending Enterprise Admin pour cet utilisateur
+      //    (invité par le Super Admin mais pas encore activé)
+      if (!user.silgapp_role || user.silgapp_role !== "admin_entreprise") {
+        try {
+          const res = await base44.functions.invoke("activatePendingEnterpriseAdmin", {});
+          if (res?.activated) {
+            // Recharger l'utilisateur pour obtenir les données mises à jour
+            const updatedUser = await base44.auth.me();
+            if (updatedUser) {
+              user.silgapp_role = updatedUser.silgapp_role;
+              user.enterprise_id = updatedUser.enterprise_id;
+            }
+          }
+        } catch (_) {}
+        if (!mounted) return;
+      }
+
       // 1. Agent de saisie → accès LIMITÉ au formulaire de création de course uniquement
       //    Pas de dashboard admin, pas de sélection de réseau.
       //    L'employé est redirigé vers /admin/creer-course s'il n'y est pas déjà.
