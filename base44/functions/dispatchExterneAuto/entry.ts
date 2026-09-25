@@ -3,7 +3,8 @@ import { notifierRedispatchClient } from '../../shared/venusRedispatchNotifier.t
 import { STATUTS_ACTIFS_COURSE, STATUTS_ACTIFS_VERIF, normalizeCommissionPct, chargerConfigPays } from '../../shared/dispatchConstants.ts';
 import { verifierPaysCourseLivreur, reponseDejaPrise, generateToken, generatePIN, supprimerNotificationsCourse, journaliserDispatch } from '../../shared/dispatchUtils.ts';
 import { chargerConfigDispatch, chargerConfigVaguesGPS, CYCLE_EPUISE_TIMEOUT_MS } from '../../shared/dispatchConfig.ts';
-import { lancerDispatchMulti } from '../../shared/dispatchEngine.ts';
+// V1 (lancerDispatchMulti) désactivé en runtime — V2 est l'unique moteur de dispatch.
+// import { lancerDispatchMulti } from '../../shared/dispatchEngine.ts';
 import { runWatchdog } from '../../shared/dispatchWatchdog.ts';
 import { marquerRefuse, marquerAccepte, getLivreursNotifies, getLivreursRefuses, resetNotifications as resetNotifsEntity } from '../../shared/dispatchNotifications.ts';
 import { accepterCourseV2, publierCourseDansFil, isV2Enabled, secoursDispatchV2, isPilotLivreur, DISPATCH_V2_BUNDLE_VERSION } from '../../shared/dispatchV2.ts';
@@ -753,10 +754,10 @@ Deno.serve(async (req) => {
 
       const etaitVerrouillee = course.livreur_id === livreur_id;
       if (etaitVerrouillee) {
-        // Libérer le verrou + remettre le statut en recherche (sinon reste bloqué à livreur_en_route)
+        // V2 : publier dans le fil (isolation Enterprise automatique via publierCourseDansFil)
         await base44.asServiceRole.entities.CourseExterne.update(course_id, {
           statut: 'recherche_livreur',
-          dispatch_status: 'redispatch',
+          dispatch_status: 'en_attente',
           remarque_livreur: raison || 'Refusé',
           livreur_id: '',
           livreur_nom: '',
@@ -765,10 +766,8 @@ Deno.serve(async (req) => {
           accepted_by_livreur_id: '',
           accepted_at: null,
         });
-        const result = await lancerDispatchMulti(base44, course_id, []);
-        if (result.noLivreur) return Response.json({ success: true, noLivreur: true });
-        if (result.cycleEpuise) return Response.json({ success: true, cycle_epuise: true });
-        return Response.json({ success: true, nb_notifies: result.nb_notifies });
+        const result = await publierCourseDansFil(base44, course);
+        return Response.json({ success: true, v2: true, ...result });
       }
 
       return Response.json({ success: true, exclu_definitif: true });
@@ -783,11 +782,11 @@ Deno.serve(async (req) => {
 
       // Expiration du verrou actif
       if (expired && course.dispatch_status === 'propose' && course.livreur_id) {
-        console.log(`[DISPATCH] ⏰ Verrou expiré course ${course_id} — redispatch`);
+        console.log(`[DISPATCH] ⏰ Verrou expiré course ${course_id} — redispatch V2`);
 
         await base44.asServiceRole.entities.CourseExterne.update(course_id, {
           statut: 'recherche_livreur',
-          dispatch_status: 'redispatch',
+          dispatch_status: 'en_attente',
           livreur_id: '',
           livreur_nom: '',
           livreur_telephone: '',
@@ -796,42 +795,20 @@ Deno.serve(async (req) => {
           accepted_at: null,
         });
 
-        const result = await lancerDispatchMulti(base44, course_id, []);
-        return Response.json({ expired: true, redispatched: !result.noLivreur, nb_restants: result.total_notifies });
+        const result = await publierCourseDansFil(base44, course);
+        return Response.json({ expired: true, redispatched: true, v2: true, ...result });
       }
 
-      // Expiration vague multi (sans verrou)
+      // Expiration vague multi (sans verrou) — V2 : publier dans le fil
       if (expired && course.dispatch_status === 'propose' && !course.livreur_id) {
-        const currentWave = course.dispatch_wave || 0;
-        if (currentWave > 0) {
-          const gpsCfg = await chargerConfigVaguesGPS(base44);
-          const maxWave = gpsCfg.waves.length;
+        console.log(`[DISPATCH] ⏰ Vague expirée course ${course_id} — redispatch V2`);
+        await base44.asServiceRole.entities.CourseExterne.update(course_id, {
+          statut: 'recherche_livreur',
+          dispatch_status: 'en_attente',
+        });
 
-          const nextWave = currentWave + 1;
-
-          if (nextWave > maxWave) {
-            console.log(`[DISPATCH] 📍 GPS vague ${currentWave} expirée (max: ${maxWave}) — cycle_epuise pour course ${course_id}`);
-            const cycleEpuiseDeadline = new Date(Date.now() + CYCLE_EPUISE_TIMEOUT_MS).toISOString();
-            await base44.asServiceRole.entities.CourseExterne.update(course_id, {
-              dispatch_status: 'cycle_epuise',
-              dispatch_wave: maxWave,
-              timeout_expires_at: cycleEpuiseDeadline,
-            });
-            // Notification WhatsApp VENUS désactivée — le client peut relancer via l'app
-            return Response.json({ expired: true, wave_epuise: true, venus_notifie: false });
-          }
-          console.log(`[DISPATCH] 📍 GPS avancement vague ${currentWave} → ${nextWave} pour course ${course_id}`);
-          await base44.asServiceRole.entities.CourseExterne.update(course_id, {
-            dispatch_status: 'redispatch',
-            dispatch_wave: nextWave,
-          });
-        } else {
-          console.log(`[DISPATCH] ⏰ Vague expirée course ${course_id} — nouvelle sélection`);
-          await base44.asServiceRole.entities.CourseExterne.update(course_id, { dispatch_status: 'redispatch' });
-        }
-
-        const result = await lancerDispatchMulti(base44, course_id, []);
-        return Response.json({ expired: true, redispatched: !result.noLivreur });
+        const result = await publierCourseDansFil(base44, course);
+        return Response.json({ expired: true, redispatched: true, v2: true, ...result });
       }
 
       return Response.json({ expired, dispatch_status: course.dispatch_status, livreur_id: course.livreur_id });
@@ -869,7 +846,7 @@ Deno.serve(async (req) => {
       const resultats = [];
       for (const course of coursesToProcess) {
         try {
-          const result = await withAuthRetry(req, 'lancerDispatchMulti_retry', (b44: any) => lancerDispatchMulti(b44, course.id, [], cachedConfig));
+          const result = await withAuthRetry(req, 'publierCourseDansFil_retry', (b44: any) => publierCourseDansFil(b44, course));
           resultats.push({ course_id: course.id, ...result });
         } catch (err) {
           console.error(`[DISPATCH] ❌ Erreur retry course ${course.id}:`, err.message);
@@ -945,7 +922,7 @@ Deno.serve(async (req) => {
 
         await base44.asServiceRole.entities.CourseExterne.update(course_id, {
           manual_price_status: 'refused', client_price_refused_at: now,
-          statut: 'recherche_livreur', dispatch_status: 'redispatch',
+          statut: 'recherche_livreur', dispatch_status: 'en_attente',
           livreur_id: '', livreur_nom: '', livreur_telephone: '',
           pricing_mode: 'automatic', manual_price: null, proposed_by_livreur_id: '',
         });
@@ -954,9 +931,9 @@ Deno.serve(async (req) => {
           await base44.asServiceRole.entities.Livreur.update(livreurRefuseId, { statut: 'disponible' });
         }
 
-        // Redispatch sans exclure (le refus était côté client, pas livreur)
-        const result = await lancerDispatchMulti(base44, course_id, []);
-        return Response.json({ success: true, accepted: false, redispatched: !result.noLivreur });
+        // V2 : publier dans le fil (isolation Enterprise automatique)
+        const result = await publierCourseDansFil(base44, course);
+        return Response.json({ success: true, accepted: false, v2: true, ...result });
       }
     }
 

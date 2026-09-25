@@ -15,9 +15,8 @@
 import { STATUTS_ACTIFS_COURSE, STATUTS_ACTIFS_VERIF } from './dispatchConstants.ts';
 import { journaliserDispatch } from './dispatchUtils.ts';
 import { getLivreursNotifies, getLivreursRefuses } from './dispatchNotifications.ts';
-import { lancerDispatchMulti } from './dispatchEngine.ts';
 import { chargerConfigDispatch, chargerConfigVaguesGPS } from './dispatchConfig.ts';
-import { isV2Enabled, secoursDispatchV2, calculerScore } from './dispatchV2.ts';
+import { isV2Enabled, secoursDispatchV2, calculerScore, publierCourseDansFil } from './dispatchV2.ts';
 import { gererPushGeneralT10 } from './pushGeneralT10.ts';
 
 /** Crée une alerte admin si aucune alerte récente n'existe pour la même course. */
@@ -124,10 +123,10 @@ export async function runWatchdog(base44, body = {}) {
     anomalies.push({ course_id: course.id, type: 'nouvelle_jamais_traitee', severity: 'critique', description: `Course nouvelle depuis ${ageMin}min sans notification` });
 
     try {
-      const result = await lancerDispatchMulti(base44, course.id, [], cachedConfig);
-      corrections.push({ course_id: course.id, action: 'force_dispatch_nouvelle', result });
+      const result = await publierCourseDansFil(base44, course);
+      corrections.push({ course_id: course.id, action: 'force_dispatch_nouvelle_v2', result });
     } catch (err) {
-      corrections.push({ course_id: course.id, action: 'force_dispatch_nouvelle', error: err.message });
+      corrections.push({ course_id: course.id, action: 'force_dispatch_nouvelle_v2', error: err.message });
     }
 
     await createAdminAlert(base44,
@@ -152,10 +151,10 @@ export async function runWatchdog(base44, body = {}) {
     anomalies.push({ course_id: course.id, type: 'recherche_sans_vague', severity: 'critique', description: `Course en_attente depuis ${ageMin}min sans vague` });
 
     try {
-      const result = await lancerDispatchMulti(base44, course.id, [], cachedConfig);
-      corrections.push({ course_id: course.id, action: 'force_dispatch_recherche', result });
+      const result = await publierCourseDansFil(base44, course);
+      corrections.push({ course_id: course.id, action: 'force_dispatch_recherche_v2', result });
     } catch (err) {
-      corrections.push({ course_id: course.id, action: 'force_dispatch_recherche', error: err.message });
+      corrections.push({ course_id: course.id, action: 'force_dispatch_recherche_v2', error: err.message });
     }
 
     await createAdminAlert(base44,
@@ -182,40 +181,25 @@ export async function runWatchdog(base44, body = {}) {
       // Verrou expiré avec livreur_id (prix manuel sans réponse, ou acceptation expirée)
       await base44.asServiceRole.entities.CourseExterne.update(course.id, {
         statut: 'recherche_livreur',
-        dispatch_status: 'redispatch',
+        dispatch_status: 'en_attente',
         livreur_id: '', livreur_nom: '', livreur_telephone: '',
         heure_acceptation: null, accepted_by_livreur_id: '', accepted_at: null,
         pricing_mode: 'automatic', manual_price: null, manual_price_status: null,
         proposed_by_livreur_id: '', timeout_expires_at: null,
       });
     } else {
-      // Vague expirée sans verrou → avancer à la prochaine vague ou cycle_epuise
-      const currentWave = course.dispatch_wave || 0;
-      const maxWave = cachedConfig.gps.waves.length;
-      const nextWave = currentWave + 1;
-
-      if (nextWave > maxWave) {
-        const cycleEpuiseDeadline = new Date(now.getTime() + CYCLE_EPUISE_TIMEOUT_MS).toISOString();
-        await base44.asServiceRole.entities.CourseExterne.update(course.id, {
-          dispatch_status: 'cycle_epuise',
-          dispatch_wave: maxWave,
-          timeout_expires_at: cycleEpuiseDeadline,
-        });
-        corrections.push({ course_id: course.id, action: 'cycle_epuise' });
-        continue;
-      }
-
+      // Vague expirée sans verrou → V2 : publier dans le fil
       await base44.asServiceRole.entities.CourseExterne.update(course.id, {
-        dispatch_status: 'redispatch',
-        dispatch_wave: nextWave,
+        statut: 'recherche_livreur',
+        dispatch_status: 'en_attente',
       });
     }
 
     try {
-      const result = await lancerDispatchMulti(base44, course.id, [], cachedConfig);
-      corrections.push({ course_id: course.id, action: 'redispatch_propose_timeout', result });
+      const result = await publierCourseDansFil(base44, course);
+      corrections.push({ course_id: course.id, action: 'redispatch_propose_timeout_v2', result });
     } catch (err) {
-      corrections.push({ course_id: course.id, action: 'redispatch_propose_timeout', error: err.message });
+      corrections.push({ course_id: course.id, action: 'redispatch_propose_timeout_v2', error: err.message });
     }
     await new Promise(r => setTimeout(r, 100));
   }
