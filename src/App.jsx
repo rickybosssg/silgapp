@@ -123,6 +123,10 @@ const MetaAdsDashboard = lazy(() => import('./pages/MetaAdsDashboard.jsx'));
 const PassZeroCommissionAdmin = lazy(() => import('./pages/PassZeroCommissionAdmin.jsx'));
 import Diag500Panel from './components/admin/Diag500Panel.jsx';
 
+// ── SILGAPP ENTREPRISE — Module multi-tenant ──
+const EntrepriseApp = lazy(() => import('./pages/EntrepriseApp.jsx'));
+const SuperAdminEntreprises = lazy(() => import('./pages/SuperAdminEntreprises.jsx'));
+
 function AnimatedRoutes({ children }) {
   // Variables définies DANS la fonction pour éviter init issues
   const location = useLocation();
@@ -222,6 +226,15 @@ function AppContent() {
   const [isClient, setIsClient] = useState(false);
   const [isPartenaire, setIsPartenaire] = useState(false);
   const [reseau, setReseau] = useState(null);
+
+  // ── /entreprise → Admin Entreprise dashboard (auth required, handled by EntrepriseApp) ──
+  if (currentPath === '/entreprise' || currentPath.startsWith('/entreprise/')) {
+    return (
+      <Suspense fallback={<LoadingScreen />}>
+        <EntrepriseApp />
+      </Suspense>
+    );
+  }
 
   // 🌍 ROUTES PUBLIQUES - ACCESSIBLES SANS AUTHENTIFICATION (PRIORITÉ ABSOLUE)
   // Ces routes doivent être vérifiées AVANT toute logique d'authentification
@@ -450,6 +463,7 @@ function AppContent() {
           <Route path="/admin/growth" element={<AnimatedRoutes><GrowthDashboard /></AnimatedRoutes>} />
           <Route path="/admin/meta-ads" element={<AnimatedRoutes><MetaAdsDashboard /></AnimatedRoutes>} />
           <Route path="/admin/pass-zero-commission" element={<AnimatedRoutes><PassZeroCommissionAdmin /></AnimatedRoutes>} />
+          <Route path="/admin/entreprises" element={<AnimatedRoutes><SuperAdminEntreprises /></AnimatedRoutes>} />
           <Route path="/admin/messages" element={<AnimatedRoutes><AdminMessages /></AnimatedRoutes>} />
           <Route path="/admin/whatsapp" element={<AnimatedRoutes><WhatsAppAdmin /></AnimatedRoutes>} />
           <Route path="/admin/venus" element={<AnimatedRoutes><VenusAdminCenter /></AnimatedRoutes>} />

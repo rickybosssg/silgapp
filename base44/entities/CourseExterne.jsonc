@@ -6,6 +6,32 @@
       "type": "string",
       "description": "Code pays ISO 2 lettres (ex: BF, CI, TG). Dynamique : aucun pays cod\u00e9 en dur."
     },
+    "enterprise_id": {
+      "type": "string",
+      "description": "ID financier IMMUABLE de l'entreprise propri\u00e9taire de cette course. Null = course du r\u00e9seau public SILGAPP. Non null = course priv\u00e9e entreprise, invisible des autres entreprises et du dispatch public. R\u00e9solu c\u00f4t\u00e9 backend uniquement, jamais depuis le frontend."
+    },
+    "enterprise_commission_rate_locked": {
+      "type": "number",
+      "description": "Taux de commission SILGAPP verrouill\u00e9 au moment de l'acceptation de la course entreprise. Fig\u00e9 pour emp\u00eacher tout recalcul r\u00e9troactif. Un changement de taux par le Super Admin n'affecte que les nouvelles courses."
+    },
+    "enterprise_commission_locked_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date/heure de verrouillage du taux entreprise."
+    },
+    "enterprise_commission_amount": {
+      "type": "number",
+      "description": "Montant de la commission SILGAPP entreprise calcul\u00e9 \u00e0 la livraison. = prix_final \u00d7 enterprise_commission_rate_locked / 100."
+    },
+    "enterprise_encours_comptabilise_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date \u00e0 laquelle la commission entreprise a \u00e9t\u00e9 comptabilis\u00e9e dans le EnterpriseLedger (anti double-comptage). Si null, la commission n'a pas encore \u00e9t\u00e9 ajout\u00e9e au solde entreprise."
+    },
+    "enterprise_encours_comptabilise_montant": {
+      "type": "number",
+      "description": "Montant de la commission entreprise comptabilis\u00e9e dans le EnterpriseLedger (pour audit)."
+    },
     "source": {
       "type": "string",
       "enum": [

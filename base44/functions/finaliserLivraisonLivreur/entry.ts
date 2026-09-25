@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
 import { chargerConfigPays, normalizeCommissionPct } from '../../shared/dispatchConstants.ts';
+import { comptabiliserCommissionEnterprise } from '../../shared/enterpriseFinance.ts';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // FINALISER LIVRAISON LIVREUR — Source de vérité pour la livraison
@@ -158,6 +159,17 @@ export default async function(req: Request): Promise<Response> {
         console.error('[finaliserLivraisonLivreur] verifierEncoursLivreur error:', encoursErr?.message);
       }
 
+      // ── SILGAPP ENTREPRISE: comptabiliser la commission entreprise ──
+      // Non-bloquant, idempotent. N'augmente JAMAIS le montant_du_silga du livreur.
+      try {
+        const entCourse = await base44.asServiceRole.entities.CourseExterne.get(course_id);
+        if (entCourse?.enterprise_id) {
+          await comptabiliserCommissionEnterprise(base44.asServiceRole, entCourse);
+        }
+      } catch (entErr: any) {
+        console.error('[finaliserLivraisonLivreur] enterprise accounting error:', entErr?.message);
+      }
+
       return Response.json({
         success: true,
         course: updated,
@@ -200,6 +212,17 @@ export default async function(req: Request): Promise<Response> {
 
       // NE PAS appeler verifierEncoursLivreur ici — il n'y a pas de commission à comptabiliser.
       // verifierEncoursLivreur sera appelé par confirmerPrixCourseAdmin après confirmation du prix.
+
+      // ── SILGAPP ENTREPRISE: même pour prix à confirmer, vérifier l'enterprise ──
+      // Non-bloquant, idempotent. N'augmente JAMAIS le montant_du_silga du livreur.
+      try {
+        if (course.enterprise_id) {
+          await comptabiliserCommissionEnterprise(base44.asServiceRole, { ...course, statut: 'livree' });
+        }
+      } catch (entErr: any) {
+        console.error('[finaliserLivraisonLivreur] enterprise accounting error (prix à confirmer):', entErr?.message);
+      }
+
       return Response.json({
         success: true,
         course: updated,
@@ -227,6 +250,20 @@ export default async function(req: Request): Promise<Response> {
         if (is_multi_colis && colis_data) {
           await handleMultiColis(base44, course_id, colis_data, now);
         }
+
+        // ── SILGAPP ENTREPRISE: comptabiliser la commission entreprise ──
+        // Non-bloquant, idempotent. N'augmente JAMAIS le montant_du_silga du livreur.
+        try {
+          if (course.enterprise_id) {
+            const entCourse = await base44.asServiceRole.entities.CourseExterne.get(course_id);
+            if (entCourse?.enterprise_id) {
+              await comptabiliserCommissionEnterprise(base44.asServiceRole, entCourse);
+            }
+          }
+        } catch (entErr: any) {
+          console.error('[finaliserLivraisonLivreur] enterprise accounting error (standard):', entErr?.message);
+        }
+
         return Response.json({
           success: true,
           course: res.course,

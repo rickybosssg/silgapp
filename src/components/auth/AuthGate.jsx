@@ -276,6 +276,17 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
         return;
       }
 
+      // 1b. Admin Entreprise → dashboard entreprise privé (/entreprise)
+      if (user.silgapp_role === "admin_entreprise" && user.enterprise_id) {
+        const currentPath = window.location.pathname;
+        if (currentPath !== "/entreprise" && !currentPath.startsWith("/entreprise")) {
+          window.location.replace("/entreprise");
+          return;
+        }
+        setState("admin_entreprise");
+        return;
+      }
+
       // 2. Admin → dashboard admin
       if (user.role === "admin") {
         registerPushToken(null, {
@@ -784,6 +795,11 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
   // Choix du rôle (nouvel utilisateur sans profil)
   if (state === "choix_role") {
     return <RoleSelection onPartenaire={onPartenaire} />;
+  }
+
+  // Admin Entreprise → dashboard entreprise
+  if (state === "admin_entreprise") {
+    return <>{children}</>;
   }
 
   // Admin → toujours accessible, pas de gate maintenance
