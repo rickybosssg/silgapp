@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Building2, Upload, Loader2, Check } from "lucide-react";
+import LogoUploader from "@/components/enterprise/LogoUploader.jsx";
 
 export default function BrandingTab({ enterprise, onRefresh }) {
   const [form, setForm] = useState({
@@ -94,30 +95,11 @@ export default function BrandingTab({ enterprise, onRefresh }) {
       {/* Logo */}
       <Card>
         <CardHeader><CardTitle className="text-sm">Logo de l'agence</CardTitle></CardHeader>
-        <CardContent className="space-y-3">
-          {form.logo_url ? (
-            <div className="flex items-center gap-3">
-              <img src={form.logo_url} alt="" className="w-16 h-16 rounded-xl object-cover border" />
-              <Button type="button" variant="outline" size="sm" onClick={() => setForm({ ...form, logo_url: "" })}>
-                Retirer
-              </Button>
-            </div>
-          ) : (
-            <label className="flex flex-col items-center justify-center gap-2 p-6 rounded-xl border-2 border-dashed border-gray-200 hover:border-blue-400 cursor-pointer transition-colors">
-              {uploading ? (
-                <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
-              ) : (
-                <Upload className="w-6 h-6 text-gray-400" />
-              )}
-              <span className="text-sm text-gray-500">{uploading ? "Upload..." : "Cliquez pour téléverser un logo"}</span>
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => handleUploadLogo(e.target.files?.[0])}
-              />
-            </label>
-          )}
+        <CardContent>
+          <LogoUploader
+            value={form.logo_url}
+            onChange={(url) => setForm({ ...form, logo_url: url })}
+          />
         </CardContent>
       </Card>
 

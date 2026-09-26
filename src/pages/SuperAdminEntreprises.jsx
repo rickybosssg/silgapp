@@ -9,6 +9,7 @@ import {
   Percent, Truck, Package, ArrowLeft, UserMinus, UserPlus, Power,
   Clock, Zap, Send,
 } from "lucide-react";
+import LogoUploader from "@/components/enterprise/LogoUploader.jsx";
 
 /**
  * SuperAdminEntreprises — Gestion complète SILGAPP ENTREPRISE depuis le Super Admin.
@@ -242,8 +243,13 @@ function CreateEnterpriseModal({ onClose, onCreated }) {
               <Input value={form.adresse} onChange={(e) => setForm({ ...form, adresse: e.target.value })} />
             </div>
             <div>
-              <Label className="text-xs">Logo URL</Label>
-              <Input value={form.logo_url} onChange={(e) => setForm({ ...form, logo_url: e.target.value })} placeholder="https://..." />
+              <Label className="text-xs">Logo de l'entreprise</Label>
+              <div className="mt-1">
+                <LogoUploader
+                  value={form.logo_url}
+                  onChange={(url) => setForm({ ...form, logo_url: url })}
+                />
+              </div>
             </div>
             <div>
               <Label className="text-xs">Couleur principale</Label>
