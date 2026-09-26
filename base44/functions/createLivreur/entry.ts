@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { ensureCodePromo } from '../../shared/codePromoUtils.ts';
 
 Deno.serve(async (req) => {
   try {
@@ -54,6 +55,20 @@ Deno.serve(async (req) => {
       statut_paiement: 'paye', // Nouveau livreur = dû 0 → à jour
     });
     console.log(" [createLivreur] Livreur créé:", created.id);
+
+    // Garantir le CodePromo personnel du livreur (idempotent)
+    try {
+      await ensureCodePromo(base44.asServiceRole, {
+        proprietaire_type: 'livreur',
+        proprietaire_id: created.id,
+        proprietaire_nom: created.nom || created.prenom || data.email || 'Livreur',
+        proprietaire_email: created.user_email || data.email || '',
+        country_code: countryCode,
+      });
+    } catch (e) {
+      console.error('[createLivreur] Erreur code promo:', e.message);
+    }
+
     return Response.json({ success: true, livreur: created });
   } catch (error) {
     console.error(" [createLivreur] Erreur:", error);

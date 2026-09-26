@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.51';
 import { normalizeEnterpriseId } from '../../shared/enterpriseFinance.ts';
+import { ensureCodePromo } from '../../shared/codePromoUtils.ts';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // manageDriverInvitation — Gestion des invitations livreurs Enterprise
@@ -219,6 +220,19 @@ export default async function(req: Request): Promise<Response> {
             used_by_user_email: normalizedEmail,
           });
 
+          // Garantir le CodePromo personnel du livreur Enterprise (idempotent)
+          try {
+            await ensureCodePromo(base44.asServiceRole, {
+              proprietaire_type: 'livreur',
+              proprietaire_id: livreur.id,
+              proprietaire_nom: livreur.nom || livreur.prenom || normalizedEmail,
+              proprietaire_email: normalizedEmail,
+              country_code: invitation.country_code,
+            });
+          } catch (e) {
+            console.error('[manageDriverInvitation] Erreur code promo (CAS 4):', e.message);
+          }
+
           return Response.json({
             success: true,
             livreur,
@@ -296,6 +310,19 @@ export default async function(req: Request): Promise<Response> {
           used_at: new Date().toISOString(),
           used_by_user_email: normalizedEmail,
         });
+
+        // Garantir le CodePromo personnel du livreur Enterprise (idempotent)
+        try {
+          await ensureCodePromo(base44.asServiceRole, {
+            proprietaire_type: 'livreur',
+            proprietaire_id: livreur.id,
+            proprietaire_nom: livreur.nom || livreur.prenom || normalizedEmail,
+            proprietaire_email: normalizedEmail,
+            country_code: invitation.country_code,
+          });
+        } catch (e) {
+          console.error('[manageDriverInvitation] Erreur code promo (CAS 1):', e.message);
+        }
 
         return Response.json({
           success: true,
