@@ -409,6 +409,81 @@
         },
         "handler": "silgappCopilotQuery",
         "annotations": { "read_only_hint": true, "destructive_hint": false, "idempotent_hint": true }
+      },
+      {
+        "name": "create_course",
+        "title": "Create Course",
+        "description": "Créer une course administrative. REQUIERT confirmation humaine avant exécution. Paramètres requis : type_course (expedier/recevoir/deplacement), adresse_depart, country_code, client_telephone. Paramètres optionnels : adresse_arrivee, client_nom, etc.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "tool": { "type": "string", "enum": ["create_course"], "description": "Nom de l'outil" },
+            "type_course": { "type": "string", "enum": ["expedier", "recevoir", "deplacement"], "description": "Type de course" },
+            "adresse_depart": { "type": "string", "description": "Adresse de départ" },
+            "adresse_arrivee": { "type": "string", "description": "Adresse d'arrivée" },
+            "country_code": { "type": "string", "description": "Code pays ISO 2 lettres (ex: BF, CI)" },
+            "client_telephone": { "type": "string", "description": "Numéro de téléphone du client (obligatoire)" },
+            "client_nom": { "type": "string", "description": "Nom du client" },
+            "expediteur_nom": { "type": "string", "description": "Nom de l'expéditeur" },
+            "expediteur_telephone": { "type": "string", "description": "Téléphone de l'expéditeur" },
+            "destinataire_nom": { "type": "string", "description": "Nom du destinataire" },
+            "destinataire_telephone": { "type": "string", "description": "Téléphone du destinataire" },
+            "notes": { "type": "string", "description": "Notes administratives" }
+          },
+          "required": ["tool", "type_course", "adresse_depart", "country_code", "client_telephone"]
+        },
+        "handler": "silgappCopilotWrite",
+        "annotations": { "read_only_hint": false, "destructive_hint": false, "idempotent_hint": false }
+      },
+      {
+        "name": "redispatch_course",
+        "title": "Redispatch Course",
+        "description": "Relancer/redispatcher une course bloquée. REQUIERT confirmation humaine avant exécution. Paramètres requis : course_id. Paramètres optionnels : mode (redispatch/vague0), motif.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "tool": { "type": "string", "enum": ["redispatch_course"], "description": "Nom de l'outil" },
+            "course_id": { "type": "string", "description": "ID de la course à relancer" },
+            "mode": { "type": "string", "enum": ["redispatch", "vague0"], "description": "Mode de relance (défaut: redispatch)" },
+            "motif": { "type": "string", "description": "Motif de la relance" }
+          },
+          "required": ["tool", "course_id"]
+        },
+        "handler": "silgappCopilotWrite",
+        "annotations": { "read_only_hint": false, "destructive_hint": false, "idempotent_hint": true }
+      },
+      {
+        "name": "assign_driver",
+        "title": "Assign Driver",
+        "description": "Affecter manuellement un livreur à une course. REQUIERT confirmation humaine avant exécution. Paramètres requis : course_id, livreur_id. Paramètre optionnel : motif.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "tool": { "type": "string", "enum": ["assign_driver"], "description": "Nom de l'outil" },
+            "course_id": { "type": "string", "description": "ID de la course" },
+            "livreur_id": { "type": "string", "description": "ID du livreur à assigner" },
+            "motif": { "type": "string", "description": "Motif de l'assignation manuelle" }
+          },
+          "required": ["tool", "course_id", "livreur_id"]
+        },
+        "handler": "silgappCopilotWrite",
+        "annotations": { "read_only_hint": false, "destructive_hint": false, "idempotent_hint": true }
+      },
+      {
+        "name": "cancel_course",
+        "title": "Cancel Course",
+        "description": "Annuler une course définitivement. REQUIERT confirmation humaine avant exécution. Paramètres requis : course_id. Paramètre optionnel : motif.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "tool": { "type": "string", "enum": ["cancel_course"], "description": "Nom de l'outil" },
+            "course_id": { "type": "string", "description": "ID de la course à annuler" },
+            "motif": { "type": "string", "description": "Motif d'annulation" }
+          },
+          "required": ["tool", "course_id"]
+        },
+        "handler": "silgappCopilotWrite",
+        "annotations": { "read_only_hint": false, "destructive_hint": true, "idempotent_hint": false }
       }
     ]
   }
