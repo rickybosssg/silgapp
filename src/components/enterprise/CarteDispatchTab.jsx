@@ -1,65 +1,107 @@
-import React from "react";
-import { MapContainer, TileLayer, Marker, Popup, Polyline } from "react-leaflet";
-import { RefreshCw, Truck, Package, Users } from "lucide-react";
-import L from "leaflet";
+import React, { useMemo } from "react";
+import DispatchMap from "@/components/carte/DispatchMap";
+import { RefreshCw } from "lucide-react";
 
-// Fix default icon
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-});
-
-function livreurIcon(statut) {
-  const color = statut === "disponible" ? "#10b981" : statut === "en_course" ? "#f59e0b" : "#94a3b8";
-  return L.divIcon({
-    html: `<div style="background:${color};width:28px;height:28px;border-radius:50%;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;color:white;font-size:12px;font-weight:bold;">🛵</div>`,
-    className: "",
-    iconSize: [28, 28],
-    iconAnchor: [14, 14],
-  });
-}
-
-function courseIcon() {
-  return L.divIcon({
-    html: `<div style="background:#3b82f6;width:28px;height:28px;border-radius:50%;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;color:white;font-size:12px;font-weight:bold;">📦</div>`,
-    className: "",
-    iconSize: [28, 28],
-    iconAnchor: [14, 14],
-  });
-}
-
+/**
+ * CarteDispatchTab — Carte temps réel SILGAPP Enterprise
+ *
+ * RÉUTILISE le moteur cartographique SILGAPP existant (DispatchMap).
+ * Aucun second moteur cartographique créé.
+ *
+ * ISOLATION ENTERPRISE :
+ *   - Les livreurs proviennent de getEnterpriseDashboard (backend)
+ *   - L'enterprise_id est résolu côté backend depuis l'admin authentifié
+ *   - Le frontend ne fournit JAMAIS d'enterprise_id comme autorité
+ *
+ * GPS — LECTURE SEULE ABSOLUE :
+ *   - Aucune écriture latitude/longitude
+ *   - Aucun heartbeat
+ *   - Aucune modification de statut, actif, admin_hors_ligne, manual_hors_ligne
+ *   - Aucune modification de fréquence GPS
+ *
+ * DISPATCH V2 — NON MODIFIÉ :
+ *   - Aucune nouvelle règle d'éligibilité introduite
+ *   - La carte est un affichage uniquement
+ *
+ * POLLING :
+ *   - Réutilise le polling centralisé Enterprise (30s) du parent (EntrepriseApp)
+ *   - Aucun timer interne
+ */
 export default function CarteDispatchTab({ enterprise, data, onRefresh, onCourseClick, onLivreurClick }) {
-  // Les données proviennent du parent (EntrepriseApp) — polling centralisé 30s
+  // ── Les données proviennent du parent (EntrepriseApp) — polling centralisé 30s ──
   // Aucun polling interne pour éviter les requêtes dupliquées.
+  const allLivreurs = data?.livreurs || [];
+  const allCourses = data?.courses?.in_progress || [];
+
+  // ── Livreurs avec GPS valide pour l'affichage carte ──
+  const livreursSurCarte = allLivreurs.filter((l) => l.latitude && l.longitude);
+
+  // ── IDs des livreurs actuellement en course réelle (pour le statut visuel orange) ──
+  // Calculé depuis les courses enterprise en cours — lecture seule.
+  const livreurIdsEnCourseReelle = useMemo(() => {
+    const ids = new Set();
+    allCourses.forEach((c) => {
+      if (c.livreur_id && !["livree", "annulee"].includes(c.statut)) {
+        ids.add(c.livreur_id);
+      }
+    });
+    return ids;
+  }, [allCourses]);
+
+  // ── Position centrale : calculée depuis les livreurs, fallback Ouaga ──
+  // Ne dépend QUE des données enterprise (déjà filtrées par tenant côté backend).
+  const centerPosition = useMemo(() => {
+    const withGPS = allLivreurs.filter((l) => l.latitude && l.longitude);
+    if (withGPS.length > 0) {
+      const avgLat = withGPS.reduce((s, l) => s + l.latitude, 0) / withGPS.length;
+      const avgLng = withGPS.reduce((s, l) => s + l.longitude, 0) / withGPS.length;
+      return { latitude: avgLat, longitude: avgLng, zoom: 12 };
+    }
+    return { latitude: 12.3569, longitude: -1.5353, zoom: 12 };
+  }, [allLivreurs]);
+
   if (!data) {
-    return <div className="text-center py-8"><RefreshCw className="w-5 h-5 animate-spin mx-auto text-gray-400" /></div>;
+    return (
+      <div className="text-center py-8">
+        <RefreshCw className="w-5 h-5 animate-spin mx-auto text-gray-400" />
+      </div>
+    );
   }
 
-  const livreurs = (data?.livreurs || []).filter(
-    (l) => l.latitude && l.longitude
-  );
-  const activeCourses = (data?.courses?.in_progress || []).filter(
-    (c) => (c.gps_depart_lat && c.gps_depart_lng) || (c.livreur_id && c.gps_arrivee_lat)
+  // ── Courses en attente (avec GPS départ) pour affichage sur la carte ──
+  // Lecture seule — aucun dispatch manuel depuis la carte.
+  const coursesSurCarte = allCourses.filter(
+    (c) => c.gps_depart_lat && c.gps_depart_lng
   );
 
-  const countDispo = livreurs.filter((l) => l.statut === "disponible").length;
-  const countEnCourse = livreurs.filter((l) => l.statut === "en_course").length;
-  const countCoursesRecherche = (data?.courses?.in_progress || []).filter((c) =>
+  // ── Compteurs (lecture seule) ──
+  const countDispo = allLivreurs.filter(
+    (l) => l.statut === "disponible" && l.actif !== false && l.validation === "valide"
+  ).length;
+  const countEnCourse = allLivreurs.filter((l) => l.statut === "en_course").length;
+  const countHorsLigne = allLivreurs.filter(
+    (l) => l.statut === "hors_ligne" || l.actif === false || l.validation !== "valide"
+  ).length;
+  const countCoursesRecherche = allCourses.filter((c) =>
     ["nouvelle", "en_attente", "recherche_livreur"].includes(c.statut)
   ).length;
 
-  const allLats = [...livreurs.map((l) => l.latitude), ...activeCourses.map((c) => c.gps_depart_lat).filter(Boolean)];
-  const allLngs = [...livreurs.map((l) => l.longitude), ...activeCourses.map((c) => c.gps_depart_lng).filter(Boolean)];
-
-  const center = allLats.length > 0
-    ? [allLats.reduce((a, b) => a + b, 0) / allLats.length, allLngs.reduce((a, b) => a + b, 0) / allLngs.length]
-    : [12.3714, -1.5197]; // Ouaga default
+  // ── Handler clic marqueur ──
+  // DispatchMap retourne l'entité cliquée. On route vers le bon modal.
+  const handleMarkerClick = (entity) => {
+    if (!entity) return;
+    // Si c'est une course (marqueur rouge)
+    if (entity._type === "course" || entity.gps_depart_lat !== undefined) {
+      onCourseClick?.(entity);
+      return;
+    }
+    // Sinon c'est un livreur → ouvre la fiche Enterprise
+    onLivreurClick?.(entity);
+  };
 
   return (
     <div className="space-y-3">
-      {/* Compteurs */}
+      {/* ── Compteurs (lecture seule) ── */}
       <div className="grid grid-cols-4 gap-2">
         <div className="bg-emerald-50 rounded-lg p-2 text-center">
           <p className="text-[9px] text-gray-500">Dispos</p>
@@ -75,77 +117,35 @@ export default function CarteDispatchTab({ enterprise, data, onRefresh, onCourse
         </div>
         <div className="bg-gray-50 rounded-lg p-2 text-center">
           <p className="text-[9px] text-gray-500">Total L.</p>
-          <p className="text-sm font-bold text-gray-700">{livreurs.length}</p>
+          <p className="text-sm font-bold text-gray-700">{allLivreurs.length}</p>
         </div>
       </div>
 
-      {/* Carte */}
-      <div className="rounded-xl overflow-hidden border border-gray-200" style={{ height: "400px" }}>
-        <MapContainer center={center} zoom={12} style={{ height: "100%", width: "100%" }}>
-          <TileLayer
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            attribution='&copy; OpenStreetMap'
-          />
-          {livreurs.map((l) => (
-            <Marker
-              key={l.id}
-              position={[l.latitude, l.longitude]}
-              icon={livreurIcon(l.statut)}
-              eventHandlers={{ click: () => onLivreurClick?.(l) }}
-            >
-              <Popup>
-                <div className="text-xs">
-                  <p className="font-bold">{l.prenom} {l.nom}</p>
-                  <p>{l.telephone}</p>
-                  <p>Statut: {l.statut}</p>
-                  <p>Véhicule: {l.vehicule || l.type_vehicule || "moto"}</p>
-                  {l.derniere_position_date && (
-                    <p>GPS: {new Date(l.derniere_position_date).toLocaleTimeString("fr-FR")}</p>
-                  )}
-                </div>
-              </Popup>
-            </Marker>
-          ))}
-
-          {activeCourses.map((c) => {
-            const pos = c.gps_depart_lat ? [c.gps_depart_lat, c.gps_depart_lng] : null;
-            if (!pos) return null;
-            return (
-              <Marker
-                key={c.id}
-                position={pos}
-                icon={courseIcon()}
-                eventHandlers={{ click: () => onCourseClick?.(c) }}
-              >
-                <Popup>
-                  <div className="text-xs">
-                    <p className="font-bold">{c.client_nom || "Client"}</p>
-                    <p>{c.adresse_depart} → {c.adresse_arrivee}</p>
-                    <p>Statut: {c.statut}</p>
-                    {c.livreur_nom && <p>Livreur: {c.livreur_nom}</p>}
-                    {c.prix_final > 0 && <p>{c.prix_final.toLocaleString("fr-FR")} F</p>}
-                  </div>
-                </Popup>
-              </Marker>
-            );
-          })}
-
-          {activeCourses.map((c) => {
-            if (c.gps_depart_lat && c.gps_arrivee_lat) {
-              return (
-                <Polyline
-                  key={`line-${c.id}`}
-                  positions={[[c.gps_depart_lat, c.gps_depart_lng], [c.gps_arrivee_lat, c.gps_arrivee_lng]]}
-                  pathOptions={{ color: "#3b82f6", weight: 2, dashArray: "5, 5" }}
-                />
-              );
-            }
-            return null;
-          })}
-        </MapContainer>
+      {/* ── Carte — réutilise DispatchMap (moteur cartographique SILGAPP) ── */}
+      <div
+        className="rounded-xl overflow-hidden border border-gray-200 relative"
+        style={{ height: "calc(100vh - 300px)", minHeight: "320px" }}
+      >
+        <DispatchMap
+          position={centerPosition}
+          livreurs={livreursSurCarte}
+          clients={[]}
+          courses={coursesSurCarte}
+          partenaires={[]}
+          onMarkerClick={handleMarkerClick}
+          showClients={false}
+          showLivreurs={true}
+          showPartenaires={false}
+          showHeatmap={false}
+          livreurIdsEnCourseReelle={livreurIdsEnCourseReelle}
+          showOldPositions={false}
+        />
       </div>
 
-      <button onClick={onRefresh} className="w-full text-xs text-blue-500 flex items-center justify-center gap-1 py-2">
+      <button
+        onClick={onRefresh}
+        className="w-full text-xs text-blue-500 flex items-center justify-center gap-1 py-2"
+      >
         <RefreshCw className="w-3 h-3" /> Rafraîchir (auto 30s)
       </button>
 
