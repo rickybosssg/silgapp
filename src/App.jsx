@@ -126,6 +126,7 @@ import Diag500Panel from './components/admin/Diag500Panel.jsx';
 // ── SILGAPP ENTREPRISE — Module multi-tenant ──
 const EntrepriseApp = lazy(() => import('./pages/EntrepriseApp.jsx'));
 const SuperAdminEntreprises = lazy(() => import('./pages/SuperAdminEntreprises.jsx'));
+const SuiviEnterprise = lazy(() => import('./pages/SuiviEnterprise.jsx'));
 const InscriptionLivreurEntreprise = lazy(() => import('./pages/InscriptionLivreurEntreprise.jsx'));
 
 function AnimatedRoutes({ children }) {
@@ -468,6 +469,7 @@ function AppContent() {
           <Route path="/admin/meta-ads" element={<AnimatedRoutes><MetaAdsDashboard /></AnimatedRoutes>} />
           <Route path="/admin/pass-zero-commission" element={<AnimatedRoutes><PassZeroCommissionAdmin /></AnimatedRoutes>} />
           <Route path="/admin/entreprises" element={<AnimatedRoutes><SuperAdminEntreprises /></AnimatedRoutes>} />
+          <Route path="/admin/suivi-enterprise" element={<AnimatedRoutes><SuiviEnterprise /></AnimatedRoutes>} />
           <Route path="/admin/messages" element={<AnimatedRoutes><AdminMessages /></AnimatedRoutes>} />
           <Route path="/admin/whatsapp" element={<AnimatedRoutes><WhatsAppAdmin /></AnimatedRoutes>} />
           <Route path="/admin/venus" element={<AnimatedRoutes><VenusAdminCenter /></AnimatedRoutes>} />

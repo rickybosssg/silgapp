@@ -71,6 +71,7 @@ export const navItems = [
   { path: "/admin/fiabilite-push", label: "Fiabilité Push", icon: Radio },
   { path: "/admin/silga-score", label: "Silga Score", icon: Trophy },
   { path: "/admin/entreprises", label: "SILGAPP Entreprise", icon: Building2 },
+  { path: "/admin/suivi-enterprise", label: "Suivi Enterprise", icon: TrendingUp },
   { path: "/notifications", label: "Notifications", icon: Bell },
   { path: "/maintenance", label: "Maintenance", icon: Shield },
 ];
