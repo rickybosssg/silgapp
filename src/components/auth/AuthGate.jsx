@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { base44, detectedToken } from "@/api/base44Client";
 import { APP_PUBLIC_URL, BASE44_APP_ID } from "@/lib/app-params";
 import { ArrowRight, Loader2, Lock, Mail, ShieldCheck, Truck, Store } from "lucide-react";
@@ -210,6 +211,7 @@ async function resetPasswordWithToken(resetToken, newPassword) {
  * - detectedToken permet de savoir si un token a été trouvé
  */
 export default function AuthGate({ children, onLivreur, onClient, onPartenaire }) {
+  const navigate = useNavigate();
   const [state, setState] = useState("loading");
   const [authRetry, setAuthRetry] = useState(0);
   const initialResetToken = getPasswordResetTokenFromUrl();
@@ -310,10 +312,12 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
       }
 
       // 1b. Admin Entreprise → dashboard entreprise privé (/entreprise)
+      // Navigation client-side (React Router) — évite le full page reload
+      // qui provoque un écran blanc dans l'APK Capacitor avec bundle local.
       if (user.silgapp_role === "admin_entreprise" && user.enterprise_id) {
         const currentPath = window.location.pathname;
         if (currentPath !== "/entreprise" && !currentPath.startsWith("/entreprise")) {
-          window.location.replace("/entreprise");
+          navigate("/entreprise", { replace: true });
           return;
         }
         setState("admin_entreprise");
