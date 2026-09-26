@@ -2,6 +2,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
 import { haversineKm } from '../../shared/geoUtils.ts';
 import { normalizeCommissionPct, chargerConfigPays, chargerTarifZone } from '../../shared/dispatchConstants.ts';
 import { evaluerAvantageCommission } from '../../shared/commissionAvantage.ts';
+import { normalizeEnterpriseId } from '../../shared/enterpriseFinance.ts';
 
 // ⚠️ Aucun tarif codé en dur — tous les paramètres proviennent de l'entité Country.
 // Fallback générique unique (ne suppose aucun pays) utilisé uniquement si la BDD
@@ -109,15 +110,22 @@ Deno.serve(async (req) => {
     // traitées par le bloc admin ci-dessus et n'atteignent jamais ce garde-fou.
     // ⚠️ Si la commission a été figée à l'acceptation (Pass/Happy Hour), utiliser
     // le taux figé (commission_taux_applique) au lieu du taux normal du pays.
+    // ── ENTERPRISE : commission_silga = 0 (payée par l'entreprise via EnterpriseLedger) ──
     if (course.prix_propose_client && course.prix_propose_client > 0) {
       const prixRetenu = course.prix_final || course.prix_propose_client;
-      // Utiliser le taux figé à l'acceptation si disponible, sinon le taux normal du pays
-      let tauxEffectif = commissionPct;
-      if (course.commission_locked_at && course.commission_taux_applique != null) {
-        tauxEffectif = Number(course.commission_taux_applique);
+      let commissionSilga: number;
+      let montantLivreur: number;
+      if (normalizeEnterpriseId(course.enterprise_id)) {
+        commissionSilga = 0;
+        montantLivreur = prixRetenu;
+      } else {
+        let tauxEffectif = commissionPct;
+        if (course.commission_locked_at && course.commission_taux_applique != null) {
+          tauxEffectif = Number(course.commission_taux_applique);
+        }
+        commissionSilga = Math.round(prixRetenu * (tauxEffectif / 100));
+        montantLivreur = prixRetenu - commissionSilga;
       }
-      const commissionSilga = Math.round(prixRetenu * (tauxEffectif / 100));
-      const montantLivreur = prixRetenu - commissionSilga;
       const courseUpdated = await base44.asServiceRole.entities.CourseExterne.update(course_id, {
         prix_final: prixRetenu,
         commission_silga: commissionSilga,
@@ -243,12 +251,20 @@ Deno.serve(async (req) => {
     // Commission Silga et montant livreur — calculés sur le prix finalement retenu.
     // ⚠️ Si la commission a été figée à l'acceptation (Pass/Happy Hour), utiliser
     // le taux figé (commission_taux_applique) au lieu du taux normal du pays.
-    let tauxEffectif = commissionPct;
-    if (course.commission_locked_at && course.commission_taux_applique != null) {
-      tauxEffectif = Number(course.commission_taux_applique);
+    // ── ENTERPRISE : commission_silga = 0 (payée par l'entreprise via EnterpriseLedger) ──
+    let commissionSilga: number;
+    let montantLivreur: number;
+    if (normalizeEnterpriseId(course.enterprise_id)) {
+      commissionSilga = 0;
+      montantLivreur = prixRetenu;
+    } else {
+      let tauxEffectif = commissionPct;
+      if (course.commission_locked_at && course.commission_taux_applique != null) {
+        tauxEffectif = Number(course.commission_taux_applique);
+      }
+      commissionSilga = Math.round(prixRetenu * (tauxEffectif / 100));
+      montantLivreur = prixRetenu - commissionSilga;
     }
-    const commissionSilga = Math.round(prixRetenu * (tauxEffectif / 100));
-    const montantLivreur = prixRetenu - commissionSilga;
 
     // Mettre à jour la course
     const courseUpdated = await base44.asServiceRole.entities.CourseExterne.update(course_id, {

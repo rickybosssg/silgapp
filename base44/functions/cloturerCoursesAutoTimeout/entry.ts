@@ -1,6 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
 import { chargerConfigPays, normalizeCommissionPct } from '../../shared/dispatchConstants.ts';
-import { comptabiliserCommissionEnterprise } from '../../shared/enterpriseFinance.ts';
+import { comptabiliserCommissionEnterprise, normalizeEnterpriseId } from '../../shared/enterpriseFinance.ts';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CLOTURER COURSES AUTO TIMEOUT — Clôture automatique des courses après timeout
@@ -269,8 +269,17 @@ async function finalizeOneCourse(base44: any, course: any, nowIso: string, delay
       };
     }
 
-    const commissionSilga = Math.round(montant * (tauxEffectif / 100));
-    const montantLivreur = montant - commissionSilga;
+    let commissionSilga = Math.round(montant * (tauxEffectif / 100));
+    let montantLivreur = montant - commissionSilga;
+
+    // ── ENTERPRISE : la commission est payée par l'entreprise, pas le livreur ──
+    // commission_silga = 0 sur la course → le livreur n'est jamais débité.
+    // La commission Enterprise est comptabilisée dans EnterpriseLedger.
+    // Le chemin public (enterprise_id null) n'est JAMAIS affecté.
+    if (normalizeEnterpriseId(course.enterprise_id)) {
+      commissionSilga = 0;
+      montantLivreur = montant;
+    }
 
     await base44.asServiceRole.entities.CourseExterne.update(courseId, {
       statut: 'livree',

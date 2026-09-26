@@ -25,6 +25,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { chargerConfigPays, normalizeCommissionPct } from './dispatchConstants.ts';
+import { normalizeEnterpriseId } from './enterpriseFinance.ts';
 
 export interface AvantageCommission {
   taux_normal: number;        // Country.commission_pct
@@ -203,6 +204,69 @@ export async function figerCommissionAcceptation(
   }
 
   try {
+    // ═══════════════════════════════════════════════════════════════════════
+    // ENTERPRISE : Les courses Enterprise sont TOTALEMENT indépendantes des
+    // avantages publics (Happy Hour, Pass, Pass Code). Le taux est verrouillé
+    // selon enterprise_commission_rate_locked (si déjà figé) ou le taux actuel
+    // de l'enterprise. Les champs Happy Hour / Pass ne sont JAMAIS settés.
+    // IDEMPOTENT : si enterprise_commission_rate_locked est déjà présent, ne
+    // pas le remplacer.
+    // ═══════════════════════════════════════════════════════════════════════
+    const course = await base44.asServiceRole.entities.CourseExterne.get(courseId);
+    if (course && normalizeEnterpriseId(course.enterprise_id)) {
+      // ── Idempotence : ne pas remplacer un taux déjà figé ──
+      if (course.enterprise_commission_rate_locked != null && course.enterprise_commission_locked_at) {
+        const tauxExistant = Number(course.enterprise_commission_rate_locked);
+        console.log(`[COMMISSION_LOCK] Course Enterprise ${courseId} déjà figée à ${tauxExistant}% — skip re-figement`);
+        return {
+          taux_normal: tauxExistant,
+          taux_applique: tauxExistant,
+          mode: 'normal',
+          pass_id: null,
+          happy_hour_id: null,
+        };
+      }
+
+      // ── Charger le taux Enterprise depuis l'entreprise ──
+      const enterprises = await base44.asServiceRole.entities.Enterprise.filter({
+        enterprise_financier_id: normalizeEnterpriseId(course.enterprise_id),
+      }).catch(() => []);
+      const enterprise = enterprises?.[0];
+      const tauxEnterprise = Number(enterprise?.commission_silgapp_pct);
+      if (!Number.isFinite(tauxEnterprise) || tauxEnterprise < 0) {
+        console.error(`[COMMISSION_LOCK] Course Enterprise ${courseId} — taux invalide sur l'entreprise, fallback normal`);
+        // Ne pas bloquer l'acceptation — fallback vers evaluerAvantageCommission
+      } else {
+        // ── Figer le taux Enterprise (UNE SEULE FOIS) ──
+        const nowIso = new Date().toISOString();
+        await base44.asServiceRole.entities.CourseExterne.update(courseId, {
+          enterprise_commission_rate_locked: tauxEnterprise,
+          enterprise_commission_locked_at: nowIso,
+          // commission_taux_applique = 0 pour que le livreur ne soit pas débité
+          // (la commission Enterprise est payée par l'entreprise via EnterpriseLedger)
+          commission_taux_normal: tauxEnterprise,
+          commission_taux_applique: 0,
+          commission_mode: 'normal',
+          pass_id: '',
+          happy_hour_id: '',
+          commission_locked_at: nowIso,
+        });
+
+        console.log(`[COMMISSION_LOCK] Course Enterprise ${courseId} figée: mode=normal taux_enterprise=${tauxEnterprise}% (commission_silga=0 — payée par entreprise) livreur=${livreurId}`);
+        return {
+          taux_normal: tauxEnterprise,
+          taux_applique: 0,
+          mode: 'normal',
+          pass_id: null,
+          happy_hour_id: null,
+        };
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // PUBLIC (enterprise_id null/absent) : comportement inchangé — Happy Hour,
+    // Pass et commission normale du pays s'appliquent comme avant.
+    // ═══════════════════════════════════════════════════════════════════════
     const avantage = await evaluerAvantageCommission(
       base44,
       livreurId,
