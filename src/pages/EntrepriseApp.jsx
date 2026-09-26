@@ -11,6 +11,7 @@ import CourseDetailModal from "@/components/enterprise/CourseDetailModal.jsx";
 import LivreurFicheModal from "@/components/enterprise/LivreurFicheModal.jsx";
 import CreateLivreurEnterpriseModal from "@/components/enterprise/CreateLivreurEnterpriseModal.jsx";
 import CarteDispatchTab from "@/components/enterprise/CarteDispatchTab.jsx";
+import ClientsEnterpriseTab from "@/components/enterprise/ClientsEnterpriseTab.jsx";
 import { EN_TRAITEMENT_STATUSES, STATUS_BADGE } from "@/components/enterprise/courseStatus.js";
 
 export default function EntrepriseApp() {
@@ -111,6 +112,7 @@ export default function EntrepriseApp() {
             onCreateClick={() => setShowCreateLivreur(true)}
           />
         )}
+        {activeTab === "clients" && <ClientsEnterpriseTab />}
         {activeTab === "pending" && <PendingDriversTab />}
         {activeTab === "invitations" && <InvitationsTab />}
         {activeTab === "branding" && <BrandingTab enterprise={enterprise} onRefresh={loadDashboard} />}
