@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { base44 } from "@/api/base44Client";
-import { Building2, Users, Package, TrendingUp, Wallet, LogOut, RefreshCw, Truck, MapPin, Palette, UserPlus, Clock, Plus, Map } from "lucide-react";
+import { Building2, RefreshCw } from "lucide-react";
+import EnterpriseLayout from "@/components/enterprise/EnterpriseLayout.jsx";
+import EnterpriseDashboard from "@/components/enterprise/EnterpriseDashboard.jsx";
 import BrandingTab from "@/components/enterprise/BrandingTab.jsx";
 import InvitationsTab from "@/components/enterprise/InvitationsTab.jsx";
 import PendingDriversTab from "@/components/enterprise/PendingDriversTab.jsx";
@@ -32,25 +34,18 @@ export default function EntrepriseApp() {
   }, []);
 
   // ── Polling centralisé 30s — LECTURE SEULE (getEnterpriseDashboard ne fait que des filter()).
-  //    Aucun GPS, heartbeat, dispatch, notification ni écriture déclenché.
-  //    CarteDispatchTab et CoursesTab utilisent les mêmes données → pas de double polling.
   useEffect(() => {
     loadDashboard();
     const interval = setInterval(() => loadDashboard(true), 30000);
     return () => clearInterval(interval);
   }, [loadDashboard]);
 
-  const handleLogout = () => {
-    if (!window.confirm("Voulez-vous vraiment vous déconnecter ?")) return;
-    base44.auth.logout();
-  };
-
   if (loading && !data) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center space-y-3">
-          <RefreshCw className="w-8 h-8 animate-spin text-blue-500 mx-auto" />
-          <p className="text-sm text-gray-500">Chargement du dashboard entreprise...</p>
+          <RefreshCw className="w-8 h-8 animate-spin text-primary mx-auto" />
+          <p className="text-sm text-muted-foreground">Chargement du dashboard entreprise...</p>
         </div>
       </div>
     );
@@ -58,10 +53,10 @@ export default function EntrepriseApp() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <div className="text-center space-y-3 max-w-sm">
-          <p className="text-sm text-red-500">{error}</p>
-          <button onClick={loadDashboard} className="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm">Réessayer</button>
+          <p className="text-sm text-destructive">{error}</p>
+          <button onClick={loadDashboard} className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm">Réessayer</button>
         </div>
       </div>
     );
@@ -69,86 +64,30 @@ export default function EntrepriseApp() {
 
   if (!data?.enterprise) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <div className="text-center space-y-3 max-w-sm">
-          <Building2 className="w-12 h-12 text-gray-400 mx-auto" />
-          <p className="text-sm text-gray-500">Aucune entreprise rattachée à ce compte.</p>
-          <button onClick={handleLogout} className="px-4 py-2 border rounded-lg text-sm">Se déconnecter</button>
+          <Building2 className="w-12 h-12 text-muted-foreground mx-auto" />
+          <p className="text-sm text-muted-foreground">Aucune entreprise rattachée à ce compte.</p>
+          <button onClick={() => base44.auth.logout()} className="px-4 py-2 border rounded-lg text-sm">Se déconnecter</button>
         </div>
       </div>
     );
   }
 
   const { enterprise, stats, courses, livreurs, ledger } = data;
-  const primaryColor = enterprise.couleur_primaire || "#007AFF";
-
-  const tabs = [
-    { id: "overview", label: "Tableau de bord", icon: TrendingUp },
-    { id: "courses", label: "Courses", icon: Package },
-    { id: "create", label: "Nouvelle course", icon: Plus },
-    { id: "carte", label: "Carte", icon: Map },
-    { id: "livreurs", label: "Livreurs", icon: Truck },
-    { id: "pending", label: "Candidats", icon: Clock },
-    { id: "invitations", label: "Invitations", icon: UserPlus },
-    { id: "branding", label: "Identité", icon: Palette },
-    { id: "comptabilite", label: "Comptabilité", icon: Wallet },
-  ];
+  const pendingCount = stats?.candidats_en_attente || 0;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header
-        className="sticky top-0 z-40 text-white shadow-lg"
-        style={{ background: `linear-gradient(135deg, ${primaryColor}, ${primaryColor}DD)` }}
-      >
-        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            {enterprise.logo_url ? (
-              <img src={enterprise.logo_url} alt={enterprise.nom} className="w-10 h-10 rounded-lg object-cover bg-white/10" />
-            ) : (
-              <div className="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center">
-                <Building2 className="w-6 h-6" />
-              </div>
-            )}
-            <div>
-              <h1 className="text-sm font-bold leading-tight">{enterprise.nom}</h1>
-              <p className="text-[10px] opacity-80">Dashboard Entreprise</p>
-            </div>
-          </div>
-          <button onClick={handleLogout} className="p-2 rounded-lg hover:bg-white/10">
-            <LogOut className="w-5 h-5" />
-          </button>
-        </div>
-      </header>
-
-      {/* Tabs */}
-      <nav className="sticky top-[56px] z-30 bg-white border-b shadow-sm">
-        <div className="max-w-4xl mx-auto flex overflow-x-auto scrollbar-hide">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-1.5 px-4 py-3 text-xs font-semibold whitespace-nowrap border-b-2 transition ${
-                  activeTab === tab.id
-                    ? "border-current text-blue-600"
-                    : "border-transparent text-gray-400 hover:text-gray-600"
-                }`}
-                style={activeTab === tab.id ? { color: primaryColor, borderColor: primaryColor } : {}}
-              >
-                <Icon className="w-4 h-4" />
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
-      </nav>
-
-      {/* Content */}
-      <main className="max-w-4xl mx-auto px-4 py-4 pb-20">
+    <EnterpriseLayout
+      enterprise={enterprise}
+      activeTab={activeTab}
+      onTabChange={setActiveTab}
+      pendingCount={pendingCount}
+      onRefresh={() => loadDashboard()}
+    >
+      <div className="p-4 lg:p-0">
         {activeTab === "overview" && (
-          <OverviewTab stats={stats} enterprise={enterprise} courses={courses} />
+          <EnterpriseDashboard stats={stats} enterprise={enterprise} courses={courses} onTabChange={setActiveTab} />
         )}
         {activeTab === "courses" && (
           <CoursesTab courses={courses} stats={stats} onCourseClick={setSelectedCourse} />
@@ -170,7 +109,7 @@ export default function EntrepriseApp() {
         {activeTab === "invitations" && <InvitationsTab />}
         {activeTab === "branding" && <BrandingTab enterprise={enterprise} onRefresh={loadDashboard} />}
         {activeTab === "comptabilite" && <ComptabiliteTab stats={stats} ledger={ledger} enterprise={enterprise} />}
-      </main>
+      </div>
 
       {/* Modals */}
       <CourseDetailModal
@@ -184,91 +123,7 @@ export default function EntrepriseApp() {
         onClose={() => setSelectedLivreur(null)}
         onAction={loadDashboard}
       />
-    </div>
-  );
-}
-
-// ── Onglet Vue d'ensemble ──
-function OverviewTab({ stats, enterprise, courses }) {
-  const statCards = [
-    { icon: Package, label: "Courses aujourd'hui", value: stats?.courses_today || 0, color: "text-blue-600", bg: "bg-blue-50" },
-    { icon: Clock, label: "En attente", value: stats?.courses_pending || 0, color: "text-amber-600", bg: "bg-amber-50" },
-    { icon: Truck, label: "En cours", value: stats?.courses_in_progress || 0, color: "text-purple-600", bg: "bg-purple-50" },
-    { icon: Package, label: "Livrées aujourd'hui", value: stats?.courses_completed_today || 0, color: "text-emerald-600", bg: "bg-emerald-50" },
-    { icon: Users, label: "Livreurs actifs", value: stats?.livreurs_actifs || 0, color: "text-emerald-600", bg: "bg-emerald-50" },
-    { icon: Truck, label: "Disponibles", value: stats?.livreurs_disponibles || 0, color: "text-green-600", bg: "bg-green-50" },
-    { icon: Truck, label: "En course", value: stats?.livreurs_en_course || 0, color: "text-amber-600", bg: "bg-amber-50" },
-    { icon: Users, label: "Hors ligne", value: stats?.livreurs_hors_ligne || 0, color: "text-gray-600", bg: "bg-gray-50" },
-  ];
-
-  const isAgenceActive = enterprise?.actif !== false && enterprise?.statut === "actif";
-
-  return (
-    <div className="space-y-4">
-      {/* Statut agence */}
-      <div className={`rounded-xl p-3 flex items-center gap-2 ${isAgenceActive ? "bg-emerald-50" : "bg-red-50"}`}>
-        <div className={`w-2.5 h-2.5 rounded-full ${isAgenceActive ? "bg-emerald-500" : "bg-red-500"}`} />
-        <span className="text-sm font-bold text-gray-900">{isAgenceActive ? "Agence active" : "Agence suspendue"}</span>
-      </div>
-
-      {/* Candidats */}
-      {(stats?.candidats_en_attente || 0) > 0 && (
-        <div className="rounded-xl bg-amber-50 p-3 flex items-center justify-between">
-          <span className="text-sm text-amber-700">Candidats en attente</span>
-          <span className="text-sm font-bold text-amber-700">{stats?.candidats_en_attente}</span>
-        </div>
-      )}
-
-      {/* Stats grid */}
-      <div className="grid grid-cols-2 gap-3">
-        {statCards.map((stat, i) => {
-          const Icon = stat.icon;
-          return (
-            <div key={i} className="bg-white rounded-xl border p-3 shadow-sm">
-              <div className={`w-8 h-8 rounded-lg ${stat.bg} flex items-center justify-center mb-2`}>
-                <Icon className={`w-4 h-4 ${stat.color}`} />
-              </div>
-              <p className="text-xl font-bold text-gray-900 tabular-nums">{stat.value}</p>
-              <p className="text-[10px] text-gray-500 leading-tight">{stat.label}</p>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Taux et volume */}
-      <div className="bg-white rounded-xl border p-4 space-y-3 shadow-sm">
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-gray-500">Taux SILGAPP</span>
-          <span className="text-sm font-bold text-gray-900">{stats?.taux_silgapp || 0}%</span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-gray-500">Volume courses (livrées)</span>
-          <span className="text-sm font-bold text-gray-900">{(stats?.volume_courses || 0).toLocaleString("fr-FR")} F</span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-gray-500">Commissions générées</span>
-          <span className="text-sm font-bold text-gray-900">{(stats?.total_commissions || 0).toLocaleString("fr-FR")} F</span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-gray-500">Total payé</span>
-          <span className="text-sm font-bold text-emerald-600">{(stats?.total_paiements || 0).toLocaleString("fr-FR")} F</span>
-        </div>
-      </div>
-
-      {/* Courses récentes */}
-      <div>
-        <h3 className="text-sm font-bold text-gray-900 mb-2">Courses récentes</h3>
-        {courses?.recent?.length > 0 ? (
-          <div className="space-y-2">
-            {courses.recent.slice(0, 5).map((c) => (
-              <CourseRow key={c.id} course={c} />
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm text-gray-400 text-center py-4">Aucune course</p>
-        )}
-      </div>
-    </div>
+    </EnterpriseLayout>
   );
 }
 
