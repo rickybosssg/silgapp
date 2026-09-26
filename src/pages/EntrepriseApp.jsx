@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { base44 } from "@/api/base44Client";
-import { Building2, RefreshCw } from "lucide-react";
+import { Building2, RefreshCw, UserPlus } from "lucide-react";
 import EnterpriseLayout from "@/components/enterprise/EnterpriseLayout.jsx";
 import EnterpriseDashboard from "@/components/enterprise/EnterpriseDashboard.jsx";
 import BrandingTab from "@/components/enterprise/BrandingTab.jsx";
@@ -9,6 +9,7 @@ import PendingDriversTab from "@/components/enterprise/PendingDriversTab.jsx";
 import CourseCreateTab from "@/components/enterprise/CourseCreateTab.jsx";
 import CourseDetailModal from "@/components/enterprise/CourseDetailModal.jsx";
 import LivreurFicheModal from "@/components/enterprise/LivreurFicheModal.jsx";
+import CreateLivreurEnterpriseModal from "@/components/enterprise/CreateLivreurEnterpriseModal.jsx";
 import CarteDispatchTab from "@/components/enterprise/CarteDispatchTab.jsx";
 import { EN_TRAITEMENT_STATUSES, STATUS_BADGE } from "@/components/enterprise/courseStatus.js";
 
@@ -19,6 +20,7 @@ export default function EntrepriseApp() {
   const [activeTab, setActiveTab] = useState("overview");
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [selectedLivreur, setSelectedLivreur] = useState(null);
+  const [showCreateLivreur, setShowCreateLivreur] = useState(false);
 
   const loadDashboard = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -103,7 +105,11 @@ export default function EntrepriseApp() {
           />
         )}
         {activeTab === "livreurs" && (
-          <LivreursTab livreurs={livreurs} onLivreurClick={setSelectedLivreur} />
+          <LivreursTab
+            livreurs={livreurs}
+            onLivreurClick={setSelectedLivreur}
+            onCreateClick={() => setShowCreateLivreur(true)}
+          />
         )}
         {activeTab === "pending" && <PendingDriversTab />}
         {activeTab === "invitations" && <InvitationsTab />}
@@ -122,6 +128,11 @@ export default function EntrepriseApp() {
         open={!!selectedLivreur}
         onClose={() => setSelectedLivreur(null)}
         onAction={loadDashboard}
+      />
+      <CreateLivreurEnterpriseModal
+        open={showCreateLivreur}
+        onClose={() => setShowCreateLivreur(false)}
+        onCreated={loadDashboard}
       />
     </EnterpriseLayout>
   );
@@ -187,57 +198,69 @@ function CoursesTab({ courses, stats, onCourseClick }) {
 }
 
 // ── Onglet Livreurs ──
-function LivreursTab({ livreurs, onLivreurClick }) {
-  if (!livreurs || livreurs.length === 0) {
-    return <p className="text-sm text-gray-400 text-center py-4">Aucun livreur</p>;
-  }
+function LivreursTab({ livreurs, onLivreurClick, onCreateClick }) {
   return (
-    <div className="space-y-2">
-      {livreurs.map((l) => (
-        <button
-          key={l.id}
-          onClick={() => onLivreurClick?.(l)}
-          className="w-full text-left bg-white rounded-xl border p-3 flex items-center gap-3 shadow-sm hover:shadow-md transition"
-        >
-          <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden shrink-0">
-            {l.photo_url ? (
-              <img src={l.photo_url} alt="" className="w-full h-full object-cover" />
-            ) : (
-              <span className="text-sm font-bold text-gray-500">
-                {(l.prenom?.[0] || "") + (l.nom?.[0] || "")}
-              </span>
-            )}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-gray-900 truncate">{l.prenom} {l.nom}</p>
-            <p className="text-xs text-gray-500">{l.telephone}</p>
-            {l.user_email && <p className="text-[10px] text-gray-400 truncate">{l.user_email}</p>}
-            <p className="text-[10px] text-gray-400">{l.vehicule || l.type_vehicule || "moto"} · {l.courses_du_jour || 0} courses aujourd'hui</p>
-          </div>
-          <div className="flex flex-col items-end gap-1">
-            {l.validation === "en_attente" && (
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700">En attente</span>
-            )}
-            {l.validation === "valide" && (
-              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                l.actif === false ? "bg-red-100 text-red-700" :
-                l.statut === "disponible" ? "bg-emerald-100 text-emerald-700" :
-                l.statut === "en_course" ? "bg-amber-100 text-amber-700" :
-                "bg-gray-100 text-gray-500"
-              }`}>
-                {l.actif === false ? "Suspendu" :
-                 l.statut === "disponible" ? "Dispo" :
-                 l.statut === "en_course" ? "En course" :
-                 "Hors ligne"}
-              </span>
-            )}
-            {l.validation === "refuse" && (
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700">Refusé</span>
-            )}
-            <span className="text-[10px] text-blue-500">Voir fiche →</span>
-          </div>
-        </button>
-      ))}
+    <div className="space-y-3">
+      {/* Bouton Nouveau livreur */}
+      <button
+        onClick={onCreateClick}
+        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold shadow-sm hover:bg-blue-700 transition"
+      >
+        <UserPlus className="w-4 h-4" /> Nouveau livreur
+      </button>
+
+      {/* Liste */}
+      {(!livreurs || livreurs.length === 0) ? (
+        <p className="text-sm text-gray-400 text-center py-4">Aucun livreur. Cliquez sur « Nouveau livreur » pour en créer un.</p>
+      ) : (
+        <div className="space-y-2">
+          {livreurs.map((l) => (
+            <button
+              key={l.id}
+              onClick={() => onLivreurClick?.(l)}
+              className="w-full text-left bg-white rounded-xl border p-3 flex items-center gap-3 shadow-sm hover:shadow-md transition"
+            >
+              <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden shrink-0">
+                {l.photo_url ? (
+                  <img src={l.photo_url} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-sm font-bold text-gray-500">
+                    {(l.prenom?.[0] || "") + (l.nom?.[0] || "")}
+                  </span>
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-gray-900 truncate">{l.prenom} {l.nom}</p>
+                <p className="text-xs text-gray-500">{l.telephone}</p>
+                {l.user_email && <p className="text-[10px] text-gray-400 truncate">{l.user_email}</p>}
+                <p className="text-[10px] text-gray-400">{l.vehicule || l.type_vehicule || "moto"} · {l.courses_du_jour || 0} courses aujourd'hui</p>
+              </div>
+              <div className="flex flex-col items-end gap-1">
+                {l.validation === "en_attente" && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700">En attente</span>
+                )}
+                {l.validation === "valide" && (
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                    l.actif === false ? "bg-red-100 text-red-700" :
+                    l.statut === "disponible" ? "bg-emerald-100 text-emerald-700" :
+                    l.statut === "en_course" ? "bg-amber-100 text-amber-700" :
+                    "bg-gray-100 text-gray-500"
+                  }`}>
+                    {l.actif === false ? "Suspendu" :
+                     l.statut === "disponible" ? "Dispo" :
+                     l.statut === "en_course" ? "En course" :
+                     "Hors ligne"}
+                  </span>
+                )}
+                {l.validation === "refuse" && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700">Refusé</span>
+                )}
+                <span className="text-[10px] text-blue-500">Voir fiche →</span>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -560,6 +560,276 @@ export default async function(req: Request): Promise<Response> {
         return Response.json({ success: true, message: 'Livreur réactivé' });
       }
 
+      // ═══════════════════════════════════════════════════════════════════
+      // 12. CRÉER UNE FICHE LIVREUR (Admin Entreprise — pré-remplissage)
+      //
+      // L'admin prépare la fiche complète du livreur. Le livreur crée
+      // son compte lui-même via l'invitation email Base44.
+      // Aucun mot de passe choisi par l'admin.
+      // ═══════════════════════════════════════════════════════════════════
+      case 'create_driver_fiche': {
+        const { nom, prenom, telephone, email, vehicule, ville, quartier, numero_plaque, photo_url, adresse } = body;
+        const user = await base44.auth.me();
+        if (!user) return Response.json({ error: 'Non autorisé' }, { status: 401 });
+        if (user.silgapp_role !== 'admin_entreprise') {
+          return Response.json({ error: 'Réservé aux administrateurs d\'entreprise' }, { status: 403 });
+        }
+        if (!user.enterprise_id) {
+          return Response.json({ error: 'Aucune entreprise rattachée à ce compte' }, { status: 403 });
+        }
+
+        // Validation des champs obligatoires
+        if (!nom || !telephone || !email) {
+          return Response.json({ error: 'Nom, téléphone et email sont obligatoires' }, { status: 400 });
+        }
+
+        const normalizedEmail = normalizeEmail(email);
+        if (!normalizedEmail || !normalizedEmail.includes('@')) {
+          return Response.json({ error: 'Email invalide' }, { status: 400 });
+        }
+
+        // Résoudre l'entreprise depuis l'admin authentifié
+        const enterprises = await base44.asServiceRole.entities.Enterprise.filter({
+          enterprise_financier_id: user.enterprise_id,
+        });
+        const enterprise = enterprises?.[0];
+        if (!enterprise) return Response.json({ error: 'Entreprise introuvable' }, { status: 404 });
+        if (!enterprise.actif || enterprise.statut !== 'actif') {
+          return Response.json({ error: 'Entreprise suspendue' }, { status: 403 });
+        }
+
+        const adminEntId = normalizeEnterpriseId(user.enterprise_id);
+
+        // ── CAS L: Email déjà utilisé par un livreur public ──
+        const existingLivreurs = await base44.asServiceRole.entities.Livreur.filter({ user_email: normalizedEmail });
+        if (existingLivreurs?.length > 0) {
+          const livreurEntId = normalizeEnterpriseId(existingLivreurs[0].enterprise_id);
+          if (livreurEntId === null) {
+            return Response.json({
+              error: 'Cette adresse e-mail appartient déjà à un livreur du réseau public SILGAPP. Contactez SILGAPP pour rejoindre une agence.',
+            }, { status: 409 });
+          }
+          // CAS M: Email déjà utilisé par un livreur d'une autre agence
+          if (livreurEntId !== adminEntId) {
+            return Response.json({
+              error: 'Cette adresse e-mail appartient déjà à un livreur d\'une autre agence. Contactez SILGAPP pour un transfert.',
+            }, { status: 409 });
+          }
+          // CAS N: Même agence — idempotent
+          return Response.json({
+            success: true,
+            idempotent: true,
+            livreur: existingLivreurs[0],
+            message: 'Ce livreur est déjà enregistré pour cette agence.',
+          });
+        }
+
+        // ── CAS L/M: Vérifier si un User existe déjà avec cet email ──
+        const existingUsers = await base44.asServiceRole.entities.User.filter({ email: normalizedEmail });
+        if (existingUsers?.length > 0) {
+          const existingUser = existingUsers[0];
+          const userEntId = normalizeEnterpriseId(existingUser.enterprise_id);
+          if (userEntId === null) {
+            return Response.json({
+              error: 'Cette adresse e-mail appartient déjà à un compte SILGAPP public. Contactez SILGAPP pour rejoindre une agence.',
+            }, { status: 409 });
+          }
+          if (userEntId !== adminEntId) {
+            return Response.json({
+              error: 'Cette adresse e-mail appartient déjà à un compte d\'une autre agence. Contactez SILGAPP pour un transfert.',
+            }, { status: 409 });
+          }
+        }
+
+        // ── CAS N: Invitation déjà existante pour cet email (anti-doublon) ──
+        const existingInvitations = await base44.asServiceRole.entities.EnterpriseDriverInvitation.filter({
+          enterprise_id: adminEntId,
+          used_by_user_email: normalizedEmail,
+        });
+        if (existingInvitations?.length > 0) {
+          return Response.json({
+            error: 'Une invitation a déjà été créée pour cet email. Utilisez « Renvoyer l\'invitation » si nécessaire.',
+          }, { status: 409 });
+        }
+
+        // ── Créer la fiche Livreur ──
+        const livreur = await base44.asServiceRole.entities.Livreur.create({
+          nom,
+          prenom: prenom || '',
+          telephone,
+          user_email: normalizedEmail,
+          country_code: enterprise.country_code,
+          type_livreur: 'externe',
+          reseau: 'externe',
+          enterprise_id: adminEntId,
+          validation: 'en_attente',
+          actif: false,
+          statut: 'hors_ligne',
+          vehicule: vehicule || 'moto',
+          type_vehicule: vehicule || 'moto',
+          ville: ville || '',
+          quartier: quartier || '',
+          numero_plaque: numero_plaque || '',
+          photo_url: photo_url || '',
+          montant_du_silga: 0,
+          encours: 0,
+          credit_surplus: 0,
+          statut_paiement: 'paye',
+          courses_du_jour: 0,
+          note_moyenne: 0,
+          nombre_avis: 0,
+          bloque_encours: false,
+        });
+
+        // ── Créer l'invitation (pré-consommée car fiche pré-remplie) ──
+        const token = generateToken();
+        const now = new Date().toISOString();
+        const expiresAt = new Date(Date.now() + INVITATION_EXPIRY_DAYS * 24 * 60 * 60 * 1000).toISOString();
+
+        await base44.asServiceRole.entities.EnterpriseDriverInvitation.create({
+          enterprise_id: adminEntId,
+          enterprise_name: enterprise.nom,
+          token,
+          status: 'used',
+          expires_at: expiresAt,
+          created_by: user.email,
+          created_at: now,
+          used_at: now,
+          used_by_user_email: normalizedEmail,
+          country_code: enterprise.country_code,
+        });
+
+        // ── Garantir le CodePromo personnel (idempotent) ──
+        try {
+          await ensureCodePromo(base44.asServiceRole, {
+            proprietaire_type: 'livreur',
+            proprietaire_id: livreur.id,
+            proprietaire_nom: livreur.nom || livreur.prenom || normalizedEmail,
+            proprietaire_email: normalizedEmail,
+            country_code: enterprise.country_code,
+          });
+        } catch (e) {
+          console.error('[manageDriverInvitation] Erreur code promo (create_driver_fiche):', e.message);
+        }
+
+        // ── Inviter le User via Base44 auth (livreur crée son compte lui-même) ──
+        try {
+          await base44.users.inviteUser(normalizedEmail, 'user');
+        } catch (inviteErr: any) {
+          if (!String(inviteErr?.message || '').includes('already')) {
+            console.error('[manageDriverInvitation] inviteUser error:', inviteErr?.message);
+          }
+          // Non-blocking: Livreur is created, admin can resend invitation later
+        }
+
+        return Response.json({
+          success: true,
+          livreur,
+          message: 'Fiche livreur créée. Une invitation email a été envoyée. Le livreur doit activer son compte.',
+        });
+      }
+
+      // ═══════════════════════════════════════════════════════════════════
+      // 13. RENVOYER L'INVITATION EMAIL (Admin Entreprise)
+      // ═══════════════════════════════════════════════════════════════════
+      case 'resend_invitation': {
+        const { livreur_id } = body;
+        const user = await base44.auth.me();
+        if (!user) return Response.json({ error: 'Non autorisé' }, { status: 401 });
+        if (user.silgapp_role !== 'admin_entreprise' || !user.enterprise_id) {
+          return Response.json({ error: 'Réservé aux administrateurs d\'entreprise' }, { status: 403 });
+        }
+
+        const livreur = await base44.asServiceRole.entities.Livreur.get(livreur_id).catch(() => null);
+        if (!livreur) return Response.json({ error: 'Livreur introuvable' }, { status: 404 });
+
+        const livreurEntId = normalizeEnterpriseId(livreur.enterprise_id);
+        const adminEntId = normalizeEnterpriseId(user.enterprise_id);
+        if (livreurEntId !== adminEntId) {
+          return Response.json({ error: 'Ce livreur n\'appartient pas à votre agence' }, { status: 403 });
+        }
+
+        if (!livreur.user_email) {
+          return Response.json({ error: 'Ce livreur n\'a pas d\'email enregistré' }, { status: 400 });
+        }
+
+        // Vérifier si le User est déjà activé
+        const existingUsers = await base44.asServiceRole.entities.User.filter({ email: livreur.user_email });
+        const existingUser = existingUsers?.[0];
+        if (existingUser && existingUser.enterprise_id && existingUser.silgapp_role === 'livreur') {
+          return Response.json({ error: 'Ce livreur a déjà activé son compte' }, { status: 409 });
+        }
+
+        // Renvoyer l'invitation Base44
+        try {
+          await base44.users.inviteUser(livreur.user_email, 'user');
+        } catch (inviteErr: any) {
+          if (String(inviteErr?.message || '').includes('already')) {
+            return Response.json({ success: true, message: 'Invitation déjà envoyée. Le livreur doit vérifier ses emails.' });
+          }
+          throw inviteErr;
+        }
+
+        return Response.json({ success: true, message: 'Invitation renvoyée. Le livreur doit vérifier ses emails.' });
+      }
+
+      // ═══════════════════════════════════════════════════════════════════
+      // 14. OBTENIR LA FICHE LIVREUR DÉTAILLÉE (Admin Entreprise)
+      // Retourne le livreur + stats de courses (livrées, en traitement)
+      // ═══════════════════════════════════════════════════════════════════
+      case 'get_livreur_fiche': {
+        const { livreur_id } = body;
+        const user = await base44.auth.me();
+        if (!user) return Response.json({ error: 'Non autorisé' }, { status: 401 });
+        if (user.silgapp_role !== 'admin_entreprise' || !user.enterprise_id) {
+          return Response.json({ error: 'Réservé aux administrateurs d\'entreprise' }, { status: 403 });
+        }
+
+        const livreur = await base44.asServiceRole.entities.Livreur.get(livreur_id).catch(() => null);
+        if (!livreur) return Response.json({ error: 'Livreur introuvable' }, { status: 404 });
+
+        const livreurEntId = normalizeEnterpriseId(livreur.enterprise_id);
+        const adminEntId = normalizeEnterpriseId(user.enterprise_id);
+        if (livreurEntId !== adminEntId) {
+          return Response.json({ error: 'Ce livreur n\'appartient pas à votre agence' }, { status: 403 });
+        }
+
+        // ── Stats de courses (depuis CourseExterne) ──
+        const courses = await base44.asServiceRole.entities.CourseExterne.filter(
+          { livreur_id: livreur_id },
+          '-created_date', 200
+        );
+
+        const coursesLivrees = (courses || []).filter((c: any) => c.statut === 'livree');
+        const coursesEnTraitement = (courses || []).filter((c: any) =>
+          !['livree', 'annulee'].includes(c.statut)
+        );
+        const coursesAnnulees = (courses || []).filter((c: any) => c.statut === 'annulee');
+
+        // ── Vérifier si le User est activé ──
+        let userActivated = false;
+        if (livreur.user_email) {
+          const users = await base44.asServiceRole.entities.User.filter({ email: livreur.user_email });
+          const livreurUser = users?.[0];
+          if (livreurUser && livreurUser.enterprise_id && livreurUser.silgapp_role === 'livreur') {
+            userActivated = true;
+          }
+        }
+
+        return Response.json({
+          success: true,
+          livreur,
+          stats: {
+            courses_livrees: coursesLivrees.length,
+            courses_en_traitement: coursesEnTraitement.length,
+            courses_annulees: coursesAnnulees.length,
+            courses_total: (courses || []).length,
+            user_activated: userActivated,
+          },
+          recent_courses: (courses || []).slice(0, 10),
+        });
+      }
+
       default:
         return Response.json({ error: 'Action inconnue: ' + action }, { status: 400 });
     }
