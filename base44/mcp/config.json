@@ -1,0 +1,415 @@
+{
+  "auth": "oauth",
+  "tools": {
+    "excluded_agents": ["venus", "venus-admin"],
+    "entity_overrides": {
+      "User": { "operations": [] },
+      "CourseExterne": { "operations": [] },
+      "Course": { "operations": [] },
+      "Livreur": { "operations": [] },
+      "ClientExterne": { "operations": [] },
+      "Enterprise": { "operations": [] },
+      "EnterpriseLedger": { "operations": [] },
+      "EnterpriseDriverInvitation": { "operations": [] },
+      "PendingEnterpriseAdmin": { "operations": [] },
+      "Country": { "operations": [] },
+      "PassAchat": { "operations": [] },
+      "PassOffer": { "operations": [] },
+      "Message": { "operations": [] },
+      "Conversation": { "operations": [] },
+      "Notification": { "operations": [] },
+      "RoutingLog": { "operations": [] },
+      "HappyHourConfig": { "operations": [] },
+      "ZoneChaudeCycleLog": { "operations": [] },
+      "AdCreative": { "operations": [] },
+      "AcquisitionLog": { "operations": [] },
+      "MetaCampaign": { "operations": [] },
+      "DownloadStats": { "operations": [] },
+      "AppInstall": { "operations": [] },
+      "GrowthSpend": { "operations": [] },
+      "Quartier": { "operations": [] },
+      "QuartierOuaga": { "operations": [] },
+      "QuartiersProposes": { "operations": [] },
+      "DispatchLog": { "operations": [] },
+      "DispatchNotification": { "operations": [] },
+      "DispatchConfig": { "operations": [] },
+      "DispatchWaveConfig": { "operations": [] },
+      "WhatsAppAlerte": { "operations": [] },
+      "VenusIncident": { "operations": [] },
+      "ClientAddress": { "operations": [] },
+      "ContactCarnet": { "operations": [] },
+      "HabitReminder": { "operations": [] },
+      "ReactivationScenario": { "operations": [] },
+      "ReactivationCampaign": { "operations": [] },
+      "ReactivationCampaignRecipient": { "operations": [] },
+      "AnnulationLivreur": { "operations": [] },
+      "CrmProspection": { "operations": [] },
+      "NotificationToken": { "operations": [] },
+      "TarifZone": { "operations": [] },
+      "CommandeRestaurant": { "operations": [] },
+      "CommandeBoutique": { "operations": [] },
+      "PaiementSilgapp": { "operations": [] },
+      "LieuSilgapp": { "operations": [] },
+      "DeviceSession": { "operations": [] },
+      "AdminInboxItem": { "operations": [] },
+      "VenusRapport": { "operations": [] },
+      "VenusAdminEvent": { "operations": [] },
+      "CommissionConfig": { "operations": [] },
+      "CodePromo": { "operations": [] },
+      "AppConfig": { "operations": [] },
+      "IntegrationCreditLog": { "operations": [] },
+      "DemoAccess": { "operations": [] },
+      "VenusCorrection": { "operations": [] },
+      "PlatRestaurant": { "operations": [] },
+      "VenusPersonality": { "operations": [] },
+      "VenusWorkflow": { "operations": [] },
+      "VenusStrategicMemory": { "operations": [] },
+      "Boutique": { "operations": [] },
+      "VenusQueueItem": { "operations": [] },
+      "VenusLongTermMemory": { "operations": [] },
+      "BugSignale": { "operations": [] },
+      "VenusLearningExample": { "operations": [] },
+      "VenusKnowledge": { "operations": [] },
+      "VenusDocument": { "operations": [] },
+      "ColisExterne": { "operations": [] },
+      "VenusEscalation": { "operations": [] },
+      "VenusWorkflowExecution": { "operations": [] },
+      "VenusLanguage": { "operations": [] },
+      "Publicite": { "operations": [] },
+      "VenusAutomationRule": { "operations": [] },
+      "VenusToolStatus": { "operations": [] },
+      "NeoAnalyse": { "operations": [] },
+      "VenusDocumentChunk": { "operations": [] },
+      "HistoriqueEncours": { "operations": [] },
+      "VenusOpenAIUsage": { "operations": [] },
+      "VenusDecisionLog": { "operations": [] },
+      "VenusAnomaly": { "operations": [] },
+      "VenusScenario": { "operations": [] },
+      "VenusBrainPrompt": { "operations": [] },
+      "VenusImprovementAlert": { "operations": [] },
+      "VenusInteraction": { "operations": [] },
+      "Feedback": { "operations": [] },
+      "NeoRecommendation": { "operations": [] },
+      "VenusCourseModificationLog": { "operations": [] },
+      "VenusWeaknessReport": { "operations": [] },
+      "ProduitBoutique": { "operations": [] },
+      "VenusSupervisionAlert": { "operations": [] },
+      "VenusBusinessInsight": { "operations": [] },
+      "PushCampagne": { "operations": [] },
+      "Leads": { "operations": [] },
+      "VenusBusinessRule": { "operations": [] },
+      "VenusAudit": { "operations": [] },
+      "Restaurant": { "operations": [] },
+      "VenusBackup": { "operations": [] },
+      "PubliciteVue": { "operations": [] },
+      "VenusAuditLog": { "operations": [] },
+      "VenusSuggestion": { "operations": [] },
+      "VenusMessageLog": { "operations": [] },
+      "FraisAnnulation": { "operations": [] },
+      "TicketSupport": { "operations": [] },
+      "VenusTranslation": { "operations": [] },
+      "VenusAgentAction": { "operations": [] },
+      "AlerteLivreur": { "operations": [] },
+      "AlerteLecture": { "operations": [] },
+      "ZoneChaudeHistorique": { "operations": [] },
+      "VenusConversationAnalysis": { "operations": [] },
+      "VenusBrand": { "operations": [] },
+      "VenusCertificationReport": { "operations": [] },
+      "AlerteFraude": { "operations": [] },
+      "VenusDocumentSearchLog": { "operations": [] },
+      "Pharmacie": { "operations": [] },
+      "PaiementPartenaire": { "operations": [] },
+      "VenusLoadTest": { "operations": [] },
+      "VenusIntent": { "operations": [] },
+      "VenusTrainingDialogue": { "operations": [] },
+      "VenusKnowledgeVersion": { "operations": [] },
+      "VenusImprovementReport": { "operations": [] },
+      "VenusMetric": { "operations": [] },
+      "VenusReasoningLog": { "operations": [] },
+      "PrimePromo": { "operations": [] },
+      "VenusDomainScore": { "operations": [] },
+      "VenusKeywordIndex": { "operations": [] },
+      "RapportMaintenance": { "operations": [] },
+      "VenusRateLimit": { "operations": [] },
+      "SystemConfig": { "operations": [] },
+      "VenusCity": { "operations": [] },
+      "BatterieAlerte": { "operations": [] },
+      "VenusTrainingPath": { "operations": [] },
+      "VenusOptimizationSuggestion": { "operations": [] }
+    },
+    "functions": [
+      {
+        "name": "get_silgapp_overview",
+        "title": "Get SILGAPP Overview",
+        "description": "Vue d'ensemble globale de SILGAPP : total clients, livreurs, courses, chiffre d'affaires sur une période. Paramètres optionnels : date_debut (YYYY-MM-DD), date_fin (YYYY-MM-DD), country_code (ex: BF, CI).",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "tool": { "type": "string", "enum": ["get_silgapp_overview"], "description": "Nom de l'outil" },
+            "date_debut": { "type": "string", "description": "Date de début au format YYYY-MM-DD" },
+            "date_fin": { "type": "string", "description": "Date de fin au format YYYY-MM-DD" },
+            "country_code": { "type": "string", "description": "Code pays ISO 2 lettres (ex: BF, CI, TG) ou ALL" }
+          },
+          "required": ["tool"]
+        },
+        "handler": "silgappCopilotQuery",
+        "annotations": { "read_only_hint": true, "destructive_hint": false, "idempotent_hint": true }
+      },
+      {
+        "name": "get_courses_today",
+        "title": "Get Courses Today",
+        "description": "Courses créées aujourd'hui avec répartition par statut. Paramètres optionnels : country_code, limit (max 200).",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "tool": { "type": "string", "enum": ["get_courses_today"], "description": "Nom de l'outil" },
+            "country_code": { "type": "string", "description": "Code pays ISO 2 lettres" },
+            "limit": { "type": "number", "description": "Nombre max de résultats (1-200, défaut 50)" }
+          },
+          "required": ["tool"]
+        },
+        "handler": "silgappCopilotQuery",
+        "annotations": { "read_only_hint": true, "destructive_hint": false, "idempotent_hint": true }
+      },
+      {
+        "name": "get_courses_in_progress",
+        "title": "Get Courses In Progress",
+        "description": "Courses actuellement en cours (non livrées, non annulées) avec répartition par statut. Paramètres optionnels : country_code, limit.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "tool": { "type": "string", "enum": ["get_courses_in_progress"], "description": "Nom de l'outil" },
+            "country_code": { "type": "string", "description": "Code pays ISO 2 lettres" },
+            "limit": { "type": "number", "description": "Nombre max de résultats (1-200, défaut 50)" }
+          },
+          "required": ["tool"]
+        },
+        "handler": "silgappCopilotQuery",
+        "annotations": { "read_only_hint": true, "destructive_hint": false, "idempotent_hint": true }
+      },
+      {
+        "name": "get_completed_courses",
+        "title": "Get Completed Courses",
+        "description": "Courses livrées sur une période avec chiffre d'affaires. Paramètres optionnels : date_debut, date_fin, country_code, limit.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "tool": { "type": "string", "enum": ["get_completed_courses"], "description": "Nom de l'outil" },
+            "date_debut": { "type": "string", "description": "Date de début YYYY-MM-DD" },
+            "date_fin": { "type": "string", "description": "Date de fin YYYY-MM-DD" },
+            "country_code": { "type": "string", "description": "Code pays ISO 2 lettres" },
+            "limit": { "type": "number", "description": "Nombre max de résultats (1-200, défaut 50)" }
+          },
+          "required": ["tool"]
+        },
+        "handler": "silgappCopilotQuery",
+        "annotations": { "read_only_hint": true, "destructive_hint": false, "idempotent_hint": true }
+      },
+      {
+        "name": "get_pending_courses",
+        "title": "Get Pending Courses",
+        "description": "Courses en attente de dispatch (nouvelle, en_attente, recherche_livreur). Paramètres optionnels : country_code, limit.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "tool": { "type": "string", "enum": ["get_pending_courses"], "description": "Nom de l'outil" },
+            "country_code": { "type": "string", "description": "Code pays ISO 2 lettres" },
+            "limit": { "type": "number", "description": "Nombre max de résultats (1-200, défaut 50)" }
+          },
+          "required": ["tool"]
+        },
+        "handler": "silgappCopilotQuery",
+        "annotations": { "read_only_hint": true, "destructive_hint": false, "idempotent_hint": true }
+      },
+      {
+        "name": "get_blocked_courses",
+        "title": "Get Blocked Courses",
+        "description": "Courses bloquées (dispatch épuisé ou en attente prolongée). Paramètres optionnels : country_code, limit.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "tool": { "type": "string", "enum": ["get_blocked_courses"], "description": "Nom de l'outil" },
+            "country_code": { "type": "string", "description": "Code pays ISO 2 lettres" },
+            "limit": { "type": "number", "description": "Nombre max de résultats (1-200, défaut 50)" }
+          },
+          "required": ["tool"]
+        },
+        "handler": "silgappCopilotQuery",
+        "annotations": { "read_only_hint": true, "destructive_hint": false, "idempotent_hint": true }
+      },
+      {
+        "name": "get_available_drivers",
+        "title": "Get Available Drivers",
+        "description": "Livreurs actuellement disponibles (statut=disponible, validés, actifs). Paramètres optionnels : country_code, limit.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "tool": { "type": "string", "enum": ["get_available_drivers"], "description": "Nom de l'outil" },
+            "country_code": { "type": "string", "description": "Code pays ISO 2 lettres" },
+            "limit": { "type": "number", "description": "Nombre max de résultats (1-200, défaut 50)" }
+          },
+          "required": ["tool"]
+        },
+        "handler": "silgappCopilotQuery",
+        "annotations": { "read_only_hint": true, "destructive_hint": false, "idempotent_hint": true }
+      },
+      {
+        "name": "get_active_drivers",
+        "title": "Get Active Drivers",
+        "description": "Livreurs actifs (en course ou récemment connectés, heartbeat < 10 min). Paramètres optionnels : country_code, limit.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "tool": { "type": "string", "enum": ["get_active_drivers"], "description": "Nom de l'outil" },
+            "country_code": { "type": "string", "description": "Code pays ISO 2 lettres" },
+            "limit": { "type": "number", "description": "Nombre max de résultats (1-200, défaut 50)" }
+          },
+          "required": ["tool"]
+        },
+        "handler": "silgappCopilotQuery",
+        "annotations": { "read_only_hint": true, "destructive_hint": false, "idempotent_hint": true }
+      },
+      {
+        "name": "get_active_clients",
+        "title": "Get Active Clients",
+        "description": "Clients actifs (ayant une course livrée dans les 30 derniers jours). Paramètres optionnels : country_code, limit.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "tool": { "type": "string", "enum": ["get_active_clients"], "description": "Nom de l'outil" },
+            "country_code": { "type": "string", "description": "Code pays ISO 2 lettres" },
+            "limit": { "type": "number", "description": "Nombre max de résultats (1-200, défaut 50)" }
+          },
+          "required": ["tool"]
+        },
+        "handler": "silgappCopilotQuery",
+        "annotations": { "read_only_hint": true, "destructive_hint": false, "idempotent_hint": true }
+      },
+      {
+        "name": "get_daily_revenue",
+        "title": "Get Daily Revenue",
+        "description": "Chiffre d'affaires du jour (courses livrées, commissions, montants livreurs). Paramètre optionnel : date (YYYY-MM-DD), country_code.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "tool": { "type": "string", "enum": ["get_daily_revenue"], "description": "Nom de l'outil" },
+            "date": { "type": "string", "description": "Date au format YYYY-MM-DD (défaut: aujourd'hui)" },
+            "country_code": { "type": "string", "description": "Code pays ISO 2 lettres" }
+          },
+          "required": ["tool"]
+        },
+        "handler": "silgappCopilotQuery",
+        "annotations": { "read_only_hint": true, "destructive_hint": false, "idempotent_hint": true }
+      },
+      {
+        "name": "get_daily_metrics",
+        "title": "Get Daily Metrics",
+        "description": "Métriques consolidées du jour : courses, livreurs, clients, CA. Paramètre optionnel : country_code.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "tool": { "type": "string", "enum": ["get_daily_metrics"], "description": "Nom de l'outil" },
+            "country_code": { "type": "string", "description": "Code pays ISO 2 lettres" }
+          },
+          "required": ["tool"]
+        },
+        "handler": "silgappCopilotQuery",
+        "annotations": { "read_only_hint": true, "destructive_hint": false, "idempotent_hint": true }
+      },
+      {
+        "name": "get_metrics_by_period",
+        "title": "Get Metrics By Period",
+        "description": "Métriques sur une période : courses, CA, taux d'annulation, panier moyen. Paramètres optionnels : date_debut, date_fin, country_code.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "tool": { "type": "string", "enum": ["get_metrics_by_period"], "description": "Nom de l'outil" },
+            "date_debut": { "type": "string", "description": "Date de début YYYY-MM-DD (défaut: 7 jours)" },
+            "date_fin": { "type": "string", "description": "Date de fin YYYY-MM-DD (défaut: aujourd'hui)" },
+            "country_code": { "type": "string", "description": "Code pays ISO 2 lettres" }
+          },
+          "required": ["tool"]
+        },
+        "handler": "silgappCopilotQuery",
+        "annotations": { "read_only_hint": true, "destructive_hint": false, "idempotent_hint": true }
+      },
+      {
+        "name": "get_course_details",
+        "title": "Get Course Details",
+        "description": "Détails d'une course spécifique par son ID. Paramètre requis : course_id.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "tool": { "type": "string", "enum": ["get_course_details"], "description": "Nom de l'outil" },
+            "course_id": { "type": "string", "description": "ID de la course" }
+          },
+          "required": ["tool", "course_id"]
+        },
+        "handler": "silgappCopilotQuery",
+        "annotations": { "read_only_hint": true, "destructive_hint": false, "idempotent_hint": true }
+      },
+      {
+        "name": "get_driver_details",
+        "title": "Get Driver Details",
+        "description": "Détails d'un livreur et ses 10 courses les plus récentes. Paramètre requis : driver_id.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "tool": { "type": "string", "enum": ["get_driver_details"], "description": "Nom de l'outil" },
+            "driver_id": { "type": "string", "description": "ID du livreur" }
+          },
+          "required": ["tool", "driver_id"]
+        },
+        "handler": "silgappCopilotQuery",
+        "annotations": { "read_only_hint": true, "destructive_hint": false, "idempotent_hint": true }
+      },
+      {
+        "name": "get_top_customers",
+        "title": "Get Top Customers",
+        "description": "Top clients par nombre de courses. Paramètres optionnels : limit (défaut 10), country_code.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "tool": { "type": "string", "enum": ["get_top_customers"], "description": "Nom de l'outil" },
+            "limit": { "type": "number", "description": "Nombre max de résultats (1-50, défaut 10)" },
+            "country_code": { "type": "string", "description": "Code pays ISO 2 lettres" }
+          },
+          "required": ["tool"]
+        },
+        "handler": "silgappCopilotQuery",
+        "annotations": { "read_only_hint": true, "destructive_hint": false, "idempotent_hint": true }
+      },
+      {
+        "name": "get_top_merchants",
+        "title": "Get Top Merchants",
+        "description": "Top commerçants (boutiques, restaurants, pharmacies). Paramètres optionnels : limit, country_code.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "tool": { "type": "string", "enum": ["get_top_merchants"], "description": "Nom de l'outil" },
+            "limit": { "type": "number", "description": "Nombre max de résultats (1-50, défaut 10)" },
+            "country_code": { "type": "string", "description": "Code pays ISO 2 lettres" }
+          },
+          "required": ["tool"]
+        },
+        "handler": "silgappCopilotQuery",
+        "annotations": { "read_only_hint": true, "destructive_hint": false, "idempotent_hint": true }
+      },
+      {
+        "name": "get_operations_summary",
+        "title": "Get Operations Summary",
+        "description": "Résumé opérationnel consolidé : courses, livreurs, clients, finances du jour. Paramètre optionnel : country_code.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "tool": { "type": "string", "enum": ["get_operations_summary"], "description": "Nom de l'outil" },
+            "country_code": { "type": "string", "description": "Code pays ISO 2 lettres" }
+          },
+          "required": ["tool"]
+        },
+        "handler": "silgappCopilotQuery",
+        "annotations": { "read_only_hint": true, "destructive_hint": false, "idempotent_hint": true }
+      }
+    ]
+  }
+}

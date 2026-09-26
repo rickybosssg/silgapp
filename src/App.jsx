@@ -128,6 +128,7 @@ const EntrepriseApp = lazy(() => import('./pages/EntrepriseApp.jsx'));
 const SuperAdminEntreprises = lazy(() => import('./pages/SuperAdminEntreprises.jsx'));
 const SuiviEnterprise = lazy(() => import('./pages/SuiviEnterprise.jsx'));
 const InscriptionLivreurEntreprise = lazy(() => import('./pages/InscriptionLivreurEntreprise.jsx'));
+const OAuthConsent = lazy(() => import('./pages/OAuthConsent.jsx'));
 
 function AnimatedRoutes({ children }) {
   // Variables définies DANS la fonction pour éviter init issues
@@ -233,6 +234,15 @@ function AppContent() {
   // Ces routes doivent être vérifiées AVANT toute logique d'authentification
   // 🌍 ROUTES PUBLIQUES - PRIORITÉ ABSOLUE (vérification avant tout)
   const currentPath = location.pathname || window.location.pathname;
+
+  // ── /oauth/consent → Page de consentement OAuth MCP (hors auth guard) ──
+  if (currentPath === '/oauth/consent') {
+    return (
+      <Suspense fallback={<LoadingScreen />}>
+        <OAuthConsent />
+      </Suspense>
+    );
+  }
 
   // ── /entreprise → Admin Entreprise dashboard (auth required, handled by EntrepriseApp) ──
   if (currentPath === '/entreprise' || currentPath.startsWith('/entreprise/')) {
