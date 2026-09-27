@@ -180,10 +180,28 @@ Deno.serve(async (req) => {
     const countryCode = body.country_code || null;
 
     // ── Récupérer les données ────────────────────────────────────────────────
+    // [ISOLATION PUBLIC/ENTERPRISE] Le système Zones Chaudes est PUBLIC uniquement.
+    // Une course/livreur Enterprise (enterprise_id non null/non vide) ne doit JAMAIS
+    // participer au calcul ni recevoir de notification. Les documents avec
+    // enterprise_id null ou absent restent PUBLIC (comportement historique préservé).
+    //
+    // Base44 ne supporte pas { enterprise_id: null } comme filtre couvrant l'absence
+    // du champ. On filtre donc en post-traitement avec isPublicRecord() ci-dessous.
     const coursesFilter = countryCode ? { country_code: countryCode } : {};
     const livreursFilter = countryCode
       ? { actif: true, type_livreur: "externe", country_code: countryCode }
       : { actif: true, type_livreur: "externe" };
+
+    /**
+     * Détermine si un enregistrement est PUBLIC (réseau SILGAPP public).
+     * PUBLIC = enterprise_id null, absent, ou chaîne vide.
+     * Enterprise = enterprise_id non vide.
+     */
+    function isPublicRecord(rec) {
+      if (!rec) return true;
+      const entId = rec.enterprise_id;
+      return !entId || (typeof entId === 'string' && entId.trim() === '');
+    }
 
     const [courses, livreurs, paysData] = await Promise.all([
       base44.asServiceRole.entities.CourseExterne.filter(coursesFilter, "-created_date", 200).catch(() => []),
@@ -191,13 +209,15 @@ Deno.serve(async (req) => {
       countryCode ? base44.asServiceRole.entities.Country.filter({ code: countryCode }).catch(() => []) : Promise.resolve([]),
     ]);
 
-    // Courses en attente récentes (< 2h)
+    // Courses en attente récentes (< 2h) — PUBLIC uniquement
     const coursesRecentes = courses.filter(c => {
+      if (!isPublicRecord(c)) return false; // [ISOLATION] exclure courses Enterprise
       return ["nouvelle", "recherche_livreur"].includes(c.statut) && isRecentMin(c.created_date, 120);
     });
 
-    // Livreurs disponibles avec GPS récent (< 15 min)
+    // Livreurs disponibles avec GPS récent (< 15 min) — PUBLIC uniquement
     const livreursDispos = livreurs.filter(l => {
+      if (!isPublicRecord(l)) return false; // [ISOLATION] exclure livreurs Enterprise
       return l.statut === "disponible" && isRecentMin(l.derniere_position_date || l.last_seen_at, 15) && l.latitude && l.longitude;
     });
 
@@ -344,6 +364,8 @@ Deno.serve(async (req) => {
         const livreursEligibles = [];
 
         for (const livreur of livreurs) {
+          // [ISOLATION PUBLIC/ENTERPRISE] Exclure les livreurs Enterprise du système Zones Chaudes PUBLIC
+          if (!isPublicRecord(livreur)) continue;
           // Filtres stricts
           if (!livreur.country_code && countryCode) continue; // skip si pas de country_code
           if (countryCode && livreur.country_code !== countryCode) continue; // pays différent
