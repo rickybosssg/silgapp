@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { base44, detectedToken } from "@/api/base44Client";
 import { APP_PUBLIC_URL, BASE44_APP_ID } from "@/lib/app-params";
 import { ArrowRight, Loader2, Lock, Mail, ShieldCheck, Store } from "lucide-react";
@@ -211,6 +212,7 @@ async function resetPasswordWithToken(resetToken, newPassword) {
  * - detectedToken permet de savoir si un token a été trouvé
  */
 export default function AuthGate({ children, onLivreur, onClient, onPartenaire }) {
+  const navigate = useNavigate();
   const [state, setState] = useState("loading");
   const [authRetry, setAuthRetry] = useState(0);
   const initialResetToken = getPasswordResetTokenFromUrl();
@@ -274,6 +276,18 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
         }
         // Déjà sur la bonne page → afficher le contenu (children = AdminCourseStandalone)
         setState("admin");
+        return;
+      }
+
+      // 1b. Admin Entreprise → dashboard entreprise privé (/entreprise)
+      // Prioritaire sur les profils ClientExterne/Livreur éventuellement associés au même email.
+      if (user.silgapp_role === "admin_entreprise" && user.enterprise_id) {
+        const currentPath = window.location.pathname;
+        if (currentPath !== "/entreprise" && !currentPath.startsWith("/entreprise/")) {
+          navigate("/entreprise", { replace: true });
+          return;
+        }
+        setState("admin_entreprise");
         return;
       }
 
@@ -421,7 +435,7 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
       if (mounted) setState("unauthenticated");
     });
     return () => { mounted = false; };
-  }, [authRetry]);
+  }, [authRetry, navigate]);
 
   const handleEmailSubmit = async (event) => {
     event.preventDefault();
@@ -777,6 +791,10 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
   // Choix du rôle (nouvel utilisateur sans profil)
   if (state === "choix_role") {
     return <RoleSelection onPartenaire={onPartenaire} />;
+  }
+
+  if (state === "admin_entreprise") {
+    return <>{children}</>;
   }
 
   // Admin → toujours accessible, pas de gate maintenance

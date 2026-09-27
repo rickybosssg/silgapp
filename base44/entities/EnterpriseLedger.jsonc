@@ -1,0 +1,120 @@
+{
+  "name": "EnterpriseLedger",
+  "type": "object",
+  "properties": {
+    "enterprise_id": {
+      "type": "string",
+      "description": "ID de l'entreprise concern\u00e9e"
+    },
+    "enterprise_financier_id": {
+      "type": "string",
+      "description": "Identifiant financier IMMUABLE de l'entreprise. Cl\u00e9 de rattachement financier. Ne change jamais."
+    },
+    "course_id": {
+      "type": "string",
+      "description": "ID de la course concern\u00e9e (si type=commission_course)"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "commission_course",
+        "paiement",
+        "ajustement_admin"
+      ],
+      "description": "Type d'\u00e9criture financi\u00e8re. commission_course = commission g\u00e9n\u00e9r\u00e9e par une course entreprise livr\u00e9e. paiement = r\u00e8glement de l'entreprise envers SILGAPP. ajustement_admin = correction manuelle par le Super Admin."
+    },
+    "montant": {
+      "type": "number",
+      "description": "Montant de l'\u00e9criture (FCFA). Positif pour les commissions et ajustements +. Pour les paiements, positif (r\u00e9duit la dette)."
+    },
+    "taux": {
+      "type": "number",
+      "description": "Taux de commission verrouill\u00e9 au moment de la course (si type=commission_course)"
+    },
+    "prix_final": {
+      "type": "number",
+      "description": "Prix final de la course (si type=commission_course)"
+    },
+    "ancien_solde": {
+      "type": "number",
+      "description": "Solde d\u00fb avant cette \u00e9criture"
+    },
+    "nouveau_solde": {
+      "type": "number",
+      "description": "Solde d\u00fb apr\u00e8s cette \u00e9criture"
+    },
+    "reference": {
+      "type": "string",
+      "description": "R\u00e9f\u00e9rence libre (num\u00e9ro de re\u00e7u, r\u00e9f\u00e9rence de paiement, etc.)"
+    },
+    "request_id": {
+      "type": "string",
+      "description": "Cl\u00e9 idempotente. Deux \u00e9critures avec le m\u00eame request_id ne peuvent pas \u00eatre cr\u00e9\u00e9es (anti-double-comptabilit\u00e9)."
+    },
+    "motif": {
+      "type": "string",
+      "description": "Motif de l'\u00e9criture (surtout pour ajustement_admin ou paiement)"
+    },
+    "moyen_paiement": {
+      "type": "string",
+      "enum": [
+        "especes",
+        "virement",
+        "mobile_money",
+        "autre"
+      ],
+      "description": "Moyen de paiement (si type=paiement)"
+    },
+    "justificatif_url": {
+      "type": "string",
+      "description": "URL du justificatif de paiement (si type=paiement)"
+    },
+    "valide_par": {
+      "type": "string",
+      "description": "Email du Super Admin ayant valid\u00e9 l'\u00e9criture (pour paiements et ajustements)"
+    },
+    "taux_ancien": {
+      "type": "number",
+      "description": "Ancien taux (pour les changements de taux historis\u00e9s)"
+    },
+    "taux_nouveau": {
+      "type": "number",
+      "description": "Nouveau taux (pour les changements de taux historis\u00e9s)"
+    }
+  },
+  "required": [
+    "enterprise_id",
+    "enterprise_financier_id",
+    "type",
+    "montant"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "data.enterprise_financier_id": "{{user.data.enterprise_id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

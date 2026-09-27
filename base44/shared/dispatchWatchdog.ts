@@ -15,9 +15,8 @@
 import { STATUTS_ACTIFS_COURSE, STATUTS_ACTIFS_VERIF } from './dispatchConstants.ts';
 import { journaliserDispatch } from './dispatchUtils.ts';
 import { getLivreursNotifies } from './dispatchNotifications.ts';
-import { lancerDispatchMulti } from './dispatchEngine.ts';
 import { chargerConfigDispatch, chargerConfigVaguesGPS } from './dispatchConfig.ts';
-import { isV2Enabled, secoursDispatchV2 } from './dispatchV2.ts';
+import { publierCourseDansFil, secoursDispatchV2 } from './dispatchV2.ts';
 import { gererPushGeneralT10 } from './pushGeneralT10.ts';
 
 /** Crée une alerte admin si aucune alerte récente n'existe pour la même course. */
@@ -116,7 +115,7 @@ export async function runWatchdog(base44, body = {}) {
     anomalies.push({ course_id: course.id, type: 'nouvelle_jamais_traitee', severity: 'critique', description: `Course nouvelle depuis ${ageMin}min sans notification` });
 
     try {
-      const result = await lancerDispatchMulti(base44, course.id, [], cachedConfig);
+      const result = await publierCourseDansFil(base44, course);
       corrections.push({ course_id: course.id, action: 'force_dispatch_nouvelle', result });
     } catch (err) {
       corrections.push({ course_id: course.id, action: 'force_dispatch_nouvelle', error: err.message });
@@ -144,7 +143,7 @@ export async function runWatchdog(base44, body = {}) {
     anomalies.push({ course_id: course.id, type: 'recherche_sans_vague', severity: 'critique', description: `Course en_attente depuis ${ageMin}min sans vague` });
 
     try {
-      const result = await lancerDispatchMulti(base44, course.id, [], cachedConfig);
+      const result = await publierCourseDansFil(base44, course);
       corrections.push({ course_id: course.id, action: 'force_dispatch_recherche', result });
     } catch (err) {
       corrections.push({ course_id: course.id, action: 'force_dispatch_recherche', error: err.message });
@@ -204,7 +203,7 @@ export async function runWatchdog(base44, body = {}) {
     }
 
     try {
-      const result = await lancerDispatchMulti(base44, course.id, [], cachedConfig);
+      const result = await publierCourseDansFil(base44, { ...course, statut: 'recherche_livreur', dispatch_status: 'en_attente' });
       corrections.push({ course_id: course.id, action: 'redispatch_propose_timeout', result });
     } catch (err) {
       corrections.push({ course_id: course.id, action: 'redispatch_propose_timeout', error: err.message });
@@ -334,31 +333,28 @@ export async function runWatchdog(base44, body = {}) {
   //         meilleurs livreurs encore éligibles et non en course.
   // Après acceptation : aucun push (la course n'est plus disponible_push).
   // Pas de T+20s, pas de priorité temporelle, pas de cycle_epuise.
-  const v2Enabled = await isV2Enabled(base44);
-  if (v2Enabled) {
-    const coursesFil = courses.filter(c => c.dispatch_status === 'disponible_push' && c.statut === 'recherche_livreur');
+  const coursesFil = courses.filter(c => c.dispatch_status === 'disponible_push' && c.statut === 'recherche_livreur');
 
-    for (const course of coursesFil) {
-      const secoursPhase = Number(course.dispatch_v2_secours_phase || 0);
-      if (secoursPhase >= 1) continue; // Rappel déjà envoyé — ne pas re-notifier
+  for (const course of coursesFil) {
+    const secoursPhase = Number(course.dispatch_v2_secours_phase || 0);
+    if (secoursPhase >= 1) continue; // Rappel déjà envoyé — ne pas re-notifier
 
-      // Garde : ne rien faire si la course a déjà un livreur (acceptation concurrente)
-      if (course.livreur_id || course.accepted_by_livreur_id) continue;
+    // Garde : ne rien faire si la course a déjà un livreur (acceptation concurrente)
+    if (course.livreur_id || course.accepted_by_livreur_id) continue;
 
-      const sollicitationMs = course.heure_sollicitation
-        ? new Date(course.heure_sollicitation).getTime()
-        : new Date(course.created_date).getTime();
-      const ageMin = (now.getTime() - sollicitationMs) / 60000;
+    const sollicitationMs = course.heure_sollicitation
+      ? new Date(course.heure_sollicitation).getTime()
+      : new Date(course.created_date).getTime();
+    const ageMin = (now.getTime() - sollicitationMs) / 60000;
 
-      if (ageMin >= cachedConfig.dispatch.secoursV2DelayMin) {
-        // T+5min (configurable) : push batch de rappel aux meilleurs livreurs encore éligibles
-        // secoursDispatchV2 exclut déjà les livreurs en course, refusés et déjà notifiés.
-        const result = await secoursDispatchV2(base44, course, cachedConfig.dispatch.secoursV2NbLivreurs, { excludeAlreadyNotified: false });
-        await base44.asServiceRole.entities.CourseExterne.update(course.id, {
-          dispatch_v2_secours_phase: 1,
-        });
-        corrections.push({ course_id: course.id, action: 'secours_v2_rappel_t5min', pushed: result.pushed });
-      }
+    if (ageMin >= cachedConfig.dispatch.secoursV2DelayMin) {
+      // T+5min (configurable) : push batch de rappel aux meilleurs livreurs encore éligibles
+      // secoursDispatchV2 exclut déjà les livreurs en course, refusés et déjà notifiés.
+      const result = await secoursDispatchV2(base44, course, cachedConfig.dispatch.secoursV2NbLivreurs, { excludeAlreadyNotified: false });
+      await base44.asServiceRole.entities.CourseExterne.update(course.id, {
+        dispatch_v2_secours_phase: 1,
+      });
+      corrections.push({ course_id: course.id, action: 'secours_v2_rappel_t5min', pushed: result.pushed });
     }
   }
 

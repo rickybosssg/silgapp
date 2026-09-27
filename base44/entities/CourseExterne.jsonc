@@ -6,6 +6,32 @@
       "type": "string",
       "description": "Code pays ISO 2 lettres (ex: BF, CI, TG). Dynamique : aucun pays cod\u00e9 en dur."
     },
+    "enterprise_id": {
+      "type": "string",
+      "description": "ID financier IMMUABLE de l'entreprise propri\u00e9taire de cette course. Null = course du r\u00e9seau public SILGAPP. R\u00e9solu c\u00f4t\u00e9 backend uniquement."
+    },
+    "enterprise_commission_rate_locked": {
+      "type": "number",
+      "description": "Taux de commission SILGAPP entreprise verrouill\u00e9 au moment de l'acceptation."
+    },
+    "enterprise_commission_locked_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date/heure de verrouillage du taux entreprise."
+    },
+    "enterprise_commission_amount": {
+      "type": "number",
+      "description": "Montant de la commission SILGAPP entreprise calcul\u00e9 \u00e0 la livraison."
+    },
+    "enterprise_encours_comptabilise_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date \u00e0 laquelle la commission entreprise a \u00e9t\u00e9 comptabilis\u00e9e dans le EnterpriseLedger."
+    },
+    "enterprise_encours_comptabilise_montant": {
+      "type": "number",
+      "description": "Montant de la commission entreprise comptabilis\u00e9e dans le EnterpriseLedger."
+    },
     "source": {
       "type": "string",
       "enum": [

@@ -1,5 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
-import { isV2Enabled, DISPATCH_V2_BUNDLE_VERSION } from '../../shared/dispatchV2.ts';
+import { DISPATCH_V2_BUNDLE_VERSION } from '../../shared/dispatchV2.ts';
 import {
   emitCourseCreated,
   emitCourseAccepted,
@@ -67,25 +67,14 @@ Deno.serve(async (req) => {
     // ÉVÉNEMENT CREATE
     // ════════════════════════════════════════════════════════════════════
     if (eventType === 'create') {
-      // 1. Dispatch : V2 (fil) ou V1 (vagues) selon feature flag
-      const v2Enabled = await isV2Enabled(base44);
-      if (v2Enabled) {
-        // V2 : dispatchExterneAuto publie et notifie de façon idempotente.
-        await fireInvoke('dispatchExterneAuto', {
-          action: 'lancer_recherche_auto',
-          course_id: courseId,
-          event,
-          data,
-        });
-        called.push('dispatchV2');
-      } else {
-        await fireInvoke('dispatchExterneAuto', {
-          action: 'lancer_recherche_auto',
-          course_id: courseId,
-          event,
-          data,
-        });
-      }
+      // 1. Dispatch V2 unique : dispatchExterneAuto publie et notifie de façon idempotente.
+      await fireInvoke('dispatchExterneAuto', {
+        action: 'lancer_recherche_auto',
+        course_id: courseId,
+        event,
+        data,
+      });
+      called.push('dispatchV2');
 
       // 2. Notifier les clients (expéditeur/destinataire)
       await fireInvoke('notifyClientSync', {
@@ -130,23 +119,13 @@ Deno.serve(async (req) => {
     // On ne relance le dispatch QUE si la course revient en recherche_livreur
     // (redispatch après refus, annulation, ou prix manuel refusé)
     if (statutChanged && newStatut === 'recherche_livreur') {
-      const v2Enabled = await isV2Enabled(base44);
-      if (v2Enabled) {
-        await fireInvoke('dispatchExterneAuto', {
-          action: 'lancer_recherche_auto',
-          course_id: courseId,
-          event,
-          data,
-        });
-        called.push('dispatchV2');
-      } else {
-        await fireInvoke('dispatchExterneAuto', {
-          action: 'lancer_recherche_auto',
-          course_id: courseId,
-          event,
-          data,
-        });
-      }
+      await fireInvoke('dispatchExterneAuto', {
+        action: 'lancer_recherche_auto',
+        course_id: courseId,
+        event,
+        data,
+      });
+      called.push('dispatchV2');
     }
 
     // ── 3. Sync commande partenaire (si statut mappé ET commande liée) ──

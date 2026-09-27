@@ -1,0 +1,156 @@
+{
+  "name": "Enterprise",
+  "type": "object",
+  "properties": {
+    "nom": {
+      "type": "string",
+      "description": "Nom de l'entreprise"
+    },
+    "slug": {
+      "type": "string",
+      "description": "Identifiant URL unique g\u00e9n\u00e9r\u00e9 c\u00f4t\u00e9 backend"
+    },
+    "country_code": {
+      "type": "string",
+      "description": "Code pays ISO 2 lettres (ex: BF, CI, TG)"
+    },
+    "logo_url": {
+      "type": "string",
+      "description": "URL du logo de l'entreprise"
+    },
+    "couleur_primaire": {
+      "type": "string",
+      "default": "#007AFF",
+      "description": "Hex code pour branding de l'entreprise dans son dashboard"
+    },
+    "nom_commercial": {
+      "type": "string",
+      "description": "Nom commercial de l'agence pour l'affichage public (page d'inscription livreur). Si vide, utilise 'nom'."
+    },
+    "whatsapp": {
+      "type": "string",
+      "description": "Num\u00e9ro WhatsApp de l'agence pour le contact livreur."
+    },
+    "telephone": {
+      "type": "string",
+      "description": "Num\u00e9ro de t\u00e9l\u00e9phone de l'entreprise"
+    },
+    "email": {
+      "type": "string",
+      "description": "Adresse email de l'entreprise"
+    },
+    "adresse": {
+      "type": "string",
+      "description": "Adresse physique de l'entreprise"
+    },
+    "actif": {
+      "type": "boolean",
+      "default": true,
+      "description": "Entreprise active ou suspendue"
+    },
+    "statut": {
+      "type": "string",
+      "enum": [
+        "actif",
+        "suspendu",
+        "resilie"
+      ],
+      "default": "actif",
+      "description": "Statut op\u00e9rationnel de l'entreprise"
+    },
+    "commission_silgapp_pct": {
+      "type": "number",
+      "default": 5,
+      "description": "Taux de commission SILGAPP sur les courses de cette entreprise. Configurable par le Super Admin uniquement. Verrouill\u00e9 par course au moment de l'acceptation. Un changement de taux ne recalcul jamais les courses existantes."
+    },
+    "enterprise_financier_id": {
+      "type": "string",
+      "description": "Identifiant financier IMMUABLE de l'entreprise. G\u00e9n\u00e9r\u00e9 c\u00f4t\u00e9 backend \u00e0 la cr\u00e9ation. Ne d\u00e9pend pas du nom. Utilis\u00e9 comme cl\u00e9 de rattachement financier dans EnterpriseLedger. Ne change jamais, m\u00eame si le nom est modifi\u00e9."
+    },
+    "date_creation": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date de cr\u00e9ation de l'entreprise"
+    },
+    "date_suspension": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date de suspension si applicable"
+    },
+    "motif_suspension": {
+      "type": "string",
+      "description": "Motif de suspension"
+    },
+    "nb_admins": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre d'administrateurs rattach\u00e9s \u00e0 cette entreprise (cache d\u00e9riv\u00e9)"
+    },
+    "nb_livreurs": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre de livreurs rattach\u00e9s \u00e0 cette entreprise (cache d\u00e9riv\u00e9)"
+    },
+    "nb_courses": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre de courses rattach\u00e9es \u00e0 cette entreprise (cache d\u00e9riv\u00e9)"
+    },
+    "volume_courses_total": {
+      "type": "number",
+      "default": 0,
+      "description": "Volume financier total des courses entreprise (FCFA). D\u00e9riv\u00e9 du EnterpriseLedger."
+    },
+    "total_commissions_silgapp": {
+      "type": "number",
+      "default": 0,
+      "description": "Total des commissions SILGAPP g\u00e9n\u00e9r\u00e9es par cette entreprise (FCFA). D\u00e9riv\u00e9 du EnterpriseLedger."
+    },
+    "total_paiements": {
+      "type": "number",
+      "default": 0,
+      "description": "Total des paiements effectu\u00e9s par l'entreprise envers SILGAPP (FCFA). D\u00e9riv\u00e9 du EnterpriseLedger."
+    },
+    "montant_du_silgapp": {
+      "type": "number",
+      "default": 0,
+      "description": "Montant actuellement d\u00fb par l'entreprise \u00e0 SILGAPP (FCFA). = total_commissions_silgapp - total_paiements. D\u00e9riv\u00e9 du EnterpriseLedger."
+    }
+  },
+  "required": [
+    "nom",
+    "slug",
+    "country_code",
+    "commission_silgapp_pct",
+    "statut"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "data.enterprise_financier_id": "{{user.data.enterprise_id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

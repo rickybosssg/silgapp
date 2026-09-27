@@ -26,6 +26,10 @@
       "type": "string",
       "description": "Code pays ISO 2 lettres (ex: BF, CI, TG). Dynamique : aucun pays cod\u00e9 en dur."
     },
+    "enterprise_id": {
+      "type": "string",
+      "description": "ID financier IMMUABLE de l'entreprise \u00e0 laquelle ce client est rattach\u00e9. Null = client du r\u00e9seau public SILGAPP. R\u00e9solu c\u00f4t\u00e9 backend uniquement."
+    },
     "ville": {
       "type": "string",
       "description": "Ville du client (d\u00e9tect\u00e9e par GPS ou saisie)"

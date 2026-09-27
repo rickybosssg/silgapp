@@ -1,0 +1,101 @@
+{
+  "name": "EnterpriseDriverInvitation",
+  "type": "object",
+  "properties": {
+    "enterprise_id": {
+      "type": "string",
+      "description": "ID financier IMMUABLE de l'entreprise propri\u00e9taire de l'invitation. R\u00e9solu c\u00f4t\u00e9 backend depuis l'admin authentifi\u00e9. Jamais fourni par le frontend."
+    },
+    "enterprise_name": {
+      "type": "string",
+      "description": "Nom snapshot de l'entreprise au moment de la cr\u00e9ation de l'invitation."
+    },
+    "token": {
+      "type": "string",
+      "description": "Token cryptographique unique et non pr\u00e9dictible. V\u00e9rifi\u00e9 c\u00f4t\u00e9 backend \u00e0 chaque \u00e9tape."
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "used",
+        "expired",
+        "revoked"
+      ],
+      "default": "pending",
+      "description": "Statut de l'invitation. pending = en attente d'utilisation. used = un livreur s'est inscrit avec. expired = d\u00e9lai de 7 jours d\u00e9pass\u00e9. revoked = r\u00e9voqu\u00e9e par l'admin."
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date d'expiration de l'invitation (7 jours apr\u00e8s cr\u00e9ation)."
+    },
+    "created_by": {
+      "type": "string",
+      "description": "Email de l'admin entreprise ayant cr\u00e9\u00e9 l'invitation."
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date de cr\u00e9ation de l'invitation."
+    },
+    "used_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date \u00e0 laquelle l'invitation a \u00e9t\u00e9 utilis\u00e9e par un candidat."
+    },
+    "used_by_user_email": {
+      "type": "string",
+      "description": "Email normalis\u00e9 (trim+lowercase) du livreur qui a utilis\u00e9 cette invitation."
+    },
+    "revoked_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date de r\u00e9vocation de l'invitation."
+    },
+    "revoked_by": {
+      "type": "string",
+      "description": "Email de l'admin ayant r\u00e9voqu\u00e9 l'invitation."
+    },
+    "country_code": {
+      "type": "string",
+      "description": "Code pays ISO 2 lettres h\u00e9rit\u00e9 de l'entreprise."
+    }
+  },
+  "required": [
+    "enterprise_id",
+    "token",
+    "status",
+    "expires_at",
+    "created_by"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "data.enterprise_id": "{{user.data.enterprise_id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

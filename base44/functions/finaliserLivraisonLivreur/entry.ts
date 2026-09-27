@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
 import { chargerConfigPays, normalizeCommissionPct } from '../../shared/dispatchConstants.ts';
+import { comptabiliserCommissionEnterprise } from '../../shared/enterpriseFinance.ts';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // FINALISER LIVRAISON LIVREUR — Source de vérité pour la livraison
@@ -146,8 +147,8 @@ export default async function(req: Request): Promise<Response> {
         heure_livraison: now,
         colis_livre_at: now,
         prix_final: montant,
-        commission_silga: commissionSilga,
-        montant_livreur: montantLivreur,
+        commission_silga: course.enterprise_id ? 0 : commissionSilga,
+        montant_livreur: course.enterprise_id ? montant : montantLivreur,
         // ── Identité financière immuable ──
         // Renseigné côté backend au moment de la livraison, JAMAIS modifié ensuite.
         // Si déjà présent (re-finalisation), on ne l'écrase pas.
@@ -166,6 +167,13 @@ export default async function(req: Request): Promise<Response> {
         await base44.asServiceRole.functions.invoke('verifierEncoursLivreur', { course_id });
       } catch (encoursErr: any) {
         console.error('[finaliserLivraisonLivreur] verifierEncoursLivreur error:', encoursErr?.message);
+      }
+      try {
+        if (updated?.enterprise_id) {
+          await comptabiliserCommissionEnterprise(base44.asServiceRole, updated);
+        }
+      } catch (entErr: any) {
+        console.error('[finaliserLivraisonLivreur] enterprise accounting error:', entErr?.message);
       }
 
       return Response.json({
@@ -231,6 +239,21 @@ export default async function(req: Request): Promise<Response> {
           await base44.asServiceRole.entities.CourseExterne.update(course_id, {
             livreur_financier_id: course.livreur_id,
           }).catch(() => {});
+        }
+        try {
+          const entCourse = await base44.asServiceRole.entities.CourseExterne.get(course_id);
+          if (entCourse?.enterprise_id) {
+            const prixFinal = Number(entCourse.prix_final);
+            const enterpriseUpdate = Number.isFinite(prixFinal) && prixFinal > 0
+              ? { commission_silga: 0, montant_livreur: prixFinal }
+              : {};
+            const enterpriseCourse = Object.keys(enterpriseUpdate).length
+              ? await base44.asServiceRole.entities.CourseExterne.update(course_id, enterpriseUpdate)
+              : entCourse;
+            await comptabiliserCommissionEnterprise(base44.asServiceRole, enterpriseCourse);
+          }
+        } catch (entErr: any) {
+          console.error('[finaliserLivraisonLivreur] enterprise accounting error (standard):', entErr?.message);
         }
 
         // Multi-colis: mettre à jour les colis individuels

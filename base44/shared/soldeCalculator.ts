@@ -140,7 +140,7 @@ export async function calculerSoldeLivreur(base44: any, livreurId: string): Prom
   // Filtrer par base comptable
   const coursesForCalc = allCourses.filter((c: any) => {
     const d = c.heure_livraison || c.colis_livre_at || c.created_date;
-    return d && new Date(d) >= new Date(baseDate);
+    return d && new Date(d) >= new Date(baseDate) && !c.enterprise_id;
   });
 
   // 2. Paiements traités
@@ -219,6 +219,7 @@ export async function calculerSoldesLivreursBatch(
   // 3. Récupérer les livreurs avec base comptable pour filtrage
   const livreurIds = new Set<string>();
   (allCourses || []).forEach((c: any) => {
+    if (c.enterprise_id) return;
     const fid = getLivreurFinancierId(c);
     if (fid) livreurIds.add(fid);
     if (c.livreur_id) livreurIds.add(c.livreur_id);

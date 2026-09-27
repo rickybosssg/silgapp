@@ -56,6 +56,21 @@ Deno.serve(async (req) => {
       });
     }
 
+    if (course.enterprise_id) {
+      const nowEnterprise = new Date().toISOString();
+      const claimEnterprise = await base44.asServiceRole.entities.CourseExterne.updateMany(
+        { id: courseId, encours_comptabilise_at: null },
+        { $set: { encours_comptabilise_at: nowEnterprise, encours_comptabilise_montant: 0 } }
+      );
+      return Response.json({
+        success: true,
+        skipped: true,
+        reason: claimEnterprise?.updated === 1 ? 'enterprise_course_public_encours_zero' : 'course_deja_comptabilisee_cas',
+        encours_comptabilise_at: nowEnterprise,
+        encours_comptabilise_montant: 0,
+      });
+    }
+
     // Vérifier qu'un livreur est assigné
     if (!course.livreur_id) {
       return Response.json({ success: true, skipped: true, reason: 'pas_de_livreur' });

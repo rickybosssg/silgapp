@@ -1,0 +1,68 @@
+{
+  "name": "PendingEnterpriseAdmin",
+  "type": "object",
+  "properties": {
+    "email": {
+      "type": "string",
+      "description": "Email de l'administrateur invit\u00e9"
+    },
+    "enterprise_id": {
+      "type": "string",
+      "description": "ID financier IMMUABLE de l'entreprise \u00e0 laquelle cet admin doit \u00eatre rattach\u00e9"
+    },
+    "enterprise_name": {
+      "type": "string",
+      "description": "Nom de l'entreprise (snapshot pour affichage admin)"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "activated"
+      ],
+      "default": "pending",
+      "description": "pending = en attente d'activation (l'utilisateur n'a pas encore accept\u00e9 l'invitation). activated = l'utilisateur s'est connect\u00e9 et son compte a \u00e9t\u00e9 configur\u00e9."
+    },
+    "invited_by": {
+      "type": "string",
+      "description": "Email du Super Admin ayant cr\u00e9\u00e9 l'invitation"
+    },
+    "invited_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date d'envoi de l'invitation"
+    },
+    "activated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date \u00e0 laquelle l'utilisateur a activ\u00e9 son compte"
+    }
+  },
+  "required": [
+    "email",
+    "enterprise_id",
+    "status"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

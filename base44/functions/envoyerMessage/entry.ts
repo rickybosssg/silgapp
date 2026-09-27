@@ -80,6 +80,11 @@ Deno.serve(async (req) => {
       realName = `${client.prenom || ''} ${client.nom || ''}`.trim() || client.telephone || 'Client';
       photoUrl = '';
     } else if (sender_type === 'admin') {
+      // sender_type='admin' est reserve au Super Admin SILGAPP.
+      // Les admins Enterprise ont silgapp_role='admin_entreprise' mais role !== 'admin'.
+      if (user.role !== 'admin') {
+        return Response.json({ error: 'sender_type admin reserve au Super Admin SILGAPP' }, { status: 403 });
+      }
       // L'admin est déjà authentifié — utiliser user.email comme sender_id
       final_sender_id = user.email;
       realName = user.full_name || user.email || 'Admin';
