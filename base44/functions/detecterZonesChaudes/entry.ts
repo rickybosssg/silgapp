@@ -250,12 +250,6 @@ Deno.serve(async (req) => {
         if (saJson) {
           const sa = JSON.parse(saJson);
           firebaseConfig = { projectId: sa.project_id, clientEmail: sa.client_email, privateKey: sa.private_key };
-        } else {
-          firebaseConfig = {
-            projectId: Deno.env.get('FIREBASE_PROJECT_ID'),
-            clientEmail: Deno.env.get('FIREBASE_CLIENT_EMAIL'),
-            privateKey: Deno.env.get('FIREBASE_PRIVATE_KEY'),
-          };
         }
         if (firebaseConfig.projectId && firebaseConfig.clientEmail && firebaseConfig.privateKey) {
           accessToken = await getAccessToken(firebaseConfig.clientEmail, firebaseConfig.privateKey);
