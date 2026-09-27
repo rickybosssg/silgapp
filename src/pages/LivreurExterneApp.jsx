@@ -590,6 +590,31 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     };
   }, [queryClient, livreurId]);
 
+  // ── Realtime CourseExterne → rafraîchit mes-courses-externes ──
+  // Invalide uniquement si l'événement concerne manifestement le livreur connecté
+  // (livreur_id, accepted_by_livreur_id, proposed_by_livreur_id, proposed_livreur_id,
+  // livreur_financier_id). Pour les deletes où data est minimale, on invalide par sécurité.
+  useEffect(() => {
+    if (!livreurId) return;
+    const unsubscribe = base44.entities.CourseExterne.subscribe((event) => {
+      if (event.type === "delete") {
+        queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+        return;
+      }
+      const c = event?.data || {};
+      const concernsLivreur =
+        String(c.livreur_id || "") === String(livreurId) ||
+        String(c.accepted_by_livreur_id || "") === String(livreurId) ||
+        String(c.proposed_by_livreur_id || "") === String(livreurId) ||
+        String(c.proposed_livreur_id || "") === String(livreurId) ||
+        String(c.livreur_financier_id || "") === String(livreurId);
+      if (concernsLivreur) {
+        queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+      }
+    });
+    return unsubscribe;
+  }, [livreurId, queryClient]);
+
   useEffect(() => {
     if (!livreurId || !livreurEmail || !onboardingTermine) return;
 
@@ -808,7 +833,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     },
     enabled: !!livreurId,
     initialData: [],
-    refetchInterval: 4000, // 1s → 4s : évite le rate limit (était 60 req/min)
+    refetchInterval: 30000, // 4s → 30s : realtime + refetch événementiel prennent le relais
     staleTime: 2000,
   });
 
