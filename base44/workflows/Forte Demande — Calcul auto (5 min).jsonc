@@ -1,0 +1,45 @@
+{
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "forte_demande_calcul_auto_5_min",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "run_function": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "calculerForteDemandeAuto",
+            "args": {}
+          },
+          "then": "end",
+          "x-base44": {
+            "title": "Calculer Forte Demande",
+            "description": "Tous les pays actifs"
+          }
+        }
+      }
+    ]
+  },
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "interval",
+      "cron_expression": null,
+      "one_time_date": null,
+      "timezone": "UTC",
+      "interval_value": 5,
+      "interval_unit": "minutes",
+      "interval_anchor": "2026-09-27T04:30:00",
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  },
+  "name": "Forte Demande \u2014 Calcul auto (5 min)",
+  "description": "Recalcule toutes les 5 min l'\u00e9tat Forte Demande pour tous les pays actifs ayant forte_demande_client_actif=true. \u00c9crit Country.forte_demande_active uniquement lors d'une transition de seuil. Aucun polling client n\u00e9cessaire \u2014 les clients re\u00e7oivent l'\u00e9tat via Country.subscribe()."
+}
