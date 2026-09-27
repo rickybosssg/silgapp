@@ -24,8 +24,14 @@ export function useHeartbeat({ user_type, position, enabled = true, debugLabel =
   const syncHeartbeat = async (pos, force = false) => {
     if (!enabled) return;
 
+    // ── Throttle dynamique : empêche startNativeLocationSync (5s) de déclencher
+    //    heartbeatAuto plus souvent que heartbeat_web_interval_ms (30s par défaut).
+    //    Le GPS local continue d'être acquis toutes les 5s, mais l'envoi serveur
+    //    est limité à 1 appel toutes les 30s. La dernière position GPS acquise
+    //    entre deux heartbeats est envoyée lors du heartbeat suivant.
     const now = Date.now();
-    if (!force && lastSyncRef.current && now - lastSyncRef.current < 5000) {
+    const throttleMs = getConfig().heartbeat_web_interval_ms;
+    if (!force && lastSyncRef.current && now - lastSyncRef.current < throttleMs) {
       return;
     }
     lastSyncRef.current = now;
