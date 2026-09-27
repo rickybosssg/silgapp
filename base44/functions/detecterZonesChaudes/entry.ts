@@ -140,6 +140,64 @@ function niveauFromScore(score, config) {
   return { niveau: "faible", emoji: "", label: "Faible demande" };
 }
 
+// ─── Pagination par curseur (READ-only) ──────────────────────────────────────
+// La SDK filter() ne retourne pas has_more. On utilise le champ de tri
+// (created_date / updated_date) comme curseur : si la page est pleine,
+// on continue avec < dernier élément jusqu'à épuisement.
+// NE PAS utiliser updateMany comme pseudo-pagination (opération d'écriture).
+async function fetchAllCoursesForCountry(base44, cc, twoHoursAgoIso) {
+  const all = [];
+  const pageSize = 200;
+  let cursorDate = null;
+  let iterations = 0;
+  const MAX_ITERATIONS = 10; // Safety: max 2000 courses per country per run
+
+  while (iterations < MAX_ITERATIONS) {
+    const query = {
+      statut: { $in: ['nouvelle', 'recherche_livreur'] },
+      country_code: cc,
+      created_date: cursorDate
+        ? { $gte: twoHoursAgoIso, $lt: cursorDate }
+        : { $gte: twoHoursAgoIso }
+    };
+    const batch = await base44.asServiceRole.entities.CourseExterne.filter(
+      query, "-created_date", pageSize
+    ).catch(() => []);
+    if (!batch || batch.length === 0) break;
+    all.push(...batch);
+    if (batch.length < pageSize) break;
+    cursorDate = batch[batch.length - 1].created_date;
+    if (!cursorDate) break;
+    iterations++;
+  }
+  return all;
+}
+
+async function fetchAllLivreursForCountry(base44, cc) {
+  const all = [];
+  const pageSize = 500;
+  let cursorDate = null;
+  let iterations = 0;
+  const MAX_ITERATIONS = 5; // Safety: max 2500 livreurs per country
+
+  while (iterations < MAX_ITERATIONS) {
+    const query = { actif: true, type_livreur: "externe", country_code: cc };
+    if (cursorDate) {
+      query.updated_date = { $lt: cursorDate };
+    }
+    const batch = await base44.asServiceRole.entities.Livreur.filter(
+      query, "-updated_date", pageSize
+    ).catch(() => []);
+    if (!batch || batch.length === 0) break;
+    all.push(...batch);
+    if (batch.length < pageSize) break;
+    cursorDate = batch[batch.length - 1].updated_date;
+    if (!cursorDate) break;
+    iterations++;
+  }
+  return all;
+}
+
 // ─── Main ────────────────────────────────────────────────────────────────────
 // ARCHITECTURE MULTI-PAYS :
 // - 1 workflow / 1 invocation → traite TOUS les pays actifs
@@ -215,32 +273,14 @@ Deno.serve(async (req) => {
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    // ÉTAPE 2 — Charger les courses (une seule fois pour tous les pays)
+    // ÉTAPE 2 — Courses et Livreurs chargés PAR PAYS dans la boucle (ÉTAPE 7)
+    //           Requêtes par pays + filtre temporel en base + pagination curseur
+    //           → élimine les plafonds globaux 200 (courses) et 500 (livreurs)
     // ══════════════════════════════════════════════════════════════════════════
-    // [LIMITE 200] On filtre par statut dès la requête pour garantir que TOUTES
-    // les courses pertinentes (nouvelle/recherche_livreur) sont chargées, sans
-    // troncature par des courses terminées/annulées plus récentes.
-    // Entity read ≠ functions.invoke : accepté dans la même invocation.
-    const coursesFilter = { statut: { $in: ['nouvelle', 'recherche_livreur'] } };
-    if (countryCode) coursesFilter.country_code = countryCode;
-    const allCourses = await base44.asServiceRole.entities.CourseExterne.filter(
-      coursesFilter, "-created_date", 200
-    ).catch(() => []);
+    const twoHoursAgoIso = new Date(now - 2 * 60 * 60 * 1000).toISOString();
 
     // ══════════════════════════════════════════════════════════════════════════
-    // ÉTAPE 3 — Charger les livreurs (une seule fois pour tous les pays)
-    // ══════════════════════════════════════════════════════════════════════════
-    // [LIMITE 500] Les livreurs externes actifs. Si SILGAPP dépasse 500 livreurs
-    // actifs, ajouter une pagination. Actuellement 142 → bien sous la limite.
-    const livreursFilter = countryCode
-      ? { actif: true, type_livreur: "externe", country_code: countryCode }
-      : { actif: true, type_livreur: "externe" };
-    const allLivreurs = await base44.asServiceRole.entities.Livreur.filter(
-      livreursFilter, "-updated_date", 500
-    ).catch(() => []);
-
-    // ══════════════════════════════════════════════════════════════════════════
-    // ÉTAPE 4 — Init Firebase (une seule fois, si push actif)
+    // ÉTAPE 3 — Init Firebase (une seule fois, si push actif)
     // ══════════════════════════════════════════════════════════════════════════
     let firebaseConfig = null;
     let accessToken = null;
@@ -264,6 +304,10 @@ Deno.serve(async (req) => {
     // ══════════════════════════════════════════════════════════════════════════
     let allTokens = [];
     if (accessToken) {
+      // [NOTE] NotificationToken n'a pas de country_code ni de limite explicite.
+      // La SDK retourne tous les records quand aucun limit n'est passé (testé : 254).
+      // Comportement non documenté formellement — si la plateforme change le défaut,
+      // une pagination par livreur_id sera nécessaire. Risque faible actuellement.
       allTokens = await base44.asServiceRole.entities.NotificationToken.filter({
         user_type: 'livreur', actif: true,
       }).catch(() => []);
@@ -291,12 +335,12 @@ Deno.serve(async (req) => {
       const cc = pays.code;
       const villeNom = pays.ville_principale || pays.nom || cc;
 
-      // ── 7a. Filtrer les courses pour ce pays — PUBLIC uniquement, < 2h ──
-      const coursesRecentes = allCourses.filter(c => {
-        if (!isPublicRecord(c)) return false; // [ISOLATION] exclure courses Enterprise
-        if (c.country_code !== cc) return false; // [ISOLATION] pays différent
-        return isRecentMin(c.created_date, 120);
-      });
+      // ── 7a. Charger les courses pour ce pays — PUBLIC, < 2h, PAGINÉ ──
+      // Requête par pays : élimine le plafond global de 200.
+      // Filtre created_date en base : ne charge que les courses < 2h.
+      // Pagination par curseur : si 200 résultats, continue jusqu'à épuisement.
+      const coursesRecentes = (await fetchAllCoursesForCountry(base44, cc, twoHoursAgoIso))
+        .filter(c => isPublicRecord(c)); // [ISOLATION] exclure courses Enterprise (défense en profondeur)
 
       // ── 7b. Skip si aucune course récente pertinente ──
       if (coursesRecentes.length === 0) {
@@ -321,12 +365,14 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // ── 7c. Filtrer les livreurs pour ce pays — PUBLIC uniquement, disponible, GPS récent ──
-      const livreursDispos = allLivreurs.filter(l => {
-        if (!isPublicRecord(l)) return false; // [ISOLATION] exclure livreurs Enterprise
-        if (l.country_code !== cc) return false; // [ISOLATION] pays différent
-        return l.statut === "disponible" && isRecentMin(l.derniere_position_date || l.last_seen_at, 15) && l.latitude && l.longitude;
-      });
+      // ── 7c. Charger les livreurs pour ce pays — PUBLIC, PAGINÉ ──
+      // Requête par pays : élimine le plafond global de 500.
+      // Pagination par curseur : si 500 résultats, continue jusqu'à épuisement.
+      const allLivreursPays = (await fetchAllLivreursForCountry(base44, cc))
+        .filter(l => isPublicRecord(l)); // [ISOLATION] exclure livreurs Enterprise (défense en profondeur)
+      const livreursDispos = allLivreursPays.filter(l =>
+        l.statut === "disponible" && isRecentMin(l.derniere_position_date || l.last_seen_at, 15) && l.latitude && l.longitude
+      );
 
       // ── 7d. Générer les zones de référence ──
       let zonesRef;
@@ -401,8 +447,10 @@ Deno.serve(async (req) => {
 
       for (const zone of zonesChaudes) {
         // 1. Vérifier doublon alerte récente (< 45 min) pour cette zone
+        const fortyFiveMinAgoIso = new Date(now - 45 * 60 * 1000).toISOString();
         const alertesExistantes = await base44.asServiceRole.entities.AlerteLivreur.filter(
-          { actif: true }, "-created_date", 50
+          { actif: true, cree_par: "moteur_zones_chaudes", created_date: { $gte: fortyFiveMinAgoIso } },
+          "-created_date", 50
         ).catch(() => []);
 
         const dejaAlerte = alertesExistantes.some(a =>
@@ -461,9 +509,11 @@ Deno.serve(async (req) => {
 
             // Rate limiting : vérifier les notifications récentes de type zone_chaude
             try {
+              const oneHourAgoIso = new Date(now - 60 * 60 * 1000).toISOString();
               const recentNotifs = await base44.asServiceRole.entities.Notification.filter({
                 destinataire_email: livreur.user_email,
                 type: 'zone_chaude',
+                created_date: { $gte: oneHourAgoIso },
               }, '-created_date', 50).catch(() => []);
 
               // Délai minimum entre alertes
