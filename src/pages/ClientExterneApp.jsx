@@ -152,24 +152,24 @@ export default function ClientExterneApp() {
     queryFn: () => base44.entities.Boutique.filter(partenaireFilter),
     initialData: [],
     enabled: !!clientProfil?.country_code,
-    staleTime: 15000,
-    refetchInterval: 30000,
+    staleTime: 120000,
+    refetchInterval: 300000,
   });
   const { data: restaurantsCarte = [] } = useQuery({
     queryKey: ["restaurants-carte-client", clientProfil?.country_code],
     queryFn: () => base44.entities.Restaurant.filter(partenaireFilter),
     initialData: [],
     enabled: !!clientProfil?.country_code,
-    staleTime: 15000,
-    refetchInterval: 30000,
+    staleTime: 120000,
+    refetchInterval: 300000,
   });
   const { data: pharmaciesCarte = [] } = useQuery({
     queryKey: ["pharmacies-carte-client", clientProfil?.country_code],
     queryFn: () => base44.entities.Pharmacie.filter(partenaireFilter),
     initialData: [],
     enabled: !!clientProfil?.country_code,
-    staleTime: 15000,
-    refetchInterval: 30000,
+    staleTime: 120000,
+    refetchInterval: 300000,
   });
   const partenairesCarte = useMemo(() => [
     ...boutiquesCarte.map(b => ({ ...b, _type: "boutique" })),
@@ -181,15 +181,29 @@ export default function ClientExterneApp() {
     queryKey: ["commandes-boutique-client-active", clientProfil?.id],
     queryFn: () => base44.entities.CommandeBoutique.filter({ client_id: clientProfil.id }, "-created_date", 50),
     enabled: !!clientProfil?.id,
-    refetchInterval: 10000,
+    refetchInterval: 60000,
   });
 
   const { data: commandesRestaurantClient = [] } = useQuery({
     queryKey: ["commandes-restaurant-client-active", clientProfil?.id],
     queryFn: () => base44.entities.CommandeRestaurant.filter({ client_id: clientProfil.id }, "-created_date", 50),
     enabled: !!clientProfil?.id,
-    refetchInterval: 10000,
+    refetchInterval: 60000,
   });
+
+  // ── Realtime : refresh immédiat des commandes client ──
+  // Le polling 60s reste le fallback de sécurité. La subscription déclenche
+  // un refresh quand une commande est créée/modifiée (statut, livreur, etc.).
+  useEffect(() => {
+    if (!clientProfil?.id) return;
+    const unsubBoutique = base44.entities.CommandeBoutique.subscribe(() => {
+      queryClient.invalidateQueries({ queryKey: ["commandes-boutique-client-active"] });
+    });
+    const unsubRestaurant = base44.entities.CommandeRestaurant.subscribe(() => {
+      queryClient.invalidateQueries({ queryKey: ["commandes-restaurant-client-active"] });
+    });
+    return () => { unsubBoutique(); unsubRestaurant(); };
+  }, [clientProfil?.id, queryClient]);
 
   const commandesActivesCount = useMemo(() => {
     const active = new Set(["commande_envoyee", "commande_recue", "paiement_verification", "paiement_valide", "en_preparation", "prete_recuperation", "livreur_assigne", "commande_recuperee", "en_livraison"]);

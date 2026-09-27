@@ -36,11 +36,23 @@ export default function EntrepriseApp() {
     }
   }, []);
 
-  // ── Polling centralisé 30s — LECTURE SEULE (getEnterpriseDashboard ne fait que des filter()).
+  // ── Polling centralisé 60s — LECTURE SEULE (getEnterpriseDashboard ne fait que des filter()).
   useEffect(() => {
     loadDashboard();
-    const interval = setInterval(() => loadDashboard(true), 30000);
+    const interval = setInterval(() => loadDashboard(true), 60000);
     return () => clearInterval(interval);
+  }, [loadDashboard]);
+
+  // ── Realtime : refresh immédiat quand une course Enterprise est créée/modifiée ──
+  // Le polling 60s reste le fallback de sécurité. La subscription déclenche
+  // un refresh immédiat pour les courses Enterprise (enterprise_id non-null).
+  useEffect(() => {
+    const unsubscribe = base44.entities.CourseExterne.subscribe((event) => {
+      if ((event.type === "create" || event.type === "update") && event.data?.enterprise_id) {
+        loadDashboard(true);
+      }
+    });
+    return unsubscribe;
   }, [loadDashboard]);
 
   if (loading && !data) {

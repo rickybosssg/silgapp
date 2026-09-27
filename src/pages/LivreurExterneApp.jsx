@@ -209,8 +209,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     select: (data) => Array.isArray(data) ? (data[0] || initialProfil) : initialProfil,
     initialData: [initialProfil],
     enabled: !!initialProfil?.id,
-    refetchInterval: 8000, // 2s → 8s : profil change rarement
-    staleTime: 4000,
+    refetchInterval: 30000, // 8s → 30s : profil change rarement, realtime sur courses déjà actif
+    staleTime: 15000,
   });
 
   // ── Vérifier si le dispatch V2 est activé (fil de courses disponibles) ──
@@ -219,9 +219,9 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     queryFn: async () => {
       const configs = await base44.entities.AppConfig.filter({ cle: "DISPATCH_V2_ENABLED" });
       return configs?.[0] ? configs[0].valeur !== "false" : true;
-    },
-    enabled: !!livreurProfil?.id,
-    staleTime: 60000,
+      },
+      enabled: !!livreurProfil?.id,
+      staleTime: 300000,
   });
 
   // ── Compteur de courses disponibles (pilote le point rouge) ──
@@ -276,7 +276,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     queryKey: ["country-commission", livreurProfil?.country_code],
     queryFn: () => base44.entities.Country.filter({ code: livreurProfil.country_code, actif: true }),
     enabled: !!livreurProfil?.country_code,
-    staleTime: 30000,
+    staleTime: 120000,
   });
   const commissionPct = normalizeCommissionPct(countryCommissionRows?.[0]?.commission_pct);
   const { data: livreurPromoCodes = [] } = useQuery({

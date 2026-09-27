@@ -72,8 +72,8 @@ export default function DashboardExterne() {
       effectiveCountry ? { type_livreur: "externe", country_code: effectiveCountry } : { type_livreur: "externe" }
     ),
     initialData: [],
-    refetchInterval: 15000,
-    staleTime: 10000,
+    refetchInterval: 30000,
+    staleTime: 20000,
   });
 
   const { data: clients = [] } = useQuery({

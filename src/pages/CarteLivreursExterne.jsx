@@ -112,15 +112,15 @@ export default function CarteLivreursExterne() {
     queryKey: ["livreurs-externes-carte", effectiveCountry],
     queryFn: () => base44.entities.Livreur.filter(livreurFilter),
     initialData: [],
-    refetchInterval: 10000,
-    staleTime: 8000,
+    refetchInterval: 15000,
+    staleTime: 12000,
   });
 
   const { data: clients = [] } = useQuery({
     queryKey: ["clients-externes-carte", effectiveCountry],
     queryFn: () => base44.entities.ClientExterne.filter(clientFilter),
     initialData: [],
-    refetchInterval: 15000,
+    refetchInterval: 30000,
   });
 
   // ── Partenaires : boutiques + restaurants (filtrés par pays) ────────
@@ -129,19 +129,19 @@ export default function CarteLivreursExterne() {
     queryKey: ["boutiques-carte", effectiveCountry],
     queryFn: () => base44.entities.Boutique.filter(partenaireFilter),
     initialData: [],
-    refetchInterval: 30000,
+    refetchInterval: 60000,
   });
   const { data: restaurantsCarte = [] } = useQuery({
     queryKey: ["restaurants-carte", effectiveCountry],
     queryFn: () => base44.entities.Restaurant.filter(partenaireFilter),
     initialData: [],
-    refetchInterval: 30000,
+    refetchInterval: 60000,
   });
   const { data: pharmaciesCarte = [] } = useQuery({
     queryKey: ["pharmacies-carte", effectiveCountry],
     queryFn: () => base44.entities.Pharmacie.filter(partenaireFilter),
     initialData: [],
-    refetchInterval: 30000,
+    refetchInterval: 60000,
   });
 
   // Combiner boutiques + restaurants + pharmacies avec _type pour différenciation visuelle
@@ -159,7 +159,7 @@ export default function CarteLivreursExterne() {
     queryKey: ["courses-attente-carte", effectiveCountry],
     queryFn: () => base44.entities.CourseExterne.filter(coursesAttenteFilter, "-created_date", 100),
     initialData: [],
-    refetchInterval: 15000,
+    refetchInterval: 30000,
   });
 
   // Abonnement temps réel IMMÉDIAT : courses ET livreurs
