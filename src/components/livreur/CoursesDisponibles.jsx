@@ -45,6 +45,12 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
   const knownCourseIdsRef = useRef(new Set());
   const courseFeedInitializedRef = useRef(false);
 
+  // ── Déduplication de marquer_vue_course (Option C) ──
+  // seen : course_ids déjà marqués vue avec succès pendant la session
+  // inFlight : course_ids dont l'appel est en cours (anti-concurrence)
+  const vueSeenRef = useRef(new Set());
+  const vueInFlightRef = useRef(new Set());
+
   const livreurId = livreurProfil?.id;
   const countryCode = livreurProfil?.country_code;
   const livreurLat = livreurProfil?.latitude;
@@ -53,22 +59,40 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
   // ── Source unique de vérité : hook partagé avec ActiviteTempsReel ──
   const { eligibleCourses, courses, isLoading, isV2Enabled, livreurDisponible, livreurPeutVoirFil, raisonBlocage, refusedCourseIds, setRefusedIds } = useCoursesDisponibles(livreurProfil);
 
-  // ── Enregistrer les vues de courses via fonction backend sécurisée ──
-  // REMPLACÉ : l'ancien code créait directement DispatchNotification depuis le frontend,
-  // ce qui permettait à un livreur d'usurper l'identité d'un autre. Désormais, le
-  // backend résout livreur_user_email, vérifie l'identité et l'éligibilité de la course.
+  // ── Tracking vue_at — DÉDUPLICATION LOCALE (Option C) ──
+  // Un seul appel marquer_vue_course par course et par session composant.
+  // Le backend reste idempotent (already_viewed: true) comme sécurité finale.
+  // Le Set est VOLATILE : perdu au unmount → un appel post-remount est un no-op backend.
   useEffect(() => {
     if (!livreurId || courses.length === 0) return;
-    (async () => {
-      for (const course of courses) {
-        try {
-          await base44.functions.invoke("dispatchExterneAuto", {
-            action: "marquer_vue_course",
-            course_id: course.id,
-          });
-        } catch (_) {}
-      }
-    })();
+    const seen = vueSeenRef.current;
+    const inFlight = vueInFlightRef.current;
+
+    for (const course of courses) {
+      const cid = course.id;
+      if (!cid) continue;
+      // Déjà marqué vue → skip
+      if (seen.has(cid)) continue;
+      // Appel déjà en cours pour cette course → anti-concurrence
+      if (inFlight.has(cid)) continue;
+
+      inFlight.add(cid);
+      base44.functions
+        .invoke("dispatchExterneAuto", {
+          action: "marquer_vue_course",
+          course_id: cid,
+        })
+        .then(() => {
+          // Succès → marquer comme vue définitivement pour cette session
+          seen.add(cid);
+        })
+        .catch(() => {
+          // Échec → ne PAS ajouter à seen : un prochain refetch pourra réessayer
+        })
+        .finally(() => {
+          inFlight.delete(cid);
+        });
+    }
   }, [courses, livreurId]);
 
   // Realtime subscription — mise à jour instantanée
