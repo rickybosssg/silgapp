@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useHeartbeat } from "@/hooks/useHeartbeat";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import { useDispatchConfig } from "@/hooks/useDispatchConfig";
 import { useClientNotifications } from "@/hooks/useClientNotifications";
 import { registerPushToken, consumePendingNotificationData } from "@/lib/notifications";
 import { usePushTokenRetry } from "@/hooks/usePushTokenRetry";
@@ -128,6 +129,10 @@ export default function ClientExterneApp() {
   const checkStatusRef = useRef(null);
   useEffect(() => { checkStatusRef.current = checkStatus; });
   const canShowCodePromo = aUnCodePromo && !!(clientProfil?.user_email || clientProfil?.email);
+
+  // ── Configuration dynamique depuis le backend (Country + AppConfig) ──
+  // Alimente dispatchConfigStore → useHeartbeat lit les intervalles en temps réel.
+  useDispatchConfig(clientProfil?.country_code);
 
   useEffect(() => {
     if (ongletActif === "promo" && !canShowCodePromo) {

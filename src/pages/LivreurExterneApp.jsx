@@ -7,6 +7,7 @@ import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { useHeartbeat } from "@/hooks/useHeartbeat";
 import { useAppVersionSync } from "@/hooks/useAppVersionSync";
+import { useDispatchConfig } from "@/hooks/useDispatchConfig";
 import { useGPSNatif } from "@/hooks/useGPSNatif";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
@@ -212,6 +213,12 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     refetchInterval: 30000, // 8s → 30s : profil change rarement, realtime sur courses déjà actif
     staleTime: 15000,
   });
+
+  // ── Configuration dynamique depuis le backend (Country + AppConfig) ──
+  // Alimente dispatchConfigStore → useHeartbeat lit les intervalles en temps réel.
+  // Quand HEARTBEAT_WEB_INTERVAL_MS ou HEARTBEAT_BG_INTERVAL_MS change dans AppConfig,
+  // le store est mis à jour et useHeartbeat recrée ses timers automatiquement.
+  useDispatchConfig(livreurProfil?.country_code);
 
   // ── Vérifier si le dispatch V2 est activé (fil de courses disponibles) ──
   const { data: isV2Enabled = true } = useQuery({

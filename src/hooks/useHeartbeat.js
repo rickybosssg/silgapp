@@ -1,6 +1,6 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 import { base44 } from "@/api/base44Client";
-import { getConfig } from "@/lib/dispatchConfigStore";
+import { getConfig, subscribeToConfigChanges, getConfigVersion } from "@/lib/dispatchConfigStore";
 import {
   isNativeMobile,
   isNativeAndroid,
@@ -12,6 +12,14 @@ export function useHeartbeat({ user_type, position, enabled = true, debugLabel =
   const intervalRef = useRef(null);
   const nativeStopRef = useRef(null);
   const lastSyncRef = useRef(null);
+
+  // ── Réactivité à la config dynamique ──
+  // Quand AppConfig change (via useDispatchConfig), setConfig() incrémente
+  // configVersionCounter et notifie les subscribers. useSyncExternalStore
+  // déclenche un re-render, ce qui fait re-runner le useEffect ci-dessous
+  // avec le nouvel intervalle. L'ancien timer et l'ancien service Android
+  // sont proprement nettoyés avant que les nouveaux ne soient créés.
+  const configVersion = useSyncExternalStore(subscribeToConfigChanges, getConfigVersion);
 
   const syncHeartbeat = async (pos, force = false) => {
     if (!enabled) return;
@@ -115,7 +123,7 @@ export function useHeartbeat({ user_type, position, enabled = true, debugLabel =
       nativeStopRef.current = null;
       nativeBgHeartbeatStop?.();
     };
-  }, [enabled, user_type, session_id]);
+  }, [enabled, user_type, session_id, configVersion]);
 
   useEffect(() => {
     if (!enabled) return;
