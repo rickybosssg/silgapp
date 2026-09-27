@@ -884,7 +884,6 @@ export default function ClientExterneApp() {
         setNotifications([]);
       }
 
-      await loadLivreursProches(pos);
     } catch (err) {
       console.error("Erreur vérification statut:", err);
     }
@@ -932,7 +931,7 @@ export default function ClientExterneApp() {
     };
     // Premier appel après 5s (laisser le temps à l'écran de se stabiliser)
     const initial = setTimeout(pollLivreurs, 5000);
-    const interval = setInterval(pollLivreurs, 30000);
+    const interval = setInterval(pollLivreurs, 120000);
     return () => { clearTimeout(initial); clearInterval(interval); };
   }, [clientProfil?.country_code, position]);
 

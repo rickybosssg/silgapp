@@ -25,9 +25,9 @@ export default function SilgappLiveStats({ countryCode }) {
       });
       return res?.data || res;
     },
-    refetchInterval: 60000,
+    refetchInterval: 300000,
     refetchOnWindowFocus: true,
-    staleTime: 30000,
+    staleTime: 300000,
   });
 
   const stats = [
