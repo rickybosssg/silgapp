@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
+import { normalizeEnterpriseId } from '../../shared/enterpriseFinance.ts';
 
 const MOTIFS_VALIDES = [
   "client_injoignable",
@@ -64,6 +65,22 @@ Deno.serve(async (req) => {
         blocked_reason: "country_mismatch",
       }, { status: 403 });
     }
+
+    // ── [ENTERPRISE ISOLATION] Admin Enterprise ne peut annuler QUE les courses de son entreprise ──
+    // Résolution côté backend UNIQUEMENT — jamais confiance au frontend.
+    // normalizeEnterpriseId : null/undefined/"" → null (réseau public), "abc" → "abc" (entreprise).
+    const userEnterpriseId = normalizeEnterpriseId(user?.data?.enterprise_id);
+    if (userEnterpriseId) {
+      const courseEnterpriseId = normalizeEnterpriseId(course.enterprise_id);
+      if (courseEnterpriseId !== userEnterpriseId) {
+        return Response.json({
+          success: false,
+          error: "Action interdite : cette course n'appartient pas à votre entreprise",
+          blocked_reason: "enterprise_mismatch",
+        }, { status: 403 });
+      }
+    }
+    // ── Super Admin (enterprise_id null) : peut annuler toute course ──
 
     const livreurId = course.livreur_id;
     let livreurLibere = false;
