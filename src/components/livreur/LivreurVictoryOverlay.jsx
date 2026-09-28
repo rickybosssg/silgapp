@@ -30,7 +30,7 @@ const VICTORY_WORDS = [
   "CHAMPION !",
 ];
 
-const DURATION_MS = 6000;
+const DURATION_MS = 9000;
 
 export default function LivreurVictoryOverlay({ courseId, onClose }) {
   const [visible, setVisible] = useState(false);
@@ -61,7 +61,7 @@ export default function LivreurVictoryOverlay({ courseId, onClose }) {
     // ── Confettis légers (seulement si motion autorisé) ──
     if (!prefersReducedMotion && typeof confetti === "function") {
       const colors = ["#34C759", "#007AFF", "#FFD60A", "#FF9500", "#AF52DE"];
-      const end = Date.now() + 2500;
+      const end = Date.now() + 3500;
       (function frame() {
         confetti({
           particleCount: 2,
@@ -144,8 +144,9 @@ export default function LivreurVictoryOverlay({ courseId, onClose }) {
                 fontSize,
                 textShadow:
                   "0 0 30px rgba(52,199,89,0.9), 0 0 60px rgba(0,122,255,0.6), 0 2px 8px rgba(0,0,0,0.5)",
-                wordBreak: "keep-all",
-                whiteSpace: "nowrap",
+                wordBreak: "break-word",
+                whiteSpace: "normal",
+                overflowWrap: "break-word",
               }}
             >
               {word}
@@ -157,7 +158,7 @@ export default function LivreurVictoryOverlay({ courseId, onClose }) {
             className="absolute bottom-[20%] left-0 right-0 text-center px-4"
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 5.0, duration: 0.5 }}
+            transition={{ delay: 7.0, duration: 0.5 }}
           >
             <p
               className="font-bold text-white"
@@ -172,7 +173,7 @@ export default function LivreurVictoryOverlay({ courseId, onClose }) {
             className="absolute inset-0 bg-black pointer-events-none"
             initial={{ opacity: 0 }}
             animate={{ opacity: [0, 0, 1] }}
-            transition={{ duration: 0.3, delay: 5.7 }}
+            transition={{ duration: 0.4, delay: 8.5 }}
           />
         </motion.div>
       )}

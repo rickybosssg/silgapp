@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import DispatchMap from "@/components/carte/DispatchMap";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, ArrowLeft } from "lucide-react";
 
 /**
  * CarteDispatchTab — Carte temps réel SILGAPP Enterprise
@@ -27,7 +27,7 @@ import { RefreshCw } from "lucide-react";
  *   - Réutilise le polling centralisé Enterprise (30s) du parent (EntrepriseApp)
  *   - Aucun timer interne
  */
-export default function CarteDispatchTab({ enterprise, data, onRefresh, onCourseClick, onLivreurClick }) {
+export default function CarteDispatchTab({ enterprise, data, onRefresh, onCourseClick, onLivreurClick, onBack }) {
   // ── Les données proviennent du parent (EntrepriseApp) — polling centralisé 30s ──
   // Aucun polling interne pour éviter les requêtes dupliquées.
   const allLivreurs = data?.livreurs || [];
@@ -101,6 +101,15 @@ export default function CarteDispatchTab({ enterprise, data, onRefresh, onCourse
 
   return (
     <div className="space-y-3">
+      {/* ── Bouton Retour (mobile-friendly) ── */}
+      <button
+        onClick={onBack}
+        className="w-full flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-gray-200 shadow-sm text-sm font-bold text-gray-700 hover:bg-gray-50 active:scale-[0.98] transition-all"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        Retour au tableau de bord
+      </button>
+
       {/* ── Compteurs (lecture seule) ── */}
       <div className="grid grid-cols-4 gap-2">
         <div className="bg-emerald-50 rounded-lg p-2 text-center">

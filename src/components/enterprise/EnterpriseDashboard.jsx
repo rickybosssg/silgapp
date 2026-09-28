@@ -1,6 +1,51 @@
 import React from "react";
 import StatCard from "@/components/dashboard/StatCard";
-import { Package, Clock, Truck, CheckCircle2, Users, UserCheck, UserX, TrendingUp, Wallet, Percent, AlertCircle, XCircle } from "lucide-react";
+import { Package, Clock, Truck, CheckCircle2, Users, UserCheck, UserX, TrendingUp, Wallet, Percent, AlertCircle, XCircle, Calendar } from "lucide-react";
+
+// ── Récap journalier — limité à la journée courante + isolation enterprise ──
+function DailyRecap({ stats, courses }) {
+  const todayCourses = courses?.today || [];
+  const todayDelivered = todayCourses.filter(c => c.statut === "livree");
+  const todayCancelled = todayCourses.filter(c => c.statut === "annulee");
+  const todayInProgress = todayCourses.filter(c => !["livree", "annulee"].includes(c.statut));
+
+  const caToday = todayDelivered.reduce((sum, c) => sum + (Number(c.prix_final) || 0), 0);
+  const commissionToday = todayDelivered.reduce((sum, c) =>
+    sum + (Number(c.enterprise_commission_amount) || 0), 0
+  );
+  const activeLivreursToday = new Set(
+    todayDelivered.map(c => c.livreur_id).filter(Boolean)
+  ).size;
+
+  const recapItems = [
+    { label: "Courses du jour", value: stats?.courses_today || 0, icon: Package, color: "text-blue-600", bg: "bg-blue-50" },
+    { label: "Livrées", value: stats?.courses_completed_today || 0, icon: CheckCircle2, color: "text-emerald-600", bg: "bg-emerald-50" },
+    { label: "En cours", value: todayInProgress.length, icon: Clock, color: "text-amber-600", bg: "bg-amber-50" },
+    { label: "Annulées", value: todayCancelled.length, icon: XCircle, color: "text-red-500", bg: "bg-red-50" },
+    { label: "CA du jour", value: `${caToday.toLocaleString("fr-FR")} F`, icon: TrendingUp, color: "text-green-700", bg: "bg-green-50" },
+    { label: "Commission SILGAPP", value: `${commissionToday.toLocaleString("fr-FR")} F`, icon: Wallet, color: "text-purple-600", bg: "bg-purple-50" },
+    { label: "Livreurs actifs", value: activeLivreursToday, icon: UserCheck, color: "text-sky-600", bg: "bg-sky-50" },
+  ];
+
+  return (
+    <div className="rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50 to-white p-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <Calendar className="w-4 h-4 text-blue-600" />
+        <h3 className="text-sm font-bold text-gray-900">Résumé d'aujourd'hui</h3>
+        <span className="ml-auto text-[10px] text-gray-400">{new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}</span>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        {recapItems.map((item) => (
+          <div key={item.label} className={`${item.bg} rounded-xl p-2.5 text-center`}>
+            <item.icon className={`w-4 h-4 mx-auto mb-1 ${item.color}`} />
+            <p className={`text-sm font-black ${item.color}`}>{item.value}</p>
+            <p className="text-[9px] text-gray-600 font-semibold mt-0.5">{item.label}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function EnterpriseDashboard({ stats, enterprise, courses, onTabChange }) {
   const isAgenceActive = enterprise?.actif !== false && enterprise?.statut === "actif";
@@ -35,6 +80,9 @@ export default function EnterpriseDashboard({ stats, enterprise, courses, onTabC
           <span className="text-xs font-semibold text-amber-700">Valider →</span>
         </button>
       )}
+
+      {/* ── Résumé d'aujourd'hui ── */}
+      <DailyRecap stats={stats} courses={courses} />
 
       {/* KPI Courses */}
       <div>

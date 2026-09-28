@@ -18,7 +18,7 @@ const periodFilters = [
   { value: "month", label: "Ce mois" },
 ];
 
-export default function LivreurHistorique({ mesCourses, livreurProfil, isExterne = false }) {
+export default function LivreurHistorique({ mesCourses, livreurProfil, isExterne = false, isEnterpriseDriver = false }) {
   const [period, setPeriod] = useState("today");
   const { data: countries = [] } = useQuery({
     queryKey: ["countries-commission-livreur-historique"],
@@ -130,20 +130,27 @@ export default function LivreurHistorique({ mesCourses, livreurProfil, isExterne
                 <p className="text-xs text-amber-600">Prix total courses</p>
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-2">
+            {isEnterpriseDriver ? (
               <div className="bg-green-50 rounded-lg p-2 border border-green-200 text-center">
-                <p className="text-xs font-bold text-green-700">{gainLivreurToday.toLocaleString()} FCFA</p>
-                <p className="text-[10px] text-green-600 mt-0.5">Votre gain</p>
+                <p className="text-xs font-bold text-green-700">{totalEncaisseToday.toLocaleString()} FCFA</p>
+                <p className="text-[10px] text-green-600 mt-0.5">Montant des courses</p>
               </div>
-              <div className="bg-orange-50 rounded-lg p-2 border border-orange-200 text-center">
-                <p className="text-xs font-bold text-orange-700">{commissionToday.toLocaleString()} FCFA</p>
-                <p className="text-[10px] text-orange-600 mt-0.5">Commission du jour</p>
+            ) : (
+              <div className="grid grid-cols-3 gap-2">
+                <div className="bg-green-50 rounded-lg p-2 border border-green-200 text-center">
+                  <p className="text-xs font-bold text-green-700">{gainLivreurToday.toLocaleString()} FCFA</p>
+                  <p className="text-[10px] text-green-600 mt-0.5">Votre gain</p>
+                </div>
+                <div className="bg-orange-50 rounded-lg p-2 border border-orange-200 text-center">
+                  <p className="text-xs font-bold text-orange-700">{commissionToday.toLocaleString()} FCFA</p>
+                  <p className="text-[10px] text-orange-600 mt-0.5">Commission du jour</p>
+                </div>
+                <div className="bg-red-50 rounded-lg p-2 border border-red-200 text-center">
+                  <p className="text-xs font-bold text-red-700">{montantDuSilga.toLocaleString()} FCFA</p>
+                  <p className="text-[10px] text-red-600 mt-0.5">À payer à SILGAPP</p>
+                </div>
               </div>
-              <div className="bg-red-50 rounded-lg p-2 border border-red-200 text-center">
-                <p className="text-xs font-bold text-red-700">{montantDuSilga.toLocaleString()} FCFA</p>
-                <p className="text-[10px] text-red-600 mt-0.5">À payer à SILGAPP</p>
-              </div>
-            </div>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-3">
@@ -316,7 +323,7 @@ export default function LivreurHistorique({ mesCourses, livreurProfil, isExterne
                                        +{gain.toLocaleString()} F
                                     </span>
                                   )}
-                                  {commission > 0 && (
+                                  {!isEnterpriseDriver && commission > 0 && (
                                     <span className="text-xs text-orange-600 bg-orange-50 rounded px-2 py-0.5">
                                       SILGAPP: {commission.toLocaleString()} F
                                     </span>

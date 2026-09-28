@@ -1023,6 +1023,9 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     [livreurProfil?.montant_du_silga]
   );
 
+  // ── Correction 6 : Livreur Enterprise ne paie PAS de commission à SILGAPP ──
+  const isEnterpriseDriver = !!(livreurProfil?.enterprise_id);
+
   // ─── isEnLigne ────────────────────────────────────────────────────────────
   const isEnLigne = livreurProfil ? livreurProfil.statut !== "hors_ligne" : false;
   const livreurVisible = isEnLigne && gpsActif && livreurProfil?.latitude && livreurProfil?.longitude;
@@ -1595,8 +1598,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
               userType="livreur"
             />
 
-            <PassActifBadge />
-            <HappyHourBadge />
+            {!isEnterpriseDriver && <PassActifBadge />}
+            {!isEnterpriseDriver && <HappyHourBadge />}
 
             <LivreurHeader
               livreur={livreurProfil}
@@ -1682,11 +1685,13 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
               montantDuSilga={montantDuSilga}
               isExterne={true}
               livreurId={livreurProfil?.id}
+              isEnterpriseDriver={isEnterpriseDriver}
             />
 
             {/* ── SILGAPP EN DIRECT — activité globale du réseau ── */}
             <SilgappLiveStats countryCode={livreurProfil?.country_code} />
 
+            {!isEnterpriseDriver && (
             <Link to="/payer-silgapp">
               <div className={`rounded-2xl border flex items-center justify-between transition active:scale-[0.98] ${
                 montantDuSilga > 0
@@ -1719,6 +1724,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
                 <ChevronRight className={`w-4 h-4 ${montantDuSilga !== 0 ? "text-slate-400" : "text-slate-300"}`} />
               </div>
             </Link>
+            )}
 
             {coursesActives.length > 0 && (
               <div className="space-y-3">
@@ -1749,10 +1755,12 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
               <ActiviteTempsReel livreurProfil={livreurProfil} mesCourses={mesCourses} isExterne={true} />
             )}
 
-            <PassZeroCommissionSection
-              livreurId={livreurProfil?.id}
-              countryCode={livreurProfil?.country_code}
-            />
+            {!isEnterpriseDriver && (
+              <PassZeroCommissionSection
+                livreurId={livreurProfil?.id}
+                countryCode={livreurProfil?.country_code}
+              />
+            )}
 
             {sessionExpired ? (
               <div className="rounded-2xl bg-red-500/15 border border-red-500/30 text-red-400 p-5 text-center space-y-2 shadow-lg">
@@ -1780,7 +1788,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
                 <p className="text-red-400/80 text-xs leading-relaxed">
                   Votre plafond d'encours SILGAPP a été atteint. Veuillez effectuer votre dépôt auprès de SILGAPP afin de réactiver votre compte.
                 </p>
-                {(livreurProfil?.montant_du_silga ?? livreurProfil?.encours ?? 0) > 0 && (
+                {!isEnterpriseDriver && (livreurProfil?.montant_du_silga ?? livreurProfil?.encours ?? 0) > 0 && (
                   <p className="text-red-400/60 text-[10px]">
                     À payer à SILGAPP : {(livreurProfil.montant_du_silga ?? livreurProfil.encours ?? 0).toLocaleString()} FCFA
                   </p>
@@ -1826,7 +1834,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         />
 
         {activeTab === "historique" && (
-          <LivreurHistorique mesCourses={mesCourses} livreurProfil={livreurProfil} isExterne={true} />
+          <LivreurHistorique mesCourses={mesCourses} livreurProfil={livreurProfil} isExterne={true} isEnterpriseDriver={isEnterpriseDriver} />
         )}
 
         {activeTab === "messages" && (
