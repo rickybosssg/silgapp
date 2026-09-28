@@ -3,7 +3,7 @@ import { TrendingUp, Package, CheckCircle } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import LivreurFiabiliteCard from "./LivreurFiabiliteCard";
 
-export default function LivreurStatsBanner({ mesCourses, totalEncaisse, montantDuSilga, isExterne = false, livreur }) {
+export default function LivreurStatsBanner({ mesCourses, totalEncaisse, montantDuSilga, isExterne = false, livreur, isEnterpriseDriver = false }) {
   const today = new Date().toDateString();
   const livreesToday = mesCourses.filter(c =>
     c.statut === "livree" && new Date(c.heure_livraison || c.updated_date).toDateString() === today
@@ -44,32 +44,36 @@ export default function LivreurStatsBanner({ mesCourses, totalEncaisse, montantD
 
   if (isExterne) {
     return (
-      <div className="grid grid-cols-4 gap-2.5">
+      <div className={`grid gap-2.5 ${isEnterpriseDriver ? "grid-cols-3" : "grid-cols-4"}`}>
         {/* Livrées */}
         <div className="bg-white rounded-2xl p-3 shadow-[0_8px_24px_rgba(15,23,42,0.06)] border border-black/5 text-center">
           <p className="text-2xl font-black text-success leading-none">{livreesToday.length}</p>
           <p className="text-[10px] text-slate-600 font-semibold mt-1">Livrées</p>
         </div>
-        {/* Gains */}
+        {/* Gains / Montant */}
         <div className="bg-white rounded-2xl p-3 shadow-[0_8px_24px_rgba(15,23,42,0.06)] border border-black/5 text-center">
           <p className="text-base font-black text-slate-900 leading-none">
             {totalEncaisse > 0 ? totalEncaisse.toLocaleString() : "0"}<span className="text-[10px] font-normal ml-0.5">F</span>
           </p>
-          <p className="text-[10px] text-slate-600 font-semibold mt-1">Gains</p>
+          <p className="text-[10px] text-slate-600 font-semibold mt-1">{isEnterpriseDriver ? "Montant" : "Gains"}</p>
         </div>
-        {/* Dû SILGAPP */}
-        <div className={`rounded-2xl p-3 shadow-[0_8px_24px_rgba(15,23,42,0.06)] border text-center ${
-          montantDuSilga > 0 ? "bg-orange-50 border-orange-200" : montantDuSilga < 0 ? "bg-green-50 border-green-200" : "bg-white border-black/5"
-        }`}>
-          <p className={`text-base font-black leading-none ${
-            montantDuSilga > 0 ? "text-orange-500" : montantDuSilga < 0 ? "text-green-500" : "text-slate-400"
+        {/* Dû SILGAPP — masqué pour les livreurs Enterprise */}
+        {!isEnterpriseDriver && (
+          <div className={`rounded-2xl p-3 shadow-[0_8px_24px_rgba(15,23,42,0.06)] border text-center ${
+            montantDuSilga > 0 ? "bg-orange-50 border-orange-200" : montantDuSilga < 0 ? "bg-green-50 border-green-200" : "bg-white border-black/5"
           }`}>
-            {Math.abs(montantDuSilga).toLocaleString()}<span className="text-[10px] font-normal ml-0.5">F</span>
-          </p>
-          <p className="text-[10px] text-slate-600 font-semibold mt-1">À payer à SILGAPP</p>
-        </div>
+            <p className={`text-base font-black leading-none ${
+              montantDuSilga > 0 ? "text-orange-500" : montantDuSilga < 0 ? "text-green-500" : "text-slate-400"
+            }`}>
+              {Math.abs(montantDuSilga).toLocaleString()}<span className="text-[10px] font-normal ml-0.5">F</span>
+            </p>
+            <p className="text-[10px] text-slate-600 font-semibold mt-1">À payer à SILGAPP</p>
+          </div>
+        )}
         {/* Score de fiabilité (Phase 1 anti-annulation) */}
-        <LivreurFiabiliteCard livreur={livreur || (mesCourses?.[0] ? { id: mesCourses[0].livreur_id } : null)} compact />
+        {!isEnterpriseDriver && (
+          <LivreurFiabiliteCard livreur={livreur || (mesCourses?.[0] ? { id: mesCourses[0].livreur_id } : null)} compact />
+        )}
       </div>
     );
   }

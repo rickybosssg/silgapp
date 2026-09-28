@@ -7,6 +7,7 @@ import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { useHeartbeat } from "@/hooks/useHeartbeat";
 import { useAppVersionSync } from "@/hooks/useAppVersionSync";
+import { useDispatchConfig } from "@/hooks/useDispatchConfig";
 import { useGPSNatif } from "@/hooks/useGPSNatif";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
@@ -38,6 +39,7 @@ import SilgappLiveStats from "@/components/shared/SilgappLiveStats";
 import PubliciteCarousel from "@/components/publicite/PubliciteCarousel";
 import PubliciteFullscreen from "@/components/publicite/PubliciteFullscreen";
 import PrixManuelReponseAlert from "@/components/livreur/PrixManuelReponseAlert";
+import ZoneChaudeAlert from "@/components/livreur/ZoneChaudeAlert";
 import { normalizeCommissionPct, splitAmountByCommission } from "@/lib/commissionUtils";
 import MessagesPage from "@/components/chat/MessagesPage";
 import OngletCodePromoLivreur from "@/components/livreur/OngletCodePromoLivreur";
@@ -51,8 +53,6 @@ import {
 } from "@/lib/livreurCourseState";
 import CoursesDisponibles from "@/components/livreur/CoursesDisponibles";
 import CourseArrivalToast from "@/components/livreur/CourseArrivalToast";
-import ZoneChaudeAlert from "@/components/livreur/ZoneChaudeAlert";
-import { useCoursesDisponibles } from "@/hooks/useCoursesDisponibles";
 import DashboardThemeProvider from "@/components/livreur/DashboardThemeProvider";
 import PassActifBadge from "@/components/livreur/PassActifBadge";
 import HappyHourBadge from "@/components/livreur/HappyHourBadge";
@@ -135,8 +135,6 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   const [hasNewAvailableCourse, setHasNewAvailableCourse] = useState(false);
   const [arrivalToastData, setArrivalToastData] = useState(null);
   const initialTabSetRef = useRef(false);
-  const tabListRef = useRef(null);
-  const tabButtonRefs = useRef(new Map());
   // ── Animation de victoire livreur (livraison validée par PIN/QR) ──
   const [victoryCourseId, setVictoryCourseId] = useState(null);
   const celebratedCourseIdsRef = useRef(new Set());
@@ -212,19 +210,57 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     select: (data) => Array.isArray(data) ? (data[0] || initialProfil) : initialProfil,
     initialData: [initialProfil],
     enabled: !!initialProfil?.id,
-    refetchInterval: 8000, // 2s → 8s : profil change rarement
-    staleTime: 4000,
+    refetchInterval: 30000, // 8s → 30s : profil change rarement, realtime sur courses déjà actif
+    staleTime: 15000,
   });
 
-  const { eligibleCourses: availableCourses, isV2Enabled } = useCoursesDisponibles(livreurProfil);
-  const availableCoursesCount = availableCourses.length;
+  // ── Configuration dynamique depuis le backend (Country + AppConfig) ──
+  // Alimente dispatchConfigStore → useHeartbeat lit les intervalles en temps réel.
+  // Quand HEARTBEAT_WEB_INTERVAL_MS ou HEARTBEAT_BG_INTERVAL_MS change dans AppConfig,
+  // le store est mis à jour et useHeartbeat recrée ses timers automatiquement.
+  useDispatchConfig(livreurProfil?.country_code);
+
+  // ── Vérifier si le dispatch V2 est activé (fil de courses disponibles) ──
+  const { data: isV2Enabled = true } = useQuery({
+    queryKey: ["dispatch-v2-enabled", livreurProfil?.id],
+    queryFn: async () => {
+      const configs = await base44.entities.AppConfig.filter({ cle: "DISPATCH_V2_ENABLED" });
+      return configs?.[0] ? configs[0].valeur !== "false" : true;
+      },
+      enabled: !!livreurProfil?.id,
+      staleTime: 300000,
+  });
+
+  // ── Compteur de courses disponibles (pilote le point rouge) ──
+  // ⚠️ Garde cohérente avec CoursesDisponibles.jsx : statut === "recherche_livreur"
+  //    ET dispatch_status === "disponible_push" | "propose"
+  const { data: availableCoursesCount = 0 } = useQuery({
+    queryKey: ["courses-disponibles-count", livreurProfil?.id, livreurProfil?.country_code, isV2Enabled],
+    queryFn: async () => {
+      if (!livreurProfil?.country_code || !isV2Enabled) return 0;
+      const all = await base44.entities.CourseExterne.filter(
+        { dispatch_status: { $in: ["disponible_push", "propose"] }, country_code: livreurProfil.country_code },
+        "-created_date", 50
+      );
+      return (all || []).filter(c =>
+        c.statut === "recherche_livreur" &&
+        (c.dispatch_status === "disponible_push" || c.dispatch_status === "propose") &&
+        !c.livreur_id &&
+        !c.accepted_by_livreur_id
+      ).length;
+    },
+    enabled: !!livreurProfil?.id && !!livreurProfil?.country_code && isV2Enabled,
+    refetchInterval: 10000,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+  });
 
   // Le point rouge s'affiche dès qu'il y a des courses disponibles ET que le livreur
   // n'est pas sur l'onglet "Disponibles"
   useEffect(() => {
     if (availableCoursesCount > 0 && activeTab !== "disponibles") {
       setHasNewAvailableCourse(true);
-    } else if (availableCoursesCount === 0 || activeTab === "disponibles") {
+    } else if (availableCoursesCount === 0) {
       setHasNewAvailableCourse(false);
     }
   }, [availableCoursesCount, activeTab]);
@@ -234,27 +270,20 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   // le cache React Query doit être invalidé immédiatement sans attendre le polling.
   useEffect(() => {
     if (!livreurProfil?.id) return;
-    const unsubscribeCourses = base44.entities.CourseExterne.subscribe((event) => {
+    const unsubscribe = base44.entities.CourseExterne.subscribe((event) => {
       if (event.type === "create" || event.type === "update" || event.type === "delete") {
+        queryClient.invalidateQueries({ queryKey: ["courses-disponibles-count"] });
         queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles"] });
       }
     });
-    const unsubscribeRefus = base44.entities.DispatchNotification.subscribe((event) => {
-      if (event.type === "create" || event.type === "update" || event.type === "delete") {
-        queryClient.invalidateQueries({ queryKey: ["dispatch-refused-courses", livreurProfil.id] });
-      }
-    });
-    return () => {
-      unsubscribeCourses();
-      unsubscribeRefus();
-    };
+    return unsubscribe;
   }, [livreurProfil?.id, queryClient]);
 
   const { data: countryCommissionRows = [] } = useQuery({
     queryKey: ["country-commission", livreurProfil?.country_code],
     queryFn: () => base44.entities.Country.filter({ code: livreurProfil.country_code, actif: true }),
     enabled: !!livreurProfil?.country_code,
-    staleTime: 30000,
+    staleTime: 120000,
   });
   const commissionPct = normalizeCommissionPct(countryCommissionRows?.[0]?.commission_pct);
   const { data: livreurPromoCodes = [] } = useQuery({
@@ -272,17 +301,6 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       setActiveTab("courses");
     }
   }, [activeTab, livreurHasPromoCode]);
-
-  useEffect(() => {
-    const activeButton = tabButtonRefs.current.get(activeTab);
-    const tabList = tabListRef.current;
-    if (!activeButton || !tabList) return;
-    const buttonRect = activeButton.getBoundingClientRect();
-    const listRect = tabList.getBoundingClientRect();
-    if (buttonRect.left < listRect.left || buttonRect.right > listRect.right) {
-      activeButton.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
-    }
-  }, [activeTab, isV2Enabled, livreurHasPromoCode]);
 
   // Synchroniser le pricingMode depuis le profil BDD au chargement
   useEffect(() => {
@@ -450,6 +468,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   useEffect(() => {
     const handleNotificationOpened = (event) => {
       const data = event?.detail || {};
+      // ── Zone chaude : afficher la bannière avec les infos de la zone ──
       if (data.type === "zone_chaude") {
         setZoneChaudeAlert({
           nom: data.zone_nom || "",
@@ -459,7 +478,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
           niveau: data.zone_niveau || "forte",
         });
         setActiveTab("courses");
-        toast.info("Zone chaude détectée", { description: "Forte demande dans une zone proche de vous." });
+        toast.info(" Zone chaude détectée", { description: "Forte demande dans une zone proche de vous." });
         return;
       }
       // ── Deep-link messages : ouvrir la conversation concernée ──
@@ -570,6 +589,31 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, [queryClient, livreurId]);
+
+  // ── Realtime CourseExterne → rafraîchit mes-courses-externes ──
+  // Invalide uniquement si l'événement concerne manifestement le livreur connecté
+  // (livreur_id, accepted_by_livreur_id, proposed_by_livreur_id, proposed_livreur_id,
+  // livreur_financier_id). Pour les deletes où data est minimale, on invalide par sécurité.
+  useEffect(() => {
+    if (!livreurId) return;
+    const unsubscribe = base44.entities.CourseExterne.subscribe((event) => {
+      if (event.type === "delete") {
+        queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+        return;
+      }
+      const c = event?.data || {};
+      const concernsLivreur =
+        String(c.livreur_id || "") === String(livreurId) ||
+        String(c.accepted_by_livreur_id || "") === String(livreurId) ||
+        String(c.proposed_by_livreur_id || "") === String(livreurId) ||
+        String(c.proposed_livreur_id || "") === String(livreurId) ||
+        String(c.livreur_financier_id || "") === String(livreurId);
+      if (concernsLivreur) {
+        queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+      }
+    });
+    return unsubscribe;
+  }, [livreurId, queryClient]);
 
   useEffect(() => {
     if (!livreurId || !livreurEmail || !onboardingTermine) return;
@@ -789,7 +833,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     },
     enabled: !!livreurId,
     initialData: [],
-    refetchInterval: 4000, // 1s → 4s : évite le rate limit (était 60 req/min)
+    refetchInterval: 30000, // 4s → 30s : realtime + refetch événementiel prennent le relais
     staleTime: 2000,
   });
 
@@ -979,6 +1023,9 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     [livreurProfil?.montant_du_silga]
   );
 
+  // ── Correction 6 : Livreur Enterprise ne paie PAS de commission à SILGAPP ──
+  const isEnterpriseDriver = !!(livreurProfil?.enterprise_id);
+
   // ─── isEnLigne ────────────────────────────────────────────────────────────
   const isEnLigne = livreurProfil ? livreurProfil.statut !== "hors_ligne" : false;
   const livreurVisible = isEnLigne && gpsActif && livreurProfil?.latitude && livreurProfil?.longitude;
@@ -1116,7 +1163,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       source,
       livreur_id: livreurProfil?.id || "",
     });
-    toast.error("Cette course a déjà été prise par un autre livreur.");
+    toast.error("Cette course a deja ete prise par un autre livreur.");
   };
 
   const handleFallbackAccepter = async (course) => {
@@ -1165,7 +1212,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         course_id: course?.id,
         error: error?.message || String(error),
       });
-      toast.error("Erreur réseau lors de l'acceptation");
+      toast.error("Erreur reseau lors de l'acceptation");
     } finally {
       fallbackAcceptingRef.current = false;
     }
@@ -1244,7 +1291,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
           course_id: course?.id,
           error: fallbackError?.message || String(fallbackError),
         });
-        toast.error("Erreur réseau lors de l'annulation");
+        toast.error("Erreur reseau lors de l'annulation");
         return false;
       }
       toast.error("Erreur réseau lors de l'annulation");
@@ -1508,27 +1555,15 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
       {/* ── Navigation sticky en haut ──────────────── */}
       <div className="sticky top-0 z-30 bg-background/90 backdrop-blur-xl px-3 pt-3 pb-2 border-b border-border">
-        <div
-          ref={tabListRef}
-          role="tablist"
-          aria-label="Navigation livreur"
-          className="max-w-lg mx-auto flex w-full gap-1 overflow-x-auto overscroll-x-contain scroll-smooth snap-x snap-proximity scroll-px-1 touch-pan-x bg-card/90 rounded-2xl p-1 shadow-[0_8px_30px_rgba(15,23,42,0.06)] border border-border [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        >
+        <div className="max-w-lg mx-auto flex w-full gap-0.5 bg-card/90 rounded-2xl p-1 shadow-[0_8px_30px_rgba(15,23,42,0.06)] border border-border">
           {TABS.map(tab => (
             <button
               key={tab.id}
-              ref={(element) => {
-                if (element) tabButtonRefs.current.set(tab.id, element);
-                else tabButtonRefs.current.delete(tab.id);
-              }}
-              type="button"
-              role="tab"
-              aria-selected={activeTab === tab.id}
               onClick={() => {
                 setActiveTab(tab.id);
                 if (tab.id === "disponibles") setHasNewAvailableCourse(false);
               }}
-              className={`relative flex-none min-w-max px-3 snap-start flex items-center justify-center gap-1 py-2.5 rounded-xl text-[11px] font-bold leading-tight text-center whitespace-nowrap transition-all ${
+              className={`relative min-w-0 flex-1 px-1 flex items-center justify-center py-2.5 rounded-xl text-[10px] font-bold leading-tight text-center transition-all ${
                 activeTab === tab.id
                   ? "bg-primary text-white shadow-sm"
                   : "text-slate-500 hover:text-slate-900"
@@ -1563,8 +1598,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
               userType="livreur"
             />
 
-            <PassActifBadge />
-            <HappyHourBadge />
+            {!isEnterpriseDriver && <PassActifBadge />}
+            {!isEnterpriseDriver && <HappyHourBadge />}
 
             <LivreurHeader
               livreur={livreurProfil}
@@ -1650,11 +1685,13 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
               montantDuSilga={montantDuSilga}
               isExterne={true}
               livreurId={livreurProfil?.id}
+              isEnterpriseDriver={isEnterpriseDriver}
             />
 
             {/* ── SILGAPP EN DIRECT — activité globale du réseau ── */}
             <SilgappLiveStats countryCode={livreurProfil?.country_code} />
 
+            {!isEnterpriseDriver && (
             <Link to="/payer-silgapp">
               <div className={`rounded-2xl border flex items-center justify-between transition active:scale-[0.98] ${
                 montantDuSilga > 0
@@ -1687,6 +1724,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
                 <ChevronRight className={`w-4 h-4 ${montantDuSilga !== 0 ? "text-slate-400" : "text-slate-300"}`} />
               </div>
             </Link>
+            )}
 
             {coursesActives.length > 0 && (
               <div className="space-y-3">
@@ -1717,10 +1755,12 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
               <ActiviteTempsReel livreurProfil={livreurProfil} mesCourses={mesCourses} isExterne={true} />
             )}
 
-            <PassZeroCommissionSection
-              livreurId={livreurProfil?.id}
-              countryCode={livreurProfil?.country_code}
-            />
+            {!isEnterpriseDriver && (
+              <PassZeroCommissionSection
+                livreurId={livreurProfil?.id}
+                countryCode={livreurProfil?.country_code}
+              />
+            )}
 
             {sessionExpired ? (
               <div className="rounded-2xl bg-red-500/15 border border-red-500/30 text-red-400 p-5 text-center space-y-2 shadow-lg">
@@ -1748,7 +1788,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
                 <p className="text-red-400/80 text-xs leading-relaxed">
                   Votre plafond d'encours SILGAPP a été atteint. Veuillez effectuer votre dépôt auprès de SILGAPP afin de réactiver votre compte.
                 </p>
-                {(livreurProfil?.montant_du_silga ?? livreurProfil?.encours ?? 0) > 0 && (
+                {!isEnterpriseDriver && (livreurProfil?.montant_du_silga ?? livreurProfil?.encours ?? 0) > 0 && (
                   <p className="text-red-400/60 text-[10px]">
                     À payer à SILGAPP : {(livreurProfil.montant_du_silga ?? livreurProfil.encours ?? 0).toLocaleString()} FCFA
                   </p>
@@ -1769,7 +1809,11 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
             livreurProfil={livreurProfil}
             onNewCourse={(data) => {
               setHasNewAvailableCourse(true);
-              setArrivalToastData(data);
+              setArrivalToastData({
+                courseId: data.course?.id,
+                count: data.count,
+                course: data.course,
+              });
             }}
             onAcceptSuccess={() => {
               setActiveTab("courses");
@@ -1778,8 +1822,19 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
           />
         )}
 
+        {/* ── Toast visuel V2 : nouvelle course détectée (foreground uniquement) ── */}
+        <CourseArrivalToast
+          courseData={arrivalToastData}
+          onSeeCourses={() => {
+            setArrivalToastData(null);
+            setActiveTab("disponibles");
+            setHasNewAvailableCourse(false);
+          }}
+          onDismiss={() => setArrivalToastData(null)}
+        />
+
         {activeTab === "historique" && (
-          <LivreurHistorique mesCourses={mesCourses} livreurProfil={livreurProfil} isExterne={true} />
+          <LivreurHistorique mesCourses={mesCourses} livreurProfil={livreurProfil} isExterne={true} isEnterpriseDriver={isEnterpriseDriver} />
         )}
 
         {activeTab === "messages" && (
@@ -1805,16 +1860,6 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
             }}
           />
         )}
-
-        <CourseArrivalToast
-          courseData={arrivalToastData}
-          onSeeCourses={() => {
-            setArrivalToastData(null);
-            setActiveTab("disponibles");
-            setHasNewAvailableCourse(false);
-          }}
-          onDismiss={() => setArrivalToastData(null)}
-        />
       </div>
     </div>
 

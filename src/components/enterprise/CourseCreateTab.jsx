@@ -11,7 +11,7 @@ import MapPickerModal from "@/components/admin/MapPickerModal";
 import ClientPhoneDetector from "@/components/crm/ClientPhoneDetector";
 import { resolveGpsFromSelection } from "@/lib/resolveGpsFromSelection";
 import { validateLocalPhone } from "@/lib/phoneUtils";
-import { calculerPrixApproximatif } from "@/lib/priceEstimate";
+import { calculerPrixApproximatifAsync } from "@/lib/priceEstimate";
 
 const TYPE_OPTIONS = [
   { key: "expedier", label: "Expédition", icon: "📦", desc: "Envoyer un colis" },
@@ -61,8 +61,8 @@ export default function CourseCreateTab({ enterprise, onCreated }) {
   // ── Calcul du prix approximatif quand les GPS sont disponibles ──
   useEffect(() => {
     if (gpsDepart && gpsArrivee) {
-      calculerPrixApproximatif(gpsDepart.lat, gpsDepart.lng, gpsArrivee.lat, gpsArrivee.lng, countryCode)
-        .then(setPrixApproximatif)
+      calculerPrixApproximatifAsync(gpsDepart.lat, gpsDepart.lng, gpsArrivee.lat, gpsArrivee.lng, countryCode)
+        .then((result) => setPrixApproximatif(result?.prix ?? null))
         .catch(() => setPrixApproximatif(null));
     } else {
       setPrixApproximatif(null);

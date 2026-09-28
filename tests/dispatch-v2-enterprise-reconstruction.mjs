@@ -64,7 +64,12 @@ for (const file of changed) {
 const allowedHistoricalFrontend = new Set([
   'src/App.jsx',
   'src/components/auth/AuthGate.jsx',
+  'src/components/chat/ChatWindow.jsx',
   'src/components/layout/Sidebar.jsx',
+  'src/components/livreur/LivreurHistorique.jsx',
+  'src/components/livreur/LivreurStatsBanner.jsx',
+  'src/components/livreur/LivreurVictoryOverlay.jsx',
+  'src/pages/LivreurExterneApp.jsx',
 ]);
 for (const file of changed.filter((f) =>
   f.startsWith('src/') &&

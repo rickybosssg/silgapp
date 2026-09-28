@@ -12,6 +12,7 @@ import LivreurFicheModal from "@/components/enterprise/LivreurFicheModal.jsx";
 import CreateLivreurEnterpriseModal from "@/components/enterprise/CreateLivreurEnterpriseModal.jsx";
 import CarteDispatchTab from "@/components/enterprise/CarteDispatchTab.jsx";
 import ClientsEnterpriseTab from "@/components/enterprise/ClientsEnterpriseTab.jsx";
+import EnterpriseSettingsTab from "@/components/enterprise/EnterpriseSettingsTab.jsx";
 import { EN_TRAITEMENT_STATUSES, STATUS_BADGE } from "@/components/enterprise/courseStatus.js";
 
 export default function EntrepriseApp() {
@@ -36,11 +37,23 @@ export default function EntrepriseApp() {
     }
   }, []);
 
-  // ── Polling centralisé 30s — LECTURE SEULE (getEnterpriseDashboard ne fait que des filter()).
+  // ── Polling centralisé 60s — LECTURE SEULE (getEnterpriseDashboard ne fait que des filter()).
   useEffect(() => {
     loadDashboard();
-    const interval = setInterval(() => loadDashboard(true), 30000);
+    const interval = setInterval(() => loadDashboard(true), 60000);
     return () => clearInterval(interval);
+  }, [loadDashboard]);
+
+  // ── Realtime : refresh immédiat quand une course Enterprise est créée/modifiée ──
+  // Le polling 60s reste le fallback de sécurité. La subscription déclenche
+  // un refresh immédiat pour les courses Enterprise (enterprise_id non-null).
+  useEffect(() => {
+    const unsubscribe = base44.entities.CourseExterne.subscribe((event) => {
+      if ((event.type === "create" || event.type === "update") && event.data?.enterprise_id) {
+        loadDashboard(true);
+      }
+    });
+    return unsubscribe;
   }, [loadDashboard]);
 
   if (loading && !data) {
@@ -103,6 +116,7 @@ export default function EntrepriseApp() {
             onRefresh={() => loadDashboard()}
             onCourseClick={setSelectedCourse}
             onLivreurClick={setSelectedLivreur}
+            onBack={() => setActiveTab("overview")}
           />
         )}
         {activeTab === "livreurs" && (
@@ -117,6 +131,7 @@ export default function EntrepriseApp() {
         {activeTab === "invitations" && <InvitationsTab />}
         {activeTab === "branding" && <BrandingTab enterprise={enterprise} onRefresh={loadDashboard} />}
         {activeTab === "comptabilite" && <ComptabiliteTab stats={stats} ledger={ledger} enterprise={enterprise} />}
+        {activeTab === "parametres" && <EnterpriseSettingsTab enterprise={enterprise} onRefresh={loadDashboard} />}
       </div>
 
       {/* Modals */}
@@ -344,38 +359,51 @@ function ComptabiliteTab({ stats, ledger, enterprise }) {
 // ── Composant: ligne de course ──
 function CourseRow({ course, onClick }) {
   const badge = STATUS_BADGE[course.statut] || { label: course.statut, cls: "bg-gray-100 text-gray-500" };
+  const hasLivreur = !!course.livreur_nom;
+  const hasPrix = course.prix_final > 0;
 
   return (
     <button
       onClick={onClick}
-      className="w-full text-left bg-white rounded-xl border p-3 shadow-sm hover:shadow-md transition"
+      className="w-full text-left bg-white rounded-2xl border border-gray-100 p-3.5 shadow-[0_2px_12px_rgba(15,23,42,0.04)] hover:shadow-[0_8px_24px_rgba(15,23,42,0.08)] hover:border-gray-200 transition-all active:scale-[0.98]"
     >
-      {/* #COURSE */}
-      <span className="text-[10px] font-mono text-gray-400">#{course.id?.slice(-6) || "—"}</span>
-      {/* Client */}
-      <p className="text-sm font-semibold text-gray-900 truncate mt-0.5">{course.client_nom || "Client"}</p>
-      {/* Départ → Destination */}
-      <p className="text-xs text-gray-500 truncate">{course.adresse_depart || "—"} → {course.adresse_arrivee || "—"}</p>
-      {/* Livreur • Statut */}
-      <div className="flex items-center gap-1 mt-1">
-        <span className="text-xs text-gray-500 truncate flex-1">
-          {course.livreur_nom ? (
-            <>🛵 {course.livreur_nom}</>
-          ) : (
-            <span className="text-amber-600 italic">Recherche d'un livreur</span>
-          )}
-        </span>
-        <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold whitespace-nowrap ${badge.cls}`}>
+      {/* Header: #ID + Statut badge */}
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[10px] font-mono text-gray-400">#{course.id?.slice(-6) || "—"}</span>
+        <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold whitespace-nowrap ${badge.cls}`}>
           {badge.label}
         </span>
       </div>
-      {/* Prix • Heure */}
-      <div className="flex items-center justify-between mt-1">
-        <span className="text-xs font-bold text-gray-900">
-          {course.prix_final > 0 ? `${course.prix_final.toLocaleString("fr-FR")} F` : "—"}
+      {/* Client */}
+      <p className="text-sm font-bold text-gray-900 truncate">{course.client_nom || "Client"}</p>
+      {/* Trajet */}
+      <div className="flex items-center gap-1.5 mt-1.5">
+        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
+        <span className="text-xs text-gray-600 truncate flex-1">{course.adresse_depart || "—"}</span>
+      </div>
+      <div className="flex items-center gap-1.5 mt-1">
+        <div className="w-1.5 h-1.5 rounded-full bg-rose-500 flex-shrink-0" />
+        <span className="text-xs text-gray-600 truncate flex-1">{course.adresse_arrivee || "—"}</span>
+      </div>
+      {/* Livreur */}
+      <div className="mt-2">
+        {hasLivreur ? (
+          <span className="text-xs text-gray-700 font-medium flex items-center gap-1">
+            🛵 {course.livreur_nom}
+          </span>
+        ) : (
+          <span className="text-xs text-amber-600 italic">Recherche d'un livreur...</span>
+        )}
+      </div>
+      {/* Prix + Date */}
+      <div className="flex items-center justify-between mt-2.5 pt-2.5 border-t border-gray-100">
+        <span className={`text-sm font-black ${hasPrix ? "text-gray-900" : "text-gray-300"}`}>
+          {hasPrix ? `${course.prix_final.toLocaleString("fr-FR")} F` : "Prix non défini"}
         </span>
         {course.created_date && (
-          <span className="text-[10px] text-gray-400">{new Date(course.created_date).toLocaleString("fr-FR")}</span>
+          <span className="text-[10px] text-gray-400">
+            {new Date(course.created_date).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+          </span>
         )}
       </div>
     </button>

@@ -124,8 +124,13 @@ export default function ChatWindow({ courseId, senderType, senderId, senderName,
     };
   }, [courseId, open, refetchMessages]);
 
+  // ── Correction scroll : scrollTop sur le conteneur du chat uniquement,
+  //    JAMAIS scrollIntoView (qui fait défiler toute la page).
+  //    Les mises à jour realtime/polling ne doivent pas modifier la position
+  //    de scroll choisie par l'utilisateur sur la page principale. ──
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const container = bottomRef.current?.parentElement;
+    if (container) container.scrollTop = container.scrollHeight;
   }, [messages]);
 
   // Envoi sécurisé via la fonction backend envoyerMessage
