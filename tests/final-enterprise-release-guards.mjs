@@ -79,4 +79,37 @@ const verifierEncours = text('base44/functions/verifierEncoursLivreur/entry.ts')
 if (!verifierEncours.includes('course.enterprise_id')) fail('public_finance_enterprise_skip_missing');
 if (!verifierEncours.includes('encours_comptabilise_montant: 0')) fail('enterprise_public_encours_zero_missing');
 
+const annulerCourse = text('base44/functions/annulerCourseExterne/entry.ts');
+for (const needle of [
+  "import { normalizeEnterpriseId } from '../../shared/enterpriseFinance.ts'",
+  'const userEnterpriseId = normalizeEnterpriseId(user?.enterprise_id ?? user?.data?.enterprise_id)',
+  'const courseEnterpriseId = normalizeEnterpriseId(course.enterprise_id)',
+  'blocked_reason: "enterprise_mismatch"',
+  'dispatch_status: "expire"',
+  'statut: livreur.manual_hors_ligne === true ? "hors_ligne" : "disponible"',
+  'envoiNotificationPush',
+  'type: "course_annulee"',
+]) {
+  if (!annulerCourse.includes(needle)) fail(`enterprise_cancel_backend_missing needle=${needle}`);
+}
+
+const enterpriseCourseModal = text('src/components/enterprise/CourseDetailModal.jsx');
+for (const needle of [
+  'onRefresh',
+  'base44.functions.invoke("annulerCourseExterne"',
+  'source: "admin"',
+  'motif: "annulation_admin_enterprise"',
+  'const isCancellable = course.statut !== "annulee" && course.statut !== "livree"',
+  'Annuler la course',
+  'Voulez-vous vraiment annuler cette course ?',
+  'Confirmer l\'annulation',
+  'onRefresh?.()',
+]) {
+  if (!enterpriseCourseModal.includes(needle)) fail(`enterprise_cancel_frontend_missing needle=${needle}`);
+}
+if (enterpriseCourseModal.includes('window.location')) fail('enterprise_cancel_full_reload_introduced');
+
+const enterpriseApp = text('src/pages/EntrepriseApp.jsx');
+if (!enterpriseApp.includes('onRefresh={loadDashboard}')) fail('enterprise_cancel_refresh_not_wired');
+
 console.log('FINAL_ENTERPRISE_RELEASE_GUARDS=PASS');

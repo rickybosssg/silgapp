@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Phone, MapPin, User, Truck, Calendar, Navigation, MessageSquare } from "lucide-react";
+import { Phone, MapPin, User, Truck, Calendar, Navigation, MessageSquare, XCircle, AlertTriangle } from "lucide-react";
+import { toast } from "sonner";
+import { base44 } from "@/api/base44Client";
 import { STATUS_LABELS, PROGRESSION_STEPS, getProgressionStep } from "./courseStatus.js";
 import EnterpriseCourseMessages from "./EnterpriseCourseMessages.jsx";
 
@@ -14,11 +16,37 @@ const DISPATCH_LABELS = {
   disponible_push: "Disponible (push)",
 };
 
-export default function CourseDetailModal({ course, open, onClose }) {
+export default function CourseDetailModal({ course, open, onClose, onRefresh }) {
   const [showMessages, setShowMessages] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   if (!course) return null;
 
   const currentStep = getProgressionStep(course);
+  const isCancellable = course.statut !== "annulee" && course.statut !== "livree";
+
+  const handleCancel = async () => {
+    setCancelling(true);
+    try {
+      const res = await base44.functions.invoke("annulerCourseExterne", {
+        course_id: course.id,
+        source: "admin",
+        motif: "annulation_admin_enterprise",
+      });
+      if (res?.success) {
+        toast.success("Course annulée avec succès");
+        setShowCancelConfirm(false);
+        onClose();
+        onRefresh?.();
+      } else {
+        toast.error(res?.error || "Échec de l'annulation");
+      }
+    } catch (err) {
+      toast.error(err?.message || "Erreur lors de l'annulation");
+    } finally {
+      setCancelling(false);
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
@@ -170,6 +198,55 @@ export default function CourseDetailModal({ course, open, onClose }) {
               Messagerie
             </button>
           </div>
+
+          {isCancellable && !showCancelConfirm && (
+            <div className="border-t pt-3">
+              <button
+                onClick={() => setShowCancelConfirm(true)}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-red-50 text-red-600 text-sm font-semibold hover:bg-red-100 transition"
+              >
+                <XCircle className="w-4 h-4" />
+                Annuler la course
+              </button>
+            </div>
+          )}
+
+          {showCancelConfirm && (
+            <div className="border-t pt-3 space-y-3">
+              <div className="rounded-lg bg-red-50 border border-red-200 p-3 flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-bold text-red-700">Voulez-vous vraiment annuler cette course ?</p>
+                  <p className="text-xs text-red-600 mt-1">
+                    Cette action est définitive. {course.livreur_nom ? "Le livreur sera libéré et notifié." : "La course sera retirée du fil des livreurs."}
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowCancelConfirm(false)}
+                  disabled={cancelling}
+                  className="flex-1 py-2.5 rounded-lg border border-gray-200 bg-white text-gray-600 text-sm font-semibold hover:bg-gray-50 transition disabled:opacity-50"
+                >
+                  Retour
+                </button>
+                <button
+                  onClick={handleCancel}
+                  disabled={cancelling}
+                  className="flex-1 py-2.5 rounded-lg bg-red-500 text-white text-sm font-semibold hover:bg-red-600 transition disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {cancelling ? (
+                    <>
+                      <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                      Annulation...
+                    </>
+                  ) : (
+                    "Confirmer l'annulation"
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </DialogContent>
 

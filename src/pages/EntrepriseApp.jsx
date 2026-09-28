@@ -139,6 +139,7 @@ export default function EntrepriseApp() {
         course={selectedCourse}
         open={!!selectedCourse}
         onClose={() => setSelectedCourse(null)}
+        onRefresh={loadDashboard}
       />
       <LivreurFicheModal
         livreur={selectedLivreur}
