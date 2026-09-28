@@ -8,11 +8,12 @@ import confetti from "canvas-confetti";
  * Déclenchée UNIQUEMENT après confirmation backend du succès du PIN/QR de LIVRAISON.
  * Jamais sur la récupération, jamais sur erreur, jamais sur ouverture/rafraîchissement.
  *
- * Durée : 6 secondes exactement.
+ * Durée : 9 secondes exactement.
  *  0.0→1.0s  : le mot apparaît au centre
  *  1.0→4.0s  : le mot grandit de façon spectaculaire (rebond + glow + confettis)
- *  4.0→5.0s  : le mot reste visible à grande taille
- *  5.0→6.0s  : "✓ +1 COURSE RÉUSSIE" apparaît, puis fondu de sortie
+ *  4.0→7.0s  : le mot reste visible à grande taille (lecture confortable)
+ *  7.0→8.0s  : "✓ +1 COURSE RÉUSSIE" apparaît
+ *  8.5→9.0s  : fondu de sortie
  *
  * Anti-doublon : le composant mémorise le dernier courseId célébré.
  * Un même courseId ne rejoue jamais l'animation.
