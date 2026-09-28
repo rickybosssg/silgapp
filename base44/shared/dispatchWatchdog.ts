@@ -411,7 +411,8 @@ export async function runWatchdog(base44, body = {}) {
           country_code: course.country_code,
           bloque_encours: false,
           manual_hors_ligne: { $ne: true },
-          admin_hors_ligne: { $ne: true },
+          // [CORRECTION 11] admin_hors_ligne retiré du ciblage FCM secours :
+          // un livreur bloqué par l'Admin continue à recevoir le push.
         }, '-last_seen_at', 50);
 
         // Exclure les livreurs en course (fresh check)

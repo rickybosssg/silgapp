@@ -430,8 +430,9 @@ function logException(base44, step, message, countryCode, courseIds) {
  *   - actif = true
  *   - validation = "valide"
  *   - bloque_encours = false
- *   - admin_hors_ligne != true
  *   - manual_hors_ligne != true
+ *   [CORRECTION 11] admin_hors_ligne retiré : un livreur bloqué par l'Admin
+ *   continue à recevoir le push "Nouvelle course".
  *   - possède au moins un token FCM natif (pas web_)
  *
  * Aucun filtre GPS/heartbeat.
@@ -447,7 +448,7 @@ async function getLivreursDestinataires(base44, countryCode) {
     }, undefined, 1000);
 
     const eligible = (livreurs || []).filter(l =>
-      l.admin_hors_ligne !== true && l.manual_hors_ligne !== true
+      l.manual_hors_ligne !== true
     );
     if (eligible.length === 0) return [];
 

@@ -87,7 +87,9 @@ async function notifierLivreursEligiblesV2(base44: any, course: any, options: an
       country_code: course.country_code,
       bloque_encours: false,
       manual_hors_ligne: { $ne: true },
-      admin_hors_ligne: { $ne: true },
+      // [CORRECTION 11] admin_hors_ligne retiré du ciblage FCM : un livreur bloqué
+      // par l'Admin continue à recevoir le push "Nouvelle course". L'acceptation
+      // reste bloquée côté accepterCourseV2 (livreur.admin_hors_ligne !== true).
       // [ENTERPRISE] Isolation : ne proposer que les livreurs du même périmètre.
       // Pour les courses publiques, on filtre enterprise_id: null qui matche
       // à la fois null et absent (undefined) en MongoDB.
