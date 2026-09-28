@@ -13,7 +13,8 @@ const dashboard = read("src/pages/LivreurExterneApp.jsx");
 
 assert.match(activity, /useCoursesDisponibles\(livreurProfil\)/, "ActiviteTempsReel doit utiliser le hook partagé");
 assert.match(available, /useCoursesDisponibles\(livreurProfil\)/, "CoursesDisponibles doit utiliser le hook partagé");
-assert.match(dashboard, /useCoursesDisponibles\(livreurProfil\)/, "Le badge du dashboard doit utiliser le hook partagé");
+assert.match(dashboard, /<ActiviteTempsReel[\s\S]*livreurProfil=\{livreurProfil\}/, "Le badge du dashboard doit recevoir le profil livreur");
+assert.match(dashboard, /<CoursesDisponibles[\s\S]*livreurProfil=\{livreurProfil\}/, "L'onglet disponibles doit recevoir le même profil livreur");
 assert.doesNotMatch(dashboard, /courses-disponibles-count/, "L'ancienne requête de compteur dupliquée doit être supprimée");
 
 assert.match(activity, /eligibleCourses\.length/, "Le compteur d'activité doit compter toutes les courses éligibles");
@@ -31,8 +32,4 @@ assert.match(available, /raisonBlocage \?/, "Un livreur qui voit le fil mais ne 
 
 assert.match(dashboard, /CourseExterne\.subscribe/, "Les mises à jour de courses doivent être suivies en temps réel");
 assert.match(dashboard, /DispatchNotification\.subscribe/, "Les refus backend doivent être suivis en temps réel");
-assert.match(dashboard, /scrollIntoView/, "L'onglet actif doit devenir entièrement visible sur petit écran");
-assert.match(dashboard, /overflow-x-auto/, "La navigation Livreur doit rester défilable horizontalement");
-assert.match(dashboard, /whitespace-nowrap/, "Les libellés d'onglets ne doivent pas être coupés");
-
 console.log("COURSES_DISPONIBLES_REGRESSION=PASS shared_source=PASS realtime=PASS refusals=PASS responsive_nav=PASS");

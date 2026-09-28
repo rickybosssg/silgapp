@@ -50,6 +50,10 @@ const coursesDisponiblesSource = readFileSync(
   new URL("../src/components/livreur/CoursesDisponibles.jsx", import.meta.url),
   "utf8",
 );
+const activitySource = readFileSync(
+  new URL("../src/components/livreur/ActiviteTempsReel.jsx", import.meta.url),
+  "utf8",
+);
 const coursesDisponiblesHookSource = readFileSync(
   new URL("../src/hooks/useCoursesDisponibles.js", import.meta.url),
   "utf8",
@@ -100,7 +104,10 @@ const dispatchWatchdogSource = readFileSync(
   new URL("../base44/shared/dispatchWatchdog.ts", import.meta.url),
   "utf8",
 );
-assert.match(livreurAppSource, /eligibleCourses:\s*availableCourses,\s*isV2Enabled\s*}\s*=\s*useCoursesDisponibles/, "le badge et l'onglet doivent partager la source V2");
+assert.match(activitySource, /useCoursesDisponibles\(livreurProfil\)/, "le badge doit utiliser la source V2 partagée");
+assert.match(coursesDisponiblesSource, /useCoursesDisponibles\(livreurProfil\)/, "l'onglet doit utiliser la source V2 partagée");
+assert.match(livreurAppSource, /<ActiviteTempsReel[\s\S]*livreurProfil=\{livreurProfil\}/, "le dashboard doit transmettre le profil au badge");
+assert.match(livreurAppSource, /<CoursesDisponibles[\s\S]*livreurProfil=\{livreurProfil\}/, "le dashboard doit transmettre le profil à l'onglet");
 assert.match(coursesDisponiblesHookSource, /DispatchNotification\.filter\([\s\S]*statut:\s*"refuse"/, "le badge doit exclure les refus persistants");
 assert.match(coursesDisponiblesHookSource, /refusedIds\.includes\(course\.id\)/, "le badge doit exclure les courses masquees localement");
 assert.match(livreurAppSource, /livreurProfil\.statut !== "disponible"[\s\S]*coursesActives\.length === 0[\s\S]*statut: "en_course"/, "une course active doit maintenir le livreur en_course");

@@ -22,6 +22,12 @@ const FINAL_COURSE_STATUSES = new Set(["livree", "annulee", "completed", "delive
 const DISMISSED_COURSES_KEY = "silgapp_dismissed_courses";
 const DISMISS_TTL_MS = 30 * 60 * 1000;
 
+function normalizeEnterpriseId(val) {
+  if (val === null || val === undefined || val === "") return null;
+  const normalized = String(val).trim();
+  return normalized || null;
+}
+
 function readActiveDismissedCourseIds() {
   try {
     const now = Date.now();
@@ -39,6 +45,7 @@ function readActiveDismissedCourseIds() {
 export function useCoursesDisponibles(livreurProfil) {
   const livreurId = livreurProfil?.id;
   const countryCode = livreurProfil?.country_code;
+  const livreurEnterpriseId = normalizeEnterpriseId(livreurProfil?.enterprise_id);
 
   const livreurDisponible =
     livreurProfil?.type_livreur === "externe" &&
@@ -81,7 +88,7 @@ export function useCoursesDisponibles(livreurProfil) {
 
   // ── Courses disponibles (fetch brut) ──
   const { data: courses = [], isLoading } = useQuery({
-    queryKey: ["courses-externes-disponibles", livreurId, countryCode, isV2Enabled],
+    queryKey: ["courses-externes-disponibles", livreurId, countryCode, livreurEnterpriseId, isV2Enabled],
     queryFn: async () => {
       if (!countryCode || !isV2Enabled) return [];
       const all = await base44.entities.CourseExterne.filter(
@@ -130,6 +137,7 @@ export function useCoursesDisponibles(livreurProfil) {
   const eligibleCourses = useMemo(() => {
     if (!livreurPeutVoirFil || !isV2Enabled) return [];
     return courses.filter(course => {
+      if (normalizeEnterpriseId(course.enterprise_id) !== livreurEnterpriseId) return false;
       if (course.statut === "en_attente") return false;
       if (FINAL_COURSE_STATUSES.has(course.statut)) return false;
       if (course.statut !== "recherche_livreur") return false;
@@ -144,7 +152,7 @@ export function useCoursesDisponibles(livreurProfil) {
       if (refusedCourseIds.includes(course.id)) return false;
       return true;
     });
-  }, [courses, refusedIds, refusedCourseIds, livreurPeutVoirFil, isV2Enabled]);
+  }, [courses, refusedIds, refusedCourseIds, livreurPeutVoirFil, livreurEnterpriseId, isV2Enabled]);
 
   return {
     eligibleCourses,

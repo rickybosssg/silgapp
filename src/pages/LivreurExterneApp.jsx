@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { useHeartbeat } from "@/hooks/useHeartbeat";
 import { useAppVersionSync } from "@/hooks/useAppVersionSync";
 import { useDispatchConfig } from "@/hooks/useDispatchConfig";
+import { useCoursesDisponibles } from "@/hooks/useCoursesDisponibles";
 import { useGPSNatif } from "@/hooks/useGPSNatif";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
@@ -220,40 +221,10 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   // le store est mis à jour et useHeartbeat recrée ses timers automatiquement.
   useDispatchConfig(livreurProfil?.country_code);
 
-  // ── Vérifier si le dispatch V2 est activé (fil de courses disponibles) ──
-  const { data: isV2Enabled = true } = useQuery({
-    queryKey: ["dispatch-v2-enabled", livreurProfil?.id],
-    queryFn: async () => {
-      const configs = await base44.entities.AppConfig.filter({ cle: "DISPATCH_V2_ENABLED" });
-      return configs?.[0] ? configs[0].valeur !== "false" : true;
-      },
-      enabled: !!livreurProfil?.id,
-      staleTime: 300000,
-  });
-
   // ── Compteur de courses disponibles (pilote le point rouge) ──
-  // ⚠️ Garde cohérente avec CoursesDisponibles.jsx : statut === "recherche_livreur"
-  //    ET dispatch_status === "disponible_push" | "propose"
-  const { data: availableCoursesCount = 0 } = useQuery({
-    queryKey: ["courses-disponibles-count", livreurProfil?.id, livreurProfil?.country_code, isV2Enabled],
-    queryFn: async () => {
-      if (!livreurProfil?.country_code || !isV2Enabled) return 0;
-      const all = await base44.entities.CourseExterne.filter(
-        { dispatch_status: { $in: ["disponible_push", "propose"] }, country_code: livreurProfil.country_code },
-        "-created_date", 50
-      );
-      return (all || []).filter(c =>
-        c.statut === "recherche_livreur" &&
-        (c.dispatch_status === "disponible_push" || c.dispatch_status === "propose") &&
-        !c.livreur_id &&
-        !c.accepted_by_livreur_id
-      ).length;
-    },
-    enabled: !!livreurProfil?.id && !!livreurProfil?.country_code && isV2Enabled,
-    refetchInterval: 10000,
-    staleTime: 0,
-    refetchOnWindowFocus: true,
-  });
+  // Source partagée avec ActiviteTempsReel et CoursesDisponibles : inclut le filtre enterprise_id.
+  const { eligibleCourses: availableCourses, isV2Enabled } = useCoursesDisponibles(livreurProfil);
+  const availableCoursesCount = availableCourses.length;
 
   // Le point rouge s'affiche dès qu'il y a des courses disponibles ET que le livreur
   // n'est pas sur l'onglet "Disponibles"
@@ -270,13 +241,21 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   // le cache React Query doit être invalidé immédiatement sans attendre le polling.
   useEffect(() => {
     if (!livreurProfil?.id) return;
-    const unsubscribe = base44.entities.CourseExterne.subscribe((event) => {
+    const unsubscribeCourses = base44.entities.CourseExterne.subscribe((event) => {
       if (event.type === "create" || event.type === "update" || event.type === "delete") {
-        queryClient.invalidateQueries({ queryKey: ["courses-disponibles-count"] });
         queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles"] });
       }
     });
-    return unsubscribe;
+    const unsubscribeNotifications = base44.entities.DispatchNotification.subscribe((event) => {
+      if (event.type === "create" || event.type === "update" || event.type === "delete") {
+        queryClient.invalidateQueries({ queryKey: ["dispatch-refused-courses"] });
+        queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles"] });
+      }
+    });
+    return () => {
+      unsubscribeCourses?.();
+      unsubscribeNotifications?.();
+    };
   }, [livreurProfil?.id, queryClient]);
 
   const { data: countryCommissionRows = [] } = useQuery({

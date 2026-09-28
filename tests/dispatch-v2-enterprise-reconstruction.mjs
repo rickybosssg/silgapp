@@ -38,6 +38,16 @@ for (const needle of [
   if (!dispatchV2.includes(needle)) fail(`missing_enterprise_isolation needle=${needle}`);
 }
 
+const coursesDisponibles = text('src/hooks/useCoursesDisponibles.js');
+for (const needle of [
+  'function normalizeEnterpriseId(val)',
+  'const livreurEnterpriseId = normalizeEnterpriseId(livreurProfil?.enterprise_id)',
+  '["courses-externes-disponibles", livreurId, countryCode, livreurEnterpriseId, isV2Enabled]',
+  'normalizeEnterpriseId(course.enterprise_id) !== livreurEnterpriseId',
+]) {
+  if (!coursesDisponibles.includes(needle)) fail(`missing_frontend_enterprise_isolation needle=${needle}`);
+}
+
 const rootCapacitor = text('capacitor.config.json');
 if (rootCapacitor.includes('"url"') || rootCapacitor.includes('server.url')) {
   fail('root_capacitor_server_url_introduced');
@@ -69,6 +79,7 @@ const allowedHistoricalFrontend = new Set([
   'src/components/livreur/LivreurHistorique.jsx',
   'src/components/livreur/LivreurStatsBanner.jsx',
   'src/components/livreur/LivreurVictoryOverlay.jsx',
+  'src/hooks/useCoursesDisponibles.js',
   'src/pages/LivreurExterneApp.jsx',
 ]);
 for (const file of changed.filter((f) =>
