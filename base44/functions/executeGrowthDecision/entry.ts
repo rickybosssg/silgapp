@@ -97,6 +97,22 @@ export default async function(req: Request): Promise<Response> {
       let metaCreationResult: any = null;
       let metaCreationError: string | null = null;
 
+      // Helper: invoke manageMetaCampaign et parse la réponse
+      // (functions.invoke peut retourner un objet Response non parsé selon le runtime)
+      const invokeMeta = async (action: string, payload: any = {}): Promise<any> => {
+        const res = await base44.asServiceRole.functions.invoke('manageMetaCampaign', { action, ...payload });
+        let parsed: any;
+        if (typeof res?.json === 'function') {
+          parsed = await res.json();
+        } else if (res?.data && typeof res.data === 'object') {
+          parsed = res.data;
+        } else {
+          parsed = res;
+        }
+        console.log(`[executeGrowthDecision] ${action}: success=${parsed?.success} error=${parsed?.error || 'none'}`);
+        return parsed;
+      };
+
       try {
         // Vérifier le kill switch META_ACQUISITION_ENABLED
         const metaConfigs = await base44.asServiceRole.entities.AppConfig.filter({ cle: 'META_ACQUISITION_ENABLED' });
@@ -106,12 +122,11 @@ export default async function(req: Request): Promise<Response> {
           metaCreationError = 'META_ACQUISITION_ENABLED=false — campagne Meta non créée. Activez ce kill switch pour permettre la création automatique.';
         } else {
           // 2a. Créer le brouillon de MetaCampaign
-          const draftRes = await base44.asServiceRole.functions.invoke('manageMetaCampaign', {
-            action: 'create_campaign_draft',
+          const draftRes = await invokeMeta('create_campaign_draft', {
             name: experiment.name,
             objective: experiment.meta_objective,
-            lifetime_budget: experiment.budget_test_fcfa, // lifetime_budget = budget total non dépassable (3000 FCFA)
-            creative_ids: null, // Pas de créatif — l'admin en ajoutera ultérieurement
+            lifetime_budget: experiment.budget_test_fcfa,
+            creative_ids: null,
             country_codes: '["BF"]',
             target_audience: JSON.stringify({
               geo: experiment.targeting_geo,
@@ -129,19 +144,13 @@ export default async function(req: Request): Promise<Response> {
           const metaCampaignEntityId = draftRes.campaign.id;
 
           // 2b. Approuver la MetaCampaign
-          const approveRes = await base44.asServiceRole.functions.invoke('manageMetaCampaign', {
-            action: 'approve_campaign',
-            campaign_id: metaCampaignEntityId,
-          });
+          const approveRes = await invokeMeta('approve_campaign', { campaign_id: metaCampaignEntityId });
           if (!approveRes?.success) {
             throw new Error(approveRes?.error || 'Échec approve_campaign');
           }
 
           // 2c. Activer la MetaCampaign (crée sur Meta en PAUSED — ne dépense rien)
-          const activateRes = await base44.asServiceRole.functions.invoke('manageMetaCampaign', {
-            action: 'activate_campaign',
-            campaign_id: metaCampaignEntityId,
-          });
+          const activateRes = await invokeMeta('activate_campaign', { campaign_id: metaCampaignEntityId });
 
           if (!activateRes?.success) {
             throw new Error(activateRes?.error || 'Échec activate_campaign');
