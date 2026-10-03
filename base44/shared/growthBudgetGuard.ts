@@ -51,6 +51,32 @@ export function getConfigValue(configs: any[], key: string): string | null {
   return config?.valeur || null;
 }
 
+// ── Taux de conversion USD → FCFA (source autoritaire, partagé avec manageMetaCampaign) ──
+export const META_USD_TO_FCFA_RATE = 600;
+
+// ── Helper : normaliser un montant GrowthSpend en FCFA ──
+//
+// RÈGLE ABSOLUE : le moteur utilise TOUJOURS amount_fcfa pour les calculs budgétaires.
+//
+// 1. Si amount_fcfa est renseigné (enregistrements post-correction) → utiliser directement.
+// 2. Si amount_fcfa est null ET l'enregistrement vient de syncMetaAdsSpend
+//    (idempotency_key commence par 'meta_spend_') → appliquer conversion à la volée
+//    (montant × META_USD_TO_FCFA_RATE). Les anciennes données Meta sont en USD stocké comme FCFA.
+// 3. Sinon (primes, réactivation, etc.) → montant est déjà en FCFA, utiliser tel quel.
+//
+// NE MODIFIE PAS les enregistrements historiques en base. La conversion est appliquée
+// à la volée au moment du calcul, pas en écriture.
+export function normalizeAmountToFcfa(spend: any): number {
+  if (spend.amount_fcfa != null && spend.amount_fcfa > 0) {
+    return spend.amount_fcfa;
+  }
+  const montant = spend.montant || 0;
+  if (spend.idempotency_key && spend.idempotency_key.startsWith('meta_spend_')) {
+    return Math.round(montant * META_USD_TO_FCFA_RATE);
+  }
+  return montant;
+}
+
 // ── Helper : calculer les dépenses par moteur pour le mois courant ──
 export function computeSpendByMoteur(growthSpends: any[]): Record<string, number> {
   const { start, end } = getCurrentMonthRange();
@@ -61,7 +87,7 @@ export function computeSpendByMoteur(growthSpends: any[]): Record<string, number
     const spendTs = spend.date_depense ? new Date(spend.date_depense).getTime() : 0;
     if (spendTs < start || spendTs > end) continue;
     const moteur = spend.moteur || 'autre';
-    byMoteur[moteur] = (byMoteur[moteur] || 0) + (spend.montant || 0);
+    byMoteur[moteur] = (byMoteur[moteur] || 0) + normalizeAmountToFcfa(spend);
   }
 
   return byMoteur;

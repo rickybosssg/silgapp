@@ -22,6 +22,12 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 const META_API_BASE = 'https://graph.facebook.com/v25.0';
 const DEFAULT_AD_ACCOUNT_ID = '234850849367733'; // Eric Compaore (compte réel SILGAPP)
 
+// ── Taux de conversion USD → FCFA ──
+// Le compte Meta est configuré en USD. Meta API retourne le spend en USD.
+// Ce taux doit être identique à META_USD_TO_FCFA_RATE dans growthBudgetGuard.ts
+// et dans manageMetaCampaign/entry.ts.
+const META_USD_TO_FCFA_RATE = 600;
+
 // ── WHITELIST HARD-CODÉE : seuls ces comptes sont autorisés ──
 // Empêche toute importation de dépenses depuis d'autres comptes (CDL, etc.)
 // même si META_AD_ACCOUNT_ID est modifié dans AppConfig.
@@ -99,6 +105,13 @@ async function fetchCampaignInsights(accessToken, campaignId, dateSince, dateUnt
 async function upsertGrowthSpend(base44, accountId, date, spend, impressions, clicks) {
   const idempotencyKey = `meta_spend_${accountId}_${date}`;
 
+  // ── Conversion USD → FCFA ──
+  // Meta API retourne le spend en USD (compte configuré en USD).
+  // On stocke le montant original ET le montant converti en FCFA.
+  // Le moteur utilise amount_fcfa pour tous les calculs budgétaires.
+  const amountFcfa = Math.round(spend * META_USD_TO_FCFA_RATE);
+  const now = new Date().toISOString();
+
   // Vérifier si une entrée existe déjà pour cette clé (idempotence)
   const existing = await base44.asServiceRole.entities.GrowthSpend.filter({
     idempotency_key: idempotencyKey,
@@ -109,10 +122,16 @@ async function upsertGrowthSpend(base44, accountId, date, spend, impressions, cl
     const entry = existing[0];
     await base44.asServiceRole.entities.GrowthSpend.update(entry.id, {
       montant: spend,
+      devise: 'USD',
+      amount_original: spend,
+      currency_original: 'USD',
+      amount_fcfa: amountFcfa,
+      conversion_rate: META_USD_TO_FCFA_RATE,
+      converted_at: now,
       description_depense: `Meta Ads ${date} — ${impressions} impressions, ${clicks} clics`,
       date_depense: new Date(date + 'T12:00:00Z').toISOString(),
     });
-    return { action: 'updated', id: entry.id };
+    return { action: 'updated', id: entry.id, amount_usd: spend, amount_fcfa: amountFcfa };
   }
 
   // Create
@@ -120,14 +139,19 @@ async function upsertGrowthSpend(base44, accountId, date, spend, impressions, cl
     moteur: 'publicite',
     type_depense: 'autre',
     montant: spend,
-    devise: 'FCFA',
+    devise: 'USD',
+    amount_original: spend,
+    currency_original: 'USD',
+    amount_fcfa: amountFcfa,
+    conversion_rate: META_USD_TO_FCFA_RATE,
+    converted_at: now,
     country_code: '',
     idempotency_key: idempotencyKey,
     description_depense: `Meta Ads ${date} — ${impressions} impressions, ${clicks} clics`,
     statut: 'engagee',
     date_depense: new Date(date + 'T12:00:00Z').toISOString(),
   });
-  return { action: 'created', id: entry.id };
+  return { action: 'created', id: entry.id, amount_usd: spend, amount_fcfa: amountFcfa };
 }
 
 async function storeLatestMetrics(base44, accountId, campaigns, insights) {
@@ -138,21 +162,27 @@ async function storeLatestMetrics(base44, accountId, campaigns, insights) {
   const metrics = {
     account_id: accountId,
     synced_at: new Date().toISOString(),
+    currency_note: 'Meta account is in USD. All spend values below are converted to FCFA at rate ' + META_USD_TO_FCFA_RATE + ' FCFA/USD.',
+    conversion_rate: META_USD_TO_FCFA_RATE,
     today: todayInsight ? {
       date: todayInsight.date_start,
-      spend: parseFloat(todayInsight.spend || '0'),
+      spend_usd: parseFloat(todayInsight.spend || '0'),
+      spend_fcfa: Math.round(parseFloat(todayInsight.spend || '0') * META_USD_TO_FCFA_RATE),
       impressions: parseInt(todayInsight.impressions || '0'),
       clicks: parseInt(todayInsight.clicks || '0'),
       ctr: parseFloat(todayInsight.ctr || '0'),
-      cpc: parseFloat(todayInsight.cpc || '0'),
+      cpc_usd: parseFloat(todayInsight.cpc || '0'),
+      cpc_fcfa: Math.round(parseFloat(todayInsight.cpc || '0') * META_USD_TO_FCFA_RATE),
     } : null,
     last_7_days: insights.slice(-7).map(i => ({
       date: i.date_start,
-      spend: parseFloat(i.spend || '0'),
+      spend_usd: parseFloat(i.spend || '0'),
+      spend_fcfa: Math.round(parseFloat(i.spend || '0') * META_USD_TO_FCFA_RATE),
       impressions: parseInt(i.impressions || '0'),
       clicks: parseInt(i.clicks || '0'),
       ctr: parseFloat(i.ctr || '0'),
-      cpc: parseFloat(i.cpc || '0'),
+      cpc_usd: parseFloat(i.cpc || '0'),
+      cpc_fcfa: Math.round(parseFloat(i.cpc || '0') * META_USD_TO_FCFA_RATE),
     })),
     campaigns: campaigns
       .sort((a, b) => (b.spend || 0) - (a.spend || 0))
@@ -162,11 +192,13 @@ async function storeLatestMetrics(base44, accountId, campaigns, insights) {
         name: (c.name || '').substring(0, 50),
         status: c.status,
         objective: c.objective,
-        spend: c.spend || 0,
+        spend_usd: c.spend || 0,
+        spend_fcfa: Math.round((c.spend || 0) * META_USD_TO_FCFA_RATE),
         impressions: c.impressions || 0,
         clicks: c.clicks || 0,
         ctr: c.ctr || '0',
-        cpc: c.cpc || '0',
+        cpc_usd: c.cpc || '0',
+        cpc_fcfa: Math.round(parseFloat(c.cpc || '0') * META_USD_TO_FCFA_RATE),
       })),
   };
 

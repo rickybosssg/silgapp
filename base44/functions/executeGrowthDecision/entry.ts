@@ -59,7 +59,7 @@ export default async function(req: Request): Promise<Response> {
 
     // ── Exécuter selon le type de décision ──
     if (decision.decision_type === 'create_experiment') {
-      // Créer la GrowthExperiment
+      // ── Étape 1 : Créer la GrowthExperiment ──
       const experiment = await base44.asServiceRole.entities.GrowthExperiment.create({
         name: actionPayload.name || `Test ${Date.now()}`,
         status: 'approved',
@@ -79,13 +79,93 @@ export default async function(req: Request): Promise<Response> {
         phase: actionPayload.phase || 'exploration',
       });
 
+      // ── Étape 2 : Tenter la création automatique de la campagne Meta en PAUSED ──
+      // Le moteur crée la campagne Meta en PAUSED via manageMetaCampaign.
+      // Le moteur NE L'ACTIVE PAS (ne la met pas en ACTIVE) — seul l'admin peut le faire.
+      let metaCreationResult: any = null;
+      let metaCreationError: string | null = null;
+
+      try {
+        // Vérifier le kill switch META_ACQUISITION_ENABLED
+        const metaConfigs = await base44.asServiceRole.entities.AppConfig.filter({ cle: 'META_ACQUISITION_ENABLED' });
+        const metaEnabled = metaConfigs?.[0]?.valeur === 'true';
+
+        if (!metaEnabled) {
+          metaCreationError = 'META_ACQUISITION_ENABLED=false — campagne Meta non créée. Activez ce kill switch pour permettre la création automatique.';
+        } else {
+          // 2a. Créer le brouillon de MetaCampaign
+          const draftRes = await base44.asServiceRole.functions.invoke('manageMetaCampaign', {
+            action: 'create_campaign_draft',
+            name: experiment.name,
+            objective: experiment.meta_objective,
+            daily_budget: experiment.budget_test_fcfa,
+            creative_ids: null, // Pas de créatif — l'admin en ajoutera ultérieurement
+            country_codes: '["BF"]',
+            target_audience: JSON.stringify({
+              geo: experiment.targeting_geo,
+              age_min: experiment.targeting_age_min,
+              age_max: experiment.targeting_age_max,
+              gender: experiment.targeting_gender,
+              message_angle: experiment.message_angle,
+            }),
+            idempotency_key: `autopilote_exp_${experiment.id}`,
+          });
+
+          if (!draftRes?.success) {
+            throw new Error(draftRes?.error || 'Échec create_campaign_draft');
+          }
+          const metaCampaignEntityId = draftRes.campaign.id;
+
+          // 2b. Approuver la MetaCampaign
+          const approveRes = await base44.asServiceRole.functions.invoke('manageMetaCampaign', {
+            action: 'approve_campaign',
+            campaign_id: metaCampaignEntityId,
+          });
+          if (!approveRes?.success) {
+            throw new Error(approveRes?.error || 'Échec approve_campaign');
+          }
+
+          // 2c. Activer la MetaCampaign (crée sur Meta en PAUSED — ne dépense rien)
+          const activateRes = await base44.asServiceRole.functions.invoke('manageMetaCampaign', {
+            action: 'activate_campaign',
+            campaign_id: metaCampaignEntityId,
+          });
+
+          if (!activateRes?.success) {
+            throw new Error(activateRes?.error || 'Échec activate_campaign');
+          }
+
+          // 2d. Lier les IDs Meta à la GrowthExperiment
+          await base44.asServiceRole.entities.GrowthExperiment.update(experiment.id, {
+            meta_campaign_id: activateRes.meta_campaign_id || null,
+            meta_adset_id: activateRes.meta_adset_id || null,
+          });
+
+          metaCreationResult = {
+            meta_campaign_entity_id: metaCampaignEntityId,
+            meta_campaign_id: activateRes.meta_campaign_id,
+            meta_adset_id: activateRes.meta_adset_id,
+            meta_ad_id: activateRes.meta_ad_id,
+            meta_status: activateRes.meta_status || 'PAUSED',
+            message: 'Campagne Meta créée en PAUSED. L\'admin doit ajouter des créatifs puis appeler resume_campaign pour démarrer la diffusion.',
+          };
+        }
+      } catch (metaErr: any) {
+        metaCreationError = metaErr?.message || 'Erreur lors de la création Meta';
+        // Non-bloquant : la GrowthExperiment est créée, l'admin peut créer la campagne manuellement
+      }
+
       await base44.asServiceRole.entities.GrowthDecision.update(decision_id, {
         status: 'executed',
         executed_at: now,
         execution_result: JSON.stringify({
           experiment_id: experiment.id,
           experiment_name: experiment.name,
-          note: 'Expérience créée. L\'admin doit créer la campagne Meta Ads en PAUSED avec ces paramètres, puis linker le meta_campaign_id à l\'expérience.',
+          meta_creation: metaCreationResult,
+          meta_creation_error: metaCreationError,
+          note: metaCreationResult
+            ? 'Expérience créée + campagne Meta créée en PAUSED. Ajoutez des créatifs puis resume_campaign.'
+            : 'Expérience créée. Campagne Meta non créée automatiquement.',
         }),
         experiment_id: experiment.id,
       });
@@ -93,7 +173,11 @@ export default async function(req: Request): Promise<Response> {
       return Response.json({
         success: true,
         experiment_id: experiment.id,
-        message: 'Expérience créée. Créez la campagne Meta Ads en PAUSED avec les paramètres fournis, puis linkez le meta_campaign_id.',
+        meta_creation: metaCreationResult,
+        meta_creation_error: metaCreationError,
+        message: metaCreationResult
+          ? 'Expérience créée + campagne Meta créée en PAUSED (aucune dépense). L\'admin doit ajouter des créatifs puis resume_campaign.'
+          : 'Expérience créée. Campagne Meta non créée automatiquement.',
       });
     }
 

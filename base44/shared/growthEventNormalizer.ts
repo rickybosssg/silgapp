@@ -72,17 +72,19 @@ export function computeFirstAndSecondCourses(
       return da - db;
     });
 
-    if (courses.length === 1) {
-      const ts = courses[0].heure_livraison ? new Date(courses[0].heure_livraison).getTime() : 0;
-      if (ts >= periodStart && ts <= periodEnd) {
-        firstCourses.push(courses[0]);
-      }
-    } else if (courses.length === 2) {
+    // 1ère course historique du client (index 0 dans le tri chronologique)
+    // Comptée même si le client a 3+ courses au total
+    if (courses.length >= 1) {
       const firstTs = courses[0].heure_livraison ? new Date(courses[0].heure_livraison).getTime() : 0;
-      const secondTs = courses[1].heure_livraison ? new Date(courses[1].heure_livraison).getTime() : 0;
       if (firstTs >= periodStart && firstTs <= periodEnd) {
         firstCourses.push(courses[0]);
       }
+    }
+
+    // 2ème course historique du client (index 1 dans le tri chronologique)
+    // Comptée même si le client a 3+ courses au total
+    if (courses.length >= 2) {
+      const secondTs = courses[1].heure_livraison ? new Date(courses[1].heure_livraison).getTime() : 0;
       if (secondTs >= periodStart && secondTs <= periodEnd) {
         secondCourses.push(courses[1]);
       }
