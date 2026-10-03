@@ -81,6 +81,7 @@ export default async function(req: Request): Promise<Response> {
         meta_objective: actionPayload.meta_objective || 'OUTCOME_APP_PROMOTION',
         message_angle: actionPayload.message_angle || 'rapidite',
         budget_test_fcfa: actionPayload.budget_test_fcfa || 3000,
+        utm_campaign_name: actionPayload.utm_campaign_name || `silgapp_exp_${Date.now()}`,
         proposed_by: 'autopilote',
         proposed_at: now,
         proposal_rationale: actionPayload.rationale || decision.recommended_action,
@@ -109,7 +110,7 @@ export default async function(req: Request): Promise<Response> {
             action: 'create_campaign_draft',
             name: experiment.name,
             objective: experiment.meta_objective,
-            daily_budget: experiment.budget_test_fcfa,
+            lifetime_budget: experiment.budget_test_fcfa, // lifetime_budget = budget total non dépassable (3000 FCFA)
             creative_ids: null, // Pas de créatif — l'admin en ajoutera ultérieurement
             country_codes: '["BF"]',
             target_audience: JSON.stringify({

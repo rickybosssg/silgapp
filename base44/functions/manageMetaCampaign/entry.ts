@@ -175,7 +175,7 @@ Deno.serve(async (req) => {
     // ═══════════════════════════════════════════════════════════════════════
 
     if (action === 'create_campaign_draft') {
-      const { name, objective, daily_budget, creative_ids, country_codes, target_audience, idempotency_key } = body;
+      const { name, objective, daily_budget, lifetime_budget, creative_ids, country_codes, target_audience, idempotency_key } = body;
       if (!name) return Response.json({ error: 'name requis' }, { status: 400 });
 
       // Idempotency check
@@ -196,10 +196,11 @@ Deno.serve(async (req) => {
         return Response.json({ error: `Objectif non autorisé: ${objective}. Autorisés: ${g.allowedObjectives.join(', ')}` }, { status: 400 });
       }
 
-      // Validate budget
+      // Validate budget — daily_budget est soumis au plafond quotidien
       if (daily_budget && daily_budget > g.dailyBudgetCap) {
         return Response.json({ error: `Budget ${daily_budget} > plafond ${g.dailyBudgetCap} FCFA` }, { status: 400 });
       }
+      // lifetime_budget n'est PAS soumis au plafond quotidien — c'est un budget total, validé par budget_test_fcfa
 
       // Validate creatives
       if (creative_ids) {
@@ -213,7 +214,7 @@ Deno.serve(async (req) => {
       }
 
       const campaign = await base44.asServiceRole.entities.MetaCampaign.create({
-        name, objective, daily_budget, creative_ids, country_codes, target_audience,
+        name, objective, daily_budget, lifetime_budget, creative_ids, country_codes, target_audience,
         idempotency_key: idempotency_key || `mc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         status: 'draft',
       });
@@ -287,19 +288,18 @@ Deno.serve(async (req) => {
       if (!g.allowedObjectives.includes(campaign.objective)) {
         return Response.json({ error: 'Objectif non autorisé' }, { status: 400 });
       }
-      // Garde-fou budget : doit être > 0 et <= plafond métier (FCFA)
-      const budgetFcfa = campaign.daily_budget || 0;
+      // Garde-fou budget : lifetime_budget (total) ou daily_budget (journalier)
+      const useLifetimeBudget = campaign.lifetime_budget && campaign.lifetime_budget > 0;
+      const budgetFcfa = useLifetimeBudget ? campaign.lifetime_budget : (campaign.daily_budget || 0);
       if (budgetFcfa <= 0) {
         return Response.json({ error: 'Budget doit être > 0 FCFA' }, { status: 400 });
       }
-      if (budgetFcfa > g.dailyBudgetCap) {
+      // Le plafond quotidien ne s'applique qu'aux budgets quotidiens, pas aux budgets lifetime
+      if (!useLifetimeBudget && budgetFcfa > g.dailyBudgetCap) {
         return Response.json({ error: `Budget ${budgetFcfa} FCFA > plafond ${g.dailyBudgetCap} FCFA` }, { status: 400 });
       }
       // Conversion FCFA → cents USD (compte Meta en USD)
-      // 1000 FCFA → 167 cents USD ($1.67) — JAMAIS 100000 cents ($1000)
       const budgetUsdCents = fcfaToUsdCents(budgetFcfa);
-      // Vérification de cohérence : le résultat ne doit jamais dépasser budgetFcfa
-      // (si rate=600, 1000 FCFA → 167 cents ; si on obtenait 100000, ce serait un bug)
       if (budgetUsdCents > budgetFcfa) {
         await logAction('meta_api_error', 'meta_campaign', campaign_id, campaign.name, {
           error: `Conversion incohérente: ${budgetFcfa} FCFA → ${budgetUsdCents} cents USD (attendu < ${budgetFcfa})`,
@@ -356,25 +356,37 @@ Deno.serve(async (req) => {
 
       // 2. Create ad set on Meta (PAUSED) — ciblage Ouagadougou + 25km, 18-45 ans
       const OUAGADOUGOU_CITY_KEY = '193625'; // Meta city key pour Ouagadougou (région Kadiogo, BF)
+      const adsetPayload: any = {
+        name: `${campaign.name} - AdSet`,
+        campaign_id: metaCampaignId,
+        billing_event: 'IMPRESSIONS',
+        optimization_goal: campaign.objective === 'OUTCOME_TRAFFIC' ? 'LINK_CLICKS' : 'OFFSITE_CONVERSIONS',
+        targeting: {
+          geo_locations: {
+            cities: [{ key: OUAGADOUGOU_CITY_KEY, radius: 25, distance_unit: 'kilometer' }],
+          },
+          age_min: 18,
+          age_max: 45,
+          genders: [0], // 0 = tous genres
+        },
+        status: 'PAUSED',
+      };
+
+      if (useLifetimeBudget) {
+        // lifetime_budget: budget total non dépassable. Meta arrête la diffusion une fois le budget atteint.
+        // 3000 FCFA → 500 cents USD ($5.00) — Meta ne dépensera JAMAIS plus que ce montant.
+        adsetPayload.lifetime_budget = budgetUsdCents;
+        adsetPayload.start_time = new Date().toISOString();
+        adsetPayload.end_time = new Date(Date.now() + 14 * 86400000).toISOString(); // 14 jours d'observation
+        adsetPayload.pacing_type = ['budget']; // Requis par Meta API pour lifetime_budget
+      } else {
+        adsetPayload.daily_budget = budgetUsdCents;
+      }
+
       const adsetRes = await fetch(`${META_API_BASE}/${accountId}/adsets`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: `${campaign.name} - AdSet`,
-          campaign_id: metaCampaignId,
-          daily_budget: budgetUsdCents, // FCFA → USD → cents USD (ex: 1000 FCFA → 167 cents = $1.67)
-          billing_event: 'IMPRESSIONS',
-          optimization_goal: campaign.objective === 'OUTCOME_TRAFFIC' ? 'LINK_CLICKS' : 'OFFSITE_CONVERSIONS',
-          targeting: {
-            geo_locations: {
-              cities: [{ key: OUAGADOUGOU_CITY_KEY, radius: 25, distance_unit: 'kilometer' }],
-            },
-            age_min: 18,
-            age_max: 45,
-            genders: [0], // 0 = tous genres
-          },
-          status: 'PAUSED',
-        }),
+        body: JSON.stringify(adsetPayload),
       });
       const adsetData = await adsetRes.json();
       if (adsetData.error) {

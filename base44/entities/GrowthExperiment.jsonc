@@ -69,11 +69,15 @@
     },
     "meta_campaign_id": {
       "type": "string",
-      "description": "ID de la campagne Meta Ads cr\u00e9\u00e9e (renseign\u00e9 apr\u00e8s cr\u00e9ation)"
+      "description": "ID de la campagne Meta Ads cr\u00e9\u00e9e (renseign\u00e9 apr\u00e8s cr\u00e9ation). C'est le v\u00e9ritable ID retourn\u00e9 par l'API Meta."
     },
     "meta_adset_id": {
       "type": "string",
       "description": "ID de l'ensemble de publicit\u00e9 Meta Ads"
+    },
+    "utm_campaign_name": {
+      "type": "string",
+      "description": "Nom UTM unique de l'exp\u00e9rience (ex: silgapp_test_a_ouaga_rapidite). Utilis\u00e9 pour l'attribution quand meta_campaign_id n'est pas captur\u00e9 dans AppInstall (Google Play referrer ne transmet que les UTM, pas le meta_campaign_id). Mapping d\u00e9terministe utm_campaign \u2192 meta_campaign_id. JAMAIS \u00e9crire une valeur UTM dans meta_campaign_id \u2014 ce champ est s\u00e9par\u00e9."
     },
     "spend_fcfa": {
       "type": "number",

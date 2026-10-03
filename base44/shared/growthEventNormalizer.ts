@@ -102,14 +102,23 @@ export function attributeClientSource(
   clientEmail: string | null,
   installsByEmail: Map<string, any>,
   convertedScenarioClientKeys: Set<string>,
-  clientsWithPromoCode: Set<string>
+  clientsWithPromoCode: Set<string>,
+  utmCampaignToMetaCampaignId: Map<string, string> = new Map()
 ): { source: string; source_id: string | null } {
-  // 1. Meta Ads (via AppInstall → meta_campaign_id)
+  // 1. Meta Ads — voie principale : AppInstall.meta_campaign_id (vrai ID Meta, capturé via Meta SDK)
   const email = (clientEmail || '').trim().toLowerCase();
   if (email && installsByEmail.has(email)) {
     const install = installsByEmail.get(email);
     if (install.meta_campaign_id) {
       return { source: 'meta_ads', source_id: install.meta_campaign_id };
+    }
+    // Voie de fallback : mapping utm_campaign → meta_campaign_id
+    // Utilisée quand meta_campaign_id n'est PAS capturé dans AppInstall.
+    // Raison : Google Play Install Referrer ne transmet que les UTM, pas le meta_campaign_id.
+    // Le mapping est déterministe : utm_campaign (ex: silgapp_test_a_ouaga_rapidite) → meta_campaign_id.
+    // JAMAIS écrire une valeur UTM dans le champ meta_campaign_id — ce sont deux champs séparés.
+    if (install.utm_campaign && utmCampaignToMetaCampaignId.has(install.utm_campaign)) {
+      return { source: 'meta_ads', source_id: utmCampaignToMetaCampaignId.get(install.utm_campaign) };
     }
   }
 

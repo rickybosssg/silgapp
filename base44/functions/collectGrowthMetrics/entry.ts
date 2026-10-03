@@ -53,6 +53,16 @@ export default async function(req: Request): Promise<Response> {
     const acquisitionSpendAutopilote = computeAutopiloteAcquisitionSpend(growthSpends, autopiloteCampaignIds);
     const acquisitionSpendTotal = BUDGET_CHANNELS.acquisition.moteurs.reduce((s: number, m: string) => s + (spendByMoteur[m] || 0), 0);
     const acquisitionSpend = acquisitionSpendAutopilote; // CAC calculé sur dépenses Autopilote uniquement
+
+    // ── Build utm_campaign → meta_campaign_id mapping for attribution fallback ──
+    // Nécessaire car Google Play Install Referrer ne transmet que les UTM, pas le meta_campaign_id.
+    // Le mapping est déterministe : utm_campaign_name (GrowthExperiment) → meta_campaign_id (vrai ID Meta).
+    const utmCampaignToMetaCampaignId = new Map<string, string>();
+    for (const exp of experimentsForBudget || []) {
+      if (exp.utm_campaign_name && exp.meta_campaign_id) {
+        utmCampaignToMetaCampaignId.set(exp.utm_campaign_name, exp.meta_campaign_id);
+      }
+    }
     const primesSpend = BUDGET_CHANNELS.primes.moteurs.reduce((s: number, m: string) => s + (spendByMoteur[m] || 0), 0);
     const reactivationSpend = BUDGET_CHANNELS.reactivation.moteurs.reduce((s: number, m: string) => s + (spendByMoteur[m] || 0), 0);
     const totalSpend = acquisitionSpend + primesSpend + reactivationSpend;
@@ -106,7 +116,8 @@ export default async function(req: Request): Promise<Response> {
         course.client_user_email,
         installsByEmail,
         convertedScenarioClientKeys,
-        clientsWithPromoCode
+        clientsWithPromoCode,
+        utmCampaignToMetaCampaignId
       );
 
       firstCoursesBySource[source] = (firstCoursesBySource[source] || 0) + 1;
