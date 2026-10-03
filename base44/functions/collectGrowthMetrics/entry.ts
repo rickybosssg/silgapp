@@ -1,7 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 import { computeFirstAndSecondCourses, buildClientKey, attributeClientSource, getCurrentMonthRange } from '../../shared/growthEventNormalizer.ts';
 import { computeExperimentStatus } from '../../shared/growthDecisionRules.ts';
-import { BUDGET_CHANNELS, getConfigValue, computeSpendByMoteur } from '../../shared/growthBudgetGuard.ts';
+import { BUDGET_CHANNELS, getConfigValue, computeSpendByMoteur, normalizeAmountToFcfa, computeAutopiloteAcquisitionSpend } from '../../shared/growthBudgetGuard.ts';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // collectGrowthMetrics — Collecte et agrège les métriques Growth
@@ -39,7 +39,20 @@ export default async function(req: Request): Promise<Response> {
 
     const spendByMoteur = computeSpendByMoteur(growthSpends);
 
-    const acquisitionSpend = BUDGET_CHANNELS.acquisition.moteurs.reduce((s: number, m: string) => s + (spendByMoteur[m] || 0), 0);
+    // ── Lire les GrowthExperiments pour isoler les dépenses Autopilote ──
+    const experimentsForBudget = await base44.asServiceRole.entities.GrowthExperiment.filter(
+      { status: ['active', 'paused', 'completed'] },
+      '-created_date', 50
+    ).catch(() => []);
+
+    const autopiloteCampaignIds = new Set<string>();
+    for (const exp of experimentsForBudget || []) {
+      if (exp.meta_campaign_id) autopiloteCampaignIds.add(exp.meta_campaign_id);
+    }
+
+    const acquisitionSpendAutopilote = computeAutopiloteAcquisitionSpend(growthSpends, autopiloteCampaignIds);
+    const acquisitionSpendTotal = BUDGET_CHANNELS.acquisition.moteurs.reduce((s: number, m: string) => s + (spendByMoteur[m] || 0), 0);
+    const acquisitionSpend = acquisitionSpendAutopilote; // CAC calculé sur dépenses Autopilote uniquement
     const primesSpend = BUDGET_CHANNELS.primes.moteurs.reduce((s: number, m: string) => s + (spendByMoteur[m] || 0), 0);
     const reactivationSpend = BUDGET_CHANNELS.reactivation.moteurs.reduce((s: number, m: string) => s + (spendByMoteur[m] || 0), 0);
     const totalSpend = acquisitionSpend + primesSpend + reactivationSpend;
@@ -132,7 +145,7 @@ export default async function(req: Request): Promise<Response> {
           if (spend.reference_id === exp.meta_campaign_id || spend.campagne_id === exp.meta_campaign_id) {
             const spendTs = spend.date_depense ? new Date(spend.date_depense).getTime() : 0;
             if (spendTs >= start && spendTs <= end) {
-              expSpend += (spend.montant || 0);
+              expSpend += normalizeAmountToFcfa(spend);
             }
           }
         }
@@ -156,6 +169,39 @@ export default async function(req: Request): Promise<Response> {
         performance_status: performanceStatus,
         sample_sufficient: sampleSufficient,
       }).catch(() => {});
+
+      // ── Per-experiment budget cap: auto-pause si budget atteint ──
+      if (expSpend >= exp.budget_test_fcfa && exp.status === 'active') {
+        await base44.asServiceRole.entities.GrowthExperiment.update(exp.id, {
+          status: 'paused',
+        }).catch(() => {});
+
+        if (exp.meta_campaign_id) {
+          try {
+            await base44.asServiceRole.functions.invoke('manageMetaCampaign', {
+              action: 'pause_campaign',
+              campaign_id: exp.meta_campaign_id,
+            });
+          } catch (e) {
+            // Non-bloquant: la campagne Meta peut déjà être en pause
+          }
+        }
+
+        await base44.asServiceRole.entities.GrowthDecision.create({
+          decision_type: 'pause_experiment',
+          status: 'executed',
+          trigger_rule: 'experiment_budget_cap_reached',
+          trigger_metrics: JSON.stringify({
+            experiment_id: exp.id,
+            experiment_name: exp.name,
+            spend_fcfa: expSpend,
+            budget_test_fcfa: exp.budget_test_fcfa,
+          }),
+          recommended_action: `Expérience auto-stoppée: ${expSpend}/${exp.budget_test_fcfa} FCFA consommés`,
+          action_payload: JSON.stringify({ experiment_id: exp.id, meta_campaign_id: exp.meta_campaign_id }),
+          autopilot_cycle_id: `budget-cap-${Date.now()}`,
+        }).catch(() => {});
+      }
     }
 
     // ── 12. Écrire le GrowthMetricsCache dans AppConfig ──
@@ -168,7 +214,8 @@ export default async function(req: Request): Promise<Response> {
         acquisition_cap: parseInt(getConfigValue(configs, 'GROWTH_BUDGET_ACQUISITION_PER_MONTH') || '20000') || 20000,
         primes_cap: parseInt(getConfigValue(configs, 'GROWTH_BUDGET_PRIMES_PER_MONTH') || '5000') || 5000,
         reactivation_cap: parseInt(getConfigValue(configs, 'GROWTH_BUDGET_REACTIVATION_PER_MONTH') || '3000') || 3000,
-        acquisition_spent: acquisitionSpend,
+        acquisition_spent: acquisitionSpendAutopilote,
+        acquisition_spent_total: acquisitionSpendTotal,
         primes_spent: primesSpend,
         reactivation_spent: reactivationSpend,
         total_spent: totalSpend,
@@ -183,7 +230,8 @@ export default async function(req: Request): Promise<Response> {
       },
       cac_by_channel: {
         meta_ads: {
-          spend_fcfa: acquisitionSpend,
+          spend_fcfa_autopilote: acquisitionSpendAutopilote,
+          spend_fcfa_total: acquisitionSpendTotal,
           first_courses_attributed: firstCoursesBySource.meta_ads,
           cac_first_course_fcfa: cacMeta,
         },

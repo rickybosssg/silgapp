@@ -59,6 +59,17 @@ export default async function(req: Request): Promise<Response> {
 
     // ── Exécuter selon le type de décision ──
     if (decision.decision_type === 'create_experiment') {
+      // ── Vérifier qu'aucune expérience active n'existe déjà ──
+      const activeExperiments = await base44.asServiceRole.entities.GrowthExperiment.filter(
+        { status: 'active' }
+      ).catch(() => []);
+
+      if (activeExperiments && activeExperiments.length > 0) {
+        return Response.json({
+          error: `Une expérience est déjà active (${activeExperiments[0].name}). Une seule expérience à la fois est autorisée en V1.`,
+        }, { status: 400 });
+      }
+
       // ── Étape 1 : Créer la GrowthExperiment ──
       const experiment = await base44.asServiceRole.entities.GrowthExperiment.create({
         name: actionPayload.name || `Test ${Date.now()}`,

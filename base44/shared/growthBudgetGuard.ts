@@ -93,6 +93,30 @@ export function computeSpendByMoteur(growthSpends: any[]): Record<string, number
   return byMoteur;
 }
 
+// ── Helper : calculer les dépenses acquisition Autopilote-only ──
+// Compte UNIQUEMENT les dépenses Meta liées à une GrowthExperiment (active/paused/completed).
+// Les dépenses Meta historiques (non liées à une expérience) sont EXCLUES du budget Autopilote.
+export function computeAutopiloteAcquisitionSpend(
+  growthSpends: any[],
+  autopiloteCampaignIds: Set<string>
+): number {
+  const { start, end } = getCurrentMonthRange();
+  let total = 0;
+
+  for (const spend of growthSpends) {
+    if (spend.statut === 'annulee') continue;
+    if (spend.moteur !== 'publicite') continue;
+    const spendTs = spend.date_depense ? new Date(spend.date_depense).getTime() : 0;
+    if (spendTs < start || spendTs > end) continue;
+    const campaignId = spend.campagne_id || spend.reference_id;
+    if (campaignId && autopiloteCampaignIds.has(campaignId)) {
+      total += normalizeAmountToFcfa(spend);
+    }
+  }
+
+  return total;
+}
+
 // ── Vérifier les budgets et bloquer les moteurs si nécessaire ──
 export async function checkGrowthBudget(base44: any): Promise<{
   channels: Record<string, { spent: number; cap: number; exceeded: boolean; alert: boolean }>;
@@ -113,15 +137,40 @@ export async function checkGrowthBudget(base44: any): Promise<{
   const spendByMoteur = computeSpendByMoteur(growthSpends);
   const globalCap = parseInt(getConfigValue(configs, GLOBAL_BUDGET_CONFIG_KEY) || '0') || 0;
 
+  // ── Lire les GrowthExperiments pour isoler les dépenses Autopilote ──
+  const experiments = await base44.asServiceRole.entities.GrowthExperiment.filter(
+    { status: ['active', 'paused', 'completed'] },
+    '-created_date', 50
+  ).catch(() => []);
+
+  const autopiloteCampaignIds = new Set<string>();
+  for (const exp of experiments || []) {
+    if (exp.meta_campaign_id) autopiloteCampaignIds.add(exp.meta_campaign_id);
+  }
+
+  const acquisitionSpendAutopilote = computeAutopiloteAcquisitionSpend(growthSpends, autopiloteCampaignIds);
+  const acquisitionSpendTotal = spendByMoteur['publicite'] || 0;
+
   // ── Calculer les dépenses par canal ──
   const channels: Record<string, any> = {};
   let totalGrowthSpend = 0;
 
   for (const [channelKey, channelConfig] of Object.entries(BUDGET_CHANNELS)) {
-    const channelSpend = channelConfig.moteurs.reduce(
-      (sum: number, m: string) => sum + (spendByMoteur[m] || 0),
-      0
-    );
+    let channelSpend: number;
+    let totalChannelSpend: number | undefined;
+
+    if (channelKey === 'acquisition') {
+      // Acquisition: ne compter que les dépenses Autopilote-controlled
+      channelSpend = acquisitionSpendAutopilote;
+      totalChannelSpend = acquisitionSpendTotal;
+    } else {
+      channelSpend = channelConfig.moteurs.reduce(
+        (sum: number, m: string) => sum + (spendByMoteur[m] || 0),
+        0
+      );
+      totalChannelSpend = channelSpend;
+    }
+
     const channelCap = parseInt(getConfigValue(configs, channelConfig.config_cap_key) || '0') || 0;
     const exceeded = channelCap > 0 && channelSpend >= channelCap;
     const alert = channelCap > 0 && channelSpend >= channelCap * ALERT_THRESHOLD_PCT;
@@ -131,6 +180,7 @@ export async function checkGrowthBudget(base44: any): Promise<{
       cap: channelCap,
       exceeded,
       alert,
+      ...(totalChannelSpend !== undefined ? { total_spent: totalChannelSpend } : {}),
     };
     totalGrowthSpend += channelSpend;
 
