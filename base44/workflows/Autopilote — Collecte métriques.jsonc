@@ -1,0 +1,44 @@
+{
+  "name": "Autopilote \u2014 Collecte m\u00e9triques",
+  "description": "Collecte et agr\u00e8ge les m\u00e9triques Growth (CAC par canal, exp\u00e9riences, cache) une fois par jour \u00e0 03h00 UTC. Lecture seule sur les donn\u00e9es m\u00e9tier, \u00e9criture uniquement sur GrowthExperiment et AppConfig(GROWTH_METRICS_CACHE).",
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "recurring",
+      "cron_expression": "0 3 * * *",
+      "one_time_date": null,
+      "timezone": "UTC",
+      "interval_value": null,
+      "interval_unit": null,
+      "interval_anchor": null,
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  },
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "autopilote_collect_metrics",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "collect_metrics": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "collectGrowthMetrics"
+          },
+          "then": "end",
+          "x-base44": {
+            "title": "Collecte m\u00e9triques Growth",
+            "description": "CAC par canal + mise \u00e0 jour des exp\u00e9riences"
+          }
+        }
+      }
+    ]
+  }
+}

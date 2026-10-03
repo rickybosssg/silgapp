@@ -1,0 +1,219 @@
+{
+  "name": "GrowthExperiment",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Nom de l'exp\u00e9rience (ex: Test A \u2014 Ouaga centre 25-35 Tous)"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "pending_approval",
+        "approved",
+        "active",
+        "paused",
+        "completed",
+        "cancelled"
+      ],
+      "default": "draft",
+      "description": "Statut de l'exp\u00e9rience. draft=proposition, pending_approval=en attente validation, approved=valid\u00e9e mais non active, active=campagne Meta activ\u00e9e, paused=mise en pause, completed=termin\u00e9e, cancelled=annul\u00e9e."
+    },
+    "targeting_geo": {
+      "type": "string",
+      "enum": [
+        "ouaga_centre",
+        "ouaga_periph"
+      ],
+      "description": "Ciblage g\u00e9ographique"
+    },
+    "targeting_age_min": {
+      "type": "number",
+      "description": "\u00c2ge minimum du ciblage"
+    },
+    "targeting_age_max": {
+      "type": "number",
+      "description": "\u00c2ge maximum du ciblage"
+    },
+    "targeting_gender": {
+      "type": "string",
+      "enum": [
+        "all",
+        "female"
+      ],
+      "description": "Genre cibl\u00e9"
+    },
+    "meta_objective": {
+      "type": "string",
+      "enum": [
+        "OUTCOME_APP_PROMOTION",
+        "OUTCOME_TRAFFIC"
+      ],
+      "default": "OUTCOME_APP_PROMOTION",
+      "description": "Objectif Meta Ads"
+    },
+    "message_angle": {
+      "type": "string",
+      "enum": [
+        "rapidite",
+        "economie",
+        "sans_deplacement"
+      ],
+      "description": "Angle du message. rapidite=Livraison rapide, economie=Gagnez du temps, sans_deplacement=Faites livrer sans vous d\u00e9placer."
+    },
+    "budget_test_fcfa": {
+      "type": "number",
+      "default": 3000,
+      "description": "Budget allou\u00e9 au test (FCFA)"
+    },
+    "meta_campaign_id": {
+      "type": "string",
+      "description": "ID de la campagne Meta Ads cr\u00e9\u00e9e (renseign\u00e9 apr\u00e8s cr\u00e9ation)"
+    },
+    "meta_adset_id": {
+      "type": "string",
+      "description": "ID de l'ensemble de publicit\u00e9 Meta Ads"
+    },
+    "spend_fcfa": {
+      "type": "number",
+      "default": 0,
+      "description": "D\u00e9penses r\u00e9elles depuis GrowthSpend"
+    },
+    "installs": {
+      "type": "number",
+      "default": 0,
+      "description": "Installations attribu\u00e9es (AppInstall)"
+    },
+    "signups": {
+      "type": "number",
+      "default": 0,
+      "description": "Inscriptions attribu\u00e9es (AppInstall avec user_email)"
+    },
+    "first_courses": {
+      "type": "number",
+      "default": 0,
+      "description": "Clients avec 1\u00e8re course livr\u00e9e attribu\u00e9s \u00e0 cette exp\u00e9rience"
+    },
+    "second_courses": {
+      "type": "number",
+      "default": 0,
+      "description": "Clients avec 2\u00e8me course livr\u00e9e attribu\u00e9s"
+    },
+    "attributed_revenue_fcfa": {
+      "type": "number",
+      "default": 0,
+      "description": "CA attribu\u00e9 \u00e0 cette exp\u00e9rience"
+    },
+    "attributed_commission_fcfa": {
+      "type": "number",
+      "default": 0,
+      "description": "Commission SILGAPP attribu\u00e9e \u00e0 cette exp\u00e9rience"
+    },
+    "cac_first_course_fcfa": {
+      "type": "number",
+      "description": "CAC = spend_fcfa / first_courses. Null si first_courses=0."
+    },
+    "observation_days": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre de jours depuis l'activation"
+    },
+    "performance_status": {
+      "type": "string",
+      "enum": [
+        "donnees_insuffisantes",
+        "sous_performante",
+        "a_surveiller",
+        "performante"
+      ],
+      "default": "donnees_insuffisantes",
+      "description": "Statut de performance calcul\u00e9 par les r\u00e8gles d\u00e9terministes"
+    },
+    "sample_sufficient": {
+      "type": "boolean",
+      "default": false,
+      "description": "True si first_courses >= 3 ET observation_days >= 14"
+    },
+    "proposed_by": {
+      "type": "string",
+      "description": "'autopilote' ou email admin"
+    },
+    "proposed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "proposal_rationale": {
+      "type": "string",
+      "description": "Pourquoi cette exp\u00e9rience a \u00e9t\u00e9 propos\u00e9e"
+    },
+    "approved_by": {
+      "type": "string",
+      "description": "Email admin ayant approuv\u00e9"
+    },
+    "approved_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "activated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date d'activation r\u00e9elle sur Meta"
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "cancelled_reason": {
+      "type": "string"
+    },
+    "source_decision_id": {
+      "type": "string",
+      "description": "ID de la GrowthDecision qui a propos\u00e9 cette exp\u00e9rience"
+    },
+    "next_experiment_id": {
+      "type": "string",
+      "description": "ID de l'exp\u00e9rience suivante bas\u00e9e sur celle-ci"
+    },
+    "phase": {
+      "type": "string",
+      "enum": [
+        "exploration",
+        "exploitation"
+      ],
+      "description": "Phase du moteur : exploration (nouvelles combinaisons) ou exploitation (variantes d'une exp\u00e9rience performante)"
+    }
+  },
+  "required": [
+    "name",
+    "status",
+    "targeting_geo",
+    "targeting_age_min",
+    "targeting_age_max",
+    "targeting_gender",
+    "message_angle",
+    "budget_test_fcfa"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
