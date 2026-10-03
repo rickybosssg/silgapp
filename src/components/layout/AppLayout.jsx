@@ -11,6 +11,7 @@ import PaiementRecuModal from "@/components/admin/PaiementRecuModal";
 import SystemAlertModal from "@/components/admin/SystemAlertModal";
 import VenusCourseAlertModal from "@/components/admin/VenusCourseAlertModal";
 import VenusIncidentAlertModal from "@/components/admin/VenusIncidentAlertModal";
+import PassAchatAlertModal from "@/components/admin/PassAchatAlertModal";
 import CourseWindowStack from "@/components/admin/CourseWindowStack";
 import VenusFloatingButton from "@/components/client/VenusFloatingButton";
 import { AdminCourseWindowsProvider, useAdminCourseWindows } from "@/context/AdminCourseWindowsContext";
@@ -158,6 +159,7 @@ function AppLayoutInner({ reseau }) {
       <SystemAlertModal />
       <VenusCourseAlertModal />
       <VenusIncidentAlertModal />
+      <PassAchatAlertModal />
       <CourseWindowStack />
 
       <div className="hidden lg:flex min-h-screen">
