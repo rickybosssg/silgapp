@@ -476,11 +476,15 @@ export default function CourseStepForm({
   };
 
   // ─── Titre de l'étape courante ──────────────────────────────────────────────
+  // ── CORRECTION 4: parcours client simplifié en 3 étapes ──
+  // ÉTAPE 1: Adresses (récupération + livraison)
+  // ÉTAPE 2: Contact (destinataire / expéditeur / passager)
+  // ÉTAPE 3: Détails + commande (type colis, prix, notes, confirmer)
   const stepTitles = isExpedie
-    ? ["Récupération", "Destinataire", "Livraison", "Détails", "Récapitulatif"]
+    ? ["Adresses", "Destinataire", "Détails"]
     : isRecevoir
-    ? ["Expéditeur", "Récupération", "Détails", "Récapitulatif"]
-    : ["Prise en charge", "Destination", "Passager", "Détails", "Récapitulatif"];
+    ? ["Adresses", "Expéditeur", "Détails"]
+    : ["Adresses", "Passager", "Détails"];
 
   const updateAddress = (side, text, location) => {
     const isDeparture = side === "depart";
@@ -680,12 +684,103 @@ export default function CourseStepForm({
   // ─── RENDU DES ÉTAPES ───────────────────────────────────────────────────────
   // ═══════════════════════════════════════════════════════════════════════════
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // CORRECTION 4 — Parcours 3 étapes
+  // ÉTAPE 0: Adresses (récupération + livraison)
+  // ÉTAPE 1: Contact (destinataire / expéditeur / passager)
+  // ÉTAPE 2: Détails + commande
+  // ═══════════════════════════════════════════════════════════════════════════
   const renderStep = () => {
     switch (step) {
-      // ─── ÉTAPE 0 ───────────────────────────────────────────────────────────
+      // ─── ÉTAPE 0: ADRESSES (récupération + livraison) ──────────────────────
       case 0: {
-        // Déplacement : adresse de prise en charge
-        if (isDeplacement) {
+        return (
+          <div className="space-y-5">
+            {/* ─── RÉCUPÉRATION ─── */}
+            <div className="space-y-4">
+              <div className="text-center">
+                <StepIcon icon={MapPin} />
+                <h2 className="text-2xl font-black" style={{ color: COLORS.secondary }}>
+                  {isDeplacement ? "Point de prise en charge" : isRecevoir ? "Adresse de récupération" : "Où récupérer le colis ?"}
+                </h2>
+                <p className="text-sm mt-1.5" style={{ color: COLORS.textSecondary }}>
+                  {isDeplacement ? "Où récupérer le passager ?" : isRecevoir ? "Où le livreur doit récupérer le colis" : "Votre adresse de récupération"}
+                </p>
+              </div>
+              {formData.recuperationGPS ? (
+                <GPSAcquiredCard
+                  address={formData.adresse_depart}
+                  lat={formData.gps_depart_lat}
+                  lng={formData.gps_depart_lng}
+                  onClear={() => setFormData({ ...formData, recuperationGPS: false, gps_depart_lat: null, gps_depart_lng: null, adresse_depart: "" })}
+                />
+              ) : (
+                <>
+                  {!isRecevoir && (
+                    <GPSButton onClick={gpsHandlers?.onGetGPSDepart} loading={gpsLoading?.depart} label="Utiliser ma position actuelle" sublabel="Détection automatique de votre position" />
+                  )}
+                  {!isRecevoir && <Divider />}
+                  <SmartAddressInput
+                    countryCode={activeCountry}
+                    label="Adresse de récupération"
+                    value={formData.adresse_depart}
+                    onChange={(text, location) => updateAddress("depart", text, location)}
+                    placeholder="Quartier, rue, boutique, pharmacie..."
+                  />
+                </>
+              )}
+              {isExpedie && (
+                <div className="p-3 rounded-2xl border" style={{ background: COLORS.bgCard, borderColor: COLORS.border }}>
+                  <NombreColisSelector
+                    value={formData.nb_colis || 1}
+                    onChange={(nb) => setFormData({ ...formData, nb_colis: nb })}
+                  />
+                </div>
+              )}
+            </div>
+
+            <Divider />
+
+            {/* ─── LIVRAISON ─── */}
+            <div className="space-y-4">
+              <div className="text-center">
+                <StepIcon icon={Navigation} />
+                <h2 className="text-2xl font-black" style={{ color: COLORS.secondary }}>
+                  {isDeplacement ? "Point de destination" : isRecevoir ? "Votre adresse de livraison" : "Où livrer le colis ?"}
+                </h2>
+                <p className="text-sm mt-1.5" style={{ color: COLORS.textSecondary }}>
+                  {isDeplacement ? "Où déposer le passager ?" : isRecevoir ? "Adresse où livrer le colis" : "Adresse ou quartier d'arrivée"}
+                </p>
+              </div>
+              {formData.livraisonGPS ? (
+                <GPSAcquiredCard
+                  address={formData.adresse_arrivee}
+                  onClear={() => setFormData({ ...formData, livraisonGPS: false, gps_arrivee_lat: null, gps_arrivee_lng: null, adresse_arrivee: "" })}
+                />
+              ) : (
+                <>
+                  <SmartAddressInput
+                    countryCode={activeCountry}
+                    label={isDeplacement ? "Adresse de destination" : "Adresse de livraison"}
+                    hint="Indiquez le quartier, la rue ou un point de repère connu."
+                    value={formData.adresse_arrivee}
+                    onChange={(text, location) => updateAddress("arrivee", text, location)}
+                    placeholder="Quartier, rue, restaurant, pharmacie..."
+                  />
+                  {isDeplacement && (
+                    <GPSButton onClick={gpsHandlers?.onGetGPSArrivee} loading={gpsLoading?.arrivee} label="Utiliser ma position actuelle" sublabel="Définir la destination avec le GPS" />
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        );
+      }
+
+      // ─── ÉTAPE 1: CONTACT (destinataire / expéditeur / passager) ──────────
+      case 1: {
+        // Recevoir : expéditeur (contact)
+        if (isRecevoir) {
           return (
             <div className="space-y-5">
               <div className="text-center">

@@ -181,6 +181,9 @@ export default async function(req: Request): Promise<Response> {
         console.error('[finaliserLivraisonLivreur] enterprise accounting error:', entErr?.message);
       }
 
+      // ── Correction 1: mettre à jour le livreur (courses_du_jour +1, statut disponible) ──
+      await updateLivreurAfterDelivery(base44, course);
+
       return Response.json({
         success: true,
         course: updated,
@@ -236,6 +239,9 @@ export default async function(req: Request): Promise<Response> {
         console.error('[finaliserLivraisonLivreur] enterprise accounting error (prix à confirmer):', entErr?.message);
       }
 
+      // ── Correction 1: mettre à jour le livreur (courses_du_jour +1, statut disponible) ──
+      await updateLivreurAfterDelivery(base44, course);
+
       return Response.json({
         success: true,
         course: updated,
@@ -285,6 +291,9 @@ export default async function(req: Request): Promise<Response> {
           console.error('[finaliserLivraisonLivreur] enterprise accounting error (standard):', entErr?.message);
         }
 
+        // ── Correction 1: mettre à jour le livreur (courses_du_jour +1, statut disponible) ──
+        await updateLivreurAfterDelivery(base44, course);
+
         return Response.json({
           success: true,
           course: res.course,
@@ -311,6 +320,10 @@ export default async function(req: Request): Promise<Response> {
         }
 
         const updated = await base44.asServiceRole.entities.CourseExterne.update(course_id, updateData);
+
+        // ── Correction 1: mettre à jour le livreur (courses_du_jour +1, statut disponible) ──
+        await updateLivreurAfterDelivery(base44, course);
+
         return Response.json({
           success: true,
           course: updated,
@@ -329,6 +342,24 @@ export default async function(req: Request): Promise<Response> {
     }
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
+  }
+}
+
+// ── Correction 1: mettre à jour le livreur après livraison (courses_du_jour +1, statut disponible) ──
+// Idempotent : uniquement pour les nouvelles livraisons (pas les re-calls déjà 'livree').
+// Reproduit exactement le comportement de validateQRCode pour garantir la parité.
+async function updateLivreurAfterDelivery(base44: any, course: any): Promise<void> {
+  if (!course.livreur_id) return;
+  try {
+    const livreur = await base44.asServiceRole.entities.Livreur.get(course.livreur_id).catch(() => null);
+    if (!livreur) return;
+    await base44.asServiceRole.entities.Livreur.update(course.livreur_id, {
+      statut: livreur.bloque_encours ? 'hors_ligne' : 'disponible',
+      ...(livreur.bloque_encours ? { admin_hors_ligne: true } : {}),
+      courses_du_jour: (Number(livreur.courses_du_jour) || 0) + 1,
+    });
+  } catch (err: any) {
+    console.error('[finaliserLivraisonLivreur] updateLivreurAfterDelivery error:', err?.message);
   }
 }
 

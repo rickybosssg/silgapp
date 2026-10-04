@@ -1229,23 +1229,25 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                       // GPS optionnel — ne pas bloquer la récupération si indisponible
                       navigator.geolocation.getCurrentPosition(
                         (pos) => {
-                          base44.functions.invoke("transitionStatutLivreur", {
-                            course_id: course.id,
-                            statut_cible: "colis_recupere",
-                            latitude: pos.coords.latitude,
-                            longitude: pos.coords.longitude,
-                          }).catch(() => null);
+                           base44.functions.invoke("transitionStatutLivreur", {
+                             course_id: course.id,
+                             statut_cible: "colis_recupere",
+                             latitude: pos.coords.latitude,
+                             longitude: pos.coords.longitude,
+                             confirmation_method: "bouton",
+                           }).catch(() => null);
                           queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
                           onColisRecupere({ ...course, statut: "colis_recupere", heure_recuperation: now });
                           toast.success("Colis récupéré avec succès !");
                           setPickupBoutonPending(false);
                         },
                         () => {
-                          // GPS indisponible — récupération non bloquée
-                          base44.functions.invoke("transitionStatutLivreur", {
-                            course_id: course.id,
-                            statut_cible: "colis_recupere",
-                          }).catch(() => null);
+                           // GPS indisponible — récupération non bloquée
+                           base44.functions.invoke("transitionStatutLivreur", {
+                             course_id: course.id,
+                             statut_cible: "colis_recupere",
+                             confirmation_method: "bouton",
+                           }).catch(() => null);
                           queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
                           onColisRecupere({ ...course, statut: "colis_recupere", heure_recuperation: now });
                           toast.success("Colis récupéré avec succès !");
