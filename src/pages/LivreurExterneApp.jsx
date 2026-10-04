@@ -1866,7 +1866,11 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       {/* ── Animation de victoire livreur — 3 secondes, purement visuelle ── */}
       <LivreurVictoryOverlay
         courseId={victoryCourseId}
-        onClose={() => setVictoryCourseId(null)}
+        onClose={() => {
+          setVictoryCourseId(null);
+          // Correction 3: retour automatique à l'onglet Disponibles après la célébration
+          setActiveTab("disponibles");
+        }}
       />
     </DashboardThemeProvider>
   );

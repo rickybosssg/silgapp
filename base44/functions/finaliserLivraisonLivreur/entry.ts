@@ -145,6 +145,8 @@ export default async function(req: Request): Promise<Response> {
         statut: 'livree',
         heure_livraison: now,
         colis_livre_at: now,
+        delivery_confirmed_by: 'bouton',
+        delivery_confirmed_at: now,
         prix_final: montant,
         commission_silga: commissionSilga,
         montant_livreur: montantLivreur,
@@ -207,6 +209,8 @@ export default async function(req: Request): Promise<Response> {
         statut: 'livree',
         heure_livraison: now,
         colis_livre_at: now,
+        delivery_confirmed_by: 'bouton',
+        delivery_confirmed_at: now,
         // prix_final reste null — sera défini par confirmerPrixCourseAdmin
         // commission_silga reste null — sera calculée par confirmerPrixCourseAdmin
         // montant_livreur reste null — sera calculé par confirmerPrixCourseAdmin
@@ -249,9 +253,17 @@ export default async function(req: Request): Promise<Response> {
       if (res?.success) {
         // ── Garde livreur_financier_id : calculPrixCourseExterne ne le set pas.
         //    Le fixer une seule fois ici, après délégation. Idempotent. ──
+        //    Correction 1: aussi set delivery_confirmed_by='bouton' + delivery_confirmed_at
         if (!course.livreur_financier_id && course.livreur_id) {
           await base44.asServiceRole.entities.CourseExterne.update(course_id, {
             livreur_financier_id: course.livreur_id,
+            delivery_confirmed_by: 'bouton',
+            delivery_confirmed_at: now,
+          }).catch(() => {});
+        } else {
+          await base44.asServiceRole.entities.CourseExterne.update(course_id, {
+            delivery_confirmed_by: 'bouton',
+            delivery_confirmed_at: now,
           }).catch(() => {});
         }
 
@@ -289,6 +301,8 @@ export default async function(req: Request): Promise<Response> {
           statut: 'livree',
           heure_livraison: now,
           colis_livre_at: now,
+          delivery_confirmed_by: 'bouton',
+          delivery_confirmed_at: now,
           ...(course.livreur_financier_id ? {} : { livreur_financier_id: course.livreur_id }),
         };
 

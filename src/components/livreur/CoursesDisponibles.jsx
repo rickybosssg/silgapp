@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { startUrgentCourseAlert, stopUrgentCourseAlert } from "@/lib/livreurUrgentAlert";
 import { getPrixAffichable } from "@/utils/getPrixAffichable";
 import { useCoursesDisponibles } from "@/hooks/useCoursesDisponibles";
-import AcceptConfirmationModal from "./AcceptConfirmationModal";
+// Correction 2: AcceptConfirmationModal supprimé — acceptation en un seul clic
 
 function calculerDistance(lat1, lng1, lat2, lng2) {
   if ([lat1, lng1, lat2, lng2].some(value => value == null || Number.isNaN(Number(value)))) return null;
@@ -41,7 +41,6 @@ function persistDismissedCourse(courseId) {
 export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onNewCourse }) {
   const queryClient = useQueryClient();
   const [acceptingId, setAcceptingId] = useState(null);
-  const [pendingAcceptCourse, setPendingAcceptCourse] = useState(null);
   const knownCourseIdsRef = useRef(new Set());
   const courseFeedInitializedRef = useRef(false);
 
@@ -156,16 +155,11 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
     });
   }, [eligibleCourses, livreurLat, livreurLng]);
 
-  // Ouvre le modal de confirmation AVANT l'acceptation réelle
-  const handleAcceptClick = (course) => {
+  // Correction 2: Acceptation directe en un seul clic — plus de modal de confirmation
+  const handleAcceptClick = async (course) => {
     if (!course?.id || !livreurId) return;
-    setPendingAcceptCourse(course);
-  };
-
-  // Acceptation réelle — déclenchée par le bouton "Confirmer" du modal
-  const handleAcceptConfirm = async () => {
-    const course = pendingAcceptCourse;
-    if (!course?.id || !livreurId) return;
+    // Anti-double-tap: si déjà en cours, ignorer
+    if (acceptingId) return;
     setAcceptingId(course.id);
     try {
       const res = await base44.functions.invoke("dispatchExterneAuto", {
@@ -195,7 +189,6 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
       toast.error("Erreur réseau lors de l'acceptation");
     } finally {
       setAcceptingId(null);
-      setPendingAcceptCourse(null);
     }
   };
 
@@ -384,15 +377,6 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
           </div>
         </div>
       ))}
-      {/* Modal de confirmation d'acceptation (Phase 1 anti-annulation) */}
-      {pendingAcceptCourse && (
-        <AcceptConfirmationModal
-          course={pendingAcceptCourse}
-          onConfirm={handleAcceptConfirm}
-          onCancel={() => setPendingAcceptCourse(null)}
-          loading={acceptingId === pendingAcceptCourse.id}
-        />
-      )}
     </div>
   );
 }

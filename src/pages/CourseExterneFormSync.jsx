@@ -367,17 +367,13 @@ export default function CourseExterneFormSync() {
           }
         } catch (_) {}
       }
-      // Génération QR/codes dès la création
-      // Pour "recevoir" : pickup = chez l'expéditeur, delivery = chez le destinataire
+      // ── Correction 1: génération QR/PIN désactivée pour les nouvelles courses ──
+      // Les nouvelles courses utilisent le parcours bouton (COLIS RÉCUPÉRÉ / COLIS LIVRÉ).
+      // Les champs pickup_qr_token, pickup_code_4_digits, etc. restent null →
+      // useNewButtonParcours(course) retourne true → boutons directs au lieu de QR/PIN.
+      // ensureCourseCodeMessage n'est pas appelé car pickupPIN est null.
+      // Backward compat: les anciennes courses avec QR token conservent le parcours QR/PIN.
       if (!finalData.is_multi_colis) {
-        const pickupQrToken = crypto.randomUUID().replace(/-/g, "");
-        const deliveryQrToken = crypto.randomUUID().replace(/-/g, "");
-        const pickupCode4 = String(Math.floor(1000 + Math.random() * 9000));
-        const deliveryCode4 = String(Math.floor(1000 + Math.random() * 9000));
-        finalData.pickup_qr_token = pickupQrToken;
-        finalData.pickup_code_4_digits = pickupCode4;
-        finalData.delivery_qr_token = deliveryQrToken;
-        finalData.delivery_code_4_digits = deliveryCode4;
         finalData.pickup_confirmed_at = null;
         finalData.delivery_confirmed_at = null;
       }
@@ -893,20 +889,13 @@ export default function CourseExterneFormSync() {
     return <LivreurRechercheAnimation course={createdCourse} />;
   }
 
-  // Modal invitation WhatsApp — affiché après création réussie si contact hors SILGAPP
+  // ── Correction 1: invitation WhatsApp non bloquante ──
+  // Le client passe immédiatement à la recherche de livreur / suivi.
+  // L'invitation WhatsApp est diffusée en arrière-plan sans interrompre le flux.
   if (invitationModal && createdCourse) {
-    return (
-      <>
-        <LivreurRechercheAnimation course={createdCourse} />
-        <InvitationWhatsAppModal
-          telephone={invitationModal.telephone}
-          nomContact={invitationModal.nom}
-          nomExpediteur={clientProfil?.nom || formData.client_nom || "Votre contact"}
-          onClose={() => { setInvitationModal(null); setCourseCreated(true); }}
-          onSend={() => { setInvitationModal(null); setCourseCreated(true); }}
-        />
-      </>
-    );
+    // Fire-and-forget: ne pas bloquer le suivi
+    setInvitationModal(null);
+    setCourseCreated(true);
   }
 
   // ── Blocage client pour frais d'annulation impayés ────────────────────────
