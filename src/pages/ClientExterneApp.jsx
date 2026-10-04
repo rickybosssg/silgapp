@@ -44,19 +44,14 @@ import MultiCourseSelector from "@/components/client/MultiCourseSelector";
 import QuickOrderPanel from "@/components/client/QuickOrderPanel";
 import QuickOrderProPanel from "@/components/client/QuickOrderProPanel";
 import { haversineKm as haversineDistance } from "@/lib/priceEstimate";
-import { STATUTS_ACTIFS_COURSE, COURSE_STATUSES } from "@/lib/courseStatuses";
+import { COURSE_STATUSES, isTerminalStatus } from "@/lib/courseStatuses";
+import SuivreCourseCard from "@/components/client/SuivreCourseCard";
 import { useForteDemande } from "@/hooks/useForteDemande";
 import ForteDemandeBanner from "@/components/client/ForteDemandeBanner";
 
-// ── Statuts réellement suivables par le client (liste positive) ──
-// Inclut la phase de recherche (nouvelle, recherche_livreur) + tous les statuts
-// actifs (livreur engagé). Exclut en_attente (suspendue), programmee (non démarrée),
-// livree et annulee (terminaux).
-const STATUTS_SUIVABLES_CLIENT = [
-  COURSE_STATUSES.NOUVELLE,
-  COURSE_STATUSES.RECHERCHE_LIVREUR,
-  ...STATUTS_ACTIFS_COURSE,
-];
+// Les statuts backend existants restent suivables jusqu'à confirmation terminale.
+// disponible_push est un dispatch_status, pas un statut de course.
+const STATUTS_SUIVABLES_CLIENT = Object.values(COURSE_STATUSES).filter(s => !isTerminalStatus(s));
 
 function GPSBadge({ profil, onForceSync }) {
   const hasCoords = !!(profil?.latitude && profil?.longitude);
@@ -110,6 +105,7 @@ export default function ClientExterneApp() {
   const [sessionExpired, setSessionExpired] = useState(false);
   const [showRecherche, setShowRecherche] = useState(false);
   const [showSuiviFullscreen, setShowSuiviFullscreen] = useState(false);
+  const [suiviCourseId, setSuiviCourseId] = useState(null);
   const [showAcceptanceAnim, setShowAcceptanceAnim] = useState(false);
   const [showMultiCourseSelector, setShowMultiCourseSelector] = useState(false);
   const lastRechercheCourseId = useRef(null);
@@ -269,8 +265,8 @@ export default function ClientExterneApp() {
 
   // ── Course principale affichée dans la barre de suivi (priorité: assignée > recherche > autre) ──
   const coursePrincipale = useMemo(() =>
-    courseAssignee || courseEnRecherche || coursesActives[0] || null
-  , [coursesActives, courseEnRecherche, courseAssignee]);
+    coursesActives.find(c => c.id === suiviCourseId) || courseAssignee || courseEnRecherche || coursesActives[0] || null
+  , [coursesActives, courseEnRecherche, courseAssignee, suiviCourseId]);
 
   // ── Auto-ouverture de l'écran "Recherche livreur" quand une nouvelle course entre en recherche ──
   useEffect(() => {
@@ -628,12 +624,32 @@ export default function ClientExterneApp() {
   // Polling automatique des courses actives toutes les 8s
   // syncGpsDestinataire est appelé uniquement dans le watch GPS (15s) pour éviter le rate limit
   useEffect(() => {
-    if (!onboardingDone || !clientProfil || !position) return;
+    if (!onboardingDone || !clientProfil || !userId) return;
     const interval = setInterval(() => {
       checkStatus(position, clientProfil);
     }, 8000); //  5s → 8s : checkStatus fait 4-5 requêtes imbriquées
     return () => clearInterval(interval);
-  }, [onboardingDone, clientProfil?.id, position]);
+  }, [onboardingDone, clientProfil?.id, position, userId]);
+
+  // Charger dès que l'identité est prête, sans attendre le GPS ni le prochain tick.
+  useEffect(() => {
+    if (!userId || !clientProfil?.id) return;
+    userIdRef.current = userId;
+    const cached = queryClient.getQueryData(['courses-externes-client']) || [];
+    const confirmed = cached.filter(c => c.id && !c.id.startsWith('temp_') &&
+      (c.client_user_email === clientProfil.user_email || c.created_by_id === userId ||
+       c.destinataire_client_id === clientProfil.id ||
+       (c.expediteur_client_id === clientProfil.id && c.type_course === 'recevoir')) &&
+      (c.enterprise_id || null) === (clientProfil.enterprise_id || null) &&
+      STATUTS_SUIVABLES_CLIENT.includes(c.statut));
+    if (confirmed.length) setCoursesActives(confirmed.sort((a, b) => new Date(b.created_date) - new Date(a.created_date)));
+    checkStatusRef.current?.(positionRef.current, clientProfil);
+    const refresh = () => {
+      if (document.visibilityState === 'visible') checkStatusRef.current?.(positionRef.current, clientProfilRef.current);
+    };
+    document.addEventListener('visibilitychange', refresh);
+    return () => document.removeEventListener('visibilitychange', refresh);
+  }, [userId, clientProfil?.id, queryClient]);
 
   // ── Subscription WebSocket temps réel — met à jour les courses instantanément ──
   // Complète le polling 8s : si un livreur accepte/annule, le client le voit immédiatement
@@ -642,7 +658,7 @@ export default function ClientExterneApp() {
     const unsubscribe = base44.entities.CourseExterne.subscribe((event) => {
       const profil = clientProfilRef.current;
       const pos = positionRef.current;
-      if (profil && pos) {
+      if (profil) {
         checkStatusRef.current?.(pos, profil);
       }
     });
@@ -793,14 +809,18 @@ export default function ClientExterneApp() {
       const currentUserId = userIdRef.current;
       if (!currentUserId) return;
 
-      // 1. Courses créées par l'utilisateur
-      const coursesClient = await base44.entities.CourseExterne.filter({ created_by_id: currentUserId }, "-created_date", 20);
+      // La création service-role rattache la course par client_user_email.
+      // Garder created_by_id pour les anciennes courses créées directement.
+      const coursesClient = await base44.entities.CourseExterne.filter({
+        $or: [{ client_user_email: profil.user_email }, { created_by_id: currentUserId }],
+        statut: { $in: STATUTS_SUIVABLES_CLIENT },
+      }, "-created_date", 100);
       const actives = (coursesClient || []).filter(c => STATUTS_SUIVABLES_CLIENT.includes(c.statut));
 
       // 2. Courses où l'utilisateur est destinataire
       let activesDestinataire = [];
       if (profil?.id) {
-        const coursesDestinataire = await base44.entities.CourseExterne.filter({ destinataire_client_id: profil.id }, "-created_date", 20);
+        const coursesDestinataire = await base44.entities.CourseExterne.filter({ destinataire_client_id: profil.id, statut: { $in: STATUTS_SUIVABLES_CLIENT } }, "-created_date", 100);
         activesDestinataire = (coursesDestinataire || []).filter(c =>
           STATUTS_SUIVABLES_CLIENT.includes(c.statut) &&
           c.created_by_id !== currentUserId
@@ -810,7 +830,7 @@ export default function ClientExterneApp() {
       // 3. Courses où l'utilisateur est expéditeur (mode "recevoir") — IMPORTANT : miroir du mode expedier
       let activesExpediteur = [];
       if (profil?.id) {
-        const coursesExpediteur = await base44.entities.CourseExterne.filter({ expediteur_client_id: profil.id }, "-created_date", 20);
+        const coursesExpediteur = await base44.entities.CourseExterne.filter({ expediteur_client_id: profil.id, statut: { $in: STATUTS_SUIVABLES_CLIENT } }, "-created_date", 100);
         activesExpediteur = (coursesExpediteur || []).filter(c =>
           STATUTS_SUIVABLES_CLIENT.includes(c.statut) &&
           c.created_by_id !== currentUserId && // ne pas dupliquer
@@ -820,7 +840,9 @@ export default function ClientExterneApp() {
 
       // Fusionner sans doublons par id, trier par date desc
       const map = new Map();
-      [...actives, ...activesDestinataire, ...activesExpediteur].forEach(c => map.set(c.id, c));
+      [...actives, ...activesDestinataire, ...activesExpediteur]
+        .filter(c => (c.enterprise_id || null) === (profil.enterprise_id || null))
+        .forEach(c => map.set(c.id, c));
       const toutes = [...map.values()].sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
 
       // ── Enrichir avec GPS temps réel du livreur (_livreur) ──
@@ -1229,6 +1251,7 @@ export default function ClientExterneApp() {
                 {/* 1. COMMANDER — action principale */}
                 <button
                   className={`w-full flex items-center gap-4 rounded-2xl p-5 active:scale-[0.98] transition-all text-left ${forteDemande ? "bg-[#DC2626] shadow-[0_12px_30px_rgba(220,38,38,0.25)]" : "bg-[#007aff] shadow-[0_12px_30px_rgba(0,122,255,0.25)]"}`}
+                  data-testid="commander-card"
                   onClick={() => navigate("/client/course/expedier", { state: { position, clientProfil } })}
                 >
                   <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center flex-shrink-0">
@@ -1241,54 +1264,20 @@ export default function ClientExterneApp() {
                   <ChevronRight className="w-6 h-6 text-white/70" />
                 </button>
 
-                {/* 2. SUIVRE MA COURSE — course active en cours (carte jaune) */}
-                {coursesActives.length > 0 && (
-                  <button
-                    className="w-full flex items-center gap-4 rounded-2xl bg-amber-400 border border-amber-300 shadow-[0_12px_30px_rgba(245,158,11,0.30)] p-5 active:scale-[0.98] transition-all text-left hover:shadow-lg"
-                    onClick={() => {
-                      if (coursesActives.length > 1) {
-                        setShowMultiCourseSelector(true);
-                      } else {
-                        navigate("/client/suivi", { state: { course_id: coursesActives[0].id } });
-                      }
-                    }}
-                  >
-                    <div className="w-14 h-14 rounded-2xl bg-amber-500/30 flex items-center justify-center flex-shrink-0">
-                      <Navigation className="w-7 h-7 text-amber-900" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-lg font-black text-gray-900">
-                        {coursesActives.length > 1 ? "Suivre mes courses" : "Suivre ma course"}
-                      </p>
-                      <p className="text-sm text-gray-800/80">
-                        {coursesActives.length > 1
-                          ? `${coursesActives.length} courses en cours`
-                          : "Voir le livreur et l'avancement en direct"}
-                      </p>
-                    </div>
-                    {coursesActives.length > 1 ? (
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        {coursesActives.slice(0, 3).map((c, i) => (
-                          <span
-                            key={c.id}
-                            className={`w-2.5 h-2.5 rounded-full ${
-                              c.livreur_id ? "bg-green-600" :
-                              c.statut === "recherche_livreur" ? "bg-orange-600" : "bg-gray-600"
-                            }`}
-                            style={{ marginLeft: i === 0 ? 0 : -4 }}
-                          />
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="w-2.5 h-2.5 bg-green-600 rounded-full animate-pulse flex-shrink-0" />
-                    )}
-                    <ChevronRight className="w-6 h-6 text-gray-700 flex-shrink-0" />
-                  </button>
-                )}
+                {/* 2. Carte jaune, immédiatement entre Commander et Refaire. */}
+                <SuivreCourseCard
+                  course={coursePrincipale}
+                  onClick={() => {
+                    setSuiviCourseId(coursePrincipale.id);
+                    setShowRecherche(false);
+                    setShowSuiviFullscreen(true);
+                  }}
+                />
 
                 {/* 3. REFAIRE — historique */}
                 <button
                   className="w-full flex items-center gap-4 rounded-2xl bg-white border border-black/5 shadow-[0_8px_24px_rgba(15,23,42,0.07)] p-5 active:scale-[0.98] transition-all text-left hover:shadow-md"
+                  data-testid="refaire-card"
                   onClick={() => navigate("/client/suivi")}
                 >
                   <div className="w-14 h-14 rounded-2xl bg-green-50 flex items-center justify-center flex-shrink-0">
