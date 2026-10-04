@@ -3,7 +3,8 @@ import { base44 } from '@/api/base44Client';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { RefreshCw, CheckCircle2, XCircle, AlertTriangle, FlaskConical, TrendingUp, Wallet, Users, Repeat, Percent } from 'lucide-react';
+import { RefreshCw, CheckCircle2, XCircle, AlertTriangle, FlaskConical, TrendingUp, Wallet, Users, Repeat, Percent, Globe } from 'lucide-react';
+import AutopiloteStatusCard from '@/components/growth/AutopiloteStatusCard';
 
 const STATUS_COLORS = {
   donnees_insuffisantes: 'bg-gray-100 text-gray-700',
@@ -99,14 +100,7 @@ export default function AutopiloteDashboard() {
         </Button>
       </div>
 
-      {data.kill_switch_active && (
-        <Card className="p-4 bg-red-50 border-red-200">
-          <div className="flex items-center gap-2 text-red-700">
-            <AlertTriangle className="h-5 w-5" />
-            <span className="font-semibold">Kill switch ACTIF — tous les moteurs Growth sont désactivés</span>
-          </div>
-        </Card>
-      )}
+      <AutopiloteStatusCard data={data} />
 
       <Card className="p-4">
         <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
@@ -134,24 +128,30 @@ export default function AutopiloteDashboard() {
         </div>
       </Card>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card className="p-3">
-          <div className="flex items-center gap-1 text-xs text-gray-500"><Users className="h-3 w-3" /> 1ères courses</div>
-          <div className="text-lg font-bold text-gray-900">{data.acquisition?.first_courses_this_month ?? 0}</div>
-        </Card>
-        <Card className="p-3">
-          <div className="flex items-center gap-1 text-xs text-gray-500"><Repeat className="h-3 w-3" /> 2èmes courses</div>
-          <div className="text-lg font-bold text-gray-900">{data.acquisition?.second_courses_this_month ?? 0}</div>
-        </Card>
-        <Card className="p-3">
-          <div className="flex items-center gap-1 text-xs text-gray-500"><TrendingUp className="h-3 w-3" /> Commissions</div>
-          <div className="text-lg font-bold text-gray-900">{formatFcfa(revenue.attributed_commission_fcfa)}</div>
-        </Card>
-        <Card className="p-3">
-          <div className="flex items-center gap-1 text-xs text-gray-500"><Percent className="h-3 w-3" /> Com./Dép.</div>
-          <div className="text-lg font-bold text-gray-900">{revenue.commission_to_spend_ratio ? (revenue.commission_to_spend_ratio * 100).toFixed(1) + '%' : 'N/A'}</div>
-        </Card>
-      </div>
+      <Card className="p-4">
+        <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+          <Globe className="h-4 w-4" /> Métriques globales (tous canaux confondus)
+          <span className="text-[10px] font-normal text-gray-400 ml-1">— ≠ résultats du Test A ci-dessus</span>
+        </h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="text-center">
+            <div className="flex items-center justify-center gap-1 text-xs text-gray-500"><Users className="h-3 w-3" /> 1ères courses</div>
+            <div className="text-lg font-bold text-gray-900">{data.acquisition?.first_courses_this_month ?? 0}</div>
+          </div>
+          <div className="text-center">
+            <div className="flex items-center justify-center gap-1 text-xs text-gray-500"><Repeat className="h-3 w-3" /> 2èmes courses</div>
+            <div className="text-lg font-bold text-gray-900">{data.acquisition?.second_courses_this_month ?? 0}</div>
+          </div>
+          <div className="text-center">
+            <div className="flex items-center justify-center gap-1 text-xs text-gray-500"><TrendingUp className="h-3 w-3" /> Commissions</div>
+            <div className="text-lg font-bold text-gray-900">{formatFcfa(revenue.attributed_commission_fcfa)}</div>
+          </div>
+          <div className="text-center">
+            <div className="flex items-center justify-center gap-1 text-xs text-gray-500"><Percent className="h-3 w-3" /> Com./Dép.</div>
+            <div className="text-lg font-bold text-gray-900">{revenue.commission_to_spend_ratio ? (revenue.commission_to_spend_ratio * 100).toFixed(1) + '%' : 'N/A'}</div>
+          </div>
+        </div>
+      </Card>
 
       <Card className="p-4">
         <h2 className="text-sm font-semibold text-gray-700 mb-3">CAC par canal</h2>
