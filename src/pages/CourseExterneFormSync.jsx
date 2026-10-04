@@ -931,7 +931,7 @@ export default function CourseExterneFormSync() {
     );
   }
 
-  const totalSteps = typeCourse === "deplacement" ? 5 : typeCourse === "recevoir" ? 4 : 5;
+  const totalSteps = 3;
 
   return (
     <div className="min-h-screen p-4" style={{ background: "#F8FAFC" }}>
