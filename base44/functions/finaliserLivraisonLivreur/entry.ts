@@ -347,15 +347,58 @@ export default async function(req: Request): Promise<Response> {
 
 // ── Correction 1: mettre à jour le livreur après livraison (courses_du_jour +1, statut disponible) ──
 // Idempotent : uniquement pour les nouvelles livraisons (pas les re-calls déjà 'livree').
-// Reproduit exactement le comportement de validateQRCode pour garantir la parité.
+// Reproduit exactement le comportement de libererLivreurCourseLivree pour garantir la parité.
 async function updateLivreurAfterDelivery(base44: any, course: any): Promise<void> {
   if (!course.livreur_id) return;
   try {
     const livreur = await base44.asServiceRole.entities.Livreur.get(course.livreur_id).catch(() => null);
     if (!livreur) return;
+
+    // ── Protections historiques (parité avec libererLivreurCourseLivree) ──
+    // 1. bloque_encours → hors_ligne + admin_hors_ligne
+    if (livreur.bloque_encours) {
+      await base44.asServiceRole.entities.Livreur.update(course.livreur_id, {
+        statut: 'hors_ligne',
+        admin_hors_ligne: true,
+        courses_du_jour: (Number(livreur.courses_du_jour) || 0) + 1,
+      });
+      return;
+    }
+    // 2. manual_hors_ligne → reste hors_ligne (livreur s'est mis hors ligne lui-même)
+    if (livreur.manual_hors_ligne === true) {
+      await base44.asServiceRole.entities.Livreur.update(course.livreur_id, {
+        statut: 'hors_ligne',
+        courses_du_jour: (Number(livreur.courses_du_jour) || 0) + 1,
+      });
+      return;
+    }
+    // 3. admin_hors_ligne → reste hors_ligne (admin a forcé hors ligne)
+    if (livreur.admin_hors_ligne === true) {
+      await base44.asServiceRole.entities.Livreur.update(course.livreur_id, {
+        statut: 'hors_ligne',
+        courses_du_jour: (Number(livreur.courses_du_jour) || 0) + 1,
+      });
+      return;
+    }
+    // 4. Autre course active → reste en_course
+    const STATUTS_ACTIFS_LIVREUR = ["livreur_en_route", "client_contacte", "en_route_expediteur", "arrive_prise_en_charge", "colis_recupere", "passager_embarque", "pris_en_charge", "en_livraison", "arrivee"];
+    const autresCourses = await base44.asServiceRole.entities.CourseExterne.filter(
+      { livreur_id: course.livreur_id },
+      "-created_date", 10
+    ).catch(() => []);
+    const aAutreCourseActive = (autresCourses || []).some((c: any) =>
+      c.id !== course.id && STATUTS_ACTIFS_LIVREUR.includes(c.statut)
+    );
+    if (aAutreCourseActive) {
+      await base44.asServiceRole.entities.Livreur.update(course.livreur_id, {
+        statut: 'en_course',
+        courses_du_jour: (Number(livreur.courses_du_jour) || 0) + 1,
+      });
+      return;
+    }
+    // 5. Cas nominal → disponible
     await base44.asServiceRole.entities.Livreur.update(course.livreur_id, {
-      statut: livreur.bloque_encours ? 'hors_ligne' : 'disponible',
-      ...(livreur.bloque_encours ? { admin_hors_ligne: true } : {}),
+      statut: 'disponible',
       courses_du_jour: (Number(livreur.courses_du_jour) || 0) + 1,
     });
   } catch (err: any) {

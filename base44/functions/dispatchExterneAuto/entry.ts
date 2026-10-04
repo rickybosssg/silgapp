@@ -542,20 +542,20 @@ Deno.serve(async (req) => {
         return Response.json(reponseDejaPrise('final_check_already_taken', courseFinal));
       }
 
-      // 🔐 Préserver les tokens/PINs existants — ne JAMAIS les regénérer
-      // (générés une fois à la création de la course pour garantir l'unicité partout)
-      const pickupToken = course.pickup_qr_token || generateToken();
-      const deliveryToken = course.delivery_qr_token || generateToken();
-      const pickupPIN = course.pickup_code_4_digits || generatePIN();
-      const deliveryPIN = course.delivery_code_4_digits || generatePIN();
-      const tokensOntEteGeneres = !!(course.pickup_qr_token && course.pickup_code_4_digits);
-      if (!tokensOntEteGeneres) {
-        console.log(`[DISPATCH] 🔐 Génération nouveaux tokens/PINs pour course ${course_id} (absents à la création)`);
-      } else {
+      // 🔐 Préserver les tokens/PINs existants uniquement — ne pas générer pour les nouvelles courses
+      // Les nouvelles courses (sans QR/PIN à la création) ne reçoivent pas de tokens au dispatch.
+      // Les anciennes courses et les courses partenaire/pharmacie conservent leurs tokens.
+      const pickupToken = course.pickup_qr_token || null;
+      const deliveryToken = course.delivery_qr_token || null;
+      const pickupPIN = course.pickup_code_4_digits || null;
+      const deliveryPIN = course.delivery_code_4_digits || null;
+      if (pickupPIN) {
         console.log(`[DISPATCH] 🔒 Conservation tokens/PINs existants pour course ${course_id}`);
+      } else {
+        console.log(`[DISPATCH] ℹ️ Pas de tokens/PINs pour course ${course_id} (nouveau parcours sans QR/PIN)`);
       }
 
-      const updateData = {
+      const updateData: any = {
         dispatch_status: isManual ? 'propose' : 'accepte',
         statut: isManual ? 'recherche_livreur' : 'livreur_en_route',
         heure_acceptation: isManual ? null : new Date().toISOString(),
@@ -569,10 +569,10 @@ Deno.serve(async (req) => {
         livreur_nombre_avis: livreur.nombre_avis || 0,
         accepted_by_livreur_id: livreur_id,
         accepted_at: isManual ? null : new Date().toISOString(),
-        pickup_qr_token: pickupToken,
-        pickup_code_4_digits: pickupPIN,
-        delivery_qr_token: deliveryToken,
-        delivery_code_4_digits: deliveryPIN,
+        ...(pickupToken ? { pickup_qr_token: pickupToken } : {}),
+        ...(pickupPIN ? { pickup_code_4_digits: pickupPIN } : {}),
+        ...(deliveryToken ? { delivery_qr_token: deliveryToken } : {}),
+        ...(deliveryPIN ? { delivery_code_4_digits: deliveryPIN } : {}),
       };
 
       if (isManual) {

@@ -516,7 +516,8 @@
       "enum": [
         "qr",
         "manual_code",
-        "admin"
+        "admin",
+        "bouton"
       ]
     },
     "delivery_confirmed_by": {
@@ -525,9 +526,10 @@
         "qr",
         "manual_code",
         "admin",
-        "auto_timeout"
+        "auto_timeout",
+        "bouton"
       ],
-      "description": "M\u00e9thode de confirmation de livraison. auto_timeout = cl\u00f4ture automatique par le syst\u00e8me apr\u00e8s timeout d'acceptation."
+      "description": "M\u00e9thode de confirmation de livraison. auto_timeout = cl\u00f4ture automatique par le syst\u00e8me apr\u00e8s timeout d'acceptation. bouton = confirmation directe par bouton (nouveau parcours sans QR/PIN)."
     },
     "pickup_confirmed_at": {
       "type": "string",

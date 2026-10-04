@@ -499,6 +499,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
       await base44.functions.invoke("transitionStatutLivreur", {
         course_id: course.id,
         statut_cible: "colis_recupere",
+        confirmation_method: "bouton",
       });
 
       queryClient.invalidateQueries({ queryKey: ["colis-externes", course.id] });

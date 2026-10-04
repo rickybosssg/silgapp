@@ -29,6 +29,7 @@ const TRANSITIONS_VALIDES: Record<string, string[]> = {
 };
 
 const GPS_FIELDS_PAR_STATUT: Record<string, string[]> = {
+  'colis_recupere': ['latitude_recuperation', 'longitude_recuperation'],
   'pris_en_charge': ['latitude_prise_en_charge', 'longitude_prise_en_charge'],
   'arrivee': ['latitude_arrivee_dest', 'longitude_arrivee_dest'],
 };

@@ -393,11 +393,13 @@ export async function accepterCourseV2(base44: any, courseId: string, livreurId:
   }
   const isManual = pricing_mode === 'manual' && manual_price && Number(manual_price) >= PRIX_MIN;
 
-  // 8. Tokens/PINs (préserver existants)
-  const pickupToken = course.pickup_qr_token || generateToken();
-  const deliveryToken = course.delivery_qr_token || generateToken();
-  const pickupPIN = course.pickup_code_4_digits || generatePIN();
-  const deliveryPIN = course.delivery_code_4_digits || generatePIN();
+  // 8. Tokens/PINs — préserver existants uniquement (ne pas générer pour nouvelles courses)
+  // Les nouvelles courses (sans QR/PIN à la création) ne reçoivent pas de tokens au dispatch.
+  // Les anciennes courses et les courses partenaire/pharmacie conservent leurs tokens.
+  const pickupToken = course.pickup_qr_token || null;
+  const deliveryToken = course.delivery_qr_token || null;
+  const pickupPIN = course.pickup_code_4_digits || null;
+  const deliveryPIN = course.delivery_code_4_digits || null;
 
   // 9. Atomic lock via updateMany conditionnel
   const updateData: any = {
@@ -413,10 +415,10 @@ export async function accepterCourseV2(base44: any, courseId: string, livreurId:
     livreur_nombre_avis: livreur.nombre_avis || 0,
     accepted_by_livreur_id: livreurId,
     accepted_at: isManual ? null : new Date().toISOString(),
-    pickup_qr_token: pickupToken,
-    pickup_code_4_digits: pickupPIN,
-    delivery_qr_token: deliveryToken,
-    delivery_code_4_digits: deliveryPIN,
+    ...(pickupToken ? { pickup_qr_token: pickupToken } : {}),
+    ...(pickupPIN ? { pickup_code_4_digits: pickupPIN } : {}),
+    ...(deliveryToken ? { delivery_qr_token: deliveryToken } : {}),
+    ...(deliveryPIN ? { delivery_code_4_digits: deliveryPIN } : {}),
     ...(override_pricing_mode === 'automatic' ? { pricing_mode: 'automatic' } : {}),
   };
 
