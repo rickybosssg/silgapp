@@ -230,10 +230,109 @@ export default async function(req: Request): Promise<Response> {
             activated_at: now,
           });
 
+          // ── 2g-bis. Créer le créatif + ad (OBLIGATOIRE — sans ad, la campagne ne diffuse pas) ──
+          // PROTECTION: Une expérience ne doit JAMAIS être déclarée "active" sans meta_ad_id valide.
+          // Si cette étape échoue, l'expérience reste en "approved" et l'admin est notifié.
+          const SILGA_PAGE_ID = '395663283634586';
+          let metaCreativeId: string | null = null;
+          let metaAdId: string | null = null;
+
+          try {
+            // Chercher un AdCreative approuvé compatible avec l'objectif
+            const approvedCreatives = await base44.asServiceRole.entities.AdCreative.filter(
+              { status: 'approved' }
+            ).catch(() => []);
+
+            const compatibleCreative = (approvedCreatives || []).find((ac: any) =>
+              !ac.meta_objective || ac.meta_objective === experiment.meta_objective
+            );
+
+            if (!compatibleCreative || !compatibleCreative.image_url) {
+              throw new Error('Aucun AdCreative approuvé avec image disponible. Créatif et Ad non créés — l\'expérience ne peut pas être activée.');
+            }
+
+            // Upload image to Meta
+            const imgRes = await fetch(compatibleCreative.image_url);
+            const imgBuf = Buffer.from(await imgRes.arrayBuffer());
+            const imgB64 = imgBuf.toString('base64');
+
+            const imgUploadRes = await fetch(`${META_API_BASE}/${accountId}/adimages`, {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ bytes: imgB64, name: `exp_${experiment.id}_img` }),
+            });
+            const imgUploadData = await imgUploadRes.json();
+            const imgHash = imgUploadData?.images?.[`exp_${experiment.id}_img`]?.hash;
+            if (!imgHash) throw new Error('Upload image Meta échoué');
+
+            // Build landing URL with UTM attribution
+            const utmCampaign = experiment.utm_campaign_name || `silgapp_exp_${experiment.id}`;
+            const landingUrl = compatibleCreative.landing_url ||
+              `https://play.google.com/store/apps/details?id=com.base6a0ec08f3af5e1d1284254c1.app&utm_source=meta&utm_medium=cpc&utm_campaign=${utmCampaign}&utm_content=exp_${experiment.id}`;
+
+            // Map CTA type (AdCreative enum → Meta API enum)
+            const ctaMap: Record<string, string> = {
+              INSTALL_APP: 'INSTALL_MOBILE_APP',
+              DOWNLOAD: 'DOWNLOAD',
+              LEARN_MORE: 'LEARN_MORE',
+              SIGN_UP: 'SIGN_UP',
+              SHOP_NOW: 'SHOP_NOW',
+              CONTACT_US: 'CONTACT_US',
+            };
+            const ctaType = ctaMap[compatibleCreative.call_to_action] || 'DOWNLOAD';
+
+            // Create ad creative
+            const creativeRes = await fetch(`${META_API_BASE}/${accountId}/adcreatives`, {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                name: `${experiment.name} — Créatif`,
+                object_story_spec: {
+                  page_id: SILGA_PAGE_ID,
+                  link_data: {
+                    image_hash: imgHash,
+                    link: landingUrl,
+                    name: compatibleCreative.headline || experiment.name,
+                    message: compatibleCreative.primary_text || '',
+                    description: compatibleCreative.description || '',
+                    call_to_action: { type: ctaType, value: { link: landingUrl } },
+                  },
+                },
+              }),
+            });
+            const creativeData = await creativeRes.json();
+            if (creativeData.error) throw new Error(`Meta creative: ${creativeData.error.message}`);
+            metaCreativeId = creativeData.id;
+
+            // Create ad (PAUSED — l'admin doit activer manuellement)
+            const adRes = await fetch(`${META_API_BASE}/${accountId}/ads`, {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                name: `${experiment.name} — Ad`,
+                adset_id: metaAdsetId,
+                creative: { creative_id: metaCreativeId },
+                status: 'PAUSED',
+              }),
+            });
+            const adData = await adRes.json();
+            if (adData.error) throw new Error(`Meta ad: ${adData.error.message}`);
+            metaAdId = adData.id;
+
+            // Lier le meta_creative_id à l'AdCreative local
+            await base44.asServiceRole.entities.AdCreative.update(compatibleCreative.id, {
+              meta_creative_id: metaCreativeId,
+            }).catch(() => {});
+          } catch (creativeErr: any) {
+            metaCreationError = `Créatif/Ad: ${creativeErr?.message || 'Erreur inconnue'}. L'expérience NE DOIT PAS être activée sans ad valide.`;
+          }
+
           // ── 2h. Lier les IDs Meta à la GrowthExperiment ──
           await base44.asServiceRole.entities.GrowthExperiment.update(experiment.id, {
             meta_campaign_id: metaCampaignId,
             meta_adset_id: metaAdsetId,
+            ...(metaCreativeId ? { meta_creative_id: metaCreativeId } : {}),
+            ...(metaAdId ? { meta_ad_id: metaAdId } : {}),
           });
 
           // ── 2i. Logger l'action ──
@@ -246,10 +345,14 @@ export default async function(req: Request): Promise<Response> {
             details: JSON.stringify({
               meta_campaign_id: metaCampaignId,
               adset_id: metaAdsetId,
+              creative_id: metaCreativeId,
+              ad_id: metaAdId,
               meta_status: 'PAUSED',
-              budget_type: 'lifetime',
-              lifetime_budget_fcfa: budgetFcfa,
-              lifetime_budget_usd_cents: budgetUsdCents,
+              budget_type: 'daily',
+              daily_budget_fcfa: dailyBudgetFcfa,
+              budget_test_fcfa: budgetFcfa,
+              ad_attached: !!metaAdId,
+              warning: !metaAdId ? 'AUCUN AD ATTACHÉ — l\'expérience ne doit pas être activée' : null,
             }),
             action_date: now,
           }).catch(() => {});
@@ -258,11 +361,16 @@ export default async function(req: Request): Promise<Response> {
             meta_campaign_entity_id: metaCampaignEntity.id,
             meta_campaign_id: metaCampaignId,
             meta_adset_id: metaAdsetId,
-            meta_ad_id: null,
+            meta_creative_id: metaCreativeId,
+            meta_ad_id: metaAdId,
             meta_status: 'PAUSED',
-            budget_type: 'lifetime',
-            lifetime_budget_fcfa: budgetFcfa,
-            message: 'Campagne Meta créée en PAUSED avec lifetime_budget. L\'admin doit ajouter des créatifs puis appeler resume_campaign.',
+            budget_type: 'daily',
+            daily_budget_fcfa: dailyBudgetFcfa,
+            budget_test_fcfa: budgetFcfa,
+            ad_attached: !!metaAdId,
+            message: metaAdId
+              ? 'Campagne Meta + AdSet + Créatif + Ad créés en PAUSED. L\'admin peut activer (tous les objets sont reliés).'
+              : 'ATTENTION: Campaign + AdSet créés MAIS pas de Ad. L\'expérience NE DOIT PAS être activée.',
           };
         }
       } catch (metaErr: any) {

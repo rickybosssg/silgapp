@@ -18,7 +18,7 @@
         "cancelled"
       ],
       "default": "draft",
-      "description": "Statut de l'exp\u00e9rience. draft=proposition, pending_approval=en attente validation, approved=valid\u00e9e mais non active, active=campagne Meta activ\u00e9e, paused=mise en pause, completed=termin\u00e9e, cancelled=annul\u00e9e."
+      "description": "Statut de l'exp\u00e9rience. draft=proposition, pending_approval=en attente validation, approved=valid\u00e9e mais non active, active=campagne Meta activ\u00e9e, paused=mise en pause, completed=termin\u00e9e, cancelled=annul\u00e9e. Une exp\u00e9rience ne doit passer \u00e0 'active' QUE si meta_campaign_id, meta_adset_id, meta_creative_id ET meta_ad_id sont tous renseign\u00e9s (cha\u00eene compl\u00e8te Meta)."
     },
     "targeting_geo": {
       "type": "string",
@@ -74,6 +74,14 @@
     "meta_adset_id": {
       "type": "string",
       "description": "ID de l'ensemble de publicit\u00e9 Meta Ads"
+    },
+    "meta_creative_id": {
+      "type": "string",
+      "description": "ID du cr\u00e9atif Meta Ads cr\u00e9\u00e9. Renseign\u00e9 uniquement apr\u00e8s cr\u00e9ation r\u00e9ussie du cr\u00e9atif sur Meta. Une exp\u00e9rience ne peut pas \u00eatre activ\u00e9e sans ce champ."
+    },
+    "meta_ad_id": {
+      "type": "string",
+      "description": "ID de l'ad Meta Ads cr\u00e9\u00e9 et attach\u00e9 \u00e0 l'ad set. Renseign\u00e9 uniquement apr\u00e8s cr\u00e9ation r\u00e9ussie de l'ad sur Meta. Une exp\u00e9rience ne peut pas \u00eatre activ\u00e9e sans ce champ. Sans ad valide, la campagne Meta ne diffuse aucune impression."
     },
     "utm_campaign_name": {
       "type": "string",
@@ -162,7 +170,7 @@
     "activated_at": {
       "type": "string",
       "format": "date-time",
-      "description": "Date d'activation r\u00e9elle sur Meta"
+      "description": "Date d'activation r\u00e9elle sur Meta (moment o\u00f9 l'Ad devient effectivement diffusable)"
     },
     "completed_at": {
       "type": "string",
