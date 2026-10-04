@@ -19,6 +19,8 @@ import {
 import { Button } from "@/components/ui/button";
 import CommandeQRPartenaire from "@/components/partenaire/CommandeQRPartenaire";
 import ChatWindow from "@/components/chat/ChatWindow";
+import PreuvePaiementModal from "@/components/partenaire/PreuvePaiementModal";
+import { ZoomIn } from "lucide-react";
 
 const STATUTS = {
   commande_envoyee: { label: "Nouvelle", color: "bg-red-50 text-red-700", border: "border-l-red-500", icon: Clock },
@@ -111,6 +113,7 @@ export default function CommandesManager({ type, etablissementId, etablissementN
   const [chatOpenId, setChatOpenId] = useState(null);
   const [actionLoading, setActionLoading] = useState(null);
   const [prepPickerCmdId, setPrepPickerCmdId] = useState(null);
+  const [preuveModalCmd, setPreuveModalCmd] = useState(null);
 
   const { data: commandes = [], isLoading } = useQuery({
     queryKey: ["commandes", type, etablissementId],
@@ -269,7 +272,22 @@ export default function CommandesManager({ type, etablissementId, etablissementN
                   {cmd.preuve_paiement_url && (
                     <div>
                       <p className="text-[10px] text-gray-400 mb-1 font-medium">Preuve de paiement</p>
-                      <img src={cmd.preuve_paiement_url} alt="Preuve" className="w-full rounded-xl max-h-40 object-cover border border-gray-100" />
+                      <button
+                        type="button"
+                        onClick={() => setPreuveModalCmd(cmd)}
+                        className="block w-full relative group rounded-xl overflow-hidden border border-gray-100"
+                      >
+                        <img
+                          src={cmd.preuve_paiement_url}
+                          alt="Preuve de paiement"
+                          className="w-full max-h-48 object-contain bg-gray-50"
+                        />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+                          <span className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 text-white text-xs font-bold bg-black/60 rounded-full px-3 py-1.5">
+                            <ZoomIn className="w-3.5 h-3.5" /> Agrandir
+                          </span>
+                        </div>
+                      </button>
                     </div>
                   )}
 
@@ -406,6 +424,22 @@ export default function CommandesManager({ type, etablissementId, etablissementN
           );
         })}
       </div>
+
+      {preuveModalCmd && (
+        <PreuvePaiementModal
+          commande={preuveModalCmd}
+          loading={actionLoading === preuveModalCmd.id}
+          onClose={() => setPreuveModalCmd(null)}
+          onValider={() => {
+            handleAction(preuveModalCmd, "valider_paiement");
+            setPreuveModalCmd(null);
+          }}
+          onRefuser={() => {
+            handleAction(preuveModalCmd, "refuser_paiement");
+            setPreuveModalCmd(null);
+          }}
+        />
+      )}
     </div>
   );
 }
