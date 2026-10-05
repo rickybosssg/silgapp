@@ -24,6 +24,7 @@ async function cancellation(origin) {
   } };
   vm.runInNewContext(compile(read('base44/functions/annulerCourseExterne/entry.ts')), {
     Deno: { serve: fn => { handler = fn; } }, createClientFromRequest: () => client, Response, console: quiet,
+    normalizeEnterpriseId: value => (value == null || String(value).trim() === '') ? null : String(value).trim(),
   });
   const response = await handler(new Request('http://localhost/test', {
     method: 'POST', body: JSON.stringify({ course_id: course.id, source: 'livreur', motif: 'panne_vehicule' }),
@@ -52,6 +53,7 @@ const ctx = { formData: { type_course: 'expedier', adresse_depart: 'A', notes: '
   colis: [{ destinataire_telephone: '70000001', adresse_livraison: 'B' }, { destinataire_telephone: '70000002', adresse_livraison: 'C' }],
   adresseArriveeFinale: 'Tournee multi-colis', expediteurTel: '70000000', destinataireTelFinal: '70000001',
   destinataireNomFinal: '2 destinataires', isMulti: true, prixEstime: 1250, isDeplacement: false,
+  prixClientValide: 1250,
   courseCountryCode: 'BF', submitRequestIdRef: { current: null }, submitSignatureRef: { current: null },
   crypto: { randomUUID: () => `request-${++counter}` } };
 const submit = () => { vm.runInNewContext(`(() => { ${signatureCode} })()`, ctx); return ctx.submitRequestIdRef.current; };
@@ -70,25 +72,9 @@ assert.ok(!/180000|3\s*\*\s*60\s*\*\s*1000/.test(form), 'no global three-minute 
 console.log('PASS: retry identity, edited parcel/instructions, new course immediately.');
 
 const animation = read('src/components/client/LivreurRechercheAnimation.jsx');
-assert.match(animation, /onAjouterAutre/);
-assert.match(animation, /state:\s*\{\s*course_id:/);
-assert.match(form, /onAjouterAutre=\{handleAjouterAutre\}/);
-const resetStart = form.indexOf('  const handleAjouterAutre =');
-const resetEnd = form.indexOf('\n  const ', resetStart + 10);
-assert.ok(resetStart > 0 && resetEnd > resetStart);
-const states = {};
-vm.runInNewContext(`${form.slice(resetStart, resetEnd)}; handleAjouterAutre();`, {
-  resetSubmission() {}, submitRequestIdRef: ctx.submitRequestIdRef, submitSignatureRef: ctx.submitSignatureRef,
-  setCourseCreated: v => { states.created = v; }, setCreatedCourse: v => { states.course = v; },
-  setInvitationModal: v => { states.modal = v; }, setCurrentStep: v => { states.step = v; },
-  setFormData: v => { states.form = v; }, setColis: v => { states.colis = v; },
-  freshData: { type_course: 'expedier', destinataire_telephone: '' }, createColisDefaults: n => Array(n).fill({}),
-  localStorage: { removeItem() {} }, STORAGE_KEY: 'draft', STEP_KEY: 'step',
-});
-assert.equal(states.created, false);
-assert.equal(states.course, null);
-assert.equal(states.step, 0);
-assert.equal(states.form.destinataire_telephone, '');
-assert.equal(states.colis.length, 1);
-assert.equal(ctx.submitRequestIdRef.current, null);
-console.log('PASS: fresh React form state and explicit course tracking. No production calls.');
+assert.match(animation, /const handleAjouterAutre = \(\) =>/);
+assert.match(animation, /localStorage\.removeItem\("silgapp_course_draft"\)/);
+assert.match(animation, /localStorage\.removeItem\("silgapp_course_step"\)/);
+assert.match(animation, /navigate\(route,\s*\{\s*replace:\s*true\s*\}\)/);
+assert.match(animation, /Ajouter une autre livraison/);
+console.log('PASS: fresh new-delivery navigation clears draft/step without production calls.');

@@ -112,7 +112,9 @@ Deno.serve(async (req) => {
     // le taux figé (commission_taux_applique) au lieu du taux normal du pays.
     // ── ENTERPRISE : commission_silga = 0 (payée par l'entreprise via EnterpriseLedger) ──
     if (course.prix_propose_client && course.prix_propose_client > 0) {
-      const prixRetenu = course.prix_final || course.prix_propose_client;
+      const prixRetenu = (course.statut === 'livree' && course.prix_final && course.prix_final > 0)
+        ? Number(course.prix_final)
+        : Number(course.prix_propose_client);
       let commissionSilga: number;
       let montantLivreur: number;
       if (normalizeEnterpriseId(course.enterprise_id)) {

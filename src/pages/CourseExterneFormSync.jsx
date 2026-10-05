@@ -46,6 +46,8 @@ function createColisDefaults(nb) {
 const STORAGE_KEY = "silgapp_course_draft";
 const STEP_KEY = "silgapp_course_step";
 
+const normalizeCountryCode = (value) => String(value || "").trim().toUpperCase();
+
 export default function CourseExterneFormSync() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -53,6 +55,13 @@ export default function CourseExterneFormSync() {
   const position = location.state?.position || JSON.parse(localStorage.getItem("client_gps_position") || "null");
   const clientProfil = location.state?.clientProfil;
   const prefillCourse = location.state?.prefillCourse;
+  const prefillCountryCode = normalizeCountryCode(
+    prefillCourse?.country_code ||
+    prefillCourse?.countryCode ||
+    location.state?.country_code ||
+    location.state?.countryCode
+  );
+  const effectiveCountryCode = normalizeCountryCode(prefillCountryCode || clientProfil?.country_code);
   // Coords sauvegardées en DB — utilisées comme fallback si getCurrentPosition timeout
   const savedLat = clientProfil?.latitude || position?.latitude || null;
   const savedLng = clientProfil?.longitude || position?.longitude || null;
@@ -65,8 +74,8 @@ export default function CourseExterneFormSync() {
   const [isSubmitting, setIsSubmitting] = useState(false); // verrou anti-double-clic
   const [invitationModal, setInvitationModal] = useState(null); // { telephone, nom } ou null
   const [gpsLoading, setGpsLoading] = useState({ depart: false, arrivee: false });
-  const { forteDemande } = useForteDemande(clientProfil?.country_code);
-  const { country: countryConfig } = useCountryPricing(clientProfil?.country_code);
+  const { forteDemande } = useForteDemande(effectiveCountryCode);
+  const { country: countryConfig } = useCountryPricing(effectiveCountryCode);
   // Source tarifaire unique : Country.prix_minimum (jamais codé en dur)
   const prixMinimum = countryConfig?.prix_minimum || 500;
 
@@ -120,7 +129,7 @@ export default function CourseExterneFormSync() {
         expediteur_gps_available: false,
         expediteur_gps_lat: null,
         expediteur_gps_lng: null,
-        prix_propose: 0,
+        prix_propose: Number(prefillCourse.prix_propose || 0) || 0,
       }
     : (draft || {
         type_course: typeCourse,
@@ -397,13 +406,14 @@ export default function CourseExterneFormSync() {
       });
       // Safety: SDK peut wrapper la réponse dans { data: { ... } }
       const course = createResult?.data?.course || createResult?.course;
+      const isIdempotentReplay = createResult?.data?.idempotent === true || createResult?.idempotent === true;
 
       if (!course?.id) {
         throw new Error("Réponse invalide du serveur — course non créée");
       }
 
       // ── Créer les sous-colis si mode multi-colis (fire-and-forget) ──
-      if (finalData.is_multi_colis && finalData._colisData?.length > 1) {
+      if (!isIdempotentReplay && finalData.is_multi_colis && finalData._colisData?.length > 1) {
         Promise.all(finalData._colisData.map((c) =>
           base44.entities.ColisExterne.create({
             course_id: course.id,
@@ -431,8 +441,10 @@ export default function CourseExterneFormSync() {
       // ── Fire-and-forget : notifications et dispatch en arrière-plan ──
       // Le client ne doit PAS attendre la fin du dispatch pour voir sa confirmation.
       // La création de la course et la recherche du livreur sont deux étapes distinctes.
-      base44.functions.invoke("notifyClientSync", { course_id: course.id }).catch(() => null);
-      if (!formData.date_souhaitee) {
+      if (!isIdempotentReplay) {
+        base44.functions.invoke("notifyClientSync", { course_id: course.id }).catch(() => null);
+      }
+      if (!isIdempotentReplay && !formData.date_souhaitee) {
         base44.functions.invoke("dispatchExterneAuto", {
           action: "lancer_recherche_auto",
           course_id: course.id
@@ -539,6 +551,12 @@ export default function CourseExterneFormSync() {
       });
     }, 30000);
 
+    if (currentStep !== totalSteps - 1) {
+      console.warn("[CourseForm] Soumission ignorée hors étape finale", { currentStep, totalSteps });
+      resetSubmission();
+      return;
+    }
+
     //  country_code DOIT être déclaré AVANT toute utilisation dans normalizePhone()
     // ─── Validation des champs obligatoires ───────────────────────────────────
     const isExpedie = formData.type_course === "expedier";
@@ -597,7 +615,7 @@ export default function CourseExterneFormSync() {
       return;
     }
 
-    const courseCountryCode = clientFromDB?.country_code || clientProfil?.country_code || "";
+    const courseCountryCode = normalizeCountryCode(prefillCountryCode || clientFromDB?.country_code || clientProfil?.country_code);
     if (!courseCountryCode) {
       console.error("[CourseForm] country_code manquant sur clientFromDB:", clientFromDB);
       toast.error("Erreur : votre profil client n'a pas de pays. Veuillez contacter le support.");
@@ -828,8 +846,16 @@ export default function CourseExterneFormSync() {
       dn: destinataireNomFinal,
       pp: prixClientValide,
       ds: formData.date_souhaitee,
+      nt: formData.notes || "",
       pt: isDeplacement ? (formData.passager_telephone || "") : "",
       im: isMulti,
+      colis: isMulti ? (colis || []).map((c) => ({
+        t: c.destinataire_telephone || "",
+        a: c.adresse_livraison || "",
+        n: c.destinataire_nom || "",
+        tc: c.type_colis || "",
+        o: c.ordre_livraison || c.numero_ordre || "",
+      })) : [],
     });
     if (!submitRequestIdRef.current || submitSignatureRef.current !== _submissionSignature) {
       submitRequestIdRef.current = crypto.randomUUID();
@@ -1027,7 +1053,7 @@ export default function CourseExterneFormSync() {
               onGoToStep={handleGoToStep}
               isLoading={createMutation.isPending || isSubmitting}
               clientId={clientProfil?.id}
-              countryCode={clientProfil?.country_code}
+              countryCode={effectiveCountryCode}
               colis={colis}
               onColisChange={handleColisChange}
               savedLat={savedLat}

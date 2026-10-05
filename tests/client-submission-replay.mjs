@@ -16,6 +16,7 @@ const parcels = [], calls = [], courses = new Map();
 let uuid = 0;
 const context = {
   crypto: { randomUUID: () => `uuid-${++uuid}` }, formData: {}, console,
+  tempCourseIdRef: { current: null },
   normalizePhone: p => p, phoneVariants: p => [p], queryClient: { setQueryData() {} },
   base44: { entities: { ColisExterne: { create: async data => { parcels.push(data); return data; } } },
     functions: { invoke: async (name, payload) => {

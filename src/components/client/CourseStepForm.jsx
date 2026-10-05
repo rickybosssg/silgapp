@@ -125,7 +125,7 @@ function ProgressBar({ step, totalSteps, stepTitle }) {
 }
 
 // ─── Boutons de navigation ───────────────────────────────────────────────────
-function NavButtons({ step, totalSteps, onBack, onNext, onAnnuler, onSubmit, isLoading, isContinueDisabled, isLastStep }) {
+function NavButtons({ step, totalSteps, onBack, onNext, onAnnuler, isLoading, isContinueDisabled, isLastStep }) {
   return (
     <div className="flex gap-3 pt-2">
       {step > 0 ? (
@@ -163,7 +163,7 @@ function NavButtons({ step, totalSteps, onBack, onNext, onAnnuler, onSubmit, isL
       ) : (
         <button
           type="submit"
-          disabled={isLoading}
+          disabled={isLoading || isContinueDisabled}
           className="flex-1 h-14 rounded-xl text-white font-black text-base shadow-md transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
           style={{ background: COLORS.primary }}
         >
@@ -432,17 +432,9 @@ export default function CourseStepForm({
     ).then((tarif) => {
       if (cancelled || !tarif) return;
       derniereCleCoords.current = cleCoords;
-      // Ne pas écraser le prix si l'utilisateur l'a modifié manuellement
-      if (!prixManuelModifie.current) {
-        setFormData(prev => ({
-          ...prev,
-          prix_propose: tarif.prix || prev.prix_propose,
-          _tarifGrandOuaga: tarif,
-        }));
-      } else {
-        // Garder le résultat pour CourseExterneFormSync, mais ne pas écraser le prix
-        setFormData(prev => ({ ...prev, _tarifGrandOuaga: tarif }));
-      }
+      // Garder le tarif conseillé pour l'affichage et le payload, sans jamais
+      // le transformer en prix client. Seule une saisie/clic explicite renseigne prix_propose.
+      setFormData(prev => ({ ...prev, _tarifGrandOuaga: tarif }));
     }).catch(() => {});
 
     return () => { cancelled = true; };
@@ -462,11 +454,9 @@ export default function CourseStepForm({
       formData.gps_arrivee_source
     );
     if (tarif?.prix) {
-      prixManuelModifie.current = false;
       setRecalculerDisponible(false);
       setFormData(prev => ({
         ...prev,
-        prix_propose: tarif.prix,
         _tarifGrandOuaga: tarif,
       }));
     }
@@ -520,7 +510,7 @@ export default function CourseStepForm({
     }));
   };
 
-  // ─── Auto-remplir le prix proposé avec l'estimation GPS (conseil uniquement) ──
+  // ─── Calculer l'estimation GPS comme conseil uniquement ────────────────────
   useEffect(() => {
     const lat1 = formData.gps_depart_lat;
     const lng1 = formData.gps_depart_lng;
@@ -528,9 +518,8 @@ export default function CourseStepForm({
     const lng2 = formData.gps_arrivee_lng;
     if (lat1 && lng1 && lat2 && lng2) {
       const estimation = calculerPrixApproximatif(lat1, lng1, lat2, lng2, activeCountry);
-      // Ne pré-remplir que si le client n'a pas encore saisi de prix
-      if (estimation && !formData.prix_propose) {
-        setFormData(prev => ({ ...prev, prix_propose: estimation.prix }));
+      if (estimation) {
+        setFormData(prev => ({ ...prev, _prixIndicatif: estimation }));
       }
     }
   }, [formData.gps_depart_lat, formData.gps_depart_lng, formData.gps_arrivee_lat, formData.gps_arrivee_lng, activeCountry]);
@@ -1143,7 +1132,10 @@ export default function CourseStepForm({
                     <button
                       key={montant}
                       type="button"
-                      onClick={() => setFormData({ ...formData, prix_propose: montant })}
+                      onClick={() => {
+                        prixManuelModifie.current = true;
+                        setFormData({ ...formData, prix_propose: montant });
+                      }}
                       className="flex-1 h-14 rounded-xl border-2 font-bold text-base transition-all active:scale-[0.97]"
                       style={{
                         borderColor: formData.prix_propose === montant ? COLORS.primary : COLORS.border,
@@ -1239,14 +1231,11 @@ export default function CourseStepForm({
     );
 
     // ─── Mapping des étapes pour le bouton "Modifier" ──────────────────────
-    // Expedier: 0=Récup, 1=Destinataire, 2=Livraison, 3=Détails, 4=Récap
-    // Recevoir: 0=Expéditeur, 1=Récup, 2=Détails, 3=Récap
-    // Déplacement: 0=Prise en charge, 1=Destination, 2=Passager, 3=Détails, 4=Récap
     const editSteps = isExpedie
-      ? { trajet: 0, contact: 1, details: 3, prix: 3 }
+      ? { trajet: 0, contact: 1, details: 2, prix: 2 }
       : isRecevoir
-      ? { trajet: 1, contact: 0, details: 2, prix: 2 }
-      : { trajet: 0, contact: 2, details: 3, prix: 3 };
+      ? { trajet: 0, contact: 1, details: 2, prix: 2 }
+      : { trajet: 0, contact: 1, details: 2, prix: 2 };
 
     const handleEditStep = (targetStep) => {
       if (onGoToStep && typeof targetStep === "number") {
@@ -1351,6 +1340,10 @@ export default function CourseStepForm({
     }
     // Étape 2 : Détails + commande
     if (step === 2) {
+      if (!isMulti) {
+        const prix = Number(formData.prix_propose || 0);
+        return !Number.isFinite(prix) || prix <= 0;
+      }
       return false;
     }
     return false;
@@ -1379,7 +1372,6 @@ export default function CourseStepForm({
         onBack={onBack}
         onNext={onNext}
         onAnnuler={onAnnuler}
-        onSubmit={onNext}
         isLoading={isLoading}
         isContinueDisabled={isContinueDisabled()}
         isLastStep={isLastStep}

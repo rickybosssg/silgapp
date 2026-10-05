@@ -21,6 +21,8 @@ export default function RefaireCourseButton({ course, clientProfil, position, on
 
     const prefillData = {
       type_course: course.type_course,
+      country_code: course.country_code || clientProfil?.country_code || "",
+      devise: course.devise || "",
       adresse_depart: course.adresse_depart || "",
       adresse_arrivee: course.adresse_arrivee || "",
       quartier_depart: course.quartier_depart || "",
@@ -43,11 +45,13 @@ export default function RefaireCourseButton({ course, clientProfil, position, on
       nb_passagers: course.nb_passagers || 1,
       notes: "",
       destination_inconnue: course.destination_inconnue || false,
+      prix_propose: Number(course.prix_propose_client || course.prix_final || 0) || 0,
     };
 
     onNavigate?.(route, {
       position,
       clientProfil,
+      country_code: prefillData.country_code,
       prefillCourse: prefillData,
     });
   };

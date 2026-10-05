@@ -18,9 +18,12 @@ import { comptabiliserCommissionEnterprise, normalizeEnterpriseId } from '../../
 //      → montant_livreur = prix - commission_silga
 //      → commissionPct chargé depuis Country via chargerConfigPays
 //
-//   2. Courses standard (automatic, manual) :
-//      → DÉLÈGUE à calculPrixCourseExterne (source de vérité unique)
-//      → calculPrixCourseExterne gère prix_propose_client, TarifZone, calcul auto
+//   2. Courses client avec prix_propose_client :
+//      → prix_propose_client est la source de vérité commerciale
+//      → aucune recalcul distance/tarif à la livraison
+//
+//   3. Courses legacy sans prix client :
+//      → DÉLÈGUE à calculPrixCourseExterne (TarifZone / calcul auto)
 //      → calculPrixCourseExterne appelle verifierEncoursLivreur lui-même
 //
 // Sécurité :
@@ -212,7 +215,84 @@ export default async function(req: Request): Promise<Response> {
       });
     }
 
-    // ── CAS 2: Course standard — déléguer à calculPrixCourseExterne ──
+    // ── CAS 2: Course client standard avec prix explicite ───────────────
+    // RÈGLE PRODUIT : le prix saisi par le client est la source de vérité.
+    // Ne jamais le remplacer par distance × tarif au moment de la livraison.
+    const prixClientExplicite = Number(course.prix_propose_client || 0);
+    if (Number.isFinite(prixClientExplicite) && prixClientExplicite > 0) {
+      let commissionSilga: number;
+      let montantLivreur: number;
+
+      if (normalizeEnterpriseId(course.enterprise_id)) {
+        commissionSilga = 0;
+        montantLivreur = prixClientExplicite;
+      } else {
+        let tauxEffectif: number | null = null;
+        if (course.commission_locked_at && course.commission_taux_applique != null) {
+          const lockedRate = Number(course.commission_taux_applique);
+          tauxEffectif = Number.isFinite(lockedRate) ? lockedRate : null;
+        } else {
+          const countryConfig = await chargerConfigPays(base44, course.country_code || livreur.country_code || '');
+          tauxEffectif = normalizeCommissionPct(countryConfig?.commission_pct);
+        }
+
+        if (tauxEffectif === null) {
+          return Response.json({
+            error: `Commission non configurée pour le pays ${course.country_code || livreur.country_code || ''}`,
+            blocked_reason: 'missing_country_commission_pct',
+          }, { status: 400 });
+        }
+
+        commissionSilga = Math.round(prixClientExplicite * (tauxEffectif / 100));
+        montantLivreur = prixClientExplicite - commissionSilga;
+      }
+
+      const updateData = {
+        statut: 'livree',
+        heure_livraison: now,
+        colis_livre_at: now,
+        delivery_confirmed_by: 'bouton',
+        delivery_confirmed_at: now,
+        prix_final: prixClientExplicite,
+        commission_silga: commissionSilga,
+        montant_livreur: montantLivreur,
+        ...(course.livreur_financier_id ? {} : { livreur_financier_id: course.livreur_id }),
+      };
+
+      if (is_multi_colis && colis_data) {
+        await handleMultiColis(base44, course_id, colis_data, now);
+      }
+
+      const updated = await base44.asServiceRole.entities.CourseExterne.update(course_id, updateData);
+
+      try {
+        await base44.asServiceRole.functions.invoke('verifierEncoursLivreur', { course_id });
+      } catch (encoursErr: any) {
+        console.error('[finaliserLivraisonLivreur] verifierEncoursLivreur error (prix client):', encoursErr?.message);
+      }
+
+      try {
+        const entCourse = await base44.asServiceRole.entities.CourseExterne.get(course_id);
+        if (entCourse?.enterprise_id) {
+          await comptabiliserCommissionEnterprise(base44.asServiceRole, entCourse);
+        }
+      } catch (entErr: any) {
+        console.error('[finaliserLivraisonLivreur] enterprise accounting error (prix client):', entErr?.message);
+      }
+
+      await updateLivreurAfterDelivery(base44, course);
+
+      return Response.json({
+        success: true,
+        course: updated,
+        prix_final: prixClientExplicite,
+        commission_silga: commissionSilga,
+        montant_livreur: montantLivreur,
+        prix_source: 'prix_propose_client_explicit',
+      });
+    }
+
+    // ── CAS 3: Course standard legacy — déléguer à calculPrixCourseExterne ──
     // calculPrixCourseExterne est la source de vérité pour:
     //   - prix_propose_client_locked (client a modifié le prix)
     //   - calcul automatique (distance × prix_par_km, min prix_minimum)
