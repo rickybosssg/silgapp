@@ -30,7 +30,8 @@ assert.ok(prixClientBranch > 0, 'explicit client price branch missing');
 assert.ok(delegatedCalc > prixClientBranch, 'explicit client price must be handled before calculPrixCourseExterne');
 assert.match(finaliser, /prix_final:\s*prixClientExplicite/);
 assert.match(finaliser, /prix_source:\s*'prix_propose_client_explicit'/);
-assert.match(finaliser, /course\.commission_locked_at && course\.commission_taux_applique != null/);
+assert.match(finaliser, /tauxCommissionEffectif\(course,\s*commissionPct\)/);
+assert.match(finaliser, /zeroCommissionFields\(course\)/);
 assert.match(finaliser, /verifierEncoursLivreur', \{ course_id \}/);
 
 const calculPrix = read('base44/functions/calculPrixCourseExterne/entry.ts');

@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 import { haversineKm } from "../../shared/geoUtils.ts";
+import { chargerTauxCommissionEffectif, zeroCommissionFields } from '../../shared/commissionLock.ts';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
@@ -258,7 +259,7 @@ async function scanPaiementsNonSync(base44, bugs, corrections, recommandations) 
 
       if (dist && dist > 0) {
         const prixFinal = Math.round(dist * 100);
-        const commissionPct = await chargerCommissionPays(base44, c.country_code);
+        const commissionPct = await chargerTauxCommissionEffectif(c, () => chargerCommissionPays(base44, c.country_code));
         const commission = Math.round(prixFinal * (commissionPct / 100));
         const montantLivreur = prixFinal - commission;
 
@@ -266,7 +267,8 @@ async function scanPaiementsNonSync(base44, bugs, corrections, recommandations) 
           prix_final: prixFinal,
           distance_reelle_km: parseFloat(dist.toFixed(2)),
           commission_silga: commission,
-          montant_livreur: montantLivreur
+          montant_livreur: montantLivreur,
+          ...zeroCommissionFields(c),
         }).catch(() => null);
 
         corrections.push({
@@ -298,13 +300,14 @@ async function scanPaiementsNonSync(base44, bugs, corrections, recommandations) 
     }
 
     // Courses livrées sans commission calculée
-    if (c.prix_final && (!c.commission_silga || !c.montant_livreur)) {
-      const commissionPct = await chargerCommissionPays(base44, c.country_code);
+    if (c.prix_final && (c.commission_silga == null || c.montant_livreur == null)) {
+      const commissionPct = await chargerTauxCommissionEffectif(c, () => chargerCommissionPays(base44, c.country_code));
       const commission = Math.round(c.prix_final * (commissionPct / 100));
       const montantLivreur = c.prix_final - commission;
       await base44.asServiceRole.entities.CourseExterne.update(c.id, {
         commission_silga: commission,
-        montant_livreur: montantLivreur
+        montant_livreur: montantLivreur,
+        ...zeroCommissionFields(c),
       }).catch(() => null);
       corrections.push({
         type: "commission_recalculee",

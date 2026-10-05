@@ -2,12 +2,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
 import { emitDriverDebtThreshold } from '../../shared/venusAdminEventBus.ts';
 import { chargerConfigPays } from '../../shared/dispatchConstants.ts';
 import { recalculerSoldeLivreur } from '../../shared/recalculerSoldeLivreur.ts';
-
-function normalizeEnterpriseId(value: unknown): string | null {
-  if (value === null || value === undefined) return null;
-  const normalized = String(value).trim();
-  return normalized ? normalized : null;
-}
+import { hasZeroCommissionLock } from '../../shared/commissionLock.ts';
 
 /**
  * Vérifie l'encours d'un livreur après chaque course terminée.
@@ -120,12 +115,6 @@ Deno.serve(async (req) => {
     //    une course 0% en commission normale.
     let commission = 0;
     const storedCommission = Number(course.commission_silga) || 0;
-    const isPublicCourse = !normalizeEnterpriseId(course.enterprise_id);
-    const isLockedZeroPublicPromotion =
-      isPublicCourse &&
-      course.commission_locked_at &&
-      Number(course.commission_taux_applique) === 0 &&
-      (course.commission_mode === 'pass_zero' || course.commission_mode === 'happy_hour');
 
     if (course.commission_locked_at && course.commission_taux_applique != null) {
       // Commission figée à l'acceptation — utiliser la valeur stockée (0 pour Pass/Happy Hour)
@@ -148,7 +137,7 @@ Deno.serve(async (req) => {
     // Garde-fou défensif : une course publique verrouillée à 0% (Pass/Happy Hour)
     // ne doit jamais créer de dette, même si une ancienne écriture a stocké une
     // commission_silga positive par erreur.
-    if (isLockedZeroPublicPromotion && commission > 0) {
+    if (hasZeroCommissionLock(course) && commission > 0) {
       console.warn(
         `[ENCOURS] Anomalie corrigée: course ${courseId} ${course.commission_mode} verrouillée à 0% ` +
         `mais commission_silga=${storedCommission}. Commission comptabilisable forcée à 0.`

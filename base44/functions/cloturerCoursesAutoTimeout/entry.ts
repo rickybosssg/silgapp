@@ -1,6 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
 import { chargerConfigPays, normalizeCommissionPct } from '../../shared/dispatchConstants.ts';
 import { comptabiliserCommissionEnterprise, normalizeEnterpriseId } from '../../shared/enterpriseFinance.ts';
+import { tauxCommissionEffectif, zeroCommissionFields } from '../../shared/commissionLock.ts';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CLOTURER COURSES AUTO TIMEOUT — Clôture automatique des courses après timeout
@@ -254,11 +255,11 @@ async function finalizeOneCourse(base44: any, course: any, nowIso: string, delay
     const commissionPct = normalizeCommissionPct(countryConfig?.commission_pct);
 
     // Utiliser le taux figé à l'acceptation si disponible (Pass/Happy Hour)
-    const tauxEffectif = (course.commission_locked_at && course.commission_taux_applique != null)
-      ? Number(course.commission_taux_applique)
-      : commissionPct;
+    const tauxEffectif = normalizeEnterpriseId(course.enterprise_id)
+      ? ((course.commission_locked_at && course.commission_taux_applique != null) ? Number(course.commission_taux_applique) : commissionPct)
+      : tauxCommissionEffectif(course, commissionPct);
 
-    if (commissionPct === null) {
+    if (commissionPct === null && course.commission_taux_applique == null) {
       // Commission non configurée — BLOCAGE (ne pas clôturer sans commission)
       await createBlockedAlert(base44, course, nowIso, 'missing_country_commission_pct');
       return {
@@ -288,6 +289,7 @@ async function finalizeOneCourse(base44: any, course: any, nowIso: string, delay
       prix_final: montant,
       commission_silga: commissionSilga,
       montant_livreur: montantLivreur,
+      ...zeroCommissionFields(course),
       auto_completed: true,
       auto_completed_at: nowIso,
       auto_completed_reason: 'accepted_timeout',

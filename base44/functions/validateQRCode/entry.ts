@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 import { haversineKm } from '../../shared/geoUtils.ts';
+import { tauxCommissionEffectif, zeroCommissionFields } from '../../shared/commissionLock.ts';
 import { comptabiliserCommissionEnterprise, normalizeEnterpriseId } from '../../shared/enterpriseFinance.ts';
 
 function normalizeCommissionPct(value) {
@@ -140,7 +141,7 @@ Deno.serve(async (req) => {
             prix_final: course.prix_final || null,
             distance_reelle_km: course.distance_reelle_km || null,
             montant_livreur: course.montant_livreur || null,
-            commission_silga: course.commission_silga || null,
+            commission_silga: course.commission_silga ?? null,
           },
         });
       }
@@ -227,7 +228,7 @@ Deno.serve(async (req) => {
           }
         } catch (_) {}
 
-        if (adminCommissionPct === null) {
+        if (adminCommissionPct === null && course.commission_taux_applique == null) {
           return Response.json({
             success: false,
             error: `Commission non configurée pour le pays ${course.country_code}`,
@@ -235,6 +236,7 @@ Deno.serve(async (req) => {
           }, { status: 400 });
         }
 
+        adminCommissionPct = tauxCommissionEffectif(course, adminCommissionPct);
         const adminCommission = Math.round(prixFinalAdmin * (adminCommissionPct / 100));
         const adminMontantLivreur = prixFinalAdmin - adminCommission;
 
@@ -251,6 +253,7 @@ Deno.serve(async (req) => {
           prix_final: prixFinalAdmin,
           commission_silga: adminCommission,
           montant_livreur: adminMontantLivreur,
+          ...zeroCommissionFields(course),
         };
         if (distAdmin != null) {
           adminUpdateData.distance_reelle_km = Math.max(Number(distAdmin) || 0, 0.01);
@@ -286,8 +289,8 @@ Deno.serve(async (req) => {
             longitude_livraison: gpsLng || null,
             distance_reelle_km: adminUpdateData.distance_reelle_km || null,
             prix_final: prixFinalAdmin,
-            commission_silga: adminCommission,
-            montant_livreur: adminMontantLivreur,
+            commission_silga: adminUpdateData.commission_silga,
+            montant_livreur: adminUpdateData.montant_livreur,
           },
         });
       }
@@ -362,7 +365,7 @@ Deno.serve(async (req) => {
         }
       } catch (_) {}
 
-      if (commissionPct === null) {
+      if (commissionPct === null && course.commission_taux_applique == null) {
         console.error('[validateQRCode][COMMISSION_CONFIG_MISSING]', { course_id, countryCode });
         return Response.json({
           success: false,
@@ -381,10 +384,7 @@ Deno.serve(async (req) => {
         const prixFinal = Number(course.prix_propose_client);
 
         // Utiliser le taux figé à l'acceptation si disponible (Pass/Happy Hour), sinon taux normal
-        let tauxEffectif = commissionPct;
-        if (course.commission_locked_at && course.commission_taux_applique != null) {
-          tauxEffectif = Number(course.commission_taux_applique);
-        }
+        const tauxEffectif = tauxCommissionEffectif(course, commissionPct);
 
         const commission = Math.round(prixFinal * (tauxEffectif / 100));
         const montantLivreur = prixFinal - commission;
@@ -405,7 +405,8 @@ Deno.serve(async (req) => {
       } else if (isPrixManuel) {
         // ── MODE PRIX MANUEL LIVREUR : utiliser le prix accepté par le client ──
         const prixFinal = Number(course.manual_price);
-        const commission = Math.round(prixFinal * (commissionPct / 100));
+        const tauxEffectif = tauxCommissionEffectif(course, commissionPct);
+        const commission = Math.round(prixFinal * (tauxEffectif / 100));
         const montantLivreur = prixFinal - commission;
 
         updateData.prix_final = prixFinal;
@@ -434,7 +435,8 @@ Deno.serve(async (req) => {
         }
         const prixFinal = Math.max(Math.round(prixBrut), prixMinimumPays, PRIX_MINIMUM_GLOBAL);
 
-        const commission = Math.round(prixFinal * (commissionPct / 100));
+        const tauxEffectif = tauxCommissionEffectif(course, commissionPct);
+        const commission = Math.round(prixFinal * (tauxEffectif / 100));
         const montantLivreur = prixFinal - commission;
         // distance_reelle_km = trajet réel livreur (stats), ou distance course si pas de GPS récup
         // Privilégier distTarifaire (adresse) si distReelle trop petit ou null
@@ -448,7 +450,8 @@ Deno.serve(async (req) => {
       } else {
         // GPS course (départ/arrivée) manquants → appliquer le minimum SILGAPP
         updateData.prix_final = PRIX_MINIMUM_GLOBAL;
-        updateData.commission_silga = Math.round(PRIX_MINIMUM_GLOBAL * (commissionPct / 100));
+        const tauxEffectif = tauxCommissionEffectif(course, commissionPct);
+        updateData.commission_silga = Math.round(PRIX_MINIMUM_GLOBAL * (tauxEffectif / 100));
         updateData.montant_livreur = PRIX_MINIMUM_GLOBAL - updateData.commission_silga;
         if (distTarifaire != null) {
           updateData.distance_reelle_km = Math.max(Number(distTarifaire) || 0, 0.01);
@@ -465,6 +468,7 @@ Deno.serve(async (req) => {
         updateData.commission_silga = 0;
         updateData.montant_livreur = updateData.prix_final;
       }
+      Object.assign(updateData, zeroCommissionFields(course));
 
       await base44.asServiceRole.entities.CourseExterne.update(course_id, updateData);
 
@@ -512,14 +516,14 @@ Deno.serve(async (req) => {
         prix_final: courseFinale.prix_final || null,
         distance_km: courseFinale.distance_reelle_km || null,
         montant_livreur: courseFinale.montant_livreur || null,
-        commission_silga: courseFinale.commission_silga || null,
+        commission_silga: courseFinale.commission_silga ?? null,
         course: {
           // Champs financiers
           statut: 'livree',
           prix_final: courseFinale.prix_final || null,
           distance_reelle_km: courseFinale.distance_reelle_km || null,
           montant_livreur: courseFinale.montant_livreur || null,
-          commission_silga: courseFinale.commission_silga || null,
+          commission_silga: courseFinale.commission_silga ?? null,
           // Champs timestamps — nécessaires pour calcul durée dans LivraisonRecapitulatif
           heure_livraison: courseFinale.heure_livraison || null,
           heure_recuperation: courseFinale.heure_recuperation || null,

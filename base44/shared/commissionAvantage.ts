@@ -26,6 +26,7 @@
 
 import { chargerConfigPays, normalizeCommissionPct } from './dispatchConstants.ts';
 import { normalizeEnterpriseId } from './enterpriseFinance.ts';
+import { champsLockCommission, verifierCoherenceLock } from './commissionLock.ts';
 
 export interface AvantageCommission {
   taux_normal: number;        // Country.commission_pct
@@ -46,20 +47,30 @@ export async function passActifAt(
 ): Promise<{ actif: boolean; pass_id: string | null }> {
   if (!livreurId) return { actif: false, pass_id: null };
 
-  const achats = await base44.asServiceRole.entities.PassAchat.filter({
-    livreur_id: livreurId,
-    statut: 'valide',
-  }).catch(() => []);
+  let achats;
+  try {
+    achats = await base44.asServiceRole.entities.PassAchat.filter({
+      livreur_id: livreurId,
+      statut: 'valide',
+      debut_at: { $lte: timestamp.toISOString() },
+      expiration_at: { $gt: timestamp.toISOString() },
+    }, '-debut_at', 100);
+  } catch (error: any) {
+    console.error(JSON.stringify({ event: 'PASS_LOOKUP_ERROR', livreur_id: livreurId, timestamp: timestamp.toISOString(), error: error?.message }));
+    throw new Error('PASS_LOOKUP_ERROR: verification indisponible, reessayez');
+  }
 
   for (const achat of (achats || [])) {
     if (!achat.debut_at || !achat.expiration_at) continue;
     const debut = new Date(achat.debut_at);
     const fin = new Date(achat.expiration_at);
     if (timestamp >= debut && timestamp < fin) {
+      console.info(JSON.stringify({ event: 'PASS_FOUND', livreur_id: livreurId, pass_id: achat.id, timestamp: timestamp.toISOString() }));
       return { actif: true, pass_id: achat.id };
     }
   }
 
+  console.info(JSON.stringify({ event: 'NO_ACTIVE_PASS', livreur_id: livreurId, timestamp: timestamp.toISOString() }));
   return { actif: false, pass_id: null };
 }
 
@@ -78,7 +89,7 @@ export async function happyHourActifAt(
   const configs = await base44.asServiceRole.entities.HappyHourConfig.filter({
     country_code: countryCode,
     actif: true,
-  }).catch(() => []);
+  });
 
   for (const config of (configs || [])) {
     if (!config.heure_debut || !config.heure_fin) continue;
@@ -136,11 +147,13 @@ export async function evaluerAvantageCommission(
 ): Promise<AvantageCommission> {
   // Charger le taux normal du pays
   const countryConfig = await chargerConfigPays(base44, countryCode);
-  const tauxNormal = normalizeCommissionPct(countryConfig?.commission_pct) ?? 20;
+  const tauxNormal = countryConfig?.commission_pct == null ? null : normalizeCommissionPct(countryConfig.commission_pct);
+  if (tauxNormal === null) throw new Error('COUNTRY_COMMISSION_LOOKUP_ERROR');
 
   // 1. Happy Hour actif au timestamp ?
   const hh = await happyHourActifAt(base44, countryCode, timestamp);
   if (hh.actif && hh.config_id) {
+    console.info(JSON.stringify({ event: 'HAPPY_HOUR', country_code: countryCode, happy_hour_id: hh.config_id, timestamp: timestamp.toISOString() }));
     return {
       taux_normal: tauxNormal,
       taux_applique: hh.taux_promotionnel,
@@ -162,7 +175,8 @@ export async function evaluerAvantageCommission(
     };
   }
 
-  // 3. Commission normale
+  // 3. Commission normale uniquement après vérification fiable des avantages.
+  console.info(JSON.stringify({ event: 'NORMAL_CONFIRMED', livreur_id: livreurId, country_code: countryCode, timestamp: timestamp.toISOString() }));
   return {
     taux_normal: tauxNormal,
     taux_applique: tauxNormal,
@@ -267,21 +281,22 @@ export async function figerCommissionAcceptation(
     // PUBLIC (enterprise_id null/absent) : comportement inchangé — Happy Hour,
     // Pass et commission normale du pays s'appliquent comme avant.
     // ═══════════════════════════════════════════════════════════════════════
-    const avantage = await evaluerAvantageCommission(
-      base44,
-      livreurId,
-      countryCode,
-      new Date(heureAcceptation)
-    );
+    if (course?.commission_locked_at && course.commission_taux_applique != null &&
+        String(course.livreur_id) === String(livreurId) &&
+        new Date(course.commission_locked_at) >= new Date(heureAcceptation)) {
+      return {
+        taux_normal: Number(course.commission_taux_normal),
+        taux_applique: Number(course.commission_taux_applique),
+        mode: course.commission_mode,
+        pass_id: course.pass_id || null,
+        happy_hour_id: course.happy_hour_id || null,
+      };
+    }
 
-    await base44.asServiceRole.entities.CourseExterne.update(courseId, {
-      commission_taux_normal: avantage.taux_normal,
-      commission_taux_applique: avantage.taux_applique,
-      commission_mode: avantage.mode,
-      pass_id: avantage.pass_id || '',
-      happy_hour_id: avantage.happy_hour_id || '',
-      commission_locked_at: new Date().toISOString(),
-    });
+    const avantage = await evaluerAvantageCommission(base44, livreurId, countryCode, new Date(heureAcceptation));
+    await base44.asServiceRole.entities.CourseExterne.update(courseId, champsLockCommission(avantage, new Date().toISOString()));
+    const persisted = await base44.asServiceRole.entities.CourseExterne.get(courseId);
+    verifierCoherenceLock(persisted, avantage);
 
     console.log(`[COMMISSION_LOCK] Course ${courseId} figée: mode=${avantage.mode} taux=${avantage.taux_applique}% (normal=${avantage.taux_normal}%) livreur=${livreurId}`);
     return avantage;
