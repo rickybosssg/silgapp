@@ -6,6 +6,7 @@ import { Ticket, CheckCircle2, XCircle, Clock, Ban, Image as ImageIcon, User, Ph
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";
+import PreuveViewer from "@/components/admin/PreuveViewer";
 
 const FILTRES = [
   { id: "en_attente", label: "En attente" },
@@ -17,6 +18,7 @@ export default function AdminPassAchatsPanel({ countryCode }) {
   const queryClient = useQueryClient();
   const [filtre, setFiltre] = useState("en_attente");
   const [showProof, setShowProof] = useState(null);
+  const [viewerTarget, setViewerTarget] = useState(null);
   const [annulationTarget, setAnnulationTarget] = useState(null);
   const [motifAnnulation, setMotifAnnulation] = useState("");
 
@@ -188,7 +190,8 @@ export default function AdminPassAchatsPanel({ countryCode }) {
               <img
                 src={achat.preuve_url}
                 alt="Preuve"
-                className="w-full rounded-xl max-h-48 object-cover mb-2"
+                onClick={() => setViewerTarget(achat)}
+                className="w-full rounded-xl max-h-48 object-contain mb-2 cursor-zoom-in bg-slate-50"
               />
             )}
 
@@ -353,6 +356,13 @@ export default function AdminPassAchatsPanel({ countryCode }) {
           </div>
         );
       })()}
+
+      {viewerTarget?.preuve_url && (
+        <PreuveViewer
+          imageUrl={viewerTarget.preuve_url}
+          onClose={() => setViewerTarget(null)}
+        />
+      )}
     </div>
   );
 }
