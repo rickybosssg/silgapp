@@ -1,6 +1,6 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 import { base44 } from "@/api/base44Client";
-import { getConfig } from "@/lib/dispatchConfigStore";
+import { getConfig, subscribeToConfigChanges, getConfigVersion } from "@/lib/dispatchConfigStore";
 import {
   isNativeMobile,
   isNativeAndroid,
@@ -13,11 +13,25 @@ export function useHeartbeat({ user_type, position, enabled = true, debugLabel =
   const nativeStopRef = useRef(null);
   const lastSyncRef = useRef(null);
 
+  // ── Réactivité à la config dynamique ──
+  // Quand AppConfig change (via useDispatchConfig), setConfig() incrémente
+  // configVersionCounter et notifie les subscribers. useSyncExternalStore
+  // déclenche un re-render, ce qui fait re-runner le useEffect ci-dessous
+  // avec le nouvel intervalle. L'ancien timer et l'ancien service Android
+  // sont proprement nettoyés avant que les nouveaux ne soient créés.
+  const configVersion = useSyncExternalStore(subscribeToConfigChanges, getConfigVersion);
+
   const syncHeartbeat = async (pos, force = false) => {
     if (!enabled) return;
 
+    // ── Throttle dynamique : empêche startNativeLocationSync (5s) de déclencher
+    //    heartbeatAuto plus souvent que heartbeat_web_interval_ms (30s par défaut).
+    //    Le GPS local continue d'être acquis toutes les 5s, mais l'envoi serveur
+    //    est limité à 1 appel toutes les 30s. La dernière position GPS acquise
+    //    entre deux heartbeats est envoyée lors du heartbeat suivant.
     const now = Date.now();
-    if (!force && lastSyncRef.current && now - lastSyncRef.current < 5000) {
+    const throttleMs = getConfig().heartbeat_web_interval_ms;
+    if (!force && lastSyncRef.current && now - lastSyncRef.current < throttleMs) {
       return;
     }
     lastSyncRef.current = now;
@@ -115,7 +129,7 @@ export function useHeartbeat({ user_type, position, enabled = true, debugLabel =
       nativeStopRef.current = null;
       nativeBgHeartbeatStop?.();
     };
-  }, [enabled, user_type, session_id]);
+  }, [enabled, user_type, session_id, configVersion]);
 
   useEffect(() => {
     if (!enabled) return;

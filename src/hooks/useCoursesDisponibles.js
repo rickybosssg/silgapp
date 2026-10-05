@@ -22,24 +22,33 @@ const FINAL_COURSE_STATUSES = new Set(["livree", "annulee", "completed", "delive
 const DISMISSED_COURSES_KEY = "silgapp_dismissed_courses";
 const DISMISS_TTL_MS = 30 * 60 * 1000;
 
-function normalizeEnterpriseId(val) {
-  if (val === null || val === undefined || val === "") return null;
-  const normalized = String(val).trim();
-  return normalized || null;
-}
-
-function readActiveDismissedCourseIds() {
+function readDismissedCourseIds() {
   try {
+    const stored = localStorage.getItem(DISMISSED_COURSES_KEY);
+    if (!stored) return [];
     const now = Date.now();
-    const parsed = JSON.parse(localStorage.getItem(DISMISSED_COURSES_KEY) || "{}");
+    const parsed = JSON.parse(stored);
     const activeEntries = Object.fromEntries(
       Object.entries(parsed || {}).filter(([, dismissedAt]) => now - Number(dismissedAt) < DISMISS_TTL_MS)
     );
-    localStorage.setItem(DISMISSED_COURSES_KEY, JSON.stringify(activeEntries));
+    if (Object.keys(activeEntries).length !== Object.keys(parsed || {}).length) {
+      localStorage.setItem(DISMISSED_COURSES_KEY, JSON.stringify(activeEntries));
+    }
     return Object.keys(activeEntries);
   } catch {
     return [];
   }
+}
+
+/**
+ * Normalise un enterprise_id en valeur canonique pour comparaison.
+ * Identique à normalizeEnterpriseId du backend (enterpriseFinance.ts).
+ * null/undefined/"" → null (réseau public SILGAPP).
+ * Toute autre valeur → string non vide (entreprise privée).
+ */
+function normalizeEnterpriseId(val) {
+  if (val === null || val === undefined || val === "") return null;
+  return String(val).trim();
 }
 
 export function useCoursesDisponibles(livreurProfil) {
@@ -87,9 +96,13 @@ export function useCoursesDisponibles(livreurProfil) {
   });
 
   // ── Courses disponibles (fetch brut) ──
+  // La requête ne filtre pas par enterprise_id car MongoDB ne peut pas matcher
+  // null + undefined + "" dans une seule requête SDK. Le filtrage enterprise_id
+  // est fait côté client dans eligibleCourses (normalisation canonique).
   const { data: courses = [], isLoading } = useQuery({
     queryKey: ["courses-externes-disponibles", livreurId, countryCode, livreurEnterpriseId, isV2Enabled],
     queryFn: async () => {
+      if (!livreurPeutVoirFil || !isV2Enabled) return [];
       if (!countryCode || !isV2Enabled) return [];
       const all = await base44.entities.CourseExterne.filter(
         { dispatch_status: { $in: ["disponible_push", "propose"] }, country_code: countryCode },
@@ -121,23 +134,29 @@ export function useCoursesDisponibles(livreurProfil) {
   });
 
   // ── Courses dismissées localement (localStorage, TTL 30 min) ──
-  const [refusedIds, setRefusedIds] = useState(readActiveDismissedCourseIds);
+  const [refusedIds, setRefusedIds] = useState(readDismissedCourseIds);
 
   useEffect(() => {
-    const refreshDismissedIds = () => setRefusedIds(readActiveDismissedCourseIds());
-    window.addEventListener("silgapp:dismissed-courses-changed", refreshDismissedIds);
-    const interval = window.setInterval(refreshDismissedIds, 60000);
+    const refreshDismissed = () => setRefusedIds(readDismissedCourseIds());
+    window.addEventListener("storage", refreshDismissed);
+    window.addEventListener("silgapp:dismissed-courses-changed", refreshDismissed);
     return () => {
-      window.removeEventListener("silgapp:dismissed-courses-changed", refreshDismissedIds);
-      window.clearInterval(interval);
+      window.removeEventListener("storage", refreshDismissed);
+      window.removeEventListener("silgapp:dismissed-courses-changed", refreshDismissed);
     };
   }, []);
 
   // ── Filtrage d'éligibilité (SOURCE UNIQUE) ──
+  // [ENTERPRISE ISOLATION] Filtrage enterprise_id côté client (défense en profondeur).
+  // Le backend (dispatchV2.ts accepterCourseV2) vérifie déjà enterprise_id, mais
+  // ce filtre empêche la course d'apparaître dans le fil "Disponibles" du livreur.
+  // Normalisation canonique : null/undefined/"" → null (réseau public).
   const eligibleCourses = useMemo(() => {
-    if (!livreurPeutVoirFil || !isV2Enabled) return [];
     return courses.filter(course => {
-      if (normalizeEnterpriseId(course.enterprise_id) !== livreurEnterpriseId) return false;
+      // [ENTERPRISE] Isolation stricte : le livreur ne voit que les courses de son périmètre.
+      const courseEnterpriseId = normalizeEnterpriseId(course.enterprise_id);
+      if (courseEnterpriseId !== livreurEnterpriseId) return false;
+
       if (course.statut === "en_attente") return false;
       if (FINAL_COURSE_STATUSES.has(course.statut)) return false;
       if (course.statut !== "recherche_livreur") return false;
@@ -152,7 +171,7 @@ export function useCoursesDisponibles(livreurProfil) {
       if (refusedCourseIds.includes(course.id)) return false;
       return true;
     });
-  }, [courses, refusedIds, refusedCourseIds, livreurPeutVoirFil, livreurEnterpriseId, isV2Enabled]);
+  }, [courses, refusedIds, refusedCourseIds, livreurId, livreurEnterpriseId]);
 
   return {
     eligibleCourses,

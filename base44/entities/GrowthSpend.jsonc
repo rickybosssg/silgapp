@@ -28,11 +28,32 @@
     },
     "montant": {
       "type": "number",
-      "description": "Montant r\u00e9ellement d\u00e9pens\u00e9 en FCFA. Toujours un montant r\u00e9el et v\u00e9rifiable, jamais une estimation."
+      "description": "Montant r\u00e9ellement d\u00e9pens\u00e9. Pour les enregistrements cr\u00e9\u00e9s AVANT la correction mon\u00e9taire du 2026-10-03, ce champ peut contenir une valeur en USD (moteur=publicite, idempotency_key commence par 'meta_spend_'). Pour les nouveaux enregistrements, ce champ contient le montant original dans la devise source (voir currency_original). Le moteur utilise 'amount_fcfa' pour tous les calculs budg\u00e9taires."
     },
     "devise": {
       "type": "string",
       "default": "FCFA"
+    },
+    "amount_original": {
+      "type": "number",
+      "description": "Montant original dans la devise source (ex: 83.00 pour 83 USD). Null pour les enregistrements historiques ant\u00e9rieurs au 2026-10-03."
+    },
+    "currency_original": {
+      "type": "string",
+      "description": "Devise source originale (ex: USD, EUR). Null pour les enregistrements historiques. 'FCFA' pour les d\u00e9penses directement en FCFA (primes, r\u00e9activation, etc.)."
+    },
+    "amount_fcfa": {
+      "type": "number",
+      "description": "Montant converti en FCFA. C'est le champ utilis\u00e9 par TOUS les calculs budg\u00e9taires de l'Autopilote (sous-plafonds, plafond global, CAC, comparaison des exp\u00e9riences, dashboard). Null pour les enregistrements historiques \u2014 le moteur applique une conversion \u00e0 la vol\u00e9e (montant \u00d7 600) pour les enregistrements meta_spend_ sans amount_fcfa."
+    },
+    "conversion_rate": {
+      "type": "number",
+      "description": "Taux de conversion utilis\u00e9 (ex: 600 pour 1 USD = 600 FCFA). Null pour les enregistrements historiques."
+    },
+    "converted_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date/heure de la conversion. Null pour les enregistrements historiques."
     },
     "country_code": {
       "type": "string",

@@ -73,6 +73,11 @@ export default function DispatchHealthPanel({ courses = [], livreurs = [] }) {
   }, [livreursON]);
 
   // ── 4. Push actif (au moins 1 token FCM natif actif) ──
+  const livreurEmailsSet = useMemo(
+    () => new Set(livreursON.map(l => l.user_email).filter(Boolean)),
+    [livreursON]
+  );
+
   const { data: tokens = [] } = useQuery({
     queryKey: ["dispatch-health-push-tokens"],
     queryFn: () => base44.entities.NotificationToken.filter({

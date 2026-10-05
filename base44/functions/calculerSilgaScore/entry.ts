@@ -5,16 +5,16 @@ import { calculerScoreLivreur } from '../../shared/silgaScoreEngine.ts';
  * ═══════════════════════════════════════════════════════════════════════
  * SILGA SCORE — Backend function
  * ═══════════════════════════════════════════════════════════════════════
- *
+ * 
  * Calcule le Silga Score (0-100) pour un livreur ou pour tous les livreurs.
  * Mode observation uniquement — n'impacte pas le dispatch V2.
- *
+ * 
  * Payload:
  *   { livreur_id: string }  → calculer pour un livreur spécifique
  *   { all: true }           → calculer pour tous les livreurs validés
  *   { all: true, limit: N } → limiter le nombre de livreurs (défaut 200)
- *
- * Le score est mis en cache sur l'entité Livreur (silga_score,
+ * 
+ * Le score est mis en cache sur l'entité Livreur (silga_score, 
  * silga_score_niveau, silga_score_breakdown, silga_score_calculated_at).
  * ═══════════════════════════════════════════════════════════════════════
  */

@@ -23,7 +23,7 @@ export function useCountryPricing(countryCode) {
 
   const devise = country?.devise_symbole || country?.devise || "FCFA";
 
-  let prixSuggeres = [];
+  let prixSuggeres = [1500, 2000]; // fallback universel
   if (country?.prix_suggeres_client) {
     try {
       const parsed = JSON.parse(country.prix_suggeres_client);
@@ -31,13 +31,6 @@ export function useCountryPricing(countryCode) {
         prixSuggeres = parsed.map(Number).filter((n) => Number.isFinite(n) && n > 0);
       }
     } catch (_) {}
-  }
-
-  if (prixSuggeres.length === 0) {
-    const prixMinimum = Number(country?.prix_minimum);
-    if (Number.isFinite(prixMinimum) && prixMinimum > 0) {
-      prixSuggeres = [prixMinimum, prixMinimum * 2];
-    }
   }
 
   return { country, devise, prixSuggeres, isLoading };

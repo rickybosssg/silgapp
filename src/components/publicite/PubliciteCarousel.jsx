@@ -115,7 +115,7 @@ export default function PubliciteCarousel({ cible = "clients", userId = null, us
         style={{ background: pub.couleur_fond || "#1a1a2e", minHeight: 120 }}
         onClick={() => handleClic(pub)}
       >
-        {/* Média — garder le visuel entier, quel que soit son ratio */}
+        {/* Média — object-contain : aucune partie du média n'est coupée, quel que soit le ratio */}
         {pub.media_url && pub.type_media === "image" && (
           <img
             src={pub.media_url}

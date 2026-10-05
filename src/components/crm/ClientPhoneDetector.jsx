@@ -56,7 +56,9 @@ export default function ClientPhoneDetector({ phone, countryCode, onClientFound,
   useEffect(() => {
     if (!normalizedPhone || normalizedPhone.length < 8) {
       setClient(null);
-      // Le champ est encore incomplet : ne pas réinitialiser le parent pendant la saisie.
+      // setDetectedClient(null) dans le parent — ne touche PAS à clientTelephone.
+      // Le traceur dans AdminCourseForm surveille toute écriture dans clientTelephone.
+      onClientFoundRef.current?.(null);
       return;
     }
     const timer = setTimeout(() => searchClient.current(), 400);

@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { startUrgentCourseAlert, stopUrgentCourseAlert } from "@/lib/livreurUrgentAlert";
 import { getPrixAffichable } from "@/utils/getPrixAffichable";
 import { useCoursesDisponibles } from "@/hooks/useCoursesDisponibles";
-import AcceptConfirmationModal from "./AcceptConfirmationModal";
+// Correction 2: AcceptConfirmationModal supprimé — acceptation en un seul clic
 
 function calculerDistance(lat1, lng1, lat2, lng2) {
   if ([lat1, lng1, lat2, lng2].some(value => value == null || Number.isNaN(Number(value)))) return null;
@@ -33,7 +33,7 @@ function persistDismissedCourse(courseId) {
     );
     activeEntries[courseId] = now;
     localStorage.setItem(DISMISSED_COURSES_KEY, JSON.stringify(activeEntries));
-    window.dispatchEvent(new CustomEvent("silgapp:dismissed-courses-changed"));
+    window.dispatchEvent(new Event("silgapp:dismissed-courses-changed"));
   } catch {
     // Le refus serveur reste la source de verite si le stockage local est indisponible.
   }
@@ -42,34 +42,63 @@ function persistDismissedCourse(courseId) {
 export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onNewCourse }) {
   const queryClient = useQueryClient();
   const [acceptingId, setAcceptingId] = useState(null);
-  const [pendingAcceptCourse, setPendingAcceptCourse] = useState(null);
   const knownCourseIdsRef = useRef(new Set());
   const courseFeedInitializedRef = useRef(false);
+
+  // ── Déduplication de marquer_vue_course (Option C) ──
+  // seen : course_ids déjà marqués vue avec succès pendant la session
+  // inFlight : course_ids dont l'appel est en cours (anti-concurrence)
+  const vueSeenRef = useRef(new Set());
+  const vueInFlightRef = useRef(new Set());
 
   const livreurId = livreurProfil?.id;
   const countryCode = livreurProfil?.country_code;
   const livreurLat = livreurProfil?.latitude;
   const livreurLng = livreurProfil?.longitude;
 
+  const confirmerAcceptationDepuisCourse = async (courseId) => {
+    if (!courseId || !livreurId) return false;
+    const fresh = await base44.entities.CourseExterne.get(courseId).catch(() => null);
+    return fresh?.livreur_id === livreurId && !FINAL_COURSE_STATUSES.has(fresh?.statut);
+  };
+
   // ── Source unique de vérité : hook partagé avec ActiviteTempsReel ──
   const { eligibleCourses, courses, isLoading, isV2Enabled, livreurDisponible, livreurPeutVoirFil, raisonBlocage, refusedCourseIds, setRefusedIds } = useCoursesDisponibles(livreurProfil);
 
-  // ── Enregistrer les vues de courses via fonction backend sécurisée ──
-  // REMPLACÉ : l'ancien code créait directement DispatchNotification depuis le frontend,
-  // ce qui permettait à un livreur d'usurper l'identité d'un autre. Désormais, le
-  // backend résout livreur_user_email, vérifie l'identité et l'éligibilité de la course.
+  // ── Tracking vue_at — DÉDUPLICATION LOCALE (Option C) ──
+  // Un seul appel marquer_vue_course par course et par session composant.
+  // Le backend reste idempotent (already_viewed: true) comme sécurité finale.
+  // Le Set est VOLATILE : perdu au unmount → un appel post-remount est un no-op backend.
   useEffect(() => {
     if (!livreurId || courses.length === 0) return;
-    (async () => {
-      for (const course of courses) {
-        try {
-          await base44.functions.invoke("dispatchExterneAuto", {
-            action: "marquer_vue_course",
-            course_id: course.id,
-          });
-        } catch (_) {}
-      }
-    })();
+    const seen = vueSeenRef.current;
+    const inFlight = vueInFlightRef.current;
+
+    for (const course of courses) {
+      const cid = course.id;
+      if (!cid) continue;
+      // Déjà marqué vue → skip
+      if (seen.has(cid)) continue;
+      // Appel déjà en cours pour cette course → anti-concurrence
+      if (inFlight.has(cid)) continue;
+
+      inFlight.add(cid);
+      base44.functions
+        .invoke("dispatchExterneAuto", {
+          action: "marquer_vue_course",
+          course_id: cid,
+        })
+        .then(() => {
+          // Succès → marquer comme vue définitivement pour cette session
+          seen.add(cid);
+        })
+        .catch(() => {
+          // Échec → ne PAS ajouter à seen : un prochain refetch pourra réessayer
+        })
+        .finally(() => {
+          inFlight.delete(cid);
+        });
+    }
   }, [courses, livreurId]);
 
   // Realtime subscription — mise à jour instantanée
@@ -111,7 +140,6 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
     onNewCourse?.({
       count: newCourses.length,
       course: newestCourse,
-      courseId: newestCourse.id,
     });
   }, [eligibleCourses, isLoading, onNewCourse]);
 
@@ -134,16 +162,11 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
     });
   }, [eligibleCourses, livreurLat, livreurLng]);
 
-  // Ouvre le modal de confirmation AVANT l'acceptation réelle
-  const handleAcceptClick = (course) => {
+  // Correction 2: Acceptation directe en un seul clic — plus de modal de confirmation
+  const handleAcceptClick = async (course) => {
     if (!course?.id || !livreurId) return;
-    setPendingAcceptCourse(course);
-  };
-
-  // Acceptation réelle — déclenchée par le bouton "Confirmer" du modal
-  const handleAcceptConfirm = async () => {
-    const course = pendingAcceptCourse;
-    if (!course?.id || !livreurId) return;
+    // Anti-double-tap: si déjà en cours, ignorer
+    if (acceptingId) return;
     setAcceptingId(course.id);
     try {
       const res = await base44.functions.invoke("dispatchExterneAuto", {
@@ -151,7 +174,7 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
         course_id: course.id,
         livreur_id: livreurId,
       });
-      const data = res;
+      const data = res?.data || res || {};
       if (data?.success && data?.accepted !== false) {
         stopUrgentCourseAlert("v2-course-accepted");
         toast.success("Course acceptée !");
@@ -167,13 +190,30 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
         toast.error("Cette course a expiré.");
         queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles"] });
       } else {
-        toast.error(data?.error || "Erreur lors de l'acceptation");
+        const acceptedOnServer = await confirmerAcceptationDepuisCourse(course.id);
+        if (acceptedOnServer) {
+          stopUrgentCourseAlert("v2-course-accepted-confirmed");
+          toast.success("Course acceptée !");
+          queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles"] });
+          queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+          if (onAcceptSuccess) onAcceptSuccess();
+          return;
+        }
+        toast.error(data?.error || data?.message || "Erreur lors de l'acceptation");
       }
-    } catch {
-      toast.error("Erreur réseau lors de l'acceptation");
+    } catch (err) {
+      const acceptedOnServer = await confirmerAcceptationDepuisCourse(course.id);
+      if (acceptedOnServer) {
+        stopUrgentCourseAlert("v2-course-accepted-confirmed");
+        toast.success("Course acceptée !");
+        queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles"] });
+        queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+        if (onAcceptSuccess) onAcceptSuccess();
+        return;
+      }
+      toast.error(err?.response?.data?.error || err?.response?.data?.message || err?.message || "Erreur réseau lors de l'acceptation");
     } finally {
       setAcceptingId(null);
-      setPendingAcceptCourse(null);
     }
   };
 
@@ -362,15 +402,6 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
           </div>
         </div>
       ))}
-      {/* Modal de confirmation d'acceptation (Phase 1 anti-annulation) */}
-      {pendingAcceptCourse && (
-        <AcceptConfirmationModal
-          course={pendingAcceptCourse}
-          onConfirm={handleAcceptConfirm}
-          onCancel={() => setPendingAcceptCourse(null)}
-          loading={acceptingId === pendingAcceptCourse.id}
-        />
-      )}
     </div>
   );
 }

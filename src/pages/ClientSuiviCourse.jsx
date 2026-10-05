@@ -153,11 +153,15 @@ export default function ClientSuiviCourse() {
   });
 
   const { data: courses = [], refetch, isLoading } = useQuery({
-    queryKey: ["mes-courses-externes", userId, clientProfilId],
+    queryKey: ["mes-courses-externes", userId, clientProfilId, userEmail],
     queryFn: async () => {
+      const normalizedEmail = String(userEmail || "").trim().toLowerCase();
       const byCreator = await base44.entities.CourseExterne.filter(
         { created_by_id: userId }, "-updated_date", 50
       );
+      const byEmail = normalizedEmail
+        ? await base44.entities.CourseExterne.filter({ client_user_email: normalizedEmail }, "-updated_date", 80).catch(() => [])
+        : [];
       let byDest = [];
       let byExpediteur = [];
       if (clientProfilId) {
@@ -174,7 +178,13 @@ export default function ClientSuiviCourse() {
       }
       // Fusionner sans doublons
       const map = new Map();
-      [...(byCreator || []), ...(byDest || []), ...(byExpediteur || [])].forEach(c => map.set(c.id, c));
+      [...(byEmail || []), ...(byCreator || []), ...(byDest || []), ...(byExpediteur || [])].forEach(c => {
+        const courseEmail = String(c?.client_user_email || "").trim().toLowerCase();
+        const byClientEmail = normalizedEmail && courseEmail === normalizedEmail;
+        const byClientId = clientProfilId && (c.destinataire_client_id === clientProfilId || c.expediteur_client_id === clientProfilId);
+        const byUserId = userId && c.created_by_id === userId;
+        if (byClientEmail || byClientId || byUserId) map.set(c.id, c);
+      });
       const courses = [...map.values()].sort((a, b) => new Date(b.updated_date) - new Date(a.updated_date));
 
       // CORRECTION : Récupérer le GPS du livreur via fonction backend sécurisée

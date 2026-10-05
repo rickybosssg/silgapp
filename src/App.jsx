@@ -1,7 +1,7 @@
 import React, { Suspense, lazy, useState, useEffect } from 'react';
 import SplashScreen from './components/SplashScreen';
 import { Toaster } from '@/components/ui/toaster';
-import { Toaster as SonnerToaster } from '@/components/ui/sonner';
+import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -12,8 +12,8 @@ import SelectionReseau from './pages/SelectionReseau.jsx';
 import AppMaintenanceGate from './components/admin/AppMaintenanceGate.jsx';
 import { restoreTokenFromCookie, syncTokenFromPreferences, clearPersistedToken } from '@/lib/authPersistence';
 import { trackAppInstall } from '@/lib/trackInstall';
+import { consumePendingNotificationData } from '@/lib/notifications';
 import IOSAppStoreBanner from './components/IOSAppStoreBanner.jsx';
-import { base44 } from '@/api/base44Client';
 
 // LoadingScreen défini IMMÉDIATEMENT avant lazy loading
 const LoadingScreen = () => <SplashScreen />;
@@ -42,6 +42,7 @@ const RecapCourseLivreur = lazy(() => import('./pages/RecapCourseLivreur.jsx'));
 const CourseExterneForm = lazy(() => import('./pages/CourseExterneForm.jsx'));
 const CourseExterneFormSync = lazy(() => import('./pages/CourseExterneFormSync.jsx'));
 const ClientSuiviCourse = lazy(() => import('./pages/ClientSuiviCourse.jsx'));
+const ClientRefaireCourse = lazy(() => import('./pages/ClientRefaireCourse.jsx'));
 const DashboardAdminExterne = lazy(() => import('./pages/DashboardAdminExterne.jsx'));
 const DusLivreursExternes = lazy(() => import('./pages/DusLivreursExternes.jsx'));
 const ClientsExternesPage = lazy(() => import('./pages/ClientsExternesPage.jsx'));
@@ -121,13 +122,16 @@ const HabitRemindersPage = lazy(() => import('./pages/HabitRemindersPage.jsx'));
 const ClientsAutonomiser = lazy(() => import('./pages/ClientsAutonomiser.jsx'));
 const GrowthDashboard = lazy(() => import('./pages/GrowthDashboard.jsx'));
 const MetaAdsDashboard = lazy(() => import('./pages/MetaAdsDashboard.jsx'));
+const AutopiloteDashboard = lazy(() => import('./pages/AutopiloteDashboard.jsx'));
 const PassZeroCommissionAdmin = lazy(() => import('./pages/PassZeroCommissionAdmin.jsx'));
 import Diag500Panel from './components/admin/Diag500Panel.jsx';
 
+// ── SILGAPP ENTREPRISE — Module multi-tenant ──
 const EntrepriseApp = lazy(() => import('./pages/EntrepriseApp.jsx'));
 const SuperAdminEntreprises = lazy(() => import('./pages/SuperAdminEntreprises.jsx'));
 const SuiviEnterprise = lazy(() => import('./pages/SuiviEnterprise.jsx'));
 const InscriptionLivreurEntreprise = lazy(() => import('./pages/InscriptionLivreurEntreprise.jsx'));
+const OAuthConsent = lazy(() => import('./pages/OAuthConsent.jsx'));
 
 function AnimatedRoutes({ children }) {
   // Variables définies DANS la fonction pour éviter init issues
@@ -175,42 +179,6 @@ function AppContent() {
   // Hook for Android hardware back button
   const navigate = useNavigate();
   const location = useLocation();
-
-  useEffect(() => {
-    let active = true;
-
-    const openAdminInboxItem = async (data = {}) => {
-      const itemId = String(data.inbox_item_id || '').trim();
-      if (!itemId) return;
-
-      try {
-        const user = await base44.auth.me();
-        if (!active || user?.role !== 'admin') return;
-        localStorage.removeItem('silgapp_last_opened_notification');
-
-        const items = await base44.entities.AdminInboxItem.filter({ id: itemId }, '-created_date', 1);
-        if (!active) return;
-        const actionUrl = items?.[0]?.action_url;
-        navigate(actionUrl?.startsWith('/') ? actionUrl : '/admin/centre-notifications');
-      } catch {
-        if (active) navigate('/admin/centre-notifications');
-      }
-    };
-
-    const handleNotificationOpened = (event) => openAdminInboxItem(event.detail || {});
-    window.addEventListener('silgapp:notification-opened', handleNotificationOpened);
-
-    try {
-      const lastOpened = JSON.parse(localStorage.getItem('silgapp_last_opened_notification') || 'null');
-      if (lastOpened?.inbox_item_id) openAdminInboxItem(lastOpened);
-    } catch {}
-
-    return () => {
-      active = false;
-      window.removeEventListener('silgapp:notification-opened', handleNotificationOpened);
-    };
-  }, [navigate]);
-
   useEffect(() => {
     const handleBackButton = (e) => {
       e.preventDefault();
@@ -222,6 +190,20 @@ function AppContent() {
     document.addEventListener('backbutton', handleBackButton, false);
     return () => document.removeEventListener('backbutton', handleBackButton);
   }, [navigate, location]);
+
+  useEffect(() => {
+    const navigateFromNotification = (data = {}) => {
+      const rawTarget = data.action_url || data.url || data.path || data.route || data.deep_link || "";
+      if (typeof rawTarget !== "string" || !rawTarget.startsWith("/")) return;
+      navigate(rawTarget, { replace: false });
+    };
+    const handleNotificationOpened = (event) => navigateFromNotification(event?.detail || {});
+    window.addEventListener("silgapp:notification-opened", handleNotificationOpened);
+    consumePendingNotificationData().then((pending) => {
+      if (pending) navigateFromNotification(pending);
+    }).catch(() => null);
+    return () => window.removeEventListener("silgapp:notification-opened", handleNotificationOpened);
+  }, [navigate]);
 
   // ── Heartbeat d'authentification — empêche la déconnexion involontaire ──
   // Sur Android WebView, localStorage peut être effacé quand l'app passe en
@@ -270,6 +252,16 @@ function AppContent() {
   // 🌍 ROUTES PUBLIQUES - PRIORITÉ ABSOLUE (vérification avant tout)
   const currentPath = location.pathname || window.location.pathname;
 
+  // ── /oauth/consent → Page de consentement OAuth MCP (hors auth guard) ──
+  if (currentPath === '/oauth/consent') {
+    return (
+      <Suspense fallback={<LoadingScreen />}>
+        <OAuthConsent />
+      </Suspense>
+    );
+  }
+
+  // ── /entreprise → Admin Entreprise dashboard (auth required, handled by EntrepriseApp) ──
   if (currentPath === '/entreprise' || currentPath.startsWith('/entreprise/')) {
     return (
       <Suspense fallback={<LoadingScreen />}>
@@ -277,7 +269,6 @@ function AppContent() {
       </Suspense>
     );
   }
-
   const isPublicRoute = currentPath === '/telecharger' || 
                         currentPath === '/privacy-policy' ||
                         currentPath.startsWith('/suivi-public/') ||
@@ -302,6 +293,7 @@ function AppContent() {
           <Route path="/telecharger" element={<TelechargerSILGAPP />} />
           {/* Route publique de suivi de course */}
           <Route path="/suivi-public/:token" element={<PublicSuiviCourse />} />
+          {/* Route publique d'inscription livreur entreprise (via token invitation) */}
           <Route path="/inscription-livreur" element={<InscriptionLivreurEntreprise />} />
           {/* Politique de confidentialité — requise Google Play */}
           <Route path="/privacy-policy" element={<PolitiqueConfidentialite />} />
@@ -363,6 +355,7 @@ function AppContent() {
           <Route path="/client/course/recevoir" element={<CourseExterneFormSync />} />
           <Route path="/client/course/deplacement" element={<CourseExterneFormSync />} />
           <Route path="/client/suivi" element={<ClientSuiviCourse />} />
+          <Route path="/client/refaire" element={<ClientRefaireCourse />} />
           <Route path="/client/boutiques" element={<BoutiquesList />} />
           <Route path="/client/boutiques/:id" element={<BoutiqueDetail />} />
           <Route path="/client/restaurants" element={<RestaurantsList />} />
@@ -475,6 +468,7 @@ function AppContent() {
           )}
           <Route path="/notifications" element={<AnimatedRoutes><Notifications /></AnimatedRoutes>} />
           <Route path="/admin/test-notifications" element={<AnimatedRoutes><TestNotifications /></AnimatedRoutes>} />
+          <Route path="/diagnostic-push-complet" element={<AnimatedRoutes><DiagnosticPushComplet /></AnimatedRoutes>} />
           <Route path="/admin/test-dispatch-livreur" element={<AnimatedRoutes><TestDispatchLivreur /></AnimatedRoutes>} />
           <Route path="/admin/centre-notifications" element={<AnimatedRoutes><CentreNotifications /></AnimatedRoutes>} />
           <Route path="/admin/centre-notifications-push" element={<AnimatedRoutes><CentreNotificationsPush /></AnimatedRoutes>} />
@@ -501,12 +495,14 @@ function AppContent() {
           <Route path="/admin/clients-autonomiser" element={<AnimatedRoutes><ClientsAutonomiser /></AnimatedRoutes>} />
           <Route path="/admin/growth" element={<AnimatedRoutes><GrowthDashboard /></AnimatedRoutes>} />
           <Route path="/admin/meta-ads" element={<AnimatedRoutes><MetaAdsDashboard /></AnimatedRoutes>} />
+          <Route path="/admin/autopilote" element={<AnimatedRoutes><AutopiloteDashboard /></AnimatedRoutes>} />
           <Route path="/admin/pass-zero-commission" element={<AnimatedRoutes><PassZeroCommissionAdmin /></AnimatedRoutes>} />
           <Route path="/admin/entreprises" element={<AnimatedRoutes><SuperAdminEntreprises /></AnimatedRoutes>} />
           <Route path="/admin/suivi-enterprise" element={<AnimatedRoutes><SuiviEnterprise /></AnimatedRoutes>} />
           <Route path="/admin/messages" element={<AnimatedRoutes><AdminMessages /></AnimatedRoutes>} />
           <Route path="/admin/whatsapp" element={<AnimatedRoutes><WhatsAppAdmin /></AnimatedRoutes>} />
           <Route path="/admin/venus" element={<AnimatedRoutes><VenusAdminCenter /></AnimatedRoutes>} />
+          <Route path="/admin/venus-brain" element={<AnimatedRoutes><VenusBrainCenter /></AnimatedRoutes>} />
           <Route path="/admin/venus-learning" element={<AnimatedRoutes><VenusLearningCenter /></AnimatedRoutes>} />
           <Route path="/admin/venus-brain" element={<AnimatedRoutes><VenusBrainCenter /></AnimatedRoutes>} />
           <Route path="/admin/venus-workflows" element={<AnimatedRoutes><VenusWorkflowCenter /></AnimatedRoutes>} />

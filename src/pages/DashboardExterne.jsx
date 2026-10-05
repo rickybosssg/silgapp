@@ -52,7 +52,7 @@ export default function DashboardExterne() {
   const [statModal, setStatModal] = useState(null);
   const [showCodePromo, setShowCodePromo] = useState(false);
   const { isGlobal, isPays, countryCode: adminCountryCode, selectedCountry } = useAdminContext();
-  const { pays: paysActifs } = usePaysActifs();
+  const paysActifs = usePaysActifs();
   const defaultCountry = paysActifs.length === 1 ? paysActifs[0].code : null;
   const effectiveCountry = isPays ? adminCountryCode : (selectedCountry || defaultCountry);
 
@@ -72,8 +72,8 @@ export default function DashboardExterne() {
       effectiveCountry ? { type_livreur: "externe", country_code: effectiveCountry } : { type_livreur: "externe" }
     ),
     initialData: [],
-    refetchInterval: 15000,
-    staleTime: 10000,
+    refetchInterval: 30000,
+    staleTime: 20000,
   });
 
   const { data: clients = [] } = useQuery({

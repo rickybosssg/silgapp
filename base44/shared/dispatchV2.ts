@@ -33,15 +33,16 @@
 import { waitUntil } from 'base44:runtime';
 import { STATUTS_ACTIFS_COURSE, STATUTS_TERMINAUX_COURSE, calculerDistance, chargerConfigPays } from './dispatchConstants.ts';
 import { dispatchLog, reponseDejaPrise, generateToken, generatePIN, journaliserDispatch } from './dispatchUtils.ts';
-import { getLivreursNotifies, getLivreursRefuses, marquerAccepte } from './dispatchNotifications.ts';
+import { enregistrerNotification, enregistrerNotificationsBulk, enregistrerInboxNotificationsBulk, getLivreursNotifies, getLivreursRefuses, marquerAccepte } from './dispatchNotifications.ts';
 import { notifierLivreursUnifie } from './dispatchPushUnifie.ts';
 import { chargerConfigDispatch } from './dispatchConfig.ts';
+import { resolveCourseParticipantUserIds } from './conversationSecurity.ts';
 import { ensureCourseCodeMessage, buildCodeMessageContent } from './courseCodeMessage.ts';
 import { figerCommissionAcceptation } from './commissionAvantage.ts';
-import { normalizeEnterpriseId, checkEnterpriseActive } from './enterpriseFinance.ts';
+import { normalizeEnterpriseId } from './enterpriseFinance.ts';
 
 // ── Version du bundle (pour vérifier que la production charge la dernière version) ──
-export const DISPATCH_V2_BUNDLE_VERSION = '2026-09-25-fix-commission-lock-happy-hour';
+export const DISPATCH_V2_BUNDLE_VERSION = '2026-09-25-v2-only-unique-moteur';
 
 // ── Feature flag cache (TTL 2 min) ──
 let V2_FLAG_CACHE: { enabled: boolean; expires: number } | null = null;
@@ -70,7 +71,13 @@ async function notifierLivreursEligiblesV2(base44: any, course: any, options: an
   const { priorityOnly = false, skipAlreadyPublishedCheck = false } = options;
   if (!course?.id || !course?.country_code) return { notified: 0 };
 
-  // Lecture unifiée : livreurs + DispatchNotification existantes, puis split mémoire.
+  // [ENTERPRISE] Filtre enterprise_id : course Enterprise → livreurs même entreprise uniquement.
+  // Course publique (enterprise_id null/absent) → livreurs publics uniquement.
+  // normalizeEnterpriseId(null) === normalizeEnterpriseId(null) = true (canonique).
+  const courseEnterpriseId = normalizeEnterpriseId(course.enterprise_id);
+
+  // 📦 LECTURE UNIFIÉE : 1 Livreur.filter + 1 DispatchNotification.filter
+  // (remplace getLivreursNotifies + getLivreursRefuses → économise 1 read redondant)
   const [livreurs, allDnRecords] = await Promise.all([
     base44.asServiceRole.entities.Livreur.filter({
       type_livreur: 'externe',
@@ -80,13 +87,23 @@ async function notifierLivreursEligiblesV2(base44: any, course: any, options: an
       country_code: course.country_code,
       bloque_encours: false,
       manual_hors_ligne: { $ne: true },
-      admin_hors_ligne: { $ne: true },
+      // [CORRECTION 11] admin_hors_ligne retiré du ciblage FCM : un livreur bloqué
+      // par l'Admin continue à recevoir le push "Nouvelle course". L'acceptation
+      // reste bloquée côté accepterCourseV2 (livreur.admin_hors_ligne !== true).
+      // [ENTERPRISE] Isolation : ne proposer que les livreurs du même périmètre.
+      // Pour les courses publiques, on filtre enterprise_id: null qui matche
+      // à la fois null et absent (undefined) en MongoDB.
+      ...(courseEnterpriseId
+        ? { enterprise_id: courseEnterpriseId }
+        : { enterprise_id: null }),
     }, '-last_seen_at', 500).catch(() => []),
     base44.asServiceRole.entities.DispatchNotification.filter(
       { course_id: course.id }, '-date_notification', 500
     ).catch(() => []),
   ]);
 
+
+  // Split DN records en mémoire (évite 2 reads séparés pour notifiés vs refusés)
   const dejaNotifies = (allDnRecords || []).filter((n: any) => n.statut !== 'refuse').map((n: any) => n.livreur_id);
   const refuses = (allDnRecords || []).filter((n: any) => n.statut === 'refuse').map((n: any) => n.livreur_id);
 
@@ -99,13 +116,10 @@ async function notifierLivreursEligiblesV2(base44: any, course: any, options: an
   }
 
   const exclus = new Set([...(dejaNotifies || []), ...(refuses || [])]);
-  const courseEnterpriseId = normalizeEnterpriseId(course.enterprise_id);
-  let candidats = (livreurs || [])
-    .filter((livreur: any) => normalizeEnterpriseId(livreur.enterprise_id) === courseEnterpriseId)
-    .filter((livreur: any) => livreur.user_email && !exclus.has(livreur.id));
+  let candidats = (livreurs || []).filter((livreur: any) => livreur.user_email && !exclus.has(livreur.id));
 
   // 🚫 Exclure les livreurs déjà en course (même définition que aCourseActive)
-  const livreursEnCourse = await getLivreursEnCourse(base44, course.country_code);
+  const livreursEnCourse = await getLivreursEnCourse(base44, course.country_code, courseEnterpriseId);
   candidats = candidats.filter((l: any) => !livreursEnCourse.has(l.id));
 
   // 🎯 Priorité : si priorityOnly=true, ne notifier que les livreurs prioritaires (priorite_dispatch > 0)
@@ -113,6 +127,7 @@ async function notifierLivreursEligiblesV2(base44: any, course: any, options: an
     candidats = candidats.filter((l: any) => Number(l.priorite_dispatch || 0) > 0);
   }
 
+  // 📤 NOTIFICATION UNIFIÉE — remplace 3 appels séparés par 1 seule fonction
   console.log(`[V2] 📊 notifierLivreursEligiblesV2 — candidats=${candidats.length} livreurs=${(livreurs||[]).length} dejaNotifies=${dejaNotifies.length} refuses=${refuses.length} enCourse=${livreursEnCourse.size} course=${course.id}`);
   if (candidats.length === 0) {
     console.warn(`[V2] ⚠️ 0 candidat après filtrage — livreurs=${(livreurs||[]).length} dejaNotifies=${dejaNotifies.length} refuses=${refuses.length} enCourse=${livreursEnCourse.size}`);
@@ -124,14 +139,14 @@ async function notifierLivreursEligiblesV2(base44: any, course: any, options: an
 }
 
 // ── Helper : liste des livreurs en course (même définition que aCourseActive) ──
-async function getLivreursEnCourse(base44: any, countryCode: string): Promise<Set<string>> {
+async function getLivreursEnCourse(base44: any, countryCode: string, courseEnterpriseId: string | null = null): Promise<Set<string>> {
   if (!countryCode) return new Set();
   const [courses, coursesAccepted] = await Promise.all([
     base44.asServiceRole.entities.CourseExterne.filter(
-      { country_code: countryCode, livreur_id: { $ne: null } }, '-created_date', 200
+      { country_code: countryCode, livreur_id: { $ne: null }, ...(courseEnterpriseId ? { enterprise_id: courseEnterpriseId } : { enterprise_id: null }) }, '-created_date', 200
     ).catch(() => []),
     base44.asServiceRole.entities.CourseExterne.filter(
-      { country_code: countryCode, accepted_by_livreur_id: { $ne: null } }, '-created_date', 200
+      { country_code: countryCode, accepted_by_livreur_id: { $ne: null }, ...(courseEnterpriseId ? { enterprise_id: courseEnterpriseId } : { enterprise_id: null }) }, '-created_date', 200
     ).catch(() => []),
   ]);
   const ids = new Set<string>();
@@ -182,15 +197,18 @@ export async function publierCourseDansFil(base44: any, course: any) {
   // 🔖 Log de version bundle — pour vérifier que la production charge la dernière version
   dispatchLog(`[V2] 🔖 publierCourseDansFil — bundle version: ${DISPATCH_V2_BUNDLE_VERSION} — course ${course.id}`);
 
-  const courseEnterpriseId = normalizeEnterpriseId(course.enterprise_id);
-  const enterpriseGuard = await checkEnterpriseActive(base44.asServiceRole, courseEnterpriseId);
-  if (!enterpriseGuard.active) {
-    return {
-      success: false,
-      blocked: true,
-      reason: enterpriseGuard.suspended ? 'enterprise_suspended' : 'enterprise_not_found',
-      error: 'Cette entreprise ne peut pas recevoir de nouvelles courses actuellement.',
-    };
+  // [ENTERPRISE_SUSPENSION] Bloquer le dispatch si l'entreprise est suspendue.
+  // Les courses déjà acceptées (en cours) ne passent pas par cette fonction.
+  const suspendCheckEntId = normalizeEnterpriseId(course.enterprise_id);
+  if (suspendCheckEntId) {
+    const entList = await base44.asServiceRole.entities.Enterprise.filter({
+      enterprise_financier_id: suspendCheckEntId,
+    }).catch(() => []);
+    const ent = entList?.[0];
+    if (ent && (ent.actif === false || ent.statut !== 'actif')) {
+      dispatchLog(`[V2] 🚫 Enterprise ${suspendCheckEntId} suspendue — dispatch bloqué pour course ${course.id}`);
+      return { success: false, enterprise_suspended: true, error: 'Entreprise suspendue' };
+    }
   }
 
   // 🛡️ GARDE IDEMPOTENTE ATOMIQUE ANTI-CASCADE
@@ -324,19 +342,31 @@ export async function accepterCourseV2(base44: any, courseId: string, livreurId:
     return { success: false, error: 'country_mismatch' };
   }
 
+  // [ENTERPRISE] Vérification backend obligatoire : course.enterprise_id === livreur.enterprise_id
+  // Comparaison canonique via normalizeEnterpriseId (null === null = match pour le réseau public).
+  // Empêche un livreur Enterprise B d'accepter une course Enterprise A, et inversement.
+  // Empêche un livreur Enterprise d'accepter une course publique, et inversement.
   const courseEnterpriseId = normalizeEnterpriseId(course.enterprise_id);
   const livreurEnterpriseId = normalizeEnterpriseId(livreur.enterprise_id);
   if (courseEnterpriseId !== livreurEnterpriseId) {
-    return { success: false, accepted: false, reason: 'enterprise_mismatch', error: 'Cette course appartient à un autre périmètre.' };
-  }
-  const enterpriseGuard = await checkEnterpriseActive(base44.asServiceRole, courseEnterpriseId);
-  if (!enterpriseGuard.active) {
     return {
-      success: false,
-      accepted: false,
-      reason: enterpriseGuard.suspended ? 'enterprise_suspended' : 'enterprise_not_found',
-      error: 'Cette entreprise est temporairement suspendue.',
+      success: false, accepted: false, reason: 'enterprise_mismatch',
+      error: 'Cette course appartient à un autre périmètre.',
     };
+  }
+
+  // [ENTERPRISE_SUSPENSION] Bloquer l'acceptation si l'entreprise est suspendue.
+  if (courseEnterpriseId) {
+    const entList = await base44.asServiceRole.entities.Enterprise.filter({
+      enterprise_financier_id: courseEnterpriseId,
+    }).catch(() => []);
+    const ent = entList?.[0];
+    if (ent && (ent.actif === false || ent.statut !== 'actif')) {
+      return {
+        success: false, accepted: false, reason: 'enterprise_suspended',
+        error: 'Votre entreprise est temporairement suspendue. Veuillez contacter SILGAPP.',
+      };
+    }
   }
 
   // 4. Check bloque_encours
@@ -363,11 +393,13 @@ export async function accepterCourseV2(base44: any, courseId: string, livreurId:
   }
   const isManual = pricing_mode === 'manual' && manual_price && Number(manual_price) >= PRIX_MIN;
 
-  // 8. Tokens/PINs (préserver existants)
-  const pickupToken = course.pickup_qr_token || generateToken();
-  const deliveryToken = course.delivery_qr_token || generateToken();
-  const pickupPIN = course.pickup_code_4_digits || generatePIN();
-  const deliveryPIN = course.delivery_code_4_digits || generatePIN();
+  // 8. Tokens/PINs — préserver existants uniquement (ne pas générer pour nouvelles courses)
+  // Les nouvelles courses (sans QR/PIN à la création) ne reçoivent pas de tokens au dispatch.
+  // Les anciennes courses et les courses partenaire/pharmacie conservent leurs tokens.
+  const pickupToken = course.pickup_qr_token || null;
+  const deliveryToken = course.delivery_qr_token || null;
+  const pickupPIN = course.pickup_code_4_digits || null;
+  const deliveryPIN = course.delivery_code_4_digits || null;
 
   // 9. Atomic lock via updateMany conditionnel
   const updateData: any = {
@@ -383,18 +415,12 @@ export async function accepterCourseV2(base44: any, courseId: string, livreurId:
     livreur_nombre_avis: livreur.nombre_avis || 0,
     accepted_by_livreur_id: livreurId,
     accepted_at: isManual ? null : new Date().toISOString(),
-    pickup_qr_token: pickupToken,
-    pickup_code_4_digits: pickupPIN,
-    delivery_qr_token: deliveryToken,
-    delivery_code_4_digits: deliveryPIN,
+    ...(pickupToken ? { pickup_qr_token: pickupToken } : {}),
+    ...(pickupPIN ? { pickup_code_4_digits: pickupPIN } : {}),
+    ...(deliveryToken ? { delivery_qr_token: deliveryToken } : {}),
+    ...(deliveryPIN ? { delivery_code_4_digits: deliveryPIN } : {}),
     ...(override_pricing_mode === 'automatic' ? { pricing_mode: 'automatic' } : {}),
   };
-
-  if (!isManual && courseEnterpriseId) {
-    const enterpriseRate = Number(enterpriseGuard.enterprise?.commission_silgapp_pct);
-    updateData.enterprise_commission_rate_locked = Number.isFinite(enterpriseRate) ? enterpriseRate : 0;
-    updateData.enterprise_commission_locked_at = updateData.heure_acceptation;
-  }
 
   if (isManual) {
     updateData.pricing_mode = 'manual';
@@ -436,7 +462,7 @@ export async function accepterCourseV2(base44: any, courseId: string, livreurId:
   // Le taux est déterminé au moment exact de l'acceptation et figé sur la course.
   // Redispatch : si un nouveau livreur accepte, le taux est recalculé pour lui.
   // Non-bloquant : l'acceptation réussit même si le figement échoue (cohérent avec V1).
-  if (!isManual && !courseEnterpriseId && courseVerifie.heure_acceptation && courseVerifie.country_code) {
+  if (!isManual && courseVerifie.heure_acceptation && courseVerifie.country_code) {
     await figerCommissionAcceptation(
       base44, courseId, livreurId, courseVerifie.country_code, courseVerifie.heure_acceptation
     ).catch((err: any) => {
@@ -462,16 +488,11 @@ export async function accepterCourseV2(base44: any, courseId: string, livreurId:
         course_id: courseId,
         lue: false,
         deduplication_key: `COMMISSION_LOCK_FAILED_${courseId}`,
-      }).catch((err: any) => console.error('[V2][COMMISSION_LOCK_FAILED] Notification alert error:', err?.message || String(err)));
+      }).catch(() => {});
     }
   }
 
-  // 11. V2 : Trigger WebSocket via update single (déclenche la disparition du fil)
-  await base44.asServiceRole.entities.CourseExterne.update(courseId, {
-    heure_acceptation: courseVerifie.heure_acceptation,
-  });
-
-  // 12. Update livreur status
+  // 11. Update livreur status
   if (!isManual) {
     await base44.asServiceRole.entities.Livreur.update(livreurId, { statut: 'en_course' });
     await marquerAccepte(base44, courseId, livreurId);
@@ -578,12 +599,13 @@ export async function secoursDispatchV2(base44: any, course: any, nbLivreurs: nu
     country_code: course.country_code,
     bloque_encours: false,
     manual_hors_ligne: { $ne: true },
+    // [ENTERPRISE] Isolation secours : même périmètre que la course.
+    ...(courseEnterpriseId
+      ? { enterprise_id: courseEnterpriseId }
+      : { enterprise_id: null }),
   }, '-last_seen_at', 50);
 
   if (!livreurs || livreurs.length === 0) return { pushed: 0 };
-  const livreursMemePerimetre = (livreurs || []).filter((l: any) =>
-    normalizeEnterpriseId(l.enterprise_id) === courseEnterpriseId
-  );
 
   // 2. Exclude livreurs in course (fresh check)
   const coursesActives = await base44.asServiceRole.entities.CourseExterne.filter(
@@ -604,7 +626,7 @@ export async function secoursDispatchV2(base44: any, course: any, nbLivreurs: nu
   }
 
   // 4. Score + sort + slice top N
-  const candidats = livreursMemePerimetre
+  const candidats = livreurs
     .filter((l: any) => !livreursEnCourse.has(l.id) && !refused.includes(l.id) && !dejaNotifies.includes(l.id))
     .map((l: any) => ({ ...l, score: calculerScore(l, course) }))
     .sort((a: any, b: any) => b.score - a.score)

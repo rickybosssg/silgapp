@@ -273,19 +273,6 @@ export function formatPhoneDisplay(phone) {
   return phone || "";
 }
 
-// Validate before normalization: extractLocalPhone intentionally truncates for UI formatting.
-export function getValidContactPhone(phone, countryCode) {
-  const country = getCountryConfig(countryCode);
-  if (!country) return null;
-  let local = onlyDigits(phone);
-  if (local.startsWith("00")) local = local.slice(2);
-  const max = country.max_len || country.len;
-  if (local.length > max && local.startsWith(country.dial)) local = local.slice(country.dial.length);
-  if (local.length > max && local.startsWith("0")) local = local.slice(1);
-  if (!validateLocalPhone(local, countryCode).valid) return null;
-  return normalizePhone(local, countryCode);
-}
-
 export async function findClientByPhone(base44, phone, countryCode = null) {
   if (!phone) return null;
   try {

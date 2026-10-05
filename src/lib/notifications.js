@@ -8,7 +8,6 @@ import {
   startUrgentCourseAlert,
   stopUrgentCourseAlert,
 } from "@/lib/livreurUrgentAlert";
-import { SILGAPP_ICON_URL } from "@/lib/branding";
 
 const ANDROID_CHANNEL_ID = "silgapp_default";
 const ANDROID_URGENT_CHANNEL_ID = "silgapp_courses_official_v2";
@@ -445,8 +444,8 @@ export function showLocalNotification(titre, message, options = {}) {
 
   const notification = new Notification(titre, {
     body: message,
-    icon: options.icon || SILGAPP_ICON_URL,
-    badge: options.badge || SILGAPP_ICON_URL,
+    icon: options.icon || "/favicon.ico",
+    badge: options.badge || "/favicon.ico",
     tag: options.tag || "silga-notification",
     requireInteraction: options.requireInteraction || false,
     data: options.data || {},

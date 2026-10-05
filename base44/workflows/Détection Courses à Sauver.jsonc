@@ -1,0 +1,44 @@
+{
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "d_tection_courses_sauver",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "run_function": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "detecterCoursesARisque",
+            "args": {}
+          },
+          "then": "end"
+        }
+      }
+    ]
+  },
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "interval",
+      "cron_expression": null,
+      "one_time_date": null,
+      "timezone": "UTC",
+      "interval_value": 20,
+      "interval_unit": "minutes",
+      "interval_anchor": "2026-08-22T07:43:13.310000",
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  },
+  "description": "D\u00e9tection proactive des courses \u00e0 risque toutes les 20 minutes. Cr\u00e9e/archive des AdminInboxItem pour les courses critiques. Ne modifie ni les courses ni le dispatch V2.",
+  "name": "D\u00e9tection Courses \u00e0 Sauver",
+  "x-base44-migrated-from-automation": {
+    "legacy_payload_function": "detecterCoursesARisque"
+  }
+}

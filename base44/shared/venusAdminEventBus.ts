@@ -32,7 +32,6 @@ export async function emitVenusAdminEvent(base44: any, params: {
   country_code: string;
   title: string;
   summary: string;
-  deduplication_key?: string;
   payload?: Record<string, any>;
 }): Promise<void> {
   try {

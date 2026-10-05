@@ -75,7 +75,12 @@ export default async function(req: Request): Promise<Response> {
     }
 
     // ── Calcul commission + montant livreur ──
-    const commissionSilga = Math.round(montant * (commissionPct / 100));
+    // Si un taux a été verrouillé à l'acceptation (Pass/Happy Hour), il prime
+    // sur le taux Country, y compris lorsqu'il vaut 0.
+    const tauxEffectif = (course.commission_locked_at && course.commission_taux_applique != null)
+      ? Number(course.commission_taux_applique)
+      : commissionPct;
+    const commissionSilga = Math.round(montant * (tauxEffectif / 100));
     const montantLivreur = montant - commissionSilga;
     const now = new Date().toISOString();
 

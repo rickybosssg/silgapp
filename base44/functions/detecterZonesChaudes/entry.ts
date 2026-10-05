@@ -106,8 +106,6 @@ async function sendFcm(projectId, accessToken, fcmToken, titre, message, zoneDat
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-// haversineKm importé depuis geoUtils (source canonique)
-
 function isRecentMin(dateStr, minutes) {
   if (!dateStr) return false;
   return (Date.now() - new Date(dateStr).getTime()) < minutes * 60 * 1000;
@@ -116,8 +114,8 @@ function isRecentMin(dateStr, minutes) {
 async function loadConfig(base44) {
   const defaults = {
     ZC_ACTIF: 'true', ZC_PUSH_ACTIF: 'true', ZC_INTERVALLE_MIN: '15',
-    ZC_RAYON_KM: '3', ZC_MIN_COURSES: '2', ZC_MIN_LIVREURS: '1',
-    ZC_SCORE_FAIBLE: '1.5', ZC_SCORE_MOYEN: '3', ZC_SCORE_ELEVE: '3', ZC_SCORE_TRES_ELEVE: '6',
+    ZC_RAYON_KM: '3', ZC_MIN_COURSES: '3', ZC_MIN_LIVREURS: '1',
+    ZC_SCORE_FAIBLE: '1.5', ZC_SCORE_MOYEN: '3', ZC_SCORE_ELEVE: '6', ZC_SCORE_TRES_ELEVE: '10',
     ZC_DELAI_MIN_ALERTES_MIN: '30', ZC_MAX_NOTIFS_HEURE: '2', ZC_DISTANCE_MAX_KM: '10',
   };
   const configs = await base44.asServiceRole.entities.AppConfig.filter({}).catch(() => []);
@@ -131,8 +129,8 @@ async function loadConfig(base44) {
 
 function niveauFromScore(score, config) {
   const seuils = {
-    tres_forte: parseFloat(config.ZC_SCORE_TRES_ELEVE) || 6,
-    forte: parseFloat(config.ZC_SCORE_ELEVE) || 3,
+    tres_forte: parseFloat(config.ZC_SCORE_TRES_ELEVE) || 10,
+    forte: parseFloat(config.ZC_SCORE_ELEVE) || 6,
     moyenne: parseFloat(config.ZC_SCORE_MOYEN) || 3,
     faible: parseFloat(config.ZC_SCORE_FAIBLE) || 1.5,
   };
@@ -142,7 +140,72 @@ function niveauFromScore(score, config) {
   return { niveau: "faible", emoji: "", label: "Faible demande" };
 }
 
+// ─── Pagination par curseur (READ-only) ──────────────────────────────────────
+// La SDK filter() ne retourne pas has_more. On utilise le champ de tri
+// (created_date / updated_date) comme curseur : si la page est pleine,
+// on continue avec < dernier élément jusqu'à épuisement.
+// NE PAS utiliser updateMany comme pseudo-pagination (opération d'écriture).
+async function fetchAllCoursesForCountry(base44, cc, twoHoursAgoIso) {
+  const all = [];
+  const pageSize = 200;
+  let cursorDate = null;
+  let iterations = 0;
+  const MAX_ITERATIONS = 10; // Safety: max 2000 courses per country per run
+
+  while (iterations < MAX_ITERATIONS) {
+    const query = {
+      statut: { $in: ['nouvelle', 'recherche_livreur'] },
+      country_code: cc,
+      created_date: cursorDate
+        ? { $gte: twoHoursAgoIso, $lt: cursorDate }
+        : { $gte: twoHoursAgoIso }
+    };
+    const batch = await base44.asServiceRole.entities.CourseExterne.filter(
+      query, "-created_date", pageSize
+    ).catch(() => []);
+    if (!batch || batch.length === 0) break;
+    all.push(...batch);
+    if (batch.length < pageSize) break;
+    cursorDate = batch[batch.length - 1].created_date;
+    if (!cursorDate) break;
+    iterations++;
+  }
+  return all;
+}
+
+async function fetchAllLivreursForCountry(base44, cc) {
+  const all = [];
+  const pageSize = 500;
+  let cursorDate = null;
+  let iterations = 0;
+  const MAX_ITERATIONS = 5; // Safety: max 2500 livreurs per country
+
+  while (iterations < MAX_ITERATIONS) {
+    const query = { actif: true, type_livreur: "externe", country_code: cc };
+    if (cursorDate) {
+      query.updated_date = { $lt: cursorDate };
+    }
+    const batch = await base44.asServiceRole.entities.Livreur.filter(
+      query, "-updated_date", pageSize
+    ).catch(() => []);
+    if (!batch || batch.length === 0) break;
+    all.push(...batch);
+    if (batch.length < pageSize) break;
+    cursorDate = batch[batch.length - 1].updated_date;
+    if (!cursorDate) break;
+    iterations++;
+  }
+  return all;
+}
+
 // ─── Main ────────────────────────────────────────────────────────────────────
+// ARCHITECTURE MULTI-PAYS :
+// - 1 workflow / 1 invocation → traite TOUS les pays actifs
+// - Isolation stricte par country_code (course P → zone P → livreur P)
+// - BF → QUARTIERS_REF (20 quartiers Ouaga, validés physiquement)
+// - Autres pays → 9 zones dynamiques autour de latitude_centre/longitude_centre
+// - isPublicRecord préservé : Enterprise exclu à tous les niveaux
+// - FCM, cooldown 30 min, max 2/h, channel silgapp_default : inchangés
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -168,7 +231,7 @@ Deno.serve(async (req) => {
     }
 
     const rayonKm = parseFloat(config.ZC_RAYON_KM) || 3;
-    const minCourses = parseInt(config.ZC_MIN_COURSES) || 2;
+    const minCourses = parseInt(config.ZC_MIN_COURSES) || 3;
     const minLivreurs = parseInt(config.ZC_MIN_LIVREURS) || 1;
     const distanceMaxKm = parseFloat(config.ZC_DISTANCE_MAX_KM) || 10;
     const delaiMinAlertesMin = parseInt(config.ZC_DELAI_MIN_ALERTES_MIN) || 30;
@@ -179,111 +242,54 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const countryCode = body.country_code || null;
 
-    // ── Récupérer les données ────────────────────────────────────────────────
-    const coursesFilter = countryCode ? { country_code: countryCode } : {};
-    const livreursFilter = countryCode
-      ? { actif: true, type_livreur: "externe", country_code: countryCode }
-      : { actif: true, type_livreur: "externe" };
-
-    const [courses, livreurs, paysData] = await Promise.all([
-      base44.asServiceRole.entities.CourseExterne.filter(coursesFilter, "-created_date", 200).catch(() => []),
-      base44.asServiceRole.entities.Livreur.filter(livreursFilter, "-updated_date", 500).catch(() => []),
-      countryCode ? base44.asServiceRole.entities.Country.filter({ code: countryCode }).catch(() => []) : Promise.resolve([]),
-    ]);
-
-    // Courses en attente récentes (< 2h)
-    const coursesRecentes = courses.filter(c => {
-      return ["nouvelle", "recherche_livreur"].includes(c.statut) && isRecentMin(c.created_date, 120);
-    });
-
-    // Livreurs disponibles avec GPS récent (< 15 min)
-    const livreursDispos = livreurs.filter(l => {
-      return l.statut === "disponible" && isRecentMin(l.derniere_position_date || l.last_seen_at, 15) && l.latitude && l.longitude;
-    });
-
-    // ── Zones de référence ───────────────────────────────────────────────────
-    let zonesRef = QUARTIERS_REF;
-    const pays = paysData?.[0];
-    if (pays?.latitude_centre && pays?.longitude_centre && countryCode && countryCode !== "BF") {
-      const lat = pays.latitude_centre;
-      const lng = pays.longitude_centre;
-      const ville = pays.ville_principale || pays.nom || countryCode;
-      zonesRef = [
-        { nom: `${ville} Centre`, lat, lng, rayon_km: rayonKm * 1.0 },
-        { nom: `${ville} Nord`, lat: lat + 0.05, lng, rayon_km: rayonKm * 0.67 },
-        { nom: `${ville} Sud`, lat: lat - 0.05, lng, rayon_km: rayonKm * 0.67 },
-        { nom: `${ville} Est`, lat, lng: lng + 0.05, rayon_km: rayonKm * 0.67 },
-        { nom: `${ville} Ouest`, lat, lng: lng - 0.05, rayon_km: rayonKm * 0.67 },
-        { nom: `${ville} Nord-Est`, lat: lat + 0.04, lng: lng + 0.04, rayon_km: rayonKm * 0.6 },
-        { nom: `${ville} Sud-Ouest`,lat: lat - 0.04, lng: lng - 0.04, rayon_km: rayonKm * 0.6 },
-        { nom: `${ville} Périphérie Nord`, lat: lat + 0.09, lng, rayon_km: rayonKm * 0.83 },
-        { nom: `${ville} Périphérie Sud`, lat: lat - 0.09, lng, rayon_km: rayonKm * 0.83 },
-      ];
-    } else {
-      // Appliquer le rayon configurable aux zones Ouaga
-      zonesRef = QUARTIERS_REF.map(z => ({ ...z, rayon_km: rayonKm }));
+    /**
+     * Détermine si un enregistrement est PUBLIC (réseau SILGAPP public).
+     * PUBLIC = enterprise_id null, absent, ou chaîne vide.
+     * Enterprise = enterprise_id non vide.
+     */
+    function isPublicRecord(rec) {
+      if (!rec) return true;
+      const entId = rec.enterprise_id;
+      return !entId || (typeof entId === 'string' && entId.trim() === '');
     }
 
-    // ── Analyse par quartier ─────────────────────────────────────────────────
-    const zonesAnalyse = zonesRef.map(zone => {
-      const coursesDansZone = coursesRecentes.filter(c => {
-        if (!c.gps_depart_lat || !c.gps_depart_lng) {
-          const adresse = (c.adresse_depart || "").toLowerCase();
-          return adresse.includes(zone.nom.toLowerCase().split(" ")[0]);
-        }
-        return haversineKm(c.gps_depart_lat, c.gps_depart_lng, zone.lat, zone.lng) <= zone.rayon_km;
-      });
+    // ══════════════════════════════════════════════════════════════════════════
+    // ÉTAPE 1 — Déterminer les pays à traiter
+    // ══════════════════════════════════════════════════════════════════════════
+    let countriesToProcess = [];
+    if (countryCode) {
+      // Mode mono-pays (backward compatible) — un seul pays explicite
+      const paysData = await base44.asServiceRole.entities.Country.filter({ code: countryCode }).catch(() => []);
+      if (paysData?.[0]) {
+        countriesToProcess = [paysData[0]];
+      }
+    } else {
+      // Mode multi-pays — tous les pays actifs
+      countriesToProcess = await base44.asServiceRole.entities.Country.filter({ actif: true }).catch(() => []);
+    }
 
-      const livreursDansZone = livreursDispos.filter(l => {
-        return haversineKm(l.latitude, l.longitude, zone.lat, zone.lng) <= zone.rayon_km * 1.5;
-      });
+    if (countriesToProcess.length === 0) {
+      return Response.json({ success: true, message: "Aucun pays actif à analyser" });
+    }
 
-      const tempsAttente = coursesDansZone.filter(c => c.created_date)
-        .map(c => Math.round((now - new Date(c.created_date).getTime()) / 60000));
-      const tempsAttenteMin = tempsAttente.length > 0 ? Math.round(tempsAttente.reduce((a, b) => a + b, 0) / tempsAttente.length) : 0;
+    // ══════════════════════════════════════════════════════════════════════════
+    // ÉTAPE 2 — Courses et Livreurs chargés PAR PAYS dans la boucle (ÉTAPE 7)
+    //           Requêtes par pays + filtre temporel en base + pagination curseur
+    //           → élimine les plafonds globaux 200 (courses) et 500 (livreurs)
+    // ══════════════════════════════════════════════════════════════════════════
+    const twoHoursAgoIso = new Date(now - 2 * 60 * 60 * 1000).toISOString();
 
-      const score = coursesDansZone.length / Math.max(livreursDansZone.length, 0.5);
-      const { niveau, emoji, label } = niveauFromScore(score, config);
-
-      return {
-        nom: zone.nom, lat: zone.lat, lng: zone.lng, rayon_km: zone.rayon_km,
-        nb_courses: coursesDansZone.length, nb_livreurs: livreursDansZone.length,
-        temps_attente_min: tempsAttenteMin, score: Math.round(score * 10) / 10,
-        niveau, emoji, label,
-        country_code: coursesDansZone[0]?.country_code || countryCode || null,
-      };
-    });
-
-    // ── Zones chaudes (forte ou très forte, au moins minCourses) ─────────────
-    const zonesChaudes = zonesAnalyse
-      .filter(z => (z.niveau === "forte" || z.niveau === "tres_forte") && z.nb_courses >= minCourses)
-      .sort((a, b) => b.score - a.score);
-
-    const zonesToutesActives = zonesAnalyse
-      .filter(z => z.nb_courses >= 1 || z.nb_livreurs >= 1)
-      .sort((a, b) => b.score - a.score);
-
-    // ── Créer les alertes + envoyer les push + historique ────────────────────
-    const alertesCreees = [];
-    const pushesEnvoyes = [];
-    const historiqueEntrees = [];
-    let totalLivreursCibles = 0;
-
-    // Initialiser Firebase si push actif
+    // ══════════════════════════════════════════════════════════════════════════
+    // ÉTAPE 3 — Init Firebase (une seule fois, si push actif)
+    // ══════════════════════════════════════════════════════════════════════════
     let firebaseConfig = null;
     let accessToken = null;
-    if (pushActif && zonesChaudes.length > 0) {
+    if (pushActif) {
       try {
         const saJson = Deno.env.get('FIREBASE_SERVICE_ACCOUNT_JSON');
         if (saJson) {
           const sa = JSON.parse(saJson);
           firebaseConfig = { projectId: sa.project_id, clientEmail: sa.client_email, privateKey: sa.private_key };
-        } else {
-          firebaseConfig = {
-            projectId: Deno.env.get('FIREBASE_PROJECT_ID'),
-            clientEmail: Deno.env.get('FIREBASE_CLIENT_EMAIL'),
-            privateKey: Deno.env.get('FIREBASE_PRIVATE_KEY'),
-          };
         }
         if (firebaseConfig.projectId && firebaseConfig.clientEmail && firebaseConfig.privateKey) {
           accessToken = await getAccessToken(firebaseConfig.clientEmail, firebaseConfig.privateKey);
@@ -293,268 +299,393 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Récupérer tous les tokens FCM valides pour les livreurs
+    // ══════════════════════════════════════════════════════════════════════════
+    // ÉTAPE 5 — Charger tous les tokens FCM (une seule fois)
+    // ══════════════════════════════════════════════════════════════════════════
     let allTokens = [];
     if (accessToken) {
+      // [NOTE] NotificationToken n'a pas de country_code ni de limite explicite.
+      // La SDK retourne tous les records quand aucun limit n'est passé (testé : 254).
+      // Comportement non documenté formellement — si la plateforme change le défaut,
+      // une pagination par livreur_id sera nécessaire. Risque faible actuellement.
       allTokens = await base44.asServiceRole.entities.NotificationToken.filter({
         user_type: 'livreur', actif: true,
       }).catch(() => []);
     }
 
-    for (const zone of zonesChaudes) {
-      // 1. Vérifier doublon alerte récente (< 45 min) pour cette zone
-      const alertesExistantes = await base44.asServiceRole.entities.AlerteLivreur.filter(
-        { actif: true }, "-created_date", 50
-      ).catch(() => []);
+    // ══════════════════════════════════════════════════════════════════════════
+    // ÉTAPE 6 — Anti-doublon : fenêtre de cooldown (une seule fois pour tous les pays)
+    // ══════════════════════════════════════════════════════════════════════════
+    const windowKey = Math.floor(Date.now() / (delaiMinAlertesMin * 60 * 1000));
 
-      const dejaAlerte = alertesExistantes.some(a =>
-        isRecentMin(a.created_date, 45) && a.titre && a.titre.includes(zone.nom)
-      );
+    // ══════════════════════════════════════════════════════════════════════════
+    // ÉTAPE 7 — Traiter chaque pays indépendamment
+    // ══════════════════════════════════════════════════════════════════════════
+    let totalZonesAnalysees = 0;
+    let totalZonesChaudes = 0;
+    let totalAlertesCreees = 0;
+    let totalPushEnvoyes = 0;
+    let totalPushEchouees = 0;
+    let totalLivreursCibles = 0;
+    let paysAnalyses = 0;
+    let paysSkipped = 0;
+    const allZonesChaudesDetail = [];
 
-      let alerteId = null;
+    for (const pays of countriesToProcess) {
+      const cc = pays.code;
+      const villeNom = pays.ville_principale || pays.nom || cc;
 
-      if (!dejaAlerte) {
-        const nbCourses = zone.nb_courses;
-        const nbLivreurs = zone.nb_livreurs;
-        const attenteStr = zone.temps_attente_min > 0 ? `\nTemps d'attente moyen : ${zone.temps_attente_min} min.` : "";
+      // ── 7a. Charger les courses pour ce pays — PUBLIC, < 2h, PAGINÉ ──
+      // Requête par pays : élimine le plafond global de 200.
+      // Filtre created_date en base : ne charge que les courses < 2h.
+      // Pagination par curseur : si 200 résultats, continue jusqu'à épuisement.
+      const coursesRecentes = (await fetchAllCoursesForCountry(base44, cc, twoHoursAgoIso))
+        .filter(c => isPublicRecord(c)); // [ISOLATION] exclure courses Enterprise (défense en profondeur)
 
-        const alerte = await base44.asServiceRole.entities.AlerteLivreur.create({
-          titre: ` Forte demande détectée à ${zone.nom}`,
-          message: `${nbCourses} demande${nbCourses > 1 ? "s" : ""} de livraison en attente.\nSeulement ${nbLivreurs} livreur${nbLivreurs !== 1 ? "s" : ""} disponible${nbLivreurs !== 1 ? "s" : ""}.${attenteStr}\n\nRapprochez-vous de cette zone pour recevoir davantage de courses.`,
-          niveau: zone.niveau === "tres_forte" ? "urgent" : "important",
-          reseau: "externe",
-          actif: true,
-          delai_rappel_minutes: 30,
-          cree_par: "moteur_zones_chaudes",
-          nb_lectures: 0,
-        }).catch(() => null);
-
-        if (alerte) {
-          alerteId = alerte.id;
-          alertesCreees.push({ zone: zone.nom, alerte_id: alerte.id });
-        }
-      }
-
-      // 2. Push FCM aux livreurs éligibles
-      let notifsEnvoyees = 0;
-      let notifsEchouees = 0;
-
-      if (pushActif && accessToken && firebaseConfig) {
-        // Livreurs éligibles pour cette zone
-        const livreursEligibles = [];
-
-        for (const livreur of livreurs) {
-          // Filtres stricts
-          if (!livreur.country_code && countryCode) continue; // skip si pas de country_code
-          if (countryCode && livreur.country_code !== countryCode) continue; // pays différent
-          if (livreur.statut !== "disponible") continue; // pas disponible
-          if (livreur.actif !== true) continue; // inactif
-          if (!isRecentMin(livreur.last_seen_at, 15)) continue; // heartbeat trop ancien
-          if (!livreur.latitude || !livreur.longitude) continue; // pas de GPS
-          if (!isRecentMin(livreur.derniere_position_date || livreur.last_seen_at, 15)) continue; // GPS trop ancien
-
-          // Distance
-          const dist = haversineKm(livreur.latitude, livreur.longitude, zone.lat, zone.lng);
-          if (dist > distanceMaxKm) continue;
-
-          // Token FCM valide
-          const livreurTokens = allTokens.filter(t => t.livreur_id === livreur.id);
-          if (livreurTokens.length === 0) continue;
-
-          // Rate limiting : vérifier les notifications récentes de type zone_chaude
-          try {
-            const recentNotifs = await base44.asServiceRole.entities.Notification.filter({
-              destinataire_email: livreur.user_email,
-              type: 'zone_chaude',
-            }, '-created_date', 50).catch(() => []);
-
-            // Délai minimum entre alertes
-            const derniereNotif = recentNotifs[0];
-            if (derniereNotif && isRecentMin(derniereNotif.created_date, delaiMinAlertesMin)) continue;
-
-            // Max par heure
-            const notifsDerniereHeure = recentNotifs.filter(n => isRecentMin(n.created_date, 60));
-            if (notifsDerniereHeure.length >= maxNotifsHeure) continue;
-          } catch (_) {
-            // Si la vérification échoue, on skip par sécurité
-            continue;
-          }
-
-          livreursEligibles.push({ livreur, tokens: livreurTokens });
-        }
-
-        // Envoyer les push
-        const message = ` ${zone.nb_courses} course${zone.nb_courses > 1 ? "s" : ""} disponible${zone.nb_courses > 1 ? "s" : ""} à ${zone.nom}. Déplacez-vous vers cette zone pour augmenter vos chances.`;
-        const pushTitre = zone.niveau === "tres_forte" ? ` Zone très demandée` : ` Zone demandée`;
-
-        // ── Anti-doublon atomique : fenêtre de cooldown basée sur un timestamp fixe ──
-        // windowKey change toutes les `delaiMinAlertesMin` minutes. Deux exécutions
-        // concurrentes dans la même fenêtre calculent la même clé → la première crée
-        // la notification, la seconde la trouve et skip.
-        const windowKey = Math.floor(Date.now() / (delaiMinAlertesMin * 60 * 1000));
-
-        for (const eligible of livreursEligibles) {
-          const dedupKey = `ZONE_CHAUDE_${eligible.livreur.user_email}_${zone.nom}_${windowKey}`;
-
-          // ── Anti-doublon atomique : "créer d'abord, puis vérifier" ──
-          // La plateforme n'impose PAS de contrainte d'unicité sur deduplication_key.
-          // Le pattern "check then create" est vulnérable à une race condition :
-          // deux exécutions concurrentes peuvent toutes deux vérifier, ne rien trouver,
-          // et créer chacune une notification.
-          //
-          // Solution : créer la notification D'ABORD, puis interroger la base.
-          // Le gagnant (created_date le plus ancien + id le plus petit) envoie le FCM.
-          // Les perdants se suppriment et skip l'envoi.
-          const notifRecord = await base44.asServiceRole.entities.Notification.create({
-            titre: pushTitre,
-            message,
-            type: 'zone_chaude',
-            destinataire_email: eligible.livreur.user_email,
-            deduplication_key: dedupKey,
-            lue: false,
-          }).catch(() => null);
-
-          if (!notifRecord) continue; // skip si la création échoue
-
-          // Vérifier si D'AUTRES notifications avec la même clé existent déjà
-          const allNotifsForKey = await base44.asServiceRole.entities.Notification.filter({
-            deduplication_key: dedupKey,
-          }, 'created_date', 10).catch(() => []);
-
-          // Déterminer le gagnant : created_date le plus ancien, tiebreak sur id
-          const sortedNotifs = (allNotifsForKey || []).slice().sort((a, b) => {
-            const da = new Date(a.created_date || 0).getTime();
-            const db = new Date(b.created_date || 0).getTime();
-            if (da !== db) return da - db;
-            return (a.id || '').localeCompare(b.id || '');
+      // ── 7b. Skip si aucune course récente pertinente ──
+      if (coursesRecentes.length === 0) {
+        paysSkipped++;
+        // Cycle log pour tracer le skip
+        try {
+          await base44.asServiceRole.entities.ZoneChaudeCycleLog.create({
+            date_analyse: nowIso,
+            country_code: cc,
+            zones_analysees: 0,
+            zones_chaudes: 0,
+            livreurs_cibles: 0,
+            push_envoyes: 0,
+            push_echouees: 0,
+            duree_ms: 0,
+            erreur: null,
+            config_snapshot: null,
+            courses_en_attente: 0,
+            livreurs_disponibles: 0,
           });
-
-          const isWinner = sortedNotifs.length > 0 && sortedNotifs[0].id === notifRecord.id;
-
-          if (!isWinner) {
-            // Perdant : supprimer cette notification et skip l'envoi FCM
-            await base44.asServiceRole.entities.Notification.delete(notifRecord.id).catch(() => null);
-            continue;
-          }
-
-          for (const tokenItem of eligible.tokens) {
-            const isNative = !String(tokenItem.token).startsWith('web_');
-            if (!isNative) continue;
-
-            try {
-              const result = await sendFcm(
-                firebaseConfig.projectId,
-                accessToken,
-                tokenItem.token,
-                pushTitre,
-                message,
-                { zone_nom: zone.nom, zone_lat: zone.lat, zone_lng: zone.lng, zone_nb_courses: zone.nb_courses, zone_niveau: zone.niveau }
-              );
-              if (result.ok) {
-                notifsEnvoyees++;
-
-                // Mettre à jour le token
-                await base44.asServiceRole.entities.NotificationToken.update(tokenItem.id, {
-                  derniere_utilisation: nowIso,
-                  derniere_notif_statut: 'success',
-                  derniere_notif_titre: pushTitre,
-                  derniere_notif_date: nowIso,
-                }).catch(() => null);
-              } else {
-                notifsEchouees++;
-                const errorCode = result.result?.error?.details?.[0]?.errorCode;
-                if (['UNREGISTERED', 'INVALID_ARGUMENT'].includes(errorCode)) {
-                  await base44.asServiceRole.entities.NotificationToken.update(tokenItem.id, {
-                    actif: false,
-                    derniere_notif_statut: 'failed',
-                    fcm_error: JSON.stringify(result.result?.error || {}).slice(0, 300),
-                  }).catch(() => null);
-                }
-              }
-            } catch (_) {
-              notifsEchouees++;
-            }
-          }
-        }
-
-        totalLivreursCibles += livreursEligibles.length;
-      }
-
-      pushesEnvoyes.push({ zone: zone.nom, envoyees: notifsEnvoyees, echouees: notifsEchouees });
-
-      // 3. Sauvegarder historique
-      // ⚠️ Le pays est inféré depuis les courses de la zone (country_code du premier cours
-      // correspondant) si countryCode n'est pas fourni dans l'appel. Aucun hardcodage de BF.
-      const paysCode = zone.country_code || countryCode;
-      if (!paysCode) {
-        console.warn(`[ZonesChaudes] ⚠️ country_code non résolu pour zone ${zone.nom} — historique ignoré`);
+        } catch (_) {}
         continue;
       }
-      const villeNom = pays?.ville_principale || pays?.nom || "Ouagadougou";
+
+      // ── 7c. Charger les livreurs pour ce pays — PUBLIC, PAGINÉ ──
+      // Requête par pays : élimine le plafond global de 500.
+      // Pagination par curseur : si 500 résultats, continue jusqu'à épuisement.
+      const allLivreursPays = (await fetchAllLivreursForCountry(base44, cc))
+        .filter(l => isPublicRecord(l)); // [ISOLATION] exclure livreurs Enterprise (défense en profondeur)
+      const livreursDispos = allLivreursPays.filter(l =>
+        l.statut === "disponible" && isRecentMin(l.derniere_position_date || l.last_seen_at, 15) && l.latitude && l.longitude
+      );
+
+      // ── 7d. Générer les zones de référence ──
+      let zonesRef;
+      if (cc === "BF") {
+        // BF : QUARTIERS_REF de Ouagadougou (20 quartiers) — validés physiquement
+        zonesRef = QUARTIERS_REF.map(z => ({ ...z, rayon_km: rayonKm }));
+      } else if (pays.latitude_centre && pays.longitude_centre) {
+        // Autres pays : 9 zones dynamiques autour du centre ville
+        const lat = pays.latitude_centre;
+        const lng = pays.longitude_centre;
+        zonesRef = [
+          { nom: `${villeNom} Centre`, lat, lng, rayon_km: rayonKm * 1.0 },
+          { nom: `${villeNom} Nord`, lat: lat + 0.05, lng, rayon_km: rayonKm * 0.67 },
+          { nom: `${villeNom} Sud`, lat: lat - 0.05, lng, rayon_km: rayonKm * 0.67 },
+          { nom: `${villeNom} Est`, lat, lng: lng + 0.05, rayon_km: rayonKm * 0.67 },
+          { nom: `${villeNom} Ouest`, lat, lng: lng - 0.05, rayon_km: rayonKm * 0.67 },
+          { nom: `${villeNom} Nord-Est`, lat: lat + 0.04, lng: lng + 0.04, rayon_km: rayonKm * 0.6 },
+          { nom: `${villeNom} Sud-Ouest`, lat: lat - 0.04, lng: lng - 0.04, rayon_km: rayonKm * 0.6 },
+          { nom: `${villeNom} Périphérie Nord`, lat: lat + 0.09, lng, rayon_km: rayonKm * 0.83 },
+          { nom: `${villeNom} Périphérie Sud`, lat: lat - 0.09, lng, rayon_km: rayonKm * 0.83 },
+        ];
+      } else {
+        // Pas de coordonnées centre — skip propre, aucun fallback Ouaga
+        console.warn(`[ZonesChaudes] ⚠️ ${cc} sans coordonnées centre — skip`);
+        paysSkipped++;
+        continue;
+      }
+
+      // ── 7e. Analyser les zones ──
+      const zonesAnalyse = zonesRef.map(zone => {
+        const coursesDansZone = coursesRecentes.filter(c => {
+          if (!c.gps_depart_lat || !c.gps_depart_lng) {
+            const adresse = (c.adresse_depart || "").toLowerCase();
+            return adresse.includes(zone.nom.toLowerCase().split(" ")[0]);
+          }
+          return haversineKm(c.gps_depart_lat, c.gps_depart_lng, zone.lat, zone.lng) <= zone.rayon_km;
+        });
+
+        const livreursDansZone = livreursDispos.filter(l => {
+          return haversineKm(l.latitude, l.longitude, zone.lat, zone.lng) <= zone.rayon_km * 1.5;
+        });
+
+        const tempsAttente = coursesDansZone.filter(c => c.created_date)
+          .map(c => Math.round((now - new Date(c.created_date).getTime()) / 60000));
+        const tempsAttenteMin = tempsAttente.length > 0 ? Math.round(tempsAttente.reduce((a, b) => a + b, 0) / tempsAttente.length) : 0;
+
+        const score = coursesDansZone.length / Math.max(livreursDansZone.length, 0.5);
+        const { niveau, emoji, label } = niveauFromScore(score, config);
+
+        return {
+          nom: zone.nom, lat: zone.lat, lng: zone.lng, rayon_km: zone.rayon_km,
+          nb_courses: coursesDansZone.length, nb_livreurs: livreursDansZone.length,
+          temps_attente_min: tempsAttenteMin, score: Math.round(score * 10) / 10,
+          niveau, emoji, label,
+          country_code: cc,
+        };
+      });
+
+      // ── 7f. Zones chaudes (forte ou très forte, au moins minCourses) ──
+      const zonesChaudes = zonesAnalyse
+        .filter(z => (z.niveau === "forte" || z.niveau === "tres_forte") && z.nb_courses >= minCourses)
+        .sort((a, b) => b.score - a.score);
+
+      totalZonesAnalysees += zonesAnalyse.length;
+      totalZonesChaudes += zonesChaudes.length;
+      paysAnalyses++;
+
+      // ── 7g. Push pour chaque zone chaude ──
+      let paysPushEnvoyes = 0;
+      let paysPushEchouees = 0;
+      let paysLivreursCibles = 0;
+
+      for (const zone of zonesChaudes) {
+        // 1. Vérifier doublon alerte récente (< 45 min) pour cette zone
+        const fortyFiveMinAgoIso = new Date(now - 45 * 60 * 1000).toISOString();
+        const alertesExistantes = await base44.asServiceRole.entities.AlerteLivreur.filter(
+          { actif: true, cree_par: "moteur_zones_chaudes", created_date: { $gte: fortyFiveMinAgoIso } },
+          "-created_date", 50
+        ).catch(() => []);
+
+        const dejaAlerte = alertesExistantes.some(a =>
+          isRecentMin(a.created_date, 45) && a.titre && a.titre.includes(zone.nom)
+        );
+
+        let alerteId = null;
+
+        if (!dejaAlerte) {
+          const nbCourses = zone.nb_courses;
+          const nbLivreurs = zone.nb_livreurs;
+          const attenteStr = zone.temps_attente_min > 0 ? `\nTemps d'attente moyen : ${zone.temps_attente_min} min.` : "";
+
+          const alerte = await base44.asServiceRole.entities.AlerteLivreur.create({
+            titre: ` Forte demande détectée à ${zone.nom}`,
+            message: `${nbCourses} demande${nbCourses > 1 ? "s" : ""} de livraison en attente.\nSeulement ${nbLivreurs} livreur${nbLivreurs !== 1 ? "s" : ""} disponible${nbLivreurs !== 1 ? "s" : ""}.${attenteStr}\n\nRapprochez-vous de cette zone pour recevoir davantage de courses.`,
+            niveau: zone.niveau === "tres_forte" ? "urgent" : "important",
+            reseau: "externe",
+            actif: true,
+            delai_rappel_minutes: 30,
+            cree_par: "moteur_zones_chaudes",
+            nb_lectures: 0,
+          }).catch(() => null);
+
+          if (alerte) {
+            alerteId = alerte.id;
+            totalAlertesCreees++;
+          }
+        }
+
+        // 2. Push FCM aux livreurs éligibles
+        if (pushActif && accessToken && firebaseConfig) {
+          const livreursEligibles = [];
+
+          for (const livreur of livreursDispos) {
+            // [ISOLATION PUBLIC/ENTERPRISE] Double sécurité — déjà filtré dans livreursDispos
+            // mais conservé pour défense en profondeur
+            if (!isPublicRecord(livreur)) continue;
+            // [ISOLATION PAYS] Déjà filtré dans livreursDispos (country_code === cc)
+            // mais vérification explicite pour défense en profondeur
+            if (livreur.country_code !== cc) continue;
+            // Filtres stricts (déjà appliqués dans livreursDispos, redondance volontaire)
+            if (livreur.statut !== "disponible") continue;
+            if (livreur.actif !== true) continue;
+            if (!isRecentMin(livreur.last_seen_at, 15)) continue;
+            if (!livreur.latitude || !livreur.longitude) continue;
+            if (!isRecentMin(livreur.derniere_position_date || livreur.last_seen_at, 15)) continue;
+
+            // Distance
+            const dist = haversineKm(livreur.latitude, livreur.longitude, zone.lat, zone.lng);
+            if (dist > distanceMaxKm) continue;
+
+            // Token FCM valide
+            const livreurTokens = allTokens.filter(t => t.livreur_id === livreur.id);
+            if (livreurTokens.length === 0) continue;
+
+            // Rate limiting : vérifier les notifications récentes de type zone_chaude
+            try {
+              const oneHourAgoIso = new Date(now - 60 * 60 * 1000).toISOString();
+              const recentNotifs = await base44.asServiceRole.entities.Notification.filter({
+                destinataire_email: livreur.user_email,
+                type: 'zone_chaude',
+                created_date: { $gte: oneHourAgoIso },
+              }, '-created_date', 50).catch(() => []);
+
+              // Délai minimum entre alertes
+              const derniereNotif = recentNotifs[0];
+              if (derniereNotif && isRecentMin(derniereNotif.created_date, delaiMinAlertesMin)) continue;
+
+              // Max par heure
+              const notifsDerniereHeure = recentNotifs.filter(n => isRecentMin(n.created_date, 60));
+              if (notifsDerniereHeure.length >= maxNotifsHeure) continue;
+            } catch (_) {
+              continue;
+            }
+
+            livreursEligibles.push({ livreur, tokens: livreurTokens });
+          }
+
+          // Envoyer les push
+          const message = ` ${zone.nb_courses} course${zone.nb_courses > 1 ? "s" : ""} disponible${zone.nb_courses > 1 ? "s" : ""} à ${zone.nom}. Déplacez-vous vers cette zone pour augmenter vos chances.`;
+          const pushTitre = zone.niveau === "tres_forte" ? ` Zone très demandée` : ` Zone demandée`;
+
+          for (const eligible of livreursEligibles) {
+            // [DEDUP MULTI-PAYS] Clé incluant country_code pour empêcher toute collision
+            // entre deux pays produisant le même zone.nom (ex: "Centre" sans préfixe ville).
+            // Format : ZONE_CHAUDE_${cc}_${user_email}_${zone_nom}_${windowKey}
+            // Ne casse pas le cooldown (time-based) ni le max 2/h (count-based).
+            const dedupKey = `ZONE_CHAUDE_${cc}_${eligible.livreur.user_email}_${zone.nom}_${windowKey}`;
+
+            // ── Anti-doublon atomique : "créer d'abord, puis vérifier" ──
+            const notifRecord = await base44.asServiceRole.entities.Notification.create({
+              titre: pushTitre,
+              message,
+              type: 'zone_chaude',
+              destinataire_email: eligible.livreur.user_email,
+              deduplication_key: dedupKey,
+              lue: false,
+            }).catch(() => null);
+
+            if (!notifRecord) continue;
+
+            // Vérifier si D'AUTRES notifications avec la même clé existent déjà
+            const allNotifsForKey = await base44.asServiceRole.entities.Notification.filter({
+              deduplication_key: dedupKey,
+            }, 'created_date', 10).catch(() => []);
+
+            // Déterminer le gagnant : created_date le plus ancien, tiebreak sur id
+            const sortedNotifs = (allNotifsForKey || []).slice().sort((a, b) => {
+              const da = new Date(a.created_date || 0).getTime();
+              const db = new Date(b.created_date || 0).getTime();
+              if (da !== db) return da - db;
+              return (a.id || '').localeCompare(b.id || '');
+            });
+
+            const isWinner = sortedNotifs.length > 0 && sortedNotifs[0].id === notifRecord.id;
+
+            if (!isWinner) {
+              await base44.asServiceRole.entities.Notification.delete(notifRecord.id).catch(() => null);
+              continue;
+            }
+
+            for (const tokenItem of eligible.tokens) {
+              const isNative = !String(tokenItem.token).startsWith('web_');
+              if (!isNative) continue;
+
+              try {
+                const result = await sendFcm(
+                  firebaseConfig.projectId,
+                  accessToken,
+                  tokenItem.token,
+                  pushTitre,
+                  message,
+                  { zone_nom: zone.nom, zone_lat: zone.lat, zone_lng: zone.lng, zone_nb_courses: zone.nb_courses, zone_niveau: zone.niveau }
+                );
+                if (result.ok) {
+                  paysPushEnvoyes++;
+
+                  await base44.asServiceRole.entities.NotificationToken.update(tokenItem.id, {
+                    derniere_utilisation: nowIso,
+                    derniere_notif_statut: 'success',
+                    derniere_notif_titre: pushTitre,
+                    derniere_notif_date: nowIso,
+                  }).catch(() => null);
+                } else {
+                  paysPushEchouees++;
+                  const errorCode = result.result?.error?.details?.[0]?.errorCode;
+                  if (['UNREGISTERED', 'INVALID_ARGUMENT'].includes(errorCode)) {
+                    await base44.asServiceRole.entities.NotificationToken.update(tokenItem.id, {
+                      actif: false,
+                      derniere_notif_statut: 'failed',
+                      fcm_error: JSON.stringify(result.result?.error || {}).slice(0, 300),
+                    }).catch(() => null);
+                  }
+                }
+              } catch (_) {
+                paysPushEchouees++;
+              }
+            }
+          }
+
+          paysLivreursCibles += livreursEligibles.length;
+        }
+
+        // 3. Sauvegarder historique
+        try {
+          await base44.asServiceRole.entities.ZoneChaudeHistorique.create({
+            country_code: cc,
+            ville: villeNom,
+            quartier: zone.nom,
+            score: zone.score,
+            niveau: zone.niveau,
+            nb_courses: zone.nb_courses,
+            nb_livreurs: zone.nb_livreurs,
+            temps_attente_min: zone.temps_attente_min,
+            rayon_km: zone.rayon_km,
+            latitude: zone.lat,
+            longitude: zone.lng,
+            notifications_envoyees: paysPushEnvoyes,
+            notifications_echouees: paysPushEchouees,
+            message_envoye: pushActif ? ` Zone chaude ${zone.nom} — ${zone.nb_courses} courses, ${zone.nb_livreurs} livreurs` : "Push désactivé",
+            alerte_livreur_id: alerteId,
+            date_analyse: nowIso,
+          });
+        } catch (_) {}
+      }
+
+      totalPushEnvoyes += paysPushEnvoyes;
+      totalPushEchouees += paysPushEchouees;
+      totalLivreursCibles += paysLivreursCibles;
+
+      allZonesChaudesDetail.push(...zonesChaudes);
+
+      // ── 7h. Cycle log par pays ──
       try {
-        await base44.asServiceRole.entities.ZoneChaudeHistorique.create({
-          country_code: paysCode,
-          ville: villeNom,
-          quartier: zone.nom,
-          score: zone.score,
-          niveau: zone.niveau,
-          nb_courses: zone.nb_courses,
-          nb_livreurs: zone.nb_livreurs,
-          temps_attente_min: zone.temps_attente_min,
-          rayon_km: zone.rayon_km,
-          latitude: zone.lat,
-          longitude: zone.lng,
-          notifications_envoyees: notifsEnvoyees,
-          notifications_echouees: notifsEchouees,
-          message_envoye: pushActif ? ` Zone chaude ${zone.nom} — ${zone.nb_courses} courses, ${zone.nb_livreurs} livreurs` : "Push désactivé",
-          alerte_livreur_id: alerteId,
+        await base44.asServiceRole.entities.ZoneChaudeCycleLog.create({
           date_analyse: nowIso,
+          country_code: cc,
+          zones_analysees: zonesAnalyse.length,
+          zones_chaudes: zonesChaudes.length,
+          livreurs_cibles: paysLivreursCibles,
+          push_envoyes: paysPushEnvoyes,
+          push_echouees: paysPushEchouees,
+          duree_ms: 0,
+          erreur: null,
+          config_snapshot: JSON.stringify({
+            ZC_ACTIF: config.ZC_ACTIF,
+            ZC_PUSH_ACTIF: config.ZC_PUSH_ACTIF,
+            ZC_RAYON_KM: config.ZC_RAYON_KM,
+            ZC_MIN_COURSES: config.ZC_MIN_COURSES,
+            ZC_MIN_LIVREURS: config.ZC_MIN_LIVREURS,
+            ZC_SCORE_FAIBLE: config.ZC_SCORE_FAIBLE,
+            ZC_SCORE_MOYEN: config.ZC_SCORE_MOYEN,
+            ZC_SCORE_ELEVE: config.ZC_SCORE_ELEVE,
+            ZC_SCORE_TRES_ELEVE: config.ZC_SCORE_TRES_ELEVE,
+            ZC_DELAI_MIN_ALERTES_MIN: config.ZC_DELAI_MIN_ALERTES_MIN,
+            ZC_MAX_NOTIFS_HEURE: config.ZC_MAX_NOTIFS_HEURE,
+            ZC_DISTANCE_MAX_KM: config.ZC_DISTANCE_MAX_KM,
+          }),
+          courses_en_attente: coursesRecentes.length,
+          livreurs_disponibles: livreursDispos.length,
         });
       } catch (_) {}
     }
 
-    const totalPushEnvoyes = pushesEnvoyes.reduce((s, p) => s + p.envoyees, 0);
-    const totalPushEchouees = pushesEnvoyes.reduce((s, p) => s + p.echouees, 0);
+    // ══════════════════════════════════════════════════════════════════════════
+    // ÉTAPE 8 — Résumé global
+    // ══════════════════════════════════════════════════════════════════════════
     const dureeMs = Date.now() - now;
-
-    console.log(`[ZonesChaudes] Analyse terminée — ${zonesChaudes.length} zones chaudes, ${alertesCreees.length} alertes créées, ${totalPushEnvoyes} push envoyés (${dureeMs}ms)`);
-
-    // ── Cycle log pour traçabilité audit ──
-    try {
-      await base44.asServiceRole.entities.ZoneChaudeCycleLog.create({
-        date_analyse: nowIso,
-        country_code: countryCode || 'global',
-        zones_analysees: zonesAnalyse.length,
-        zones_chaudes: zonesChaudes.length,
-        livreurs_cibles: totalLivreursCibles,
-        push_envoyes: totalPushEnvoyes,
-        push_echouees: totalPushEchouees,
-        duree_ms: dureeMs,
-        erreur: null,
-        config_snapshot: JSON.stringify({
-          ZC_ACTIF: config.ZC_ACTIF,
-          ZC_PUSH_ACTIF: config.ZC_PUSH_ACTIF,
-          ZC_RAYON_KM: config.ZC_RAYON_KM,
-          ZC_MIN_COURSES: config.ZC_MIN_COURSES,
-          ZC_MIN_LIVREURS: config.ZC_MIN_LIVREURS,
-          ZC_SCORE_FAIBLE: config.ZC_SCORE_FAIBLE,
-          ZC_SCORE_MOYEN: config.ZC_SCORE_MOYEN,
-          ZC_SCORE_ELEVE: config.ZC_SCORE_ELEVE,
-          ZC_SCORE_TRES_ELEVE: config.ZC_SCORE_TRES_ELEVE,
-          ZC_DELAI_MIN_ALERTES_MIN: config.ZC_DELAI_MIN_ALERTES_MIN,
-          ZC_MAX_NOTIFS_HEURE: config.ZC_MAX_NOTIFS_HEURE,
-          ZC_DISTANCE_MAX_KM: config.ZC_DISTANCE_MAX_KM,
-        }),
-        courses_en_attente: coursesRecentes.length,
-        livreurs_disponibles: livreursDispos.length,
-      });
-    } catch (e) {
-      console.error('[ZonesChaudes] Erreur cycle log:', e.message);
-    }
+    console.log(`[ZonesChaudes] Multi-pays terminé — ${paysAnalyses} pays analysés, ${paysSkipped} skip, ${totalZonesChaudes} zones chaudes, ${totalPushEnvoyes} push (${dureeMs}ms)`);
 
     return Response.json({
       success: true,
       timestamp: nowIso,
+      mode: countryCode ? 'mono-pays' : 'multi-pays',
       config: {
         actif: config.ZC_ACTIF === 'true',
         push_actif: pushActif,
@@ -562,16 +693,15 @@ Deno.serve(async (req) => {
         min_courses: minCourses,
         distance_max_km: distanceMaxKm,
       },
-      zones_analysees: zonesAnalyse.length,
-      zones_chaudes: zonesChaudes.length,
-      alertes_creees: alertesCreees.length,
-      pushes_envoyes: pushesEnvoyes,
-      zones_chaudes_detail: zonesChaudes,
-      toutes_zones_actives: zonesToutesActives,
-      stats: {
-        courses_en_attente: coursesRecentes.length,
-        livreurs_disponibles: livreursDispos.length,
-      },
+      pays_analyses: paysAnalyses,
+      pays_skipped: paysSkipped,
+      zones_analysees: totalZonesAnalysees,
+      zones_chaudes: totalZonesChaudes,
+      alertes_creees: totalAlertesCreees,
+      total_push_envoyes: totalPushEnvoyes,
+      total_push_echouees: totalPushEchouees,
+      livreurs_cibles: totalLivreursCibles,
+      zones_chaudes_detail: allZonesChaudesDetail,
       cycle_log: {
         total_push_envoyes: totalPushEnvoyes,
         total_push_echouees: totalPushEchouees,
@@ -584,6 +714,7 @@ Deno.serve(async (req) => {
     console.error('[ZonesChaudes] Erreur:', error.message);
     // ── Cycle log même en cas d'erreur ──
     try {
+      const base44 = createClientFromRequest(req);
       await base44.asServiceRole.entities.ZoneChaudeCycleLog.create({
         date_analyse: new Date().toISOString(),
         country_code: 'global',

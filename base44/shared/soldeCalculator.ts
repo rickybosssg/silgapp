@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// SOLDE CALCULATOR — SOURCE DE VÉRITÉ unique (READ-ONLY)
+// SOLDE CALCULATOR — SOURCE DE VÉRITÉ unique, formule financière READ-ONLY
 // ═══════════════════════════════════════════════════════════════════════════
 //
 // RÈGLE MÉTIER DÉFINITIVE (correction 26/08/2026) :
@@ -114,7 +114,7 @@ export async function calculerSoldeLivreur(base44: any, livreurId: string): Prom
 
   // Cut-off comptable obligatoire — si pas de base définie, aucun dû reconnu
   if (!baseDate) {
-    return { solde: 0, creditDisponible: 0, creditSurplus: 0, consumedCredit: 0, totalCommissions: 0, totalPaye: 0 };
+    return { solde: 0, creditDisponible: 0, creditSurplus: 0, totalCommissions: 0, totalPaye: 0 };
   }
 
   // 1. Courses livrées (par livreur_financier_id ET livreur_id, dédupliquées)
@@ -137,15 +137,20 @@ export async function calculerSoldeLivreur(base44: any, livreurId: string): Prom
     if (!seenIds.has(c.id)) { seenIds.add(c.id); allCourses.push(c); }
   }
 
-  // Filtrer par base comptable
+  // Filtrer par base comptable + EXCLURE les courses Enterprise
+  // RÈGLE : Les courses Enterprise (enterprise_id non null) ont leur commission
+  // comptabilisée dans le EnterpriseLedger, payée par l'entreprise — JAMAIS par le livreur.
+  // Les courses publiques (enterprise_id null/undefined) restent inchangées.
   const coursesForCalc = allCourses.filter((c: any) => {
     const d = c.heure_livraison || c.colis_livre_at || c.created_date;
     return d && new Date(d) >= new Date(baseDate) && !c.enterprise_id;
   });
 
   // 2. Paiements traités
-  // Ne pas masquer un échec de lecture: recalculer avec paiements=[] écraserait
-  // le solde avec des données incomplètes.
+  // ⚠️ NE JAMAIS utiliser .catch(() => []) ici — un échec silencieux ferait
+  // remonter le dû au total des commissions (totalPaye = 0 → solde = commissions).
+  // Correction racine 2026-09-11 : si la lecture échoue, on remonte une erreur
+  // explicite au lieu d'écraser le solde avec des données incomplètes.
   let paiements: any[];
   try {
     paiements = await base44.asServiceRole.entities.PaiementSilgapp.filter(
@@ -153,7 +158,7 @@ export async function calculerSoldeLivreur(base44: any, livreurId: string): Prom
       '-date_envoi', 500
     );
   } catch (err: any) {
-    console.error('[SOLDE] Erreur lecture PaiementSilgapp - ABORT recalcul (livreur ' + livreurId + '):', err?.message || String(err));
+    console.error('[SOLDE] ❌ Erreur lecture PaiementSilgapp — ABORT recalcul (livreur ' + livreurId + '):', err?.message || String(err));
     throw new Error('Erreur lecture paiements (livreur ' + livreurId + '): ' + (err?.message || String(err)));
   }
 
@@ -206,20 +211,21 @@ export async function calculerSoldesLivreursBatch(
   const paiementsFilter = countryCode
     ? { statut: 'traite', type_dette: 'commission_livreur', country_code: countryCode }
     : { statut: 'traite', type_dette: 'commission_livreur' };
+  // ⚠️ Correction racine 2026-09-11 : pas de .catch(() => []) sur les paiements.
+  // Si la lecture échoue, on remonte une erreur explicite.
   let allPaiements: any[];
   try {
     allPaiements = await base44.asServiceRole.entities.PaiementSilgapp.filter(
       paiementsFilter, '-date_envoi', 2000
     );
   } catch (err: any) {
-    console.error('[SOLDE] Erreur lecture PaiementSilgapp (batch) - ABORT recalcul:', err?.message || String(err));
+    console.error('[SOLDE] ❌ Erreur lecture PaiementSilgapp (batch) — ABORT recalcul:', err?.message || String(err));
     throw new Error('Erreur lecture paiements (batch): ' + (err?.message || String(err)));
   }
 
   // 3. Récupérer les livreurs avec base comptable pour filtrage
   const livreurIds = new Set<string>();
   (allCourses || []).forEach((c: any) => {
-    if (c.enterprise_id) return;
     const fid = getLivreurFinancierId(c);
     if (fid) livreurIds.add(fid);
     if (c.livreur_id) livreurIds.add(c.livreur_id);
@@ -245,6 +251,8 @@ export async function calculerSoldesLivreursBatch(
   const eventsByDriver: Record<string, { type: 'commission' | 'payment'; date: string; amount: number; encours_comptabilise_at?: string | null }[]> = {};
 
   (allCourses || []).forEach((c: any) => {
+    // ── EXCLURE les courses Enterprise — commission payée par l'entreprise, pas le livreur ──
+    if (c.enterprise_id) return;
     const fid = getLivreurFinancierId(c);
     if (!fid) return;
     const base = livreursAvecBase[fid];
@@ -286,7 +294,7 @@ export async function calculerSoldesLivreursBatch(
   allIds.forEach(id => {
     const base = livreursAvecBase[id];
     if (!base) {
-      result[id] = { solde: 0, creditDisponible: 0, creditSurplus: 0, consumedCredit: 0, totalCommissions: 0, totalPaye: 0 };
+      result[id] = { solde: 0, creditDisponible: 0, creditSurplus: 0, totalCommissions: 0, totalPaye: 0 };
       return;
     }
 

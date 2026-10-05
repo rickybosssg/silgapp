@@ -14,9 +14,9 @@
 
 import { STATUTS_ACTIFS_COURSE, STATUTS_ACTIFS_VERIF } from './dispatchConstants.ts';
 import { journaliserDispatch } from './dispatchUtils.ts';
-import { getLivreursNotifies } from './dispatchNotifications.ts';
+import { getLivreursNotifies, getLivreursRefuses } from './dispatchNotifications.ts';
 import { chargerConfigDispatch, chargerConfigVaguesGPS } from './dispatchConfig.ts';
-import { publierCourseDansFil, secoursDispatchV2 } from './dispatchV2.ts';
+import { isV2Enabled, secoursDispatchV2, calculerScore, publierCourseDansFil } from './dispatchV2.ts';
 import { gererPushGeneralT10 } from './pushGeneralT10.ts';
 
 /** Crée une alerte admin si aucune alerte récente n'existe pour la même course. */
@@ -57,6 +57,41 @@ export async function runWatchdog(base44, body = {}) {
     return true;
   });
 
+  // ── Charger les courses RÉELLEMENT actives (livreur_en_route, en_livraison, etc.) ──
+  // BUGFIX : ANOMALIE 5 et 6 calculaient livreurIdsAvecCourseActive à partir de `courses`
+  // qui ne contenait que recherche_livreur + nouvelle. Comme ces statuts ne sont PAS dans
+  // STATUTS_ACTIFS_VERIF, le filtre retournait toujours un tableau vide → TOUS les
+  // livreurs en_course étaient flaggés comme fantômes (faux positifs massifs).
+  //
+  // On fetche maintenant les courses avec un statut dans STATUTS_ACTIFS_VERIF séparément.
+  // Limite 500 : le nombre de courses simultanément actives ne devrait jamais dépasser
+  // ce seuil. Si cela arrivait, les livreurs concernés au-delà du top 500 ne seraient pas
+  // protégés — cas extrême non observé en production.
+  // ── FAIL-SAFE : distinguer requête réussie (0 résultats) de requête échouée ──
+  // L'ancien .catch(() => []) avalait silencieusement les erreurs et retournait [],
+  // ce qui était indiscernable d'un résultat légitime de 0 course active.
+  // En cas d'échec de lecture, ANOMALIE 5 et 6 sont SKIPPÉES — aucune modification
+  // de statut livreur. Une erreur de lecture ne doit JAMAIS provoquer en_course → disponible.
+  let coursesActivesPourVerif: any[] = [];
+  let activeCoursesQuerySucceeded = false;
+  try {
+    const result = await base44.asServiceRole.entities.CourseExterne.filter(
+      { statut: { $in: STATUTS_ACTIFS_VERIF } },
+      '-created_date', 500
+    );
+    coursesActivesPourVerif = result || [];
+    activeCoursesQuerySucceeded = true;
+  } catch (queryErr: any) {
+    activeCoursesQuerySucceeded = false;
+    console.error('[WATCHDOG] ❌ Échec requête coursesActivesPourVerif — ANOMALIE 5/6 SKIPPÉES:', queryErr?.message || String(queryErr));
+    anomalies.push({ type: 'query_error_active_courses', severity: 'critique', description: `Échec lecture courses actives — ANOMALIE 5/6 skippées: ${queryErr?.message || String(queryErr)}` });
+  }
+  const livreurIdsAvecCourseActive = new Set(
+    coursesActivesPourVerif
+      .filter(c => c.livreur_id)
+      .map(c => c.livreur_id)
+  );
+
   // ── Pre-charger les course_ids ayant au moins une DispatchNotification ──
   const notifCourses = await base44.asServiceRole.entities.DispatchNotification.filter(
     {}, 'date_notification', 500
@@ -76,33 +111,6 @@ export async function runWatchdog(base44, body = {}) {
   const DISPONIBLE_PUSH_TIMEOUT_MS = cachedConfig.dispatch.disponiblePushTimeoutMin * 60 * 1000;
   const CYCLE_EPUISE_TIMEOUT_MS = cachedConfig.dispatch.cycleEpuiseTimeoutMs;
 
-  // ── Fail-safe : charger séparément les courses réellement actives ──
-  // Si cette lecture échoue, ANOMALIE 5/6 est skippée. Une erreur réseau/Base44
-  // ne doit jamais être interprétée comme "0 course active" et libérer un livreur.
-  let coursesActivesPourVerif: any[] = [];
-  let activeCoursesQuerySucceeded = false;
-  try {
-    const result = await base44.asServiceRole.entities.CourseExterne.filter(
-      { statut: { $in: STATUTS_ACTIFS_VERIF } },
-      '-created_date', 500
-    );
-    coursesActivesPourVerif = result || [];
-    activeCoursesQuerySucceeded = true;
-  } catch (queryErr: any) {
-    activeCoursesQuerySucceeded = false;
-    console.error('[WATCHDOG] ❌ Échec requête coursesActivesPourVerif — ANOMALIE 5/6 SKIPPÉES:', queryErr?.message || String(queryErr));
-    anomalies.push({
-      type: 'query_error_active_courses',
-      severity: 'critique',
-      description: `Échec lecture courses actives — ANOMALIE 5/6 skippées: ${queryErr?.message || String(queryErr)}`,
-    });
-  }
-  const livreurIdsAvecCourseActive = new Set(
-    coursesActivesPourVerif
-      .filter(c => c.livreur_id)
-      .map(c => c.livreur_id)
-  );
-
   // ═══ ANOMALIE 1: Course nouvelle jamais traitée par l'automation create ═══
   // Une course nouvelle > 2 min sans aucune notification = l'entity automation create a échoué
   for (const course of courses) {
@@ -116,9 +124,9 @@ export async function runWatchdog(base44, body = {}) {
 
     try {
       const result = await publierCourseDansFil(base44, course);
-      corrections.push({ course_id: course.id, action: 'force_dispatch_nouvelle', result });
+      corrections.push({ course_id: course.id, action: 'force_dispatch_nouvelle_v2', result });
     } catch (err) {
-      corrections.push({ course_id: course.id, action: 'force_dispatch_nouvelle', error: err.message });
+      corrections.push({ course_id: course.id, action: 'force_dispatch_nouvelle_v2', error: err.message });
     }
 
     await createAdminAlert(base44,
@@ -144,9 +152,9 @@ export async function runWatchdog(base44, body = {}) {
 
     try {
       const result = await publierCourseDansFil(base44, course);
-      corrections.push({ course_id: course.id, action: 'force_dispatch_recherche', result });
+      corrections.push({ course_id: course.id, action: 'force_dispatch_recherche_v2', result });
     } catch (err) {
-      corrections.push({ course_id: course.id, action: 'force_dispatch_recherche', error: err.message });
+      corrections.push({ course_id: course.id, action: 'force_dispatch_recherche_v2', error: err.message });
     }
 
     await createAdminAlert(base44,
@@ -173,40 +181,25 @@ export async function runWatchdog(base44, body = {}) {
       // Verrou expiré avec livreur_id (prix manuel sans réponse, ou acceptation expirée)
       await base44.asServiceRole.entities.CourseExterne.update(course.id, {
         statut: 'recherche_livreur',
-        dispatch_status: 'redispatch',
+        dispatch_status: 'en_attente',
         livreur_id: '', livreur_nom: '', livreur_telephone: '',
         heure_acceptation: null, accepted_by_livreur_id: '', accepted_at: null,
         pricing_mode: 'automatic', manual_price: null, manual_price_status: null,
         proposed_by_livreur_id: '', timeout_expires_at: null,
       });
     } else {
-      // Vague expirée sans verrou → avancer à la prochaine vague ou cycle_epuise
-      const currentWave = course.dispatch_wave || 0;
-      const maxWave = cachedConfig.gps.waves.length;
-      const nextWave = currentWave + 1;
-
-      if (nextWave > maxWave) {
-        const cycleEpuiseDeadline = new Date(now.getTime() + CYCLE_EPUISE_TIMEOUT_MS).toISOString();
-        await base44.asServiceRole.entities.CourseExterne.update(course.id, {
-          dispatch_status: 'cycle_epuise',
-          dispatch_wave: maxWave,
-          timeout_expires_at: cycleEpuiseDeadline,
-        });
-        corrections.push({ course_id: course.id, action: 'cycle_epuise' });
-        continue;
-      }
-
+      // Vague expirée sans verrou → V2 : publier dans le fil
       await base44.asServiceRole.entities.CourseExterne.update(course.id, {
-        dispatch_status: 'redispatch',
-        dispatch_wave: nextWave,
+        statut: 'recherche_livreur',
+        dispatch_status: 'en_attente',
       });
     }
 
     try {
-      const result = await publierCourseDansFil(base44, { ...course, statut: 'recherche_livreur', dispatch_status: 'en_attente' });
-      corrections.push({ course_id: course.id, action: 'redispatch_propose_timeout', result });
+      const result = await publierCourseDansFil(base44, course);
+      corrections.push({ course_id: course.id, action: 'redispatch_propose_timeout_v2', result });
     } catch (err) {
-      corrections.push({ course_id: course.id, action: 'redispatch_propose_timeout', error: err.message });
+      corrections.push({ course_id: course.id, action: 'redispatch_propose_timeout_v2', error: err.message });
     }
     await new Promise(r => setTimeout(r, 100));
   }
@@ -229,6 +222,12 @@ export async function runWatchdog(base44, body = {}) {
   }
 
   // ═══ ANOMALIE 5: Livreur en_course sans course active (statut fantôme) ═══
+  // SKIPPÉE si la requête coursesActivesPourVerif a échoué (fail-safe).
+  // Une erreur de lecture ne doit jamais provoquer en_course → disponible.
+  if (!activeCoursesQuerySucceeded) {
+    // Requête échouée — ne modifier AUCUN statut livreur
+    console.warn('[WATCHDOG] ⏭️ ANOMALIE 5/6 skippées (coursesActivesPourVerif query failed)');
+  }
   const livreursEnCourse = activeCoursesQuerySucceeded
     ? await base44.asServiceRole.entities.Livreur.filter(
         { type_livreur: 'externe', statut: 'en_course' },
@@ -236,6 +235,7 @@ export async function runWatchdog(base44, body = {}) {
       ).catch(() => [])
     : [];
   if (livreursEnCourse.length > 0) {
+    // livreurIdsAvecCourseActive est calculé globalement (voir BUGFIX plus haut).
     const livreursFantomes = livreursEnCourse.filter(l => !livreurIdsAvecCourseActive.has(l.id));
     for (const l of livreursFantomes) {
       const nouveauStatut = l.manual_hors_ligne === true ? 'hors_ligne' : 'disponible';
@@ -246,6 +246,7 @@ export async function runWatchdog(base44, body = {}) {
   }
 
   // ═══ ANOMALIE 6: Livreur disponible avec course active ═══
+  // SKIPPÉE si la requête coursesActivesPourVerif a échoué (fail-safe).
   const livreursDisponibles = activeCoursesQuerySucceeded
     ? await base44.asServiceRole.entities.Livreur.filter(
         { type_livreur: 'externe', statut: 'disponible' },
@@ -253,6 +254,7 @@ export async function runWatchdog(base44, body = {}) {
       ).catch(() => [])
     : [];
   if (livreursDisponibles.length > 0) {
+    // livreurIdsAvecCourseActive est calculé globalement (voir BUGFIX plus haut).
     const livreursIncoherents = livreursDisponibles.filter(l => livreurIdsAvecCourseActive.has(l.id));
     for (const l of livreursIncoherents) {
       await base44.asServiceRole.entities.Livreur.update(l.id, { statut: 'en_course' });
@@ -296,31 +298,43 @@ export async function runWatchdog(base44, body = {}) {
     }
   }
 
-  // ── Journaliser toutes les anomalies avec cooldown par livreur/course ──
+  // ── Journaliser toutes les anomalies (avec déduplication par cooldown) ──
+  // Le watchdog continue de DÉTECTER et CORRIGER les anomalies.
+  // Mais il ne crée pas de DispatchLog répétitif pour la même anomalie
+  // (livreur_id + type) tant qu'aucun changement d'état n'a eu lieu.
+  // Cooldown : 30 min — un log par anomalie unique toutes les 30 min maximum.
   const WATCHDOG_LOG_COOLDOWN_MS = 30 * 60 * 1000;
   const cooldownSince = new Date(now.getTime() - WATCHDOG_LOG_COOLDOWN_MS).toISOString();
   const recentWatchdogLogs = await base44.asServiceRole.entities.DispatchLog.filter(
     { evenement: 'watchdog_anomalie', created_date: { $gte: cooldownSince } },
     '-created_date', 200
   ).catch(() => []);
+
   const recentLogKeys = new Set<string>();
   for (const rl of (recentWatchdogLogs || [])) {
     const entityKey = rl.livreur_acceptant_id || rl.course_id || '';
     const key = `${entityKey}|${rl.raison_blocage || ''}`;
     if (entityKey) recentLogKeys.add(key);
   }
-  let logsSkipped = 0;
 
+  let logsSkipped = 0;
   for (const a of anomalies) {
+    // ── Utiliser livreur_id comme clé de déduplication pour les anomalies livreur ──
+    // ANOMALIE 5/6 sont des anomalies livreur (pas course). Le livreur_id doit être
+    // utilisé comme entityKey pour que le cooldown 30 min fonctionne correctement.
+    // Anciennement, livreur_acceptant_id était vide dans les logs → le cooldown
+    // ne fonctionnait jamais → 134 logs identiques toutes les 5 min.
     const entityKey = a.livreur_id || a.course_id || '';
     const logKey = `${entityKey}|${a.type}`;
     if (entityKey && recentLogKeys.has(logKey)) {
       logsSkipped++;
-      continue;
+      continue; // Log récent existant pour cette anomalie — cooldown 30 min
     }
+    // ── Pour les anomalies livreur (ANOMALIE 5/6), utiliser livreur_id comme
+    //    livreur_acceptant_id pour que le cooldown fonctionne. ──
     journaliserDispatch(base44, {
       course_id: a.course_id || '',
-      livreur_acceptant_id: a.livreur_id || '',
+      livreur_acceptant_id: a.livreur_id || a.course_id || '',
       evenement: 'watchdog_anomalie',
       raison_blocage: a.type,
       raison_passage: `severity:${a.severity} | ${a.description || ''}`,
@@ -333,28 +347,141 @@ export async function runWatchdog(base44, body = {}) {
   //         meilleurs livreurs encore éligibles et non en course.
   // Après acceptation : aucun push (la course n'est plus disponible_push).
   // Pas de T+20s, pas de priorité temporelle, pas de cycle_epuise.
-  const coursesFil = courses.filter(c => c.dispatch_status === 'disponible_push' && c.statut === 'recherche_livreur');
+  const v2Enabled = await isV2Enabled(base44);
+  // 📌 coursesFil est défini dans une portée COMMUNE (avant les deux blocs T+5 et T+20)
+  // pour éviter ReferenceError. Les critères de filtre sont strictement identiques.
+  const coursesFil = v2Enabled
+    ? courses.filter(c => c.dispatch_status === 'disponible_push' && c.statut === 'recherche_livreur')
+    : [];
 
-  for (const course of coursesFil) {
-    const secoursPhase = Number(course.dispatch_v2_secours_phase || 0);
-    if (secoursPhase >= 1) continue; // Rappel déjà envoyé — ne pas re-notifier
+  if (v2Enabled) {
+    for (const course of coursesFil) {
+      const secoursPhase = Number(course.dispatch_v2_secours_phase || 0);
+      if (secoursPhase >= 1) continue; // Rappel déjà envoyé — ne pas re-notifier
 
-    // Garde : ne rien faire si la course a déjà un livreur (acceptation concurrente)
-    if (course.livreur_id || course.accepted_by_livreur_id) continue;
+      // Garde : ne rien faire si la course a déjà un livreur (acceptation concurrente)
+      if (course.livreur_id || course.accepted_by_livreur_id) continue;
 
-    const sollicitationMs = course.heure_sollicitation
-      ? new Date(course.heure_sollicitation).getTime()
-      : new Date(course.created_date).getTime();
-    const ageMin = (now.getTime() - sollicitationMs) / 60000;
+      const sollicitationMs = course.heure_sollicitation
+        ? new Date(course.heure_sollicitation).getTime()
+        : new Date(course.created_date).getTime();
+      const ageMin = (now.getTime() - sollicitationMs) / 60000;
 
-    if (ageMin >= cachedConfig.dispatch.secoursV2DelayMin) {
-      // T+5min (configurable) : push batch de rappel aux meilleurs livreurs encore éligibles
-      // secoursDispatchV2 exclut déjà les livreurs en course, refusés et déjà notifiés.
-      const result = await secoursDispatchV2(base44, course, cachedConfig.dispatch.secoursV2NbLivreurs, { excludeAlreadyNotified: false });
-      await base44.asServiceRole.entities.CourseExterne.update(course.id, {
-        dispatch_v2_secours_phase: 1,
-      });
-      corrections.push({ course_id: course.id, action: 'secours_v2_rappel_t5min', pushed: result.pushed });
+      if (ageMin >= cachedConfig.dispatch.secoursV2DelayMin) {
+        // T+5min (configurable) : push batch de rappel aux meilleurs livreurs encore éligibles
+        // secoursDispatchV2 exclut déjà les livreurs en course, refusés et déjà notifiés.
+        const result = await secoursDispatchV2(base44, course, cachedConfig.dispatch.secoursV2NbLivreurs, { excludeAlreadyNotified: false });
+        await base44.asServiceRole.entities.CourseExterne.update(course.id, {
+          dispatch_v2_secours_phase: 1,
+        });
+        corrections.push({ course_id: course.id, action: 'secours_v2_rappel_t5min', pushed: result.pushed });
+      }
+    }
+  }
+
+  // ═══ RAPPEL T+20 MIN — Dernier rappel pour les courses V2 non acceptées ═══
+  // Si une course reste sans livreur 20 minutes après sa première diffusion,
+  // envoyer UN SEUL rappel push aux livreurs éligibles (non refusés, non en course).
+  // Idempotent : push_rappel_t20_envoye = true garantit qu'un même rappel n'est jamais envoyé deux fois.
+  // Ne crée aucune nouvelle DispatchNotification (utilise envoiNotificationPushBatch directement).
+  // Ne modifie pas vue_at, ne modifie pas accepterCourseV2, ne modifie pas Dispatch V2.
+  if (v2Enabled) {
+    for (const course of coursesFil) {
+      // Garde idempotence : ne jamais envoyer le rappel T+20 deux fois
+      if (course.push_rappel_t20_envoye === true) continue;
+
+      // Garde : T+5 secours doit avoir été envoyé (dispatch_v2_secours_phase >= 1)
+      if (Number(course.dispatch_v2_secours_phase || 0) < 1) continue;
+
+      // Garde : ne rien faire si la course a déjà un livreur (acceptation concurrente)
+      if (course.livreur_id || course.accepted_by_livreur_id) continue;
+
+      const sollicitationMs = course.heure_sollicitation
+        ? new Date(course.heure_sollicitation).getTime()
+        : new Date(course.created_date).getTime();
+      const ageMin = (now.getTime() - sollicitationMs) / 60000;
+
+      if (ageMin >= cachedConfig.dispatch.rappelT20DelayMin) {
+        // Récupérer les livreurs éligibles (mêmes critères que secoursDispatchV2)
+        const livreurs = await base44.asServiceRole.entities.Livreur.filter({
+          type_livreur: 'externe',
+          validation: 'valide',
+          actif: true,
+          statut: 'disponible',
+          country_code: course.country_code,
+          bloque_encours: false,
+          manual_hors_ligne: { $ne: true },
+          // [CORRECTION 11] admin_hors_ligne retiré du ciblage FCM secours :
+          // un livreur bloqué par l'Admin continue à recevoir le push.
+        }, '-last_seen_at', 50);
+
+        // Exclure les livreurs en course (fresh check)
+        const coursesActivesT20 = await base44.asServiceRole.entities.CourseExterne.filter(
+          { country_code: course.country_code }, '-created_date', 200
+        ).catch(() => []);
+        const livreursEnCourseT20 = new Set(
+          (coursesActivesT20 || [])
+            .filter((c: any) => STATUTS_ACTIFS_COURSE.includes(c.statut) && c.livreur_id)
+            .map((c: any) => c.livreur_id)
+        );
+
+        // Exclure les livreurs ayant refusé cette course
+        const refusedT20 = await getLivreursRefuses(base44, course.id);
+
+        // Filtrer + scorer + trier + slice top N
+        const candidatsT20 = (livreurs || [])
+          .filter((l: any) => !livreursEnCourseT20.has(l.id) && !refusedT20.includes(l.id) && l.user_email)
+          .map((l: any) => ({ ...l, score: calculerScore(l, course) }))
+          .sort((a: any, b: any) => b.score - a.score)
+          .slice(0, cachedConfig.dispatch.rappelT20NbLivreurs);
+
+        if (candidatsT20.length > 0) {
+          // Envoyer le push via envoiNotificationPushBatch — ne crée PAS de nouvelles
+          // DispatchNotification ni Notification inbox. Met à jour uniquement les
+          // statuts push existants (mettreAJourStatutPush) sans casser vue_at.
+          const batchResult = await base44.asServiceRole.functions.invoke('envoiNotificationPushBatch', {
+            course_id: course.id,
+            livreur_ids: candidatsT20.map((l: any) => l.id),
+            titre: 'Course toujours disponible',
+            message: 'Cette course est toujours disponible. Ouvrez SILGAPP pour la consulter.',
+            type: 'nouvelle_course',
+            dispatch_version: '2',
+          }).catch((err: any) => {
+            console.error('[WATCHDOG] ⚠️ Rappel T+20 push error:', err?.message || String(err));
+            return null;
+          });
+
+          const sent = batchResult?.data?.succes ?? batchResult?.succes ?? 0;
+          console.log(`[WATCHDOG] 📢 Rappel T+20: ${sent} push envoyé(s) pour ${candidatsT20.length} livreur(s) — course ${course.id}`);
+
+          journaliserDispatch(base44, {
+            course_id: course.id,
+            country_code: course.country_code,
+            vague: 0,
+            evenement: 'rappel_t20_envoye',
+            raison_passage: `rappel_tardif_t20 | candidats=${candidatsT20.length} | push_succes=${sent}`,
+            nombre_nouveaux_notifies: candidatsT20.length,
+            livreurs_selectionnes: candidatsT20.map((l: any) => ({
+              id: l.id, nom: `${l.prenom || ''} ${l.nom || ''}`.trim(), score: l.score,
+            })),
+          });
+
+          corrections.push({ course_id: course.id, action: 'rappel_t20_envoye', pushed: candidatsT20.length });
+        } else {
+          journaliserDispatch(base44, {
+            course_id: course.id,
+            country_code: course.country_code,
+            vague: 0,
+            evenement: 'rappel_t20_skip',
+            raison_passage: `0 candidat eligible pour le rappel T+20`,
+          });
+        }
+
+        // Marquer idempotent — qu'il y ait eu des candidats ou non, le rappel est considéré envoyé
+        await base44.asServiceRole.entities.CourseExterne.update(course.id, {
+          push_rappel_t20_envoye: true,
+        });
+      }
     }
   }
 

@@ -12,6 +12,8 @@ export const DEFAULT_DISPONIBLE_PUSH_TIMEOUT_MIN = 30;           // 30 minutes
 export const DEFAULT_MAX_CYCLES = 3;                             // 3 cycles
 export const DEFAULT_SECOURS_V2_NB_LIVREURS = 10;               // 10 livreurs
 export const DEFAULT_SECOURS_V2_DELAY_MIN = 5;                   // 5 minutes
+export const DEFAULT_RAPPEL_T20_DELAY_MIN = 20;                  // 20 minutes
+export const DEFAULT_RAPPEL_T20_NB_LIVREURS = 10;               // 10 livreurs
 
 // Rétrocompatibilité : CYCLE_EPUISE_TIMEOUT_MS reste exporté mais n'est plus la
 // source de vérité. La valeur réelle est chargée dynamiquement depuis AppConfig.
@@ -43,6 +45,8 @@ export async function chargerConfigDispatch(base44) {
     const maxCyclesConfig = get('DISPATCH_MAX_CYCLES');
     const secoursV2NbConfig = get('DISPATCH_SECOURS_V2_NB_LIVREURS');
     const secoursV2DelayConfig = get('DISPATCH_SECOURS_V2_DELAY_MIN');
+    const rappelT20DelayConfig = get('DISPATCH_RAPPEL_T20_DELAY_MIN');
+    const rappelT20NbConfig = get('DISPATCH_RAPPEL_T20_NB_LIVREURS');
 
     const nb = nbConfig ? (nbConfig.valeur === 'tous' ? 999 : getInt(nbConfig, 3)) : 3;
     const timeout = getInt(timeoutConfig, 300);
@@ -55,6 +59,8 @@ export async function chargerConfigDispatch(base44) {
     const maxCycles = getInt(maxCyclesConfig, DEFAULT_MAX_CYCLES);
     const secoursV2NbLivreurs = getInt(secoursV2NbConfig, DEFAULT_SECOURS_V2_NB_LIVREURS);
     const secoursV2DelayMin = getInt(secoursV2DelayConfig, DEFAULT_SECOURS_V2_DELAY_MIN);
+    const rappelT20DelayMin = getInt(rappelT20DelayConfig, DEFAULT_RAPPEL_T20_DELAY_MIN);
+    const rappelT20NbLivreurs = getInt(rappelT20NbConfig, DEFAULT_RAPPEL_T20_NB_LIVREURS);
 
     const result = {
       nb, timeout,
@@ -67,6 +73,8 @@ export async function chargerConfigDispatch(base44) {
       maxCycles,
       secoursV2NbLivreurs,
       secoursV2DelayMin,
+      rappelT20DelayMin,
+      rappelT20NbLivreurs,
     };
     CONFIG_CACHE.dispatch = result;
     CONFIG_CACHE.expires = Date.now() + CONFIG_TTL_MS;
@@ -84,6 +92,8 @@ export async function chargerConfigDispatch(base44) {
       maxCycles: DEFAULT_MAX_CYCLES,
       secoursV2NbLivreurs: DEFAULT_SECOURS_V2_NB_LIVREURS,
       secoursV2DelayMin: DEFAULT_SECOURS_V2_DELAY_MIN,
+      rappelT20DelayMin: DEFAULT_RAPPEL_T20_DELAY_MIN,
+      rappelT20NbLivreurs: DEFAULT_RAPPEL_T20_NB_LIVREURS,
     };
   }
 }

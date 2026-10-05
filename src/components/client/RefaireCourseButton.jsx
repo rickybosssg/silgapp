@@ -2,7 +2,7 @@ import React from "react";
 import { RotateCcw } from "lucide-react";
 
 /**
- * Bouton "Refaire cette course" — affiché sur les courses livrées dans l'historique.
+ * Bouton "RELANCER CETTE COURSE" — affiché sur les courses livrées dans l'historique.
  * Navigue vers le formulaire de création avec les données réutilisables pré-remplies.
  *
  * NE RECOPIE PAS : livreur, dispatch, statut, commission, paiement, prix final garanti.
@@ -58,7 +58,7 @@ export default function RefaireCourseButton({ course, clientProfil, position, on
       className="w-full h-11 rounded-2xl bg-primary text-white font-black text-sm shadow-lg shadow-primary/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
     >
       <RotateCcw className="w-4 h-4" />
-      Refaire cette course
+      RELANCER CETTE COURSE
     </button>
   );
 }

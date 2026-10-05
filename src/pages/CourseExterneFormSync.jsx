@@ -10,7 +10,6 @@ import CourseStepForm from "@/components/client/CourseStepForm";
 import { sauvegarderContactDB } from "@/components/client/CarnetAdresses";
 import { haversineKm } from "@/lib/priceEstimate";
 import LivreurRechercheAnimation from "@/components/client/LivreurRechercheAnimation";
-import InvitationWhatsAppModal from "@/components/client/InvitationWhatsAppModal";
 import { normalizePhone, phoneVariants } from "@/lib/phoneUtils";
 import { resolveGpsForCourse, GPS_BLOCK_MESSAGE } from "@/lib/gpsResolution";
 import { isPaysTarificationGrandOuaga } from "@/lib/tarifGrandOuaga";
@@ -64,17 +63,12 @@ export default function CourseExterneFormSync() {
   const [courseCreated, setCourseCreated] = useState(false);
   const [createdCourse, setCreatedCourse] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false); // verrou anti-double-clic
-  const submissionSafetyTimerRef = useRef(null);
   const [invitationModal, setInvitationModal] = useState(null); // { telephone, nom } ou null
   const [gpsLoading, setGpsLoading] = useState({ depart: false, arrivee: false });
   const { forteDemande } = useForteDemande(clientProfil?.country_code);
   const { country: countryConfig } = useCountryPricing(clientProfil?.country_code);
   // Source tarifaire unique : Country.prix_minimum (jamais codé en dur)
   const prixMinimum = countryConfig?.prix_minimum || 500;
-
-  useEffect(() => () => {
-    if (submissionSafetyTimerRef.current) clearTimeout(submissionSafetyTimerRef.current);
-  }, []);
 
   // Lire brouillon (données pures, sans fonctions)
   const getDraftFromStorage = () => {
@@ -97,26 +91,6 @@ export default function CourseExterneFormSync() {
   const clientGpsLng = position?.longitude || null;
   const clientAdresse = clientProfil?.quartier || "";
 
-  const freshData = {
-    type_course: typeCourse,
-    client_nom: clientProfil?.nom || "",
-    client_telephone: clientProfil?.telephone || "",
-    expediteur_nom: "", expediteur_telephone: "",
-    destinataire_nom: "", destinataire_telephone: "",
-    type_colis: "petit_colis",
-    adresse_depart: "", adresse_arrivee: "",
-    quartier_depart: "", quartier_arrivee: "",
-    destination_inconnue: false,
-    notes: "", date_souhaitee: "", mode_immediat: true,
-    gps_depart_lat: null, gps_depart_lng: null,
-    gps_arrivee_lat: typeCourse === "recevoir" ? clientGpsLat : null,
-    gps_arrivee_lng: typeCourse === "recevoir" ? clientGpsLng : null,
-    recuperationGPS: false,
-    livraisonGPS: typeCourse === "recevoir" && !!clientGpsLat,
-    expediteur_gps_available: false,
-    expediteur_gps_lat: null, expediteur_gps_lng: null,
-    prix_propose: 0,
-  };
   const initialData = prefillCourse
     ? {
         type_course: typeCourse,
@@ -148,7 +122,34 @@ export default function CourseExterneFormSync() {
         expediteur_gps_lng: null,
         prix_propose: 0,
       }
-    : (draft || freshData);
+    : (draft || {
+        type_course: typeCourse,
+        client_nom: clientProfil?.nom || "",
+        client_telephone: clientProfil?.telephone || "",
+        expediteur_nom: "",
+        expediteur_telephone: "",
+        destinataire_nom: "",
+        destinataire_telephone: "",
+        type_colis: "petit_colis",
+        adresse_depart: "",
+        adresse_arrivee: "",
+        quartier_depart: "",
+        quartier_arrivee: "",
+        destination_inconnue: false,
+        notes: "",
+        date_souhaitee: "",
+        mode_immediat: true,
+        gps_depart_lat: null,
+        gps_depart_lng: null,
+        gps_arrivee_lat: typeCourse === "recevoir" ? clientGpsLat : null,
+        gps_arrivee_lng: typeCourse === "recevoir" ? clientGpsLng : null,
+        recuperationGPS: false,
+        livraisonGPS: typeCourse === "recevoir" && !!clientGpsLat,
+        expediteur_gps_available: false,
+        expediteur_gps_lat: null,
+        expediteur_gps_lng: null,
+        prix_propose: 0,
+      });
 
   const [formData, setFormData] = useState(initialData);
 
@@ -319,6 +320,10 @@ export default function CourseExterneFormSync() {
     },
   };
   const queryClient = useQueryClient();
+  const submitRequestIdRef = useRef(null);
+  const submitSignatureRef = useRef(null);
+  const submissionSafetyTimerRef = useRef(null);
+  const tempCourseIdRef = useRef(null);
   const resetSubmission = () => {
     if (submissionSafetyTimerRef.current) {
       clearTimeout(submissionSafetyTimerRef.current);
@@ -326,15 +331,13 @@ export default function CourseExterneFormSync() {
     }
     setIsSubmitting(false);
   };
-
-  const submitRequestIdRef = useRef(null);
-  const submitSignatureRef = useRef(null);
   const createMutation = useMutation({
     mutationFn: async (data) => {
       let finalData = { ...data };
 
       // ─── OPTIMISTIC UI: Créer un brouillon temporaire pour affichage immédiat ──
       const tempId = `temp_${Date.now()}`;
+      tempCourseIdRef.current = tempId;
       const tempCourse = {
         ...data,
         id: tempId,
@@ -373,17 +376,13 @@ export default function CourseExterneFormSync() {
           }
         } catch (_) {}
       }
-      // Génération QR/codes dès la création
-      // Pour "recevoir" : pickup = chez l'expéditeur, delivery = chez le destinataire
+      // ── Correction 1: génération QR/PIN désactivée pour les nouvelles courses ──
+      // Les nouvelles courses utilisent le parcours bouton (COLIS RÉCUPÉRÉ / COLIS LIVRÉ).
+      // Les champs pickup_qr_token, pickup_code_4_digits, etc. restent null →
+      // useNewButtonParcours(course) retourne true → boutons directs au lieu de QR/PIN.
+      // ensureCourseCodeMessage n'est pas appelé car pickupPIN est null.
+      // Backward compat: les anciennes courses avec QR token conservent le parcours QR/PIN.
       if (!finalData.is_multi_colis) {
-        const pickupQrToken = crypto.randomUUID().replace(/-/g, "");
-        const deliveryQrToken = crypto.randomUUID().replace(/-/g, "");
-        const pickupCode4 = String(Math.floor(1000 + Math.random() * 9000));
-        const deliveryCode4 = String(Math.floor(1000 + Math.random() * 9000));
-        finalData.pickup_qr_token = pickupQrToken;
-        finalData.pickup_code_4_digits = pickupCode4;
-        finalData.delivery_qr_token = deliveryQrToken;
-        finalData.delivery_code_4_digits = deliveryCode4;
         finalData.pickup_confirmed_at = null;
         finalData.delivery_confirmed_at = null;
       }
@@ -398,14 +397,13 @@ export default function CourseExterneFormSync() {
       });
       // Safety: SDK peut wrapper la réponse dans { data: { ... } }
       const course = createResult?.data?.course || createResult?.course;
-      const isIdempotentReplay = createResult?.data?.idempotent === true || createResult?.idempotent === true;
 
       if (!course?.id) {
         throw new Error("Réponse invalide du serveur — course non créée");
       }
 
       // ── Créer les sous-colis si mode multi-colis (fire-and-forget) ──
-      if (!isIdempotentReplay && finalData.is_multi_colis && finalData._colisData?.length > 1) {
+      if (finalData.is_multi_colis && finalData._colisData?.length > 1) {
         Promise.all(finalData._colisData.map((c) =>
           base44.entities.ColisExterne.create({
             course_id: course.id,
@@ -433,10 +431,8 @@ export default function CourseExterneFormSync() {
       // ── Fire-and-forget : notifications et dispatch en arrière-plan ──
       // Le client ne doit PAS attendre la fin du dispatch pour voir sa confirmation.
       // La création de la course et la recherche du livreur sont deux étapes distinctes.
-      if (!isIdempotentReplay) {
-        base44.functions.invoke("notifyClientSync", { course_id: course.id }).catch(() => null);
-      }
-      if (!isIdempotentReplay && !formData.date_souhaitee) {
+      base44.functions.invoke("notifyClientSync", { course_id: course.id }).catch(() => null);
+      if (!formData.date_souhaitee) {
         base44.functions.invoke("dispatchExterneAuto", {
           action: "lancer_recherche_auto",
           course_id: course.id
@@ -454,9 +450,10 @@ export default function CourseExterneFormSync() {
       });
       // OPTIMISTIC UI: Remplacer le brouillon temporaire par la vraie course
       queryClient.setQueryData(['courses-externes-client'], (old) =>
-        (old || []).filter(c => !c.id?.startsWith('temp_')).concat(response)
+        (old || []).filter(c => c.id !== tempCourseIdRef.current).concat(response)
       );
       resetSubmission();
+      tempCourseIdRef.current = null;
       submitRequestIdRef.current = null;
       submitSignatureRef.current = null;
       localStorage.removeItem(STORAGE_KEY);
@@ -464,7 +461,7 @@ export default function CourseExterneFormSync() {
       queryClient.invalidateQueries({ queryKey: ['courses-externes-client'] });
 
       if (formData.date_souhaitee || response?.statut === "programmee") {
-        toast.success("Course programmée créée");
+        toast.success("Course programmee creee");
         navigate("/client", { replace: true });
         return;
       }
@@ -512,6 +509,7 @@ export default function CourseExterneFormSync() {
       queryClient.setQueryData(['courses-externes-client'], (old) => (old || []).filter(c => !c.id?.startsWith('temp_')));
       toast.error("Erreur : " + err.message);
       resetSubmission();
+      tempCourseIdRef.current = null;
     },
   });
 
@@ -529,9 +527,7 @@ export default function CourseExterneFormSync() {
     // ── Filelet de sécurité absolu : le bouton ne doit JAMAIS rester bloqué ──
     // Si isSubmitting est encore true après 30s, on force le reset.
     // Couvre TOUS les cas : ReferenceError, TypeError, crash réseau, etc.
-    if (submissionSafetyTimerRef.current) clearTimeout(submissionSafetyTimerRef.current);
     submissionSafetyTimerRef.current = setTimeout(() => {
-      submissionSafetyTimerRef.current = null;
       setIsSubmitting(prev => {
         if (prev) {
           console.error("[CREATE_CLIENT_TIMEOUT] isSubmitting encore true après 30s — force reset", {
@@ -565,7 +561,7 @@ export default function CourseExterneFormSync() {
     if (missingFields.length > 0) {
       console.warn("[CourseForm] Champs manquants :", missingFields);
       toast.error(`Champs manquants : ${missingFields.join(", ")}`);
-      resetSubmission();
+      setIsSubmitting(false);
       return;
     }
 
@@ -576,7 +572,7 @@ export default function CourseExterneFormSync() {
     } catch (err) {
       console.error("[CourseForm] Erreur auth:", err);
       toast.error("Session expirée ou problème de connexion. Rafraîchissez la page.");
-      resetSubmission();
+      setIsSubmitting(false);
       return;
     }
 
@@ -597,7 +593,7 @@ export default function CourseExterneFormSync() {
     if (clientFromDB?.bloque_frais_annulation) {
       toast.error("Votre compte est bloqué : frais d'annulation impayés supérieurs à 2 000 FCFA. Veuillez régulariser votre situation.");
       navigate("/payer-silgapp");
-      resetSubmission();
+      setIsSubmitting(false);
       return;
     }
 
@@ -605,7 +601,7 @@ export default function CourseExterneFormSync() {
     if (!courseCountryCode) {
       console.error("[CourseForm] country_code manquant sur clientFromDB:", clientFromDB);
       toast.error("Erreur : votre profil client n'a pas de pays. Veuillez contacter le support.");
-      resetSubmission();
+      setIsSubmitting(false);
       return;
     }
 
@@ -720,7 +716,7 @@ export default function CourseExterneFormSync() {
           const errMsg = validationRes.data.errors?.[0] || "Incohérence détectée dans les rôles";
           console.warn("[CourseForm] Validation rôles échouée :", errMsg);
           toast.error(errMsg);
-          resetSubmission();
+          setIsSubmitting(false);
           return;
         }
       } catch (err) {
@@ -759,24 +755,24 @@ export default function CourseExterneFormSync() {
     if (departGps?.ambiguous) {
       const names = departGps.suggestions.map(s => s.nom).join(", ");
       toast.error(`Point de départ ambigu : plusieurs quartiers correspondent (${names}). Sélectionnez-en un dans la liste.`);
-      resetSubmission();
+      setIsSubmitting(false);
       return;
     }
     if (!isMulti && arriveeGps?.ambiguous) {
       const names = arriveeGps.suggestions.map(s => s.nom).join(", ");
       toast.error(`Point d'arrivée ambigu : plusieurs quartiers correspondent (${names}). Sélectionnez-en un dans la liste.`);
-      resetSubmission();
+      setIsSubmitting(false);
       return;
     }
     // Blocage si aucun GPS disponible (sauf multi-colis où chaque colis a son propre GPS)
     if (!departGps || !departGps.lat) {
       toast.error(`Point de départ : ${GPS_BLOCK_MESSAGE}`);
-      resetSubmission();
+      setIsSubmitting(false);
       return;
     }
     if (!isMulti && (!arriveeGps || !arriveeGps.lat)) {
       toast.error(`Point d'arrivée : ${GPS_BLOCK_MESSAGE}`);
-      resetSubmission();
+      setIsSubmitting(false);
       return;
     }
 
@@ -789,7 +785,7 @@ export default function CourseExterneFormSync() {
       const prixClientSaisi = Number(formData.prix_propose) || 0;
       if (isHorsTarif && prixClientSaisi <= 0) {
         toast.error("Distance supérieure à 25 km — vous devez saisir un prix personnalisé avant de créer la course.");
-        resetSubmission();
+        setIsSubmitting(false);
         return;
       }
     }
@@ -806,6 +802,13 @@ export default function CourseExterneFormSync() {
       ? (colis[0]?.destinataire_telephone || "")
       : isDeplacement ? (formData.passager_telephone || "")
       : destinataireTel;
+    const prixClientValide = isMulti ? 0 : Number(formData.prix_propose || 0);
+
+    if (!isMulti && (!Number.isFinite(prixClientValide) || prixClientValide <= 0)) {
+      toast.error("Veuillez valider le prix de la course avant de commander.");
+      setIsSubmitting(false);
+      return;
+    }
 
     console.log("[CREATE_CLIENT_PRE_MUTATE]", {
       ts: Date.now(),
@@ -817,16 +820,13 @@ export default function CourseExterneFormSync() {
     });
 
     const _submissionSignature = JSON.stringify({
-      form: formData,
-      colis: isMulti ? colis : null,
-      country_code: courseCountryCode,
       tc: formData.type_course,
       ad: formData.adresse_depart,
       aa: adresseArriveeFinale,
       et: expediteurTel,
       dt: destinataireTelFinal,
       dn: destinataireNomFinal,
-      pp: isMulti ? 0 : (formData.prix_propose || prixEstime),
+      pp: prixClientValide,
       ds: formData.date_souhaitee,
       pt: isDeplacement ? (formData.passager_telephone || "") : "",
       im: isMulti,
@@ -869,13 +869,13 @@ export default function CourseExterneFormSync() {
       // prix_propose_client = prix réellement choisi par le client (formData.prix_propose)
       prix_estimate: isMulti ? 0 : prixEstime,
       prix_propose_admin: 0, // Jamais défini par le client — réservé à l'admin
-      prix_propose_client: isMulti ? 0 : (formData.prix_propose || prixEstime),
+      prix_propose_client: prixClientValide,
       distance_tarifaire_km: isMulti ? null : distanceTarifaireKm,
       distance_tarifaire_source: isMulti ? null : distanceTarifaireSource,
       // Un prix explicitement saisi par le client est TOUJOURS 'manual',
       // même s'il est numériquement égal à l'estimation. L'égalité ne signifie
       // pas que le client n'a pas validé ce prix.
-      pricing_mode: isMulti ? "automatic" : (formData.prix_propose ? "manual" : "automatic"),
+      pricing_mode: isMulti ? "automatic" : "manual",
       statut: formData.date_souhaitee ? "programmee" : "recherche_livreur",
       dispatch_status: "en_attente",
       date_souhaitee: formData.date_souhaitee || null,
@@ -893,20 +893,6 @@ export default function CourseExterneFormSync() {
     });
   };
 
-  const handleAjouterAutre = () => {
-    resetSubmission();
-    submitRequestIdRef.current = null;
-    submitSignatureRef.current = null;
-    setCourseCreated(false);
-    setCreatedCourse(null);
-    setInvitationModal(null);
-    setCurrentStep(0);
-    setFormData(freshData);
-    setColis(createColisDefaults(1));
-    localStorage.removeItem(STORAGE_KEY);
-    localStorage.removeItem(STEP_KEY);
-  };
-
   const handleNext = () => setCurrentStep((prev) => prev + 1);
   const handleBack = () => setCurrentStep((prev) => prev - 1);
   const handleGoToStep = (targetStep) => setCurrentStep(targetStep);
@@ -918,23 +904,16 @@ export default function CourseExterneFormSync() {
   };
 
   if (courseCreated && createdCourse) {
-    return <LivreurRechercheAnimation course={createdCourse} onAjouterAutre={handleAjouterAutre} />;
+    return <LivreurRechercheAnimation course={createdCourse} />;
   }
 
-  // Modal invitation WhatsApp — affiché après création réussie si contact hors SILGAPP
+  // ── Correction 1: invitation WhatsApp non bloquante ──
+  // Le client passe immédiatement à la recherche de livreur / suivi.
+  // L'invitation WhatsApp est diffusée en arrière-plan sans interrompre le flux.
   if (invitationModal && createdCourse) {
-    return (
-      <>
-        <LivreurRechercheAnimation course={createdCourse} onAjouterAutre={handleAjouterAutre} />
-        <InvitationWhatsAppModal
-          telephone={invitationModal.telephone}
-          nomContact={invitationModal.nom}
-          nomExpediteur={clientProfil?.nom || formData.client_nom || "Votre contact"}
-          onClose={() => { setInvitationModal(null); setCourseCreated(true); }}
-          onSend={() => { setInvitationModal(null); setCourseCreated(true); }}
-        />
-      </>
-    );
+    // Fire-and-forget: ne pas bloquer le suivi
+    setInvitationModal(null);
+    setCourseCreated(true);
   }
 
   // ── Blocage client pour frais d'annulation impayés ────────────────────────
@@ -970,7 +949,7 @@ export default function CourseExterneFormSync() {
     );
   }
 
-  const totalSteps = typeCourse === "deplacement" ? 5 : typeCourse === "recevoir" ? 4 : 5;
+  const totalSteps = 3;
 
   return (
     <div className="min-h-screen p-4" style={{ background: "#F8FAFC" }}>
@@ -1032,7 +1011,7 @@ export default function CourseExterneFormSync() {
                 country_code: clientProfil?.country_code || "UNKNOWN"
               });
               toast.error("Erreur lors de la création : " + (err?.message || "erreur inconnue"));
-              resetSubmission();
+              setIsSubmitting(false);
             });
           }}>
             <CourseStepForm

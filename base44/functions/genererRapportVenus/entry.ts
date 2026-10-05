@@ -13,19 +13,16 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const DATE_STR = (d) => d.toISOString().split('T')[0];
 
 export default async function handler(req) {
+  const base44 = createClientFromRequest(req);
+  const currentUser = await base44.auth.me().catch(() => null);
+  if (!currentUser || currentUser.role !== 'admin') {
+    return Response.json({ success: false, error: 'Admin requis' }, { status: 403 });
+  }
+
   const body = await req.json().catch(() => ({}));
   const type = body.type || 'matin';
   const countryCode = body.country_code || 'ALL';
 
-  const base44 = createClientFromRequest(req);
-
-  const currentUser = await base44.auth.me().catch(() => null);
-  if (!currentUser || currentUser.role !== 'admin') {
-    return Response.json(
-      { success: false, error: 'Accès refusé — les rapports VENUS sont réservés à l\'administrateur' },
-      { status: 403 }
-    );
-  }
   // ── 1. Calcul des périodes ──
   const now = new Date();
   const today = new Date(now.getTime());

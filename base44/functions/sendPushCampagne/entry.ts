@@ -1,5 +1,28 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
+// ═══════════════════════════════════════════════════════════════════════════
+// sendPushCampagne — Campagne push manuelle du Centre de notifications
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// PROBLÈME CORRIGÉ (2026-10-02) :
+//   La version précédente faisait 1 NotificationToken.update PAR TOKEN (via
+//   Promise.all → 100 appels SDK concurrents par batch). Avec ~205 tokens, cela
+//   générait ~208 appels SDK Base44, déclenchant le rate limiter de la plateforme
+//   → HTTP 500 "Rate limit exceeded".
+//
+//   FCM lui-même (fetch direct, ligne 71) n'était PAS le problème.
+//
+// CORRECTION :
+//   - Déduplication par token FCM (un token ne reçoit qu'une seule campagne)
+//   - Les appels FCM restent individuels (fetch, pas SDK, pas rate-limited)
+//   - Les updates NotificationToken sont regroupés en bulkUpdate (max 500 par appel)
+//   - PushCampagne n'est mis à jour qu'une seule fois à la fin
+//   - SDK calls: ~208 → ~3 (create campagne + bulkUpdate succès + bulkUpdate échecs + update final)
+//
+// NE MODIFIE PAS : Dispatch V2, notification "Nouvelle course", accepterCourseV2,
+//   canal officiel des nouvelles courses, TTL, RLS, heartbeat/GPS, finance, messagerie.
+// ═══════════════════════════════════════════════════════════════════════════
+
 const FCM_SCOPE = 'https://www.googleapis.com/auth/firebase.messaging';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const APP_URL = 'https://silga-dispatch-go.base44.app';
@@ -104,7 +127,6 @@ Deno.serve(async (req) => {
     const paysCible = pays || 'ALL';
 
     // ── ÉTAPE 1: Récupérer les tokens selon les filtres ─────────────────
-    // Tous les tokens actifs (sans filtre pays d'abord)
     const allTokens = await base44.asServiceRole.entities.NotificationToken.filter({
       actif: true,
     }, '-derniere_utilisation', 10000);
@@ -116,7 +138,6 @@ Deno.serve(async (req) => {
     } else if (cible === 'tous_livreurs') {
       filteredTokens = allTokens.filter(t => t.user_type === 'livreur');
     } else if (cible === 'livreurs_inactifs') {
-      // Livreurs dont le last_seen_at > 24h ou nul (inactifs long terme)
       const tousLivreurs = await base44.asServiceRole.entities.Livreur.filter({
         type_livreur: 'externe', actif: true, validation: 'valide',
       });
@@ -133,22 +154,18 @@ Deno.serve(async (req) => {
       }
       filteredTokens = allTokens.filter(t => t.user_type === 'livreur' && inactifs.has(t.user_email));
     }
-    // tous_utilisateurs: pas de filtre user_type
 
     // Filtrer par pays (si spécifié)
     if (paysCible !== 'ALL') {
-      // Pour les livreurs: filtrer via Livreur entity
       const livreurIds = new Set();
       const clientIds = new Set();
 
-      // Récupérer les livreurs du pays
       const livreursPays = await base44.asServiceRole.entities.Livreur.filter({
         country_code: paysCible,
         type_livreur: 'externe',
       });
       livreursPays.forEach(l => livreurIds.add(l.id));
 
-      // Récupérer les clients du pays
       const clientsPays = await base44.asServiceRole.entities.ClientExterne.filter({
         country_code: paysCible,
       });
@@ -168,12 +185,27 @@ Deno.serve(async (req) => {
     // Ne garder que les tokens natifs (pas les web_ tokens)
     const nativeTokens = filteredTokens.filter(t => !String(t.token).startsWith('web_'));
 
-    if (nativeTokens.length === 0) {
+    // ── DÉDUPLICATION PAR TOKEN FCM ─────────────────────────────────────
+    // Un même token ne doit recevoir la campagne qu'une seule fois.
+    const seenTokens = new Set();
+    const dedupedTokens = [];
+    let duplicatesRemoved = 0;
+    for (const t of nativeTokens) {
+      if (seenTokens.has(t.token)) {
+        duplicatesRemoved++;
+        continue;
+      }
+      seenTokens.add(t.token);
+      dedupedTokens.push(t);
+    }
+
+    if (dedupedTokens.length === 0) {
       return Response.json({
         success: false,
         error: 'Aucun token push natif trouvé pour ces critères',
         total_tokens: filteredTokens.length,
         native_tokens: 0,
+        duplicates_removed: duplicatesRemoved,
       });
     }
 
@@ -186,7 +218,7 @@ Deno.serve(async (req) => {
       type_destinataires: cible,
       admin_email: user.email,
       admin_nom: user.full_name,
-      nb_envoyes: nativeTokens.length,
+      nb_envoyes: dedupedTokens.length,
       nb_succes: 0,
       nb_echecs: 0,
       statut: 'en_cours',
@@ -235,64 +267,87 @@ Deno.serve(async (req) => {
       },
     };
 
-    // Ajouter l'image si fournie (Android seulement)
     if (image_url) {
       fcmPayload.android.notification.image = image_url;
     }
 
-    // ── ÉTAPE 5: Envoi par lots (batch de 100, délai entre lots) ────────
+    // ── ÉTAPE 5: Envoi FCM par lots + collecte des résultats ────────────
+    // FCM est appelé via fetch() direct (pas SDK → pas rate-limited par Base44).
+    // Les updates NotificationToken sont DIFFÉRÉS et regroupés en bulkUpdate.
     let successCount = 0;
     let failCount = 0;
+    const tokenUpdatesSuccess = []; // [{id, derniere_utilisation, ...}]
+    const tokenUpdatesFailed = [];   // [{id, actif, ...}]
     const BATCH_SIZE = 100;
     const DELAY_MS = 200;
+    const nowIso = new Date().toISOString();
 
-    for (let i = 0; i < nativeTokens.length; i += BATCH_SIZE) {
-      const batch = nativeTokens.slice(i, i + BATCH_SIZE);
+    for (let i = 0; i < dedupedTokens.length; i += BATCH_SIZE) {
+      const batch = dedupedTokens.slice(i, i + BATCH_SIZE);
       const results = await Promise.all(batch.map(async (item) => {
         const r = await sendOneFcm(projectId, accessToken, item.token, fcmPayload);
-        const nowIso = new Date().toISOString();
         if (!r.ok) {
           const errorCode = r.result?.error?.details?.[0]?.errorCode || r.result?.error?.status;
           const isInvalid = ['UNREGISTERED', 'INVALID_ARGUMENT'].includes(errorCode);
-          try {
-            await base44.asServiceRole.entities.NotificationToken.update(item.id, {
-              actif: isInvalid ? false : item.actif,
-              derniere_notif_statut: 'failed',
-              derniere_notif_titre: titre,
-              derniere_notif_date: nowIso,
-              fcm_error: JSON.stringify(r.result?.error || {}).slice(0, 300),
-            });
-          } catch (_) {}
-          return false;
-        }
-        try {
-          await base44.asServiceRole.entities.NotificationToken.update(item.id, {
-            derniere_utilisation: nowIso,
-            derniere_notif_statut: 'success',
+          // Collecter l'update (différé) au lieu d'appeler le SDK maintenant
+          tokenUpdatesFailed.push({
+            id: item.id,
+            actif: isInvalid ? false : item.actif,
+            derniere_notif_statut: 'failed',
             derniere_notif_titre: titre,
             derniere_notif_date: nowIso,
-            fcm_error: null,
+            fcm_error: JSON.stringify(r.result?.error || {}).slice(0, 300),
           });
-        } catch (_) {}
+          return false;
+        }
+        tokenUpdatesSuccess.push({
+          id: item.id,
+          derniere_utilisation: nowIso,
+          derniere_notif_statut: 'success',
+          derniere_notif_titre: titre,
+          derniere_notif_date: nowIso,
+          fcm_error: null,
+        });
         return true;
       }));
 
       successCount += results.filter(Boolean).length;
       failCount += results.filter(r => !r).length;
 
-      // Mettre à jour la progression en temps réel
-      await base44.asServiceRole.entities.PushCampagne.update(campagne.id, {
-        nb_succes: successCount,
-        nb_echecs: failCount,
-      });
-
       // Petit délai entre lots pour éviter de saturer FCM
-      if (i + BATCH_SIZE < nativeTokens.length) {
+      if (i + BATCH_SIZE < dedupedTokens.length) {
         await new Promise(r => setTimeout(r, DELAY_MS));
       }
     }
 
-    // ── ÉTAPE 6: Finaliser la campagne ──────────────────────────────────
+    // ── ÉTAPE 6: bulkUpdate des tokens (1 appel SDK au lieu de N) ───────
+    // bulkUpdate accepte jusqu'à 500 enregistrements par appel.
+    // Avec ~205 tokens, cela fait 1 appel au lieu de 205.
+    if (tokenUpdatesSuccess.length > 0) {
+      try {
+        for (let i = 0; i < tokenUpdatesSuccess.length; i += 500) {
+          await base44.asServiceRole.entities.NotificationToken.bulkUpdate(
+            tokenUpdatesSuccess.slice(i, i + 500)
+          );
+        }
+      } catch (e) {
+        console.error('[sendPushCampagne] bulkUpdate success error:', e?.message);
+      }
+    }
+
+    if (tokenUpdatesFailed.length > 0) {
+      try {
+        for (let i = 0; i < tokenUpdatesFailed.length; i += 500) {
+          await base44.asServiceRole.entities.NotificationToken.bulkUpdate(
+            tokenUpdatesFailed.slice(i, i + 500)
+          );
+        }
+      } catch (e) {
+        console.error('[sendPushCampagne] bulkUpdate failed error:', e?.message);
+      }
+    }
+
+    // ── ÉTAPE 7: Finaliser la campagne (1 seul update au lieu de N) ────
     await base44.asServiceRole.entities.PushCampagne.update(campagne.id, {
       statut: 'termine',
       nb_succes: successCount,
@@ -302,11 +357,20 @@ Deno.serve(async (req) => {
     return Response.json({
       success: true,
       campagne_id: campagne.id,
-      total_tokens: nativeTokens.length,
+      total_tokens: dedupedTokens.length,
+      duplicates_removed: duplicatesRemoved,
       succes: successCount,
       echecs: failCount,
     });
   } catch (error) {
-    return Response.json({ error: error.message }, { status: 500 });
+    // Détecter spécifiquement les erreurs de rate limit pour un message clair
+    const msg = error?.message || String(error);
+    if (msg.toLowerCase().includes('rate limit')) {
+      return Response.json({
+        error: 'Limite temporaire d\'envoi atteinte. Réessayez dans 30 secondes.',
+        detail: msg,
+      }, { status: 429 });
+    }
+    return Response.json({ error: msg }, { status: 500 });
   }
 });

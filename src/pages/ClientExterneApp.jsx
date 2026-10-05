@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useHeartbeat } from "@/hooks/useHeartbeat";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import { useDispatchConfig } from "@/hooks/useDispatchConfig";
 import { useClientNotifications } from "@/hooks/useClientNotifications";
 import { registerPushToken, consumePendingNotificationData } from "@/lib/notifications";
 import { usePushTokenRetry } from "@/hooks/usePushTokenRetry";
@@ -16,7 +17,7 @@ import { useQueryClient, useQuery } from "@tanstack/react-query";
 import {
   MapPin, Navigation, MessageCircle, User, Package,
   Clock, ChevronRight, TrendingUp, Loader2, ArrowLeft, RefreshCw, Wallet,
-  Store, UtensilsCrossed, Bell, Pill, Inbox, Car, Headphones, ShieldCheck,
+  Store, UtensilsCrossed, Bell, Inbox, Car, Headphones, ShieldCheck,
   Zap, CheckCircle2, RotateCcw
 } from "lucide-react";
 import LivreurRatingDialog from "@/components/client/LivreurRatingDialog";
@@ -55,6 +56,8 @@ const STATUTS_SUIVABLES_CLIENT = [
   COURSE_STATUSES.RECHERCHE_LIVREUR,
   ...STATUTS_ACTIFS_COURSE,
 ];
+
+const normalizeEmail = (value) => (value || "").trim().toLowerCase();
 
 function GPSBadge({ profil, onForceSync }) {
   const hasCoords = !!(profil?.latitude && profil?.longitude);
@@ -128,6 +131,10 @@ export default function ClientExterneApp() {
   useEffect(() => { checkStatusRef.current = checkStatus; });
   const canShowCodePromo = aUnCodePromo && !!(clientProfil?.user_email || clientProfil?.email);
 
+  // ── Configuration dynamique depuis le backend (Country + AppConfig) ──
+  // Alimente dispatchConfigStore → useHeartbeat lit les intervalles en temps réel.
+  useDispatchConfig(clientProfil?.country_code);
+
   useEffect(() => {
     if (ongletActif === "promo" && !canShowCodePromo) {
       setOngletActif("accueil");
@@ -151,24 +158,24 @@ export default function ClientExterneApp() {
     queryFn: () => base44.entities.Boutique.filter(partenaireFilter),
     initialData: [],
     enabled: !!clientProfil?.country_code,
-    staleTime: 15000,
-    refetchInterval: 30000,
+    staleTime: 120000,
+    refetchInterval: 300000,
   });
   const { data: restaurantsCarte = [] } = useQuery({
     queryKey: ["restaurants-carte-client", clientProfil?.country_code],
     queryFn: () => base44.entities.Restaurant.filter(partenaireFilter),
     initialData: [],
     enabled: !!clientProfil?.country_code,
-    staleTime: 15000,
-    refetchInterval: 30000,
+    staleTime: 120000,
+    refetchInterval: 300000,
   });
   const { data: pharmaciesCarte = [] } = useQuery({
     queryKey: ["pharmacies-carte-client", clientProfil?.country_code],
     queryFn: () => base44.entities.Pharmacie.filter(partenaireFilter),
     initialData: [],
     enabled: !!clientProfil?.country_code,
-    staleTime: 15000,
-    refetchInterval: 30000,
+    staleTime: 120000,
+    refetchInterval: 300000,
   });
   const partenairesCarte = useMemo(() => [
     ...boutiquesCarte.map(b => ({ ...b, _type: "boutique" })),
@@ -180,15 +187,29 @@ export default function ClientExterneApp() {
     queryKey: ["commandes-boutique-client-active", clientProfil?.id],
     queryFn: () => base44.entities.CommandeBoutique.filter({ client_id: clientProfil.id }, "-created_date", 50),
     enabled: !!clientProfil?.id,
-    refetchInterval: 10000,
+    refetchInterval: 60000,
   });
 
   const { data: commandesRestaurantClient = [] } = useQuery({
     queryKey: ["commandes-restaurant-client-active", clientProfil?.id],
     queryFn: () => base44.entities.CommandeRestaurant.filter({ client_id: clientProfil.id }, "-created_date", 50),
     enabled: !!clientProfil?.id,
-    refetchInterval: 10000,
+    refetchInterval: 60000,
   });
+
+  // ── Realtime : refresh immédiat des commandes client ──
+  // Le polling 60s reste le fallback de sécurité. La subscription déclenche
+  // un refresh quand une commande est créée/modifiée (statut, livreur, etc.).
+  useEffect(() => {
+    if (!clientProfil?.id) return;
+    const unsubBoutique = base44.entities.CommandeBoutique.subscribe(() => {
+      queryClient.invalidateQueries({ queryKey: ["commandes-boutique-client-active"] });
+    });
+    const unsubRestaurant = base44.entities.CommandeRestaurant.subscribe(() => {
+      queryClient.invalidateQueries({ queryKey: ["commandes-restaurant-client-active"] });
+    });
+    return () => { unsubBoutique(); unsubRestaurant(); };
+  }, [clientProfil?.id, queryClient]);
 
   const commandesActivesCount = useMemo(() => {
     const active = new Set(["commande_envoyee", "commande_recue", "paiement_verification", "paiement_valide", "en_preparation", "prete_recuperation", "livreur_assigne", "commande_recuperee", "en_livraison"]);
@@ -290,7 +311,7 @@ export default function ClientExterneApp() {
   // Pull-to-refresh
   const { pulling, refreshing } = usePullToRefresh(async () => {
     await loadProfil();
-    if (position && clientProfil) {
+    if (clientProfil) {
       await checkStatus(position, clientProfil);
     }
     await queryClient.invalidateQueries({ queryKey: ["livreurs"] });
@@ -311,7 +332,7 @@ export default function ClientExterneApp() {
   // Notifications push client — son + vibration pour expéditeurs et destinataires
   useClientNotifications(clientProfil?.user_email, (notif) => {
     // Recharger les courses si notification liée à une course
-    if (notif.course_id && clientProfil && position) {
+    if (notif.course_id && clientProfil) {
       checkStatus(position, clientProfil);
     }
   });
@@ -608,7 +629,7 @@ export default function ClientExterneApp() {
   // Polling automatique des courses actives toutes les 8s
   // syncGpsDestinataire est appelé uniquement dans le watch GPS (15s) pour éviter le rate limit
   useEffect(() => {
-    if (!onboardingDone || !clientProfil || !position) return;
+    if (!onboardingDone || !clientProfil) return;
     const interval = setInterval(() => {
       checkStatus(position, clientProfil);
     }, 8000); //  5s → 8s : checkStatus fait 4-5 requêtes imbriquées
@@ -622,7 +643,7 @@ export default function ClientExterneApp() {
     const unsubscribe = base44.entities.CourseExterne.subscribe((event) => {
       const profil = clientProfilRef.current;
       const pos = positionRef.current;
-      if (profil && pos) {
+      if (profil) {
         checkStatusRef.current?.(pos, profil);
       }
     });
@@ -715,6 +736,8 @@ export default function ClientExterneApp() {
   const loadProfil = async () => {
     try {
       const user = await base44.auth.me();
+      setUserId(user?.id || null);
+      userIdRef.current = user?.id || null;
       const clients = await base44.entities.ClientExterne.filter({ user_email: user.email });
       let profil;
       if (clients && clients.length > 0) {
@@ -730,6 +753,7 @@ export default function ClientExterneApp() {
         });
       }
       setClientProfil(profil);
+      checkStatus(positionRef.current, profil);
 
       // Heartbeat immédiat après chargement du profil (même sans GPS)
       // Cela mettra à jour last_seen_at et app_active pour TOUS les utilisateurs (anciens et nouveaux)
@@ -773,11 +797,24 @@ export default function ClientExterneApp() {
       const currentUserId = userIdRef.current;
       if (!currentUserId) return;
 
-      // 1. Courses créées par l'utilisateur
-      const coursesClient = await base44.entities.CourseExterne.filter({ created_by_id: currentUserId }, "-created_date", 20);
-      const actives = (coursesClient || []).filter(c => STATUTS_SUIVABLES_CLIENT.includes(c.statut));
+      const clientEmail = normalizeEmail(profil?.user_email || profil?.email);
 
-      // 2. Courses où l'utilisateur est destinataire
+      // 1. Courses rattachées au compte client.
+      // client_user_email est la source persistante pour les courses créées par backend/service role.
+      let coursesByEmail = [];
+      if (clientEmail) {
+        coursesByEmail = await base44.entities.CourseExterne.filter({ client_user_email: clientEmail }, "-created_date", 30);
+      }
+
+      // 2. Fallback historique : courses créées directement par l'utilisateur connecté.
+      const coursesClient = await base44.entities.CourseExterne.filter({ created_by_id: currentUserId }, "-created_date", 20);
+      const actives = [...(coursesByEmail || []), ...(coursesClient || [])].filter(c => {
+        if (!STATUTS_SUIVABLES_CLIENT.includes(c.statut)) return false;
+        const courseEmail = normalizeEmail(c.client_user_email);
+        return !courseEmail || !clientEmail || courseEmail === clientEmail || c.created_by_id === currentUserId;
+      });
+
+      // 3. Courses où l'utilisateur est destinataire
       let activesDestinataire = [];
       if (profil?.id) {
         const coursesDestinataire = await base44.entities.CourseExterne.filter({ destinataire_client_id: profil.id }, "-created_date", 20);
@@ -787,7 +824,7 @@ export default function ClientExterneApp() {
         );
       }
 
-      // 3. Courses où l'utilisateur est expéditeur (mode "recevoir") — IMPORTANT : miroir du mode expedier
+      // 4. Courses où l'utilisateur est expéditeur (mode "recevoir") — IMPORTANT : miroir du mode expedier
       let activesExpediteur = [];
       if (profil?.id) {
         const coursesExpediteur = await base44.entities.CourseExterne.filter({ expediteur_client_id: profil.id }, "-created_date", 20);
@@ -864,7 +901,6 @@ export default function ClientExterneApp() {
         setNotifications([]);
       }
 
-      await loadLivreursProches(pos);
     } catch (err) {
       console.error("Erreur vérification statut:", err);
     }
@@ -912,7 +948,7 @@ export default function ClientExterneApp() {
     };
     // Premier appel après 5s (laisser le temps à l'écran de se stabiliser)
     const initial = setTimeout(pollLivreurs, 5000);
-    const interval = setInterval(pollLivreurs, 30000);
+    const interval = setInterval(pollLivreurs, 120000);
     return () => { clearTimeout(initial); clearInterval(interval); };
   }, [clientProfil?.country_code, position]);
 
@@ -1239,7 +1275,7 @@ export default function ClientExterneApp() {
                     </div>
                     <div className="flex-1">
                       <p className="text-lg font-black text-gray-900">
-                        {coursesActives.length > 1 ? "Suivre mes courses" : "Suivre ma course"}
+                        SUIVRE LA COURSE
                       </p>
                       <p className="text-sm text-gray-800/80">
                         {coursesActives.length > 1
@@ -1270,7 +1306,7 @@ export default function ClientExterneApp() {
                 {/* 3. REFAIRE — historique */}
                 <button
                   className="w-full flex items-center gap-4 rounded-2xl bg-white border border-black/5 shadow-[0_8px_24px_rgba(15,23,42,0.07)] p-5 active:scale-[0.98] transition-all text-left hover:shadow-md"
-                  onClick={() => navigate("/client/suivi")}
+                  onClick={() => navigate("/client/refaire")}
                 >
                   <div className="w-14 h-14 rounded-2xl bg-green-50 flex items-center justify-center flex-shrink-0">
                     <RotateCcw className="w-7 h-7 text-green-600" />
@@ -1323,16 +1359,6 @@ export default function ClientExterneApp() {
                     <UtensilsCrossed className="w-5 h-5 text-white" />
                   </div>
                   <span className="text-[10px] font-semibold text-gray-600">Restaurants</span>
-                </button>
-
-                <button
-                  className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-white border border-black/5 shadow-sm active:scale-95 transition-all"
-                  onClick={() => navigate("/client/pharmacies")}
-                >
-                  <div className="w-10 h-10 rounded-xl bg-[#00a86b] flex items-center justify-center">
-                    <Pill className="w-5 h-5 text-white" />
-                  </div>
-                  <span className="text-[10px] font-semibold text-gray-600">Pharmacies</span>
                 </button>
               </div>
 

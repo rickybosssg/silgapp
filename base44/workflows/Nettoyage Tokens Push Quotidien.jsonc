@@ -1,0 +1,44 @@
+{
+  "name": "Nettoyage Tokens Push Quotidien",
+  "description": "Nettoyage quotidien des tokens push inactifs \u00e0 4h du matin : supprime les tokens morts, d\u00e9sactive les tokens avec erreurs FCM fatales ou inactifs depuis 30 jours.",
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "recurring",
+      "cron_expression": "0 4 * * *",
+      "one_time_date": null,
+      "timezone": "UTC",
+      "interval_value": null,
+      "interval_unit": null,
+      "interval_anchor": null,
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  },
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "nettoyage_tokens_push_quotidien",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "run_function": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "nettoyerTokensInactifs",
+            "args": {}
+          },
+          "then": "end"
+        }
+      }
+    ]
+  },
+  "x-base44-migrated-from-automation": {
+    "legacy_payload_function": "nettoyerTokensInactifs"
+  }
+}

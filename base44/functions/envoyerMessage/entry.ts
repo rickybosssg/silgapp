@@ -80,10 +80,11 @@ Deno.serve(async (req) => {
       realName = `${client.prenom || ''} ${client.nom || ''}`.trim() || client.telephone || 'Client';
       photoUrl = '';
     } else if (sender_type === 'admin') {
-      // sender_type='admin' est reserve au Super Admin SILGAPP.
-      // Les admins Enterprise ont silgapp_role='admin_entreprise' mais role !== 'admin'.
+      // ── SÉCURITÉ : sender_type='admin' réservé au Super Admin SILGAPP (user.role === 'admin') ──
+      // Empêche l'usurpation du rôle admin par un client, livreur ou Admin Enterprise.
+      // Admin Enterprise (silgapp_role='admin_entreprise') n'est PAS Super Admin → 403.
       if (user.role !== 'admin') {
-        return Response.json({ error: 'sender_type admin reserve au Super Admin SILGAPP' }, { status: 403 });
+        return Response.json({ error: 'sender_type admin réservé au Super Admin SILGAPP' }, { status: 403 });
       }
       // L'admin est déjà authentifié — utiliser user.email comme sender_id
       final_sender_id = user.email;
@@ -169,9 +170,10 @@ Deno.serve(async (req) => {
           const livreur = await base44.asServiceRole.entities.Livreur.get(c.livreur_id).catch(() => null);
           if (livreur) courseParticipants.push({ type: 'livreur', id: livreur.id });
         }
+        // ── Résoudre l'expéditeur ET le destinataire séparément (fix: || ne prenait qu'un seul) ──
         const clientIds = [c?.expediteur_client_id, c?.destinataire_client_id].filter(Boolean);
-        for (const clientId of clientIds) {
-          const client = await base44.asServiceRole.entities.ClientExterne.get(clientId).catch(() => null);
+        for (const cid of clientIds) {
+          const client = await base44.asServiceRole.entities.ClientExterne.get(cid).catch(() => null);
           if (client) courseParticipants.push({ type: 'client', id: client.id });
         }
         const admins = await base44.asServiceRole.entities.User.filter({ role: 'admin' });
@@ -222,8 +224,6 @@ Deno.serve(async (req) => {
 
     const pushTitle = `💬 Nouveau message de ${realName}`;
     const recipients = new Set(); // emails des destinataires (déduit pour éviter les doublons)
-    const adminInboxIds = new Map();
-    let messageCountryCode = 'ALL';
 
     try {
       // ── 5a. Messages dans une COURSE → notifier l'autre partie ──
@@ -231,7 +231,6 @@ Deno.serve(async (req) => {
         const courses = await base44.asServiceRole.entities.CourseExterne.filter({ id: course_id });
         if (courses && courses.length > 0) {
           const c = courses[0];
-          messageCountryCode = String(c.country_code || 'ALL').trim().toUpperCase();
 
           // Résoudre l'email du livreur
           if (sender_type !== 'livreur' && c.livreur_id) {
@@ -239,10 +238,10 @@ Deno.serve(async (req) => {
             if (livreur?.user_email) recipients.add(JSON.stringify({ email: livreur.user_email, user_type: 'livreur', livreur_id: livreur.id }));
           }
 
-          // Résoudre l'email des clients (expéditeur et destinataire si distincts)
+          // Résoudre l'email du client (expéditeur ou destinataire)
           if (sender_type !== 'client') {
-            const clientIds = [c.expediteur_client_id, c.destinataire_client_id].filter(Boolean);
-            for (const clientId of clientIds) {
+            const clientId = c.expediteur_client_id || c.destinataire_client_id;
+            if (clientId) {
               const client = await base44.asServiceRole.entities.ClientExterne.get(clientId).catch(() => null);
               if (client?.user_email) recipients.add(JSON.stringify({ email: client.user_email, user_type: 'client' }));
             }
@@ -252,11 +251,7 @@ Deno.serve(async (req) => {
           if (sender_type !== 'admin') {
             const admins = await base44.asServiceRole.entities.User.filter({ role: 'admin' });
             for (const a of admins || []) {
-              const adminCountry = String(a.country_code || '').trim().toUpperCase();
-              const isCountryAdmin = a.admin_type === 'pays' && !!adminCountry;
-              if (a.email && (!isCountryAdmin || adminCountry === messageCountryCode)) {
-                recipients.add(JSON.stringify({ email: a.email, user_type: 'admin', country_code: messageCountryCode }));
-              }
+              if (a.email) recipients.add(JSON.stringify({ email: a.email, user_type: 'admin' }));
             }
           }
         }
@@ -267,9 +262,6 @@ Deno.serve(async (req) => {
         const convs = await base44.asServiceRole.entities.Conversation.filter({ id: conversation_id });
         if (convs && convs.length > 0) {
           const conv = convs[0];
-          if (messageCountryCode === 'ALL') {
-            messageCountryCode = String(conv.country_code || conv.pays_code || 'ALL').trim().toUpperCase();
-          }
           let participants = [];
           try { participants = JSON.parse(conv.participants || '[]'); } catch {}
 
@@ -300,16 +292,12 @@ Deno.serve(async (req) => {
               }
             } else if (p.type === 'admin') {
               if (p.id && p.id.includes('@')) {
-                recipients.add(JSON.stringify({ email: p.id, user_type: 'admin', country_code: messageCountryCode }));
+                recipients.add(JSON.stringify({ email: p.id, user_type: 'admin' }));
               } else {
                 // Si pas d'email direct, notifier tous les admins
                 const admins = await base44.asServiceRole.entities.User.filter({ role: 'admin' });
                 for (const a of admins || []) {
-                  const adminCountry = String(a.country_code || '').trim().toUpperCase();
-                  const isCountryAdmin = a.admin_type === 'pays' && !!adminCountry;
-                  if (a.email && (!isCountryAdmin || messageCountryCode === 'ALL' || adminCountry === messageCountryCode)) {
-                    recipients.add(JSON.stringify({ email: a.email, user_type: 'admin', country_code: messageCountryCode }));
-                  }
+                  if (a.email) recipients.add(JSON.stringify({ email: a.email, user_type: 'admin' }));
                 }
               }
             }
@@ -317,13 +305,20 @@ Deno.serve(async (req) => {
         }
       }
 
-      // ── 5c. Créer l'Inbox persistante AVANT le push Admin ──
+      // ── 5c. Créer d'abord les Inbox admin, puis envoyer les push ──
+      // Règle : un push Admin doit pointer vers un élément persistant déjà créé.
+      const adminInboxIds = new Map<string, string | null>();
       if (sender_type !== 'admin') {
+        const adminRecipients = [];
         for (const recipientStr of recipients) {
           try {
-            const admin = JSON.parse(recipientStr);
-            if (admin.user_type !== 'admin') continue;
-            const inboxId = await createAdminInboxItem(base44, {
+            const r = JSON.parse(recipientStr);
+            if (r.user_type === 'admin') adminRecipients.push(r);
+          } catch (_) {}
+        }
+        for (const admin of adminRecipients) {
+          try {
+            const inboxItemId = await createAdminInboxItem(base44, {
               type: 'message',
               priority: 'P2',
               title: pushTitle,
@@ -333,12 +328,14 @@ Deno.serve(async (req) => {
               course_id: course_id || undefined,
               conversation_id: conversation_id || undefined,
               message_id: message.id,
-              country_code: admin.country_code || messageCountryCode,
+              country_code: 'ALL',
               action_url: conversation_id ? `/admin/messages?conv=${conversation_id}` : (course_id ? `/admin/messages?course=${course_id}` : '/admin/centre-notifications'),
               deduplication_key: `INBOX_MSG_${message.id}_${admin.email}`,
             });
-            if (inboxId) adminInboxIds.set(admin.email, inboxId);
-          } catch (_) {}
+            adminInboxIds.set(admin.email, inboxItemId);
+          } catch (_) {
+            adminInboxIds.set(admin.email, null);
+          }
         }
       }
 

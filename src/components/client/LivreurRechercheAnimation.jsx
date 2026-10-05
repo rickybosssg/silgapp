@@ -26,17 +26,13 @@ const messages = [
   "En attente de confirmation...",
 ];
 
-export default function LivreurRechercheAnimation({ course, onRelancer, onAjouterAutre }) {
+export default function LivreurRechercheAnimation({ course, onRelancer }) {
   const navigate = useNavigate();
   const [showAnnulerDialog, setShowAnnulerDialog] = useState(false);
   const [currentMessage, setCurrentMessage] = useState(0);
   const [aucunLivreur, setAucunLivreur] = useState(false);
 
   const handleAjouterAutre = () => {
-    if (onAjouterAutre) {
-      onAjouterAutre();
-      return;
-    }
     // Réinitialiser le brouillon pour une nouvelle course fraîche
     try {
       localStorage.removeItem("silgapp_course_draft");
@@ -67,7 +63,7 @@ export default function LivreurRechercheAnimation({ course, onRelancer, onAjoute
     if (!courseData) return;
     // Rediriger si un livreur a accepté
     if (courseData.statut === "livreur_en_route" || courseData.dispatch_status === "accepte") {
-      navigate("/client/suivi", { state: { course_id: courseData.id } });
+      navigate("/client/suivi");
     }
     // Fermée automatiquement après 4 min sans livreur → afficher l'écran "Aucun livreur"
     if (courseData.statut === "annulee" && courseData.dispatch_status === "expire") {
@@ -141,7 +137,7 @@ export default function LivreurRechercheAnimation({ course, onRelancer, onAjoute
           <PrixManuelInlineCard
             course={liveCourse}
             devise={liveCourse.devise || "FCFA"}
-            onAccepted={() => navigate("/client/suivi", { state: { course_id: course.id } })}
+            onAccepted={() => navigate("/client/suivi")}
             onRefused={() => { /* le polling reprendra automatiquement */ }}
             onAnnuler={() => setShowAnnulerDialog(true)}
           />
@@ -223,7 +219,7 @@ export default function LivreurRechercheAnimation({ course, onRelancer, onAjoute
           <div className="space-y-2">
             <Button
               className="w-full bg-primary text-white hover:bg-primary/90"
-              onClick={() => navigate("/client/suivi", { state: { course_id: course.id } })}
+              onClick={() => navigate("/client/suivi")}
             >
               <Eye className="w-4 h-4 mr-2" />
               Suivre ma course

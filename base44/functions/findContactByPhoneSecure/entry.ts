@@ -38,8 +38,7 @@ export default async function(req) {
     }
 
     // Générer toutes les variantes du numéro (format local + international + avec/sans +)
-    const normalized = normalizePhone(phone, countryCode);
-    const variants = phoneVariants(normalized);
+    const variants = phoneVariants(phone);
     if (!variants || variants.length === 0) {
       return Response.json({ found: false });
     }
@@ -57,21 +56,24 @@ export default async function(req) {
         });
         if (results && results.length > 0) {
           for (const r of results) {
-            if (countryCode && r.country_code && r.country_code !== countryCode) continue;
-            const identity = normalizePhone(r.telephone_normalized || r.telephone, r.country_code || countryCode);
-            if (identity !== normalized) continue;
             if (!seenIds.has(r.id)) { seenIds.add(r.id); allMatches.push(r); }
           }
         }
       } catch (_) {}
-    }
-    // Query the normalized index once, including when the input was already normalized.
-    if (normalized) {
-      const results = await base44.asServiceRole.entities.ClientExterne.filter({ telephone_normalized: normalized });
-      for (const r of results || []) {
-        if (countryCode && r.country_code && r.country_code !== countryCode) continue;
-        if (!seenIds.has(r.id)) { seenIds.add(r.id); allMatches.push(r); }
-      }
+      // Aussi chercher avec le format normalisé (telephone_normalized)
+      try {
+        const normalized = normalizePhone(phone, countryCode);
+        if (normalized && normalized !== v) {
+          const results = await base44.asServiceRole.entities.ClientExterne.filter({
+            telephone_normalized: normalized
+          });
+          if (results && results.length > 0) {
+            for (const r of results) {
+              if (!seenIds.has(r.id)) { seenIds.add(r.id); allMatches.push(r); }
+            }
+          }
+        }
+      } catch (_) {}
     }
     // Priorité : préférer le client avec un compte SILGAPP (user_email renseigné)
     if (allMatches.length > 0) {

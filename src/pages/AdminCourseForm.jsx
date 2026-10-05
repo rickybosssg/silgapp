@@ -9,6 +9,7 @@ import { ArrowLeft, Send, Loader2, Sparkles, Navigation, Check, Zap } from "luci
 import { useAdminContext } from "@/hooks/useAdminContext";
 import { useAdminCourseWindows } from "@/context/AdminCourseWindowsContext";
 import MapPickerModal from "@/components/admin/MapPickerModal";
+import CourseWindowStack from "@/components/admin/CourseWindowStack";
 import ClientPhoneDetector from "@/components/crm/ClientPhoneDetector";
 import SmartAddressPicker from "@/components/crm/SmartAddressPicker";
 import { upsertCourseAddresses } from "@/lib/addressBook";
@@ -331,14 +332,14 @@ export default function AdminCourseForm() {
         exactLng: gpsDepart?.lng,
         quartierName: quartierDepart,
         quartiers,
-        source: gpsDepartSource || null,
+        source: gpsDepartSource,
       });
       const arriveeGps = resolveGpsForCourse({
         exactLat: gpsArrivee?.lat,
         exactLng: gpsArrivee?.lng,
         quartierName: quartierArrivee,
         quartiers,
-        source: gpsArriveeSource || null,
+        source: gpsArriveeSource,
       });
 
       // ── Gestion des ambiguïtés : ne jamais choisir silencieusement ──
@@ -752,6 +753,10 @@ export default function AdminCourseForm() {
                 value={adresseDepart}
                 onChange={(text) => {
                   setAdresseDepart(text);
+                  // ── INVALIDATION IMMÉDIATE des anciennes coordonnées ──
+                  // Si l'utilisateur modifie le texte sans sélectionner une suggestion,
+                  // les anciennes coordonnées GPS sont effacées pour empêcher qu'une
+                  // adresse nouvellement saisie hérite des coordonnées précédentes.
                   setGpsDepart(null);
                   setGpsDepartSource(null);
                 }}
@@ -800,6 +805,7 @@ export default function AdminCourseForm() {
                 value={adresseArrivee}
                 onChange={(text) => {
                   setAdresseArrivee(text);
+                  // ── INVALIDATION IMMÉDIATE des anciennes coordonnées ──
                   setGpsArrivee(null);
                   setGpsArriveeSource(null);
                 }}
@@ -948,6 +954,9 @@ export default function AdminCourseForm() {
           La course sera automatiquement proposée aux livreurs disponibles
         </p>
       </div>
+
+      {/* Panneau des courses actives — affiche le statut en temps réel après validation */}
+      <CourseWindowStack />
 
       {/* Modals de sélection GPS */}
       <MapPickerModal

@@ -150,6 +150,13 @@ export default function LivreurRegistrationForm({ user, onComplete }) {
         silga_score_data_points: 0,
       });
 
+      // Garantir le CodePromo personnel du livreur (backend, idempotent)
+      try {
+        await base44.functions.invoke("ensureLivreurCodePromo", {});
+      } catch (e) {
+        console.error("[LivreurRegistrationForm] Erreur code promo:", e?.message);
+      }
+
       onComplete?.();
     } catch (err) {
       setError(err?.message || "Erreur lors de l'envoi de la demande.");

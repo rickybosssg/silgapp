@@ -1,0 +1,44 @@
+{
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "recurring",
+      "cron_expression": "0 */6 * * *",
+      "one_time_date": null,
+      "timezone": "Africa/Ouagadougou",
+      "interval_value": null,
+      "interval_unit": null,
+      "interval_anchor": null,
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  },
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "sync_meta_ads_spend",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "sync_spend": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "syncMetaAdsSpend"
+          },
+          "then": "end",
+          "x-base44": {
+            "title": "Sync d\u00e9penses Meta Ads",
+            "description": "Lecture seule \u2014 7 derniers jours"
+          }
+        }
+      }
+    ]
+  },
+  "description": "Synchronise les d\u00e9penses et statistiques r\u00e9elles du compte publicitaire Meta Ads vers GrowthSpend. Lecture uniquement \u2014 aucune modification de campagne.",
+  "name": "Sync Meta Ads Spend (6h)"
+}

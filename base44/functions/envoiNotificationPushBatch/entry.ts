@@ -4,7 +4,7 @@ import {
   selectLatestNativeTokens, normalizeCountryCode,
   ANDROID_CHANNEL_ID, ANDROID_CLICK_ACTION, APP_URL,
 } from '../../shared/fcmUtils.ts';
-import { mettreAJourStatutPush } from '../../shared/dispatchNotifications.ts';
+import { mettreAJourStatutPush, mettreAJourStatutPushBulk } from '../../shared/dispatchNotifications.ts';
 
 const STATUTS_ACTIFS_COURSE = [
   'recherche_livreur', 'livreur_en_route', 'client_contacte', 'en_route_expediteur',
@@ -184,16 +184,17 @@ Deno.serve(async (req) => {
     let succes = 0;
     let echecs = 0;
     const livreurIdsWithoutTokens = [];
+    // 📦 Collecteurs pour bulk updates (éliminent les N+1 sur NotificationToken et DispatchNotification)
+    const tokenUpdates = [];
+    const dispatchStatutUpdates = [];
 
     for (const livreur of livreursEligibles) {
       const tokens = pushableTokensByLivreur.get(livreur.id);
       if (!tokens || tokens.length === 0) {
         livreurIdsWithoutTokens.push(livreur.id);
-        // FIX TÉLÉMÉTRIE : marquer la DispatchNotification comme 'sans_token'
-        // si elle existe encore en statut 'notifie' (le token a pu être supprimé
-        // entre la création de la notification et l'envoi du push).
+        // 📦 Collecter pour bulk : marquer la DispatchNotification comme 'sans_token'
         if (course_id) {
-          mettreAJourStatutPush(base44, course_id, livreur.id, 'sans_token').catch(() => null);
+          dispatchStatutUpdates.push({ livreur_id: livreur.id, statut: 'sans_token' });
         }
         echecs++;
         continue;
@@ -202,9 +203,9 @@ Deno.serve(async (req) => {
       const notifId = notifIdByLivreur.get(livreur.id) || '';
       const dataPayload = { ...dataPayloadBase, livreur_id: String(livreur.id), notification_id: String(notifId) };
 
-      // FIX TÉLÉMÉTRIE : marquer la DispatchNotification comme 'push_tente'
+      // 📦 Collecter pour bulk : marquer la DispatchNotification comme 'push_tente'
       if (course_id) {
-        mettreAJourStatutPush(base44, course_id, livreur.id, 'push_tente').catch(() => null);
+        dispatchStatutUpdates.push({ livreur_id: livreur.id, statut: 'push_tente' });
       }
 
       let livreurPushSuccess = false;
@@ -252,23 +253,27 @@ Deno.serve(async (req) => {
           if (!response.ok) {
             const errorCode = response.result?.error?.details?.[0]?.errorCode || response.result?.error?.status;
             const isInvalid = ['UNREGISTERED', 'INVALID_ARGUMENT'].includes(errorCode);
-            base44.asServiceRole.entities.NotificationToken.update(tokenItem.id, {
+            // 📦 Collecter pour bulk : update du NotificationToken après réponse FCM
+            tokenUpdates.push({
+              id: tokenItem.id,
               actif: isInvalid ? false : tokenItem.actif,
               derniere_notif_statut: 'failed',
               derniere_notif_titre: finalTitre,
               derniere_notif_date: nowIso,
               fcm_error: JSON.stringify(response.result?.error || {}).slice(0, 300),
-            }).catch(() => null);
+            });
             echecs++;
             livreurPushFailed = true;
           } else {
-            base44.asServiceRole.entities.NotificationToken.update(tokenItem.id, {
+            // 📦 Collecter pour bulk : update du NotificationToken après succès FCM
+            tokenUpdates.push({
+              id: tokenItem.id,
               derniere_utilisation: nowIso,
               derniere_notif_statut: 'success',
               derniere_notif_titre: finalTitre,
               derniere_notif_date: nowIso,
               fcm_error: null,
-            }).catch(() => null);
+            });
             succes++;
             livreurPushSuccess = true;
           }
@@ -280,11 +285,21 @@ Deno.serve(async (req) => {
         }
       }
 
-      // FIX TÉLÉMÉTRIE : mettre à jour le statut final de la DispatchNotification
+      // 📦 Collecter pour bulk : statut final de la DispatchNotification
       if (course_id) {
         const finalStatut = livreurPushSuccess ? 'push_succes' : (livreurPushFailed ? 'push_echec' : 'sans_token');
-        mettreAJourStatutPush(base44, course_id, livreur.id, finalStatut).catch(() => null);
+        dispatchStatutUpdates.push({ livreur_id: livreur.id, statut: finalStatut });
       }
+    }
+
+    // 📦 BULK : NotificationToken updates (1 appel pour tous les tokens)
+    if (tokenUpdates.length > 0) {
+      await base44.asServiceRole.entities.NotificationToken.bulkUpdate(tokenUpdates).catch(() => null);
+    }
+
+    // 📦 BULK : DispatchNotification statuts (regroupés par statut → max 3 updateMany)
+    if (dispatchStatutUpdates.length > 0 && course_id) {
+      await mettreAJourStatutPushBulk(base44, course_id, dispatchStatutUpdates);
     }
 
     console.log('[envoiNotificationPushBatch] FCM batch completed', {

@@ -20,6 +20,7 @@ export default function CourseDetailModal({ course, open, onClose, onRefresh }) 
   const [showMessages, setShowMessages] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+
   if (!course) return null;
 
   const currentStep = getProgressionStep(course);
@@ -199,6 +200,7 @@ export default function CourseDetailModal({ course, open, onClose, onRefresh }) 
             </button>
           </div>
 
+          {/* Annulation course — visible uniquement si non terminée */}
           {isCancellable && !showCancelConfirm && (
             <div className="border-t pt-3">
               <button
@@ -211,6 +213,7 @@ export default function CourseDetailModal({ course, open, onClose, onRefresh }) 
             </div>
           )}
 
+          {/* Confirmation d'annulation */}
           {showCancelConfirm && (
             <div className="border-t pt-3 space-y-3">
               <div className="rounded-lg bg-red-50 border border-red-200 p-3 flex items-start gap-2">

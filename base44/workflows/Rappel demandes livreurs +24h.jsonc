@@ -1,0 +1,46 @@
+{
+  "name": "Rappel demandes livreurs +24h",
+  "description": "Toutes les 2 heures, v\u00e9rifie les demandes livreurs en attente depuis plus de 24h et notifie l'admin",
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "interval",
+      "cron_expression": null,
+      "one_time_date": null,
+      "timezone": "UTC",
+      "interval_value": 6,
+      "interval_unit": "hours",
+      "interval_anchor": "2026-06-17T09:51:41.573000",
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  },
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "rappel_demandes_livreurs_24h",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "run_function": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "notifierDemandesLivreurs",
+            "args": {
+              "action": "rappel_24h"
+            }
+          },
+          "then": "end"
+        }
+      }
+    ]
+  },
+  "x-base44-migrated-from-automation": {
+    "legacy_payload_function": "notifierDemandesLivreurs"
+  }
+}

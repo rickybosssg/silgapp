@@ -66,8 +66,9 @@ Deno.serve(async (req) => {
       }, { status: 403 });
     }
 
-    // ── Isolation Enterprise : un admin entreprise ne peut annuler que ses courses ──
-    // Résolution exclusivement côté backend depuis l'utilisateur authentifié.
+    // ── [ENTERPRISE ISOLATION] Admin Enterprise ne peut annuler QUE les courses de son entreprise ──
+    // Résolution côté backend UNIQUEMENT — jamais confiance au frontend.
+    // normalizeEnterpriseId : null/undefined/"" → null (réseau public), "abc" → "abc" (entreprise).
     const userEnterpriseId = normalizeEnterpriseId(user?.enterprise_id ?? user?.data?.enterprise_id);
     if (userEnterpriseId) {
       const courseEnterpriseId = normalizeEnterpriseId(course.enterprise_id);
@@ -79,33 +80,41 @@ Deno.serve(async (req) => {
         }, { status: 403 });
       }
     }
+    // ── Super Admin (enterprise_id null) : peut annuler toute course ──
 
     const livreurId = course.livreur_id;
     let livreurLibere = false;
-    let livreurEmail = "";
     let courseRedispatch = false;
 
     // ── Libérer le livreur ────────────────────────────────────────────
     if (livreurId) {
       const livreur = await asService.entities.Livreur.get(livreurId).catch(() => null);
       if (livreur) {
-        livreurEmail = String(livreur.user_email || "").trim().toLowerCase();
         await asService.entities.Livreur.update(livreurId, {
           statut: livreur.manual_hors_ligne === true ? "hors_ligne" : "disponible",
         });
         livreurLibere = true;
 
-        // Notification BDD + push FCM au livreur via le point d'entree centralise.
-        if (livreurEmail) {
-          await asService.functions.invoke("envoiNotificationPush", {
+        // Notification au livreur
+        if (livreur.user_email) {
+          await asService.entities.Notification.create({
             titre: "ℹ Course annulée",
             message: `La course #${course_id.slice(-8)} a été annulée. ${source === "livreur" ? "Vous êtes maintenant disponible." : ""}`,
             type: "course_annulee",
             course_id,
-            destinataire_email: livreurEmail,
+            destinataire_email: livreur.user_email,
+            lue: false,
+          }).catch(() => null);
+
+          await base44.asServiceRole.functions.invoke('envoiNotificationPush', {
+            titre: "ℹ Course annulée",
+            message: `La course #${course_id.slice(-8)} a été annulée.`,
+            type: "course_annulee",
             livreur_id: livreurId,
+            destinataire_email: livreur.user_email,
             user_type: "livreur",
             category: "annulation",
+            course_id,
           }).catch(() => null);
         }
       }
@@ -189,7 +198,7 @@ Deno.serve(async (req) => {
         delivery_confirmed_at: null,
         accepted_by_livreur_id: null,
         accepted_at: null,
-        notes: (course.notes || "") + ` | [ANNULÉ LIVREUR → EN ATTENTE ADMIN] ${motif || "non spécifié"}`,
+        notes: (course.notes || "") + ` | [ANNULÉ LIVREUR → REDISPATCH] ${motif || "non spécifié"}`,
       };
 
       // Nettoyer prix manuel si applicable
@@ -289,9 +298,7 @@ Deno.serve(async (req) => {
       // Les instructions système (redispatch) sont affichées séparément côté frontend
       // (SystemAlertModal) en tant que bloc statique, jamais concaténées au motif.
       await asService.entities.Notification.create({
-        titre: isCourseClient
-          ? "⏸ Course client annulée par le livreur — recherche relancée"
-          : "⏸ Course admin annulée par le livreur — redispatch requis",
+        titre: "⏸ Course annulée par le livreur — redispatch requis",
         message: `Le livreur ${course.livreur_nom || "?"} a annulé la course #${course_id.slice(-8)} (${course.adresse_depart || "?"} → ${course.adresse_arrivee || "?"}). Motif: ${motif || "non spécifié"}. ${motif_detail ? `Détail: ${motif_detail}` : "Aucun détail fourni par le livreur."}`,
         type: "alerte_critique_dispatch",
         course_id,
@@ -325,9 +332,7 @@ Deno.serve(async (req) => {
 
         await asService.entities.Notification.create({
           titre: "⏸ Votre course est en attente",
-          message: isCourseClient
-            ? `Votre livreur a annulé la course (motif: ${motifLabel}). La recherche d'un nouveau livreur a été relancée automatiquement.`
-            : `Votre livreur a annulé la course (motif: ${motifLabel}). Votre demande est en attente de relance par notre équipe.`,
+          message: `Votre livreur a annulé la course (motif: ${motifLabel}). Votre demande est en attente — un nouveau livreur vous sera assigné après validation de notre équipe.`,
           type: "course_modifiee",
           course_id,
           destinataire_email: clientEmail,
@@ -336,9 +341,7 @@ Deno.serve(async (req) => {
 
         await base44.asServiceRole.functions.invoke('envoiNotificationPush', {
           titre: "⏸ Votre course est en attente",
-          message: isCourseClient
-            ? `Votre livreur a annulé (motif: ${motifLabel}). La recherche d'un nouveau livreur a été relancée automatiquement.`
-            : `Votre livreur a annulé (motif: ${motifLabel}). Votre demande est en attente de relance par notre équipe.`,
+          message: `Votre livreur a annulé (motif: ${motifLabel}). Votre demande est en attente de validation par notre équipe.`,
           type: "course_modifiee",
           destinataire_email: clientEmail,
           user_type: "client",
@@ -380,8 +383,6 @@ Deno.serve(async (req) => {
       const sourceLabel = source === "client" ? "CLIENT" : "ADMIN";
       const annulData = {
         statut: "annulee",
-        // Une annulation client/admin est terminale et ne doit plus jamais
-        // rester visible dans le fil Dispatch V2.
         dispatch_status: "expire",
         date_annulation: now,
         livreur_id: "",
@@ -404,23 +405,6 @@ Deno.serve(async (req) => {
 
       await asService.entities.CourseExterne.update(course_id, annulData);
 
-      // Alerter chaque administrateur autorise pour ce pays. La fonction push
-      // cree aussi la notification en base, ce qui evite les doublons.
-      const admins = await asService.entities.User.filter({ role: "admin" }).catch(() => []);
-      for (const admin of admins || []) {
-        if (!admin.email) continue;
-        if (admin.admin_type === "pays" && admin.country_code && admin.country_code !== course.country_code) continue;
-        await asService.functions.invoke("envoiNotificationPush", {
-          titre: source === "client" ? "Course annulée par le client" : "Course annulée par l'administration",
-          message: `La course #${course_id.slice(-8)} a été annulée définitivement.${motif ? ` Motif : ${motif}` : ""}`,
-          type: "course_annulee",
-          course_id,
-          destinataire_email: admin.email,
-          user_type: "admin",
-          category: "annulation",
-        }).catch(() => null);
-      }
-
       // Archiver notifications
       const notifs = await asService.entities.Notification.filter({
         course_id,
@@ -428,6 +412,21 @@ Deno.serve(async (req) => {
       }).catch(() => []);
       for (const n of notifs) {
         await asService.entities.Notification.update(n.id, { lue: true }).catch(() => null);
+      }
+
+      const admins = await asService.entities.User.filter({ role: "admin" }).catch(() => []);
+      for (const admin of admins || []) {
+        if (admin?.admin_type === "pays" && admin.country_code && course.country_code !== admin.country_code) continue;
+        if (!admin?.email) continue;
+        await base44.asServiceRole.functions.invoke('envoiNotificationPush', {
+          titre: "Course annulée",
+          message: `La course #${course_id.slice(-8)} a été annulée.`,
+          type: "course_annulee",
+          destinataire_email: admin.email,
+          user_type: "admin",
+          category: "annulation",
+          course_id,
+        }).catch(() => null);
       }
     }
 

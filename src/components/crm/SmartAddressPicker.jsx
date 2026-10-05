@@ -136,6 +136,7 @@ export default function SmartAddressPicker({
         longitude: addr.longitude,
         quartier: addr.quartier,
         label: addr.adresse,
+        type: "adresse",
       });
     }
   };

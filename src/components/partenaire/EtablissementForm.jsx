@@ -86,16 +86,10 @@ export default function EtablissementForm({ type, existing, partenaireId, userEm
 
   // Validation téléphone selon le pays — utilise phone_min_length / phone_max_length
   const paysConfig = countries.find(p => p.code === form.pays_code) || null;
-  const paysMinDigits = Number(paysConfig?.phone_min_length) || 8;
-  const paysMaxDigits = Number(paysConfig?.phone_max_length) || paysMinDigits;
-  const paysDigitsLabel = paysMinDigits === paysMaxDigits
-    ? `${paysMaxDigits}`
-    : `${paysMinDigits} à ${paysMaxDigits}`;
+  const paysDigits = paysConfig?.phone_max_length || paysConfig?.phone_min_length || 8;
   const telDigits = (form.telephone || "").replace(/\D/g, "");
-  const telDepotDigits = (form.telephone_depot || "").replace(/\D/g, "");
-  const isValidPhoneLength = (length) => length >= paysMinDigits && length <= paysMaxDigits;
-  const telValide = !form.telephone || isValidPhoneLength(telDigits.length);
-  const telDepotValide = !form.telephone_depot || isValidPhoneLength(telDepotDigits.length);
+  const telValide = !form.telephone || telDigits.length === paysDigits;
+  const telDepotValide = !form.telephone_depot || (form.telephone_depot.replace(/\D/g, "").length === paysDigits);
 
   const handleSave = async () => {
     // Validation des champs obligatoires — feedback visible
@@ -108,11 +102,11 @@ export default function EtablissementForm({ type, existing, partenaireId, userEm
       return;
     }
     if (form.telephone && !telValide) {
-      toast?.error?.(`Téléphone invalide : ${paysConfig?.nom || "ce pays"} requiert ${paysDigitsLabel} chiffres`);
+      toast?.error?.(`Téléphone invalide : ${paysConfig?.nom || "ce pays"} requiert ${paysDigits} chiffres`);
       return;
     }
     if (form.telephone_depot && !telDepotValide) {
-      toast?.error?.(`Numéro Mobile Money invalide : ${paysDigitsLabel} chiffres requis pour ${paysConfig?.nom || "ce pays"}`);
+      toast?.error?.(`Numéro Mobile Money invalide : ${paysDigits} chiffres requis pour ${paysConfig?.nom || "ce pays"}`);
       return;
     }
     setSaving(true);
@@ -316,19 +310,19 @@ export default function EtablissementForm({ type, existing, partenaireId, userEm
             <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wide">Contact & Paiement</h3>
           </div>
           <div>
-            <Label className="text-xs font-semibold text-gray-600">Téléphone ({paysDigitsLabel} chiffres pour {paysConfig?.nom || "votre pays"})</Label>
+            <Label className="text-xs font-semibold text-gray-600">Téléphone ({paysDigits} chiffres pour {paysConfig?.nom || "votre pays"})</Label>
             <div className="relative mt-1.5">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-mono">{paysConfig?.emoji_flag || ""}</span>
               <Input
                 value={form.telephone || ""}
-                onChange={e => set("telephone", e.target.value.replace(/\D/g, "").slice(0, paysMaxDigits))}
-                placeholder={`${paysDigitsLabel} chiffres`}
+                onChange={e => set("telephone", e.target.value.replace(/\D/g, "").slice(0, paysDigits))}
+                placeholder={`${paysDigits} chiffres`}
                 inputMode="numeric"
                 className={`h-12 rounded-xl text-sm font-mono tracking-wider pl-10 ${form.telephone && !telValide ? "border-red-400 ring-2 ring-red-100" : ""}`}
-                maxLength={paysMaxDigits}
+                maxLength={paysDigits}
               />
             </div>
-            {form.telephone && !telValide && <p className="text-[11px] text-red-500 mt-1 font-medium">⚠️ {telDigits.length}/{paysDigitsLabel} chiffres saisis</p>}
+            {form.telephone && !telValide && <p className="text-[11px] text-red-500 mt-1 font-medium">⚠️ {telDigits.length}/{paysDigits} chiffres saisis</p>}
           </div>
           <div>
             <Label className="text-xs font-semibold text-gray-600">Numéro Mobile Money (dépôt) *</Label>
@@ -336,10 +330,10 @@ export default function EtablissementForm({ type, existing, partenaireId, userEm
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-mono">{paysConfig?.emoji_flag || ""}</span>
               <Input
                 value={form.telephone_depot || ""}
-                onChange={e => set("telephone_depot", e.target.value.replace(/\D/g, "").slice(0, paysMaxDigits))}
-                placeholder={`${paysDigitsLabel} chiffres`}
+                onChange={e => set("telephone_depot", e.target.value.replace(/\D/g, "").slice(0, paysDigits))}
+                placeholder={`${paysDigits} chiffres`}
                 inputMode="numeric"
-                maxLength={paysMaxDigits}
+                maxLength={paysDigits}
                 className={`h-12 rounded-xl text-sm font-mono tracking-wider pl-10 ${form.telephone_depot && !telDepotValide ? "border-red-400 ring-2 ring-red-100" : ""}`}
               />
             </div>

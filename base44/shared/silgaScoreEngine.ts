@@ -2,31 +2,31 @@
  * ═══════════════════════════════════════════════════════════════════════
  * SILGA SCORE ENGINE — Mode observation uniquement
  * ═══════════════════════════════════════════════════════════════════════
- *
+ * 
  * Calcule un score 0-100 pour chaque livreur à partir des données
  * opérationnelles existantes. Le score n'est PAS utilisé dans le dispatch
  * V2 — il est affiché aux administrateurs pour observation et analyse.
- *
+ * 
  * Phase de calibration : on vérifie que les 6 critères et leurs poids
  * correspondent à la qualité terrain avant d'envisager une intégration.
- *
+ * 
  * ═══════════════════════════════════════════════════════════════════════
  * FORMULE DU SCORE (100 points) — NE PAS MODIFIER LES POIDS
  * ═══════════════════════════════════════════════════════════════════════
- *
+ * 
  * 1. Taux d'acceptation     (25 pts) — accepted / total_notified
  * 2. Taux de livraison       (25 pts) — delivered / accepted
  * 3. Taux d'annulation      (15 pts) — 1 - (annulations / accepted)
  * 4. Délai de réponse       (15 pts) — moyenne temps_reponse_sec
  * 5. Note moyenne clients   (10 pts) — note_moyenne / 5
  * 6. Fiabilité financière  (10 pts) — dette vs seuil
- *
+ * 
  * Niveaux:
  *   excellent: 80-100  (vert)
  *   bon:       60-79   (bleu)
  *   moyen:     40-59   (orange)
  *   faible:    0-39    (rouge)
- *
+ * 
  * Confiance (volume de données):
  *   faible:   < 5 data points (nouveau livreur, score peu fiable)
  *   moyenne:  5-19 data points

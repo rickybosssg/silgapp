@@ -1,36 +1,46 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 
 /**
  * useForteDemande — Hook client pour le mode Forte Demande.
  *
- * Interroge le backend toutes les 30s pour obtenir :
- *   - Le nombre de courses actives dans le pays du client
- *   - L'état Forte Demande (true/false) après hystérésis
- *   - La config (titre, message, seuils)
+ * Lit l'état Forte Demande directement depuis l'entité Country (GRATUIT).
+ * Aucun appel backend facturable — 0 polling getForteDemandeStatus.
  *
- * L'hystérésis (activation/retour) est gérée côté backend pour garantir
- * la cohérence entre tous les clients du même pays.
+ * L'hystérésis (activation/retour) est calculée côté backend par
+ * getForteDemandeStatus et persistée sur Country.forte_demande_active.
+ * Ce hook lit simplement l'état persisté + la config (titre, message).
+ *
+ * Une subscription Country met à jour l'affichage en temps réel
+ * lorsque forte_demande_active change (transition de seuil).
+ * La subscription ne déclenche AUCUNE fonction backend facturable.
  *
  * @param {string|null} countryCode — Code pays du client (ex: "BF")
- * @returns {{ loading: boolean, forteDemande: boolean, activeCount: number, config: object|null }}
+ * @returns {{ loading: boolean, forteDemande: boolean, activeCount: null, config: object|null }}
  */
 export function useForteDemande(countryCode) {
   const [loading, setLoading] = useState(true);
   const [forteDemande, setForteDemande] = useState(false);
-  const [activeCount, setActiveCount] = useState(0);
   const [config, setConfig] = useState(null);
 
-  const checkForteDemande = async (cc) => {
+  const applyCountryState = (country) => {
+    if (!country) return;
+    const isClientActive = !!country.forte_demande_client_actif;
+    setForteDemande(isClientActive && !!country.forte_demande_active);
+    setConfig({
+      actif: isClientActive,
+      seuil_activation: country.forte_demande_seuil_activation || 5,
+      seuil_retour: country.forte_demande_seuil_retour || 3,
+      titre: country.forte_demande_titre || "🔥 FORTE DEMANDE EN COURS",
+      message: country.forte_demande_message || "Plusieurs commandes sont en cours. Proposez un prix attractif pour augmenter vos chances de trouver rapidement un livreur.",
+    });
+  };
+
+  const loadCountryState = async (cc) => {
     if (!cc) return;
     try {
-      const res = await base44.functions.invoke("getForteDemandeStatus", {
-        country_code: cc,
-      });
-      const data = res?.data || res;
-      setForteDemande(!!data?.forte_demande);
-      setActiveCount(data?.active_count || 0);
-      setConfig(data?.config || null);
+      const countries = await base44.entities.Country.filter({ code: cc });
+      applyCountryState((countries || [])[0]);
     } catch (err) {
       console.error("[ForteDemande] Erreur:", err);
     } finally {
@@ -40,11 +50,24 @@ export function useForteDemande(countryCode) {
 
   useEffect(() => {
     if (!countryCode) return;
-    checkForteDemande(countryCode);
-    // Polling 30s — léger, agrégation backend, pas de téléchargement de toutes les courses
-    const interval = setInterval(() => checkForteDemande(countryCode), 30000);
-    return () => clearInterval(interval);
+    loadCountryState(countryCode);
+
+    // ── Subscription realtime — met à jour l'affichage lorsque
+    //    forte_demande_active change (transition de seuil persistée
+    //    par le backend). Aucun appel backend facturable. ──
+    const unsubscribe = base44.entities.Country.subscribe((event) => {
+      const data = event?.data;
+      if (data?.code === countryCode) {
+        applyCountryState(data);
+      }
+    });
+
+    return () => {
+      if (typeof unsubscribe === "function") unsubscribe();
+    };
   }, [countryCode]);
 
-  return { loading, forteDemande, activeCount, config };
+  // active_count n'est pas disponible via Country (calcul dynamique backend).
+  // Non approximé, non recalculé — null côté client. Non utilisé par les consommateurs.
+  return { loading, forteDemande, activeCount: null, config };
 }

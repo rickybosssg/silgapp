@@ -47,7 +47,7 @@ export const ALIGNED_DEFAULTS = {
   // Heartbeat intervals (AppConfig seeds)
   heartbeat_web_interval_ms: 30000,
   gps_native_interval_ms: 5000,
-  heartbeat_bg_interval_ms: 15000,
+  heartbeat_bg_interval_ms: 30000,
   gps_distance_filter_m: 3,
   // Dispatch V2 (AppConfig seeds — déjà en backend)
   dispatch_secours_v2_nb_livreurs: 10,
@@ -90,6 +90,21 @@ export function clampConfig(config) {
   return clamped;
 }
 
+// ── Subscription mechanism for reactive config updates ─────────────────────
+// Permet à useHeartbeat et autres hooks de réagir aux changements de config
+// sans nécessiter un re-render manuel. useSyncExternalStore-compatible.
+let configVersionCounter = 0;
+const listeners = new Set();
+
+export function subscribeToConfigChanges(callback) {
+  listeners.add(callback);
+  return () => { listeners.delete(callback); };
+}
+
+export function getConfigVersion() {
+  return configVersionCounter;
+}
+
 // ── Store en mémoire (module-level singleton) ─────────────────────────────
 let currentConfig = null;
 
@@ -126,6 +141,7 @@ export function getConfig() {
 export function setConfig(config) {
   const clamped = clampConfig(config);
   currentConfig = { ...ALIGNED_DEFAULTS, ...clamped };
+  configVersionCounter++;
   const cacheEntry = {
     config: currentConfig,
     config_version: currentConfig.config_version || Date.now(),
@@ -134,14 +150,17 @@ export function setConfig(config) {
   try {
     localStorage.setItem(CACHE_KEY, JSON.stringify(cacheEntry));
   } catch (_) {}
+  listeners.forEach((cb) => { try { cb(); } catch (_) {} });
   return currentConfig;
 }
 
 /**
  * Diagnostique : quelle configuration un téléphone utilise.
  * Retourne la version de config, la date de mise à jour et la source.
+ * NOTE: getConfigVersion() (compteur numérique réactif) est défini plus haut
+ * pour useSyncExternalStore. Cette fonction est un diagnostic séparé.
  */
-export function getConfigVersion() {
+export function getConfigDiagnostic() {
   try {
     const raw = localStorage.getItem(CACHE_KEY);
     if (raw) {

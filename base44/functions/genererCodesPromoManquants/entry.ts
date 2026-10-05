@@ -10,8 +10,17 @@ Deno.serve(async (req) => {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
 
+    // ── RÉSERVÉ AU SUPER ADMIN SILGAPP ──
+    // Mécanisme établi : user.role === 'admin' = Super Admin SILGAPP.
+    // Les admins Enterprise ont role='user' + silgapp_role='admin_entreprise' + enterprise_id.
+    // Défense en profondeur : bloquer tout user avec enterprise_id même si role='admin'
+    // (protection contre une escalade accidentelle d'un admin Enterprise vers role='admin').
     if (!user || user.role !== 'admin') {
-      return Response.json({ error: 'Non autorisé' }, { status: 403 });
+      return Response.json({ error: 'Réservé au Super Admin SILGAPP' }, { status: 403 });
+    }
+    const userData = (user as any).data || {};
+    if (userData.enterprise_id || (user as any).silgapp_role === 'admin_entreprise') {
+      return Response.json({ error: 'Réservé au Super Admin SILGAPP — admin Enterprise interdit' }, { status: 403 });
     }
 
     const results = {

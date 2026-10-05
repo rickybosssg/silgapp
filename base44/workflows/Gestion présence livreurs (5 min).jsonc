@@ -1,0 +1,44 @@
+{
+  "name": "Gestion pr\u00e9sence livreurs (5 min)",
+  "description": "Toutes les 5 minutes, v\u00e9rifie les livreurs disponibles et met hors_ligne ceux dont le heartbeat d\u00e9passe 60 minutes.",
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "interval",
+      "cron_expression": null,
+      "one_time_date": null,
+      "timezone": "UTC",
+      "interval_value": 10,
+      "interval_unit": "minutes",
+      "interval_anchor": "2026-06-14T14:15:22.723000",
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  },
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "gestion_pr_sence_livreurs_5_min",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "run_function": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "gestionPresenceLivreurs",
+            "args": {}
+          },
+          "then": "end"
+        }
+      }
+    ]
+  },
+  "x-base44-migrated-from-automation": {
+    "legacy_payload_function": "gestionPresenceLivreurs"
+  }
+}

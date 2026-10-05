@@ -3,6 +3,12 @@ import { emitDriverDebtThreshold } from '../../shared/venusAdminEventBus.ts';
 import { chargerConfigPays } from '../../shared/dispatchConstants.ts';
 import { recalculerSoldeLivreur } from '../../shared/recalculerSoldeLivreur.ts';
 
+function normalizeEnterpriseId(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  const normalized = String(value).trim();
+  return normalized ? normalized : null;
+}
+
 /**
  * Vérifie l'encours d'un livreur après chaque course terminée.
  * - Accumule la commission dans l'encours
@@ -53,21 +59,6 @@ Deno.serve(async (req) => {
         skipped: true,
         reason: 'course_deja_comptabilisee',
         encours_comptabilise_at: course.encours_comptabilise_at,
-      });
-    }
-
-    if (course.enterprise_id) {
-      const nowEnterprise = new Date().toISOString();
-      const claimEnterprise = await base44.asServiceRole.entities.CourseExterne.updateMany(
-        { id: courseId, encours_comptabilise_at: null },
-        { $set: { encours_comptabilise_at: nowEnterprise, encours_comptabilise_montant: 0 } }
-      );
-      return Response.json({
-        success: true,
-        skipped: true,
-        reason: claimEnterprise?.updated === 1 ? 'enterprise_course_public_encours_zero' : 'course_deja_comptabilisee_cas',
-        encours_comptabilise_at: nowEnterprise,
-        encours_comptabilise_montant: 0,
       });
     }
 
@@ -128,9 +119,17 @@ Deno.serve(async (req) => {
     //    pour une course à commission figée — cela transformerait rétroactivement
     //    une course 0% en commission normale.
     let commission = 0;
+    const storedCommission = Number(course.commission_silga) || 0;
+    const isPublicCourse = !normalizeEnterpriseId(course.enterprise_id);
+    const isLockedZeroPublicPromotion =
+      isPublicCourse &&
+      course.commission_locked_at &&
+      Number(course.commission_taux_applique) === 0 &&
+      (course.commission_mode === 'pass_zero' || course.commission_mode === 'happy_hour');
+
     if (course.commission_locked_at && course.commission_taux_applique != null) {
       // Commission figée à l'acceptation — utiliser la valeur stockée (0 pour Pass/Happy Hour)
-      commission = Number(course.commission_silga) || 0;
+      commission = storedCommission;
     } else if (course.commission_silga && course.commission_silga > 0) {
       commission = course.commission_silga;
     } else if (course.prix_final && course.prix_final > 0) {
@@ -144,6 +143,17 @@ Deno.serve(async (req) => {
         }, { status: 400 });
       }
       commission = Math.round(course.prix_final * (pct / 100));
+    }
+
+    // Garde-fou défensif : une course publique verrouillée à 0% (Pass/Happy Hour)
+    // ne doit jamais créer de dette, même si une ancienne écriture a stocké une
+    // commission_silga positive par erreur.
+    if (isLockedZeroPublicPromotion && commission > 0) {
+      console.warn(
+        `[ENCOURS] Anomalie corrigée: course ${courseId} ${course.commission_mode} verrouillée à 0% ` +
+        `mais commission_silga=${storedCommission}. Commission comptabilisable forcée à 0.`
+      );
+      commission = 0;
     }
 
     // ── FIX: course à 0% (Pass Zéro Commission / Happy Hour) ──

@@ -1,6 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
 import { chargerConfigPays, normalizeCommissionPct } from '../../shared/dispatchConstants.ts';
-import { comptabiliserCommissionEnterprise } from '../../shared/enterpriseFinance.ts';
+import { comptabiliserCommissionEnterprise, normalizeEnterpriseId } from '../../shared/enterpriseFinance.ts';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // FINALISER LIVRAISON LIVREUR — Source de vérité pour la livraison
@@ -49,10 +49,10 @@ export default async function(req: Request): Promise<Response> {
     if (!course) return Response.json({ error: 'Course introuvable' }, { status: 404 });
 
     const isAdminCourse = course.pricing_mode === 'admin_manuel' || course.source === 'admin';
-    const hasFinancialData =
-      course.prix_final != null &&
-      course.commission_silga != null &&
-      course.montant_livreur != null;
+    const hasFinancialData = course.prix_final != null
+      && Number(course.prix_final) > 0
+      && course.commission_silga != null
+      && course.montant_livreur != null;
 
     // Idempotence: si déjà livrée, ne pas écraser le prix existant
     if (course.statut === 'livree' && (!isAdminCourse || hasFinancialData)) {
@@ -64,21 +64,28 @@ export default async function(req: Request): Promise<Response> {
           livreur_financier_id: course.livreur_id,
         }).catch(() => {});
       }
+
       return Response.json({ success: true, skipped: 'already_delivered', course_id });
     }
 
+    // Courses admin déjà livrées mais incomplètes : corriger le trou historique
+    // (prix_final = 0/null) en écrivant prix_propose_admin comme source de vérité.
     if (course.statut === 'livree') {
-      // Courses admin : corriger le trou historique (prix_final = 0/null)
-      // en écrivant prix_propose_admin comme source de vérité.
+      if (!course.livreur_financier_id && course.livreur_id) {
+        await base44.asServiceRole.entities.CourseExterne.update(course_id, {
+          livreur_financier_id: course.livreur_id,
+        }).catch(() => {});
+      }
+
       if (isAdminCourse && (!course.prix_final || course.prix_final === 0) && Number(course.prix_propose_admin) > 0) {
         const prixFix = Number(course.prix_propose_admin);
         const countryFix = await chargerConfigPays(base44, course.country_code || '');
         const commissionPctFix = normalizeCommissionPct(countryFix?.commission_pct);
         if (commissionPctFix !== null) {
-          const tauxFix = (course.commission_locked_at && course.commission_taux_applique != null)
+          const tauxEffectifFix = (course.commission_locked_at && course.commission_taux_applique != null)
             ? Number(course.commission_taux_applique)
             : commissionPctFix;
-          const commissionFix = Math.round(prixFix * (tauxFix / 100));
+          const commissionFix = Math.round(prixFix * (tauxEffectifFix / 100));
           const montantFix = prixFix - commissionFix;
           await base44.asServiceRole.entities.CourseExterne.update(course_id, {
             prix_final: prixFix,
@@ -88,6 +95,7 @@ export default async function(req: Request): Promise<Response> {
           console.warn(`[finaliserLivraisonLivreur] TROU CORRIGÉ: course ${course_id} prix_final=${prixFix} (was 0/null, source=prix_propose_admin)`);
         }
       }
+
       return Response.json({ success: true, skipped: 'already_delivered', course_id });
     }
 
@@ -139,16 +147,27 @@ export default async function(req: Request): Promise<Response> {
 
       // Calcul côté backend uniquement — prix_propose_admin est la source.
       // Utilise le taux figé à l'acceptation si disponible (Pass/Happy Hour).
-      const commissionSilga = Math.round(montant * (tauxEffectif / 100));
-      const montantLivreur = montant - commissionSilga;
+      let commissionSilga = Math.round(montant * (tauxEffectif / 100));
+      let montantLivreur = montant - commissionSilga;
+
+      // ── ENTERPRISE : la commission est payée par l'entreprise, pas le livreur ──
+      // commission_silga = 0 sur la course → le livreur n'est jamais débité.
+      // La commission Enterprise est comptabilisée dans EnterpriseLedger.
+      // Le chemin public (enterprise_id null) n'est JAMAIS affecté.
+      if (normalizeEnterpriseId(course.enterprise_id)) {
+        commissionSilga = 0;
+        montantLivreur = montant;
+      }
 
       const updateData = {
         statut: 'livree',
         heure_livraison: now,
         colis_livre_at: now,
+        delivery_confirmed_by: 'bouton',
+        delivery_confirmed_at: now,
         prix_final: montant,
-        commission_silga: course.enterprise_id ? 0 : commissionSilga,
-        montant_livreur: course.enterprise_id ? montant : montantLivreur,
+        commission_silga: commissionSilga,
+        montant_livreur: montantLivreur,
         // ── Identité financière immuable ──
         // Renseigné côté backend au moment de la livraison, JAMAIS modifié ensuite.
         // Si déjà présent (re-finalisation), on ne l'écrase pas.
@@ -168,13 +187,20 @@ export default async function(req: Request): Promise<Response> {
       } catch (encoursErr: any) {
         console.error('[finaliserLivraisonLivreur] verifierEncoursLivreur error:', encoursErr?.message);
       }
+
+      // ── SILGAPP ENTREPRISE: comptabiliser la commission entreprise ──
+      // Non-bloquant, idempotent. N'augmente JAMAIS le montant_du_silga du livreur.
       try {
-        if (updated?.enterprise_id) {
-          await comptabiliserCommissionEnterprise(base44.asServiceRole, updated);
+        const entCourse = await base44.asServiceRole.entities.CourseExterne.get(course_id);
+        if (entCourse?.enterprise_id) {
+          await comptabiliserCommissionEnterprise(base44.asServiceRole, entCourse);
         }
       } catch (entErr: any) {
         console.error('[finaliserLivraisonLivreur] enterprise accounting error:', entErr?.message);
       }
+
+      // ── Correction 1: mettre à jour le livreur (courses_du_jour +1, statut disponible) ──
+      await updateLivreurAfterDelivery(base44, course);
 
       return Response.json({
         success: true,
@@ -204,6 +230,8 @@ export default async function(req: Request): Promise<Response> {
         statut: 'livree',
         heure_livraison: now,
         colis_livre_at: now,
+        delivery_confirmed_by: 'bouton',
+        delivery_confirmed_at: now,
         // prix_final reste null — sera défini par confirmerPrixCourseAdmin
         // commission_silga reste null — sera calculée par confirmerPrixCourseAdmin
         // montant_livreur reste null — sera calculé par confirmerPrixCourseAdmin
@@ -218,6 +246,20 @@ export default async function(req: Request): Promise<Response> {
 
       // NE PAS appeler verifierEncoursLivreur ici — il n'y a pas de commission à comptabiliser.
       // verifierEncoursLivreur sera appelé par confirmerPrixCourseAdmin après confirmation du prix.
+
+      // ── SILGAPP ENTREPRISE: même pour prix à confirmer, vérifier l'enterprise ──
+      // Non-bloquant, idempotent. N'augmente JAMAIS le montant_du_silga du livreur.
+      try {
+        if (course.enterprise_id) {
+          await comptabiliserCommissionEnterprise(base44.asServiceRole, { ...course, statut: 'livree' });
+        }
+      } catch (entErr: any) {
+        console.error('[finaliserLivraisonLivreur] enterprise accounting error (prix à confirmer):', entErr?.message);
+      }
+
+      // ── Correction 1: mettre à jour le livreur (courses_du_jour +1, statut disponible) ──
+      await updateLivreurAfterDelivery(base44, course);
+
       return Response.json({
         success: true,
         course: updated,
@@ -232,50 +274,63 @@ export default async function(req: Request): Promise<Response> {
 
     try {
       const res = await base44.asServiceRole.functions.invoke('calculPrixCourseExterne', { course_id });
-      if (res?.success) {
+      const calcResult = res?.data || res || {};
+      if (calcResult?.success) {
         // ── Garde livreur_financier_id : calculPrixCourseExterne ne le set pas.
         //    Le fixer une seule fois ici, après délégation. Idempotent. ──
+        //    Correction 1: aussi set delivery_confirmed_by='bouton' + delivery_confirmed_at
         if (!course.livreur_financier_id && course.livreur_id) {
           await base44.asServiceRole.entities.CourseExterne.update(course_id, {
             livreur_financier_id: course.livreur_id,
+            delivery_confirmed_by: 'bouton',
+            delivery_confirmed_at: now,
           }).catch(() => {});
-        }
-        try {
-          const entCourse = await base44.asServiceRole.entities.CourseExterne.get(course_id);
-          if (entCourse?.enterprise_id) {
-            const prixFinal = Number(entCourse.prix_final);
-            const enterpriseUpdate = Number.isFinite(prixFinal) && prixFinal > 0
-              ? { commission_silga: 0, montant_livreur: prixFinal }
-              : {};
-            const enterpriseCourse = Object.keys(enterpriseUpdate).length
-              ? await base44.asServiceRole.entities.CourseExterne.update(course_id, enterpriseUpdate)
-              : entCourse;
-            await comptabiliserCommissionEnterprise(base44.asServiceRole, enterpriseCourse);
-          }
-        } catch (entErr: any) {
-          console.error('[finaliserLivraisonLivreur] enterprise accounting error (standard):', entErr?.message);
+        } else {
+          await base44.asServiceRole.entities.CourseExterne.update(course_id, {
+            delivery_confirmed_by: 'bouton',
+            delivery_confirmed_at: now,
+          }).catch(() => {});
         }
 
         // Multi-colis: mettre à jour les colis individuels
         if (is_multi_colis && colis_data) {
           await handleMultiColis(base44, course_id, colis_data, now);
         }
+
+        // ── SILGAPP ENTREPRISE: comptabiliser la commission entreprise ──
+        // Non-bloquant, idempotent. N'augmente JAMAIS le montant_du_silga du livreur.
+        try {
+          if (course.enterprise_id) {
+            const entCourse = await base44.asServiceRole.entities.CourseExterne.get(course_id);
+            if (entCourse?.enterprise_id) {
+              await comptabiliserCommissionEnterprise(base44.asServiceRole, entCourse);
+            }
+          }
+        } catch (entErr: any) {
+          console.error('[finaliserLivraisonLivreur] enterprise accounting error (standard):', entErr?.message);
+        }
+
+        // ── Correction 1: mettre à jour le livreur (courses_du_jour +1, statut disponible) ──
+        await updateLivreurAfterDelivery(base44, course);
+
         return Response.json({
           success: true,
-          course: res.course,
+          course: calcResult.course,
           delegated: 'calculPrixCourseExterne',
-          prix_final: res.prix_final,
-          commission_silga: res.commission_silga,
-          montant_livreur: res.montant_livreur,
-          prix_source: res.prix_source,
+          prix_final: calcResult.prix_final,
+          commission_silga: calcResult.commission_silga,
+          montant_livreur: calcResult.montant_livreur,
+          prix_source: calcResult.prix_source,
         });
-      } else if (res?.prix_a_confirmer) {
+      } else if (calcResult?.prix_a_confirmer) {
         // calculPrixCourseExterne a mis la course en "prix à confirmer"
         // Le livreur peut quand même terminer la livraison.
         const updateData = {
           statut: 'livree',
           heure_livraison: now,
           colis_livre_at: now,
+          delivery_confirmed_by: 'bouton',
+          delivery_confirmed_at: now,
           ...(course.livreur_financier_id ? {} : { livreur_financier_id: course.livreur_id }),
         };
 
@@ -284,6 +339,10 @@ export default async function(req: Request): Promise<Response> {
         }
 
         const updated = await base44.asServiceRole.entities.CourseExterne.update(course_id, updateData);
+
+        // ── Correction 1: mettre à jour le livreur (courses_du_jour +1, statut disponible) ──
+        await updateLivreurAfterDelivery(base44, course);
+
         return Response.json({
           success: true,
           course: updated,
@@ -295,13 +354,74 @@ export default async function(req: Request): Promise<Response> {
           message: 'Course livrée. Le prix reste à confirmer par l\'admin.',
         });
       } else {
-        return Response.json({ error: res?.error || 'Erreur calcul prix' }, { status: 400 });
+        return Response.json({ error: calcResult?.error || calcResult?.message || 'Erreur calcul prix' }, { status: 400 });
       }
     } catch (calcErr: any) {
       return Response.json({ error: 'Erreur calculPrixCourseExterne: ' + (calcErr?.message || calcErr) }, { status: 500 });
     }
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
+  }
+}
+
+// ── Correction 1: mettre à jour le livreur après livraison (courses_du_jour +1, statut disponible) ──
+// Idempotent : uniquement pour les nouvelles livraisons (pas les re-calls déjà 'livree').
+// Reproduit exactement le comportement de libererLivreurCourseLivree pour garantir la parité.
+async function updateLivreurAfterDelivery(base44: any, course: any): Promise<void> {
+  if (!course.livreur_id) return;
+  try {
+    const livreur = await base44.asServiceRole.entities.Livreur.get(course.livreur_id).catch(() => null);
+    if (!livreur) return;
+
+    // ── Protections historiques (parité avec libererLivreurCourseLivree) ──
+    // 1. bloque_encours → hors_ligne + admin_hors_ligne
+    if (livreur.bloque_encours) {
+      await base44.asServiceRole.entities.Livreur.update(course.livreur_id, {
+        statut: 'hors_ligne',
+        admin_hors_ligne: true,
+        courses_du_jour: (Number(livreur.courses_du_jour) || 0) + 1,
+      });
+      return;
+    }
+    // 2. manual_hors_ligne → reste hors_ligne (livreur s'est mis hors ligne lui-même)
+    if (livreur.manual_hors_ligne === true) {
+      await base44.asServiceRole.entities.Livreur.update(course.livreur_id, {
+        statut: 'hors_ligne',
+        courses_du_jour: (Number(livreur.courses_du_jour) || 0) + 1,
+      });
+      return;
+    }
+    // 3. admin_hors_ligne → reste hors_ligne (admin a forcé hors ligne)
+    if (livreur.admin_hors_ligne === true) {
+      await base44.asServiceRole.entities.Livreur.update(course.livreur_id, {
+        statut: 'hors_ligne',
+        courses_du_jour: (Number(livreur.courses_du_jour) || 0) + 1,
+      });
+      return;
+    }
+    // 4. Autre course active → reste en_course
+    const STATUTS_ACTIFS_LIVREUR = ["livreur_en_route", "client_contacte", "en_route_expediteur", "arrive_prise_en_charge", "colis_recupere", "passager_embarque", "pris_en_charge", "en_livraison", "arrivee"];
+    const autresCourses = await base44.asServiceRole.entities.CourseExterne.filter(
+      { livreur_id: course.livreur_id },
+      "-created_date", 10
+    ).catch(() => []);
+    const aAutreCourseActive = (autresCourses || []).some((c: any) =>
+      c.id !== course.id && STATUTS_ACTIFS_LIVREUR.includes(c.statut)
+    );
+    if (aAutreCourseActive) {
+      await base44.asServiceRole.entities.Livreur.update(course.livreur_id, {
+        statut: 'en_course',
+        courses_du_jour: (Number(livreur.courses_du_jour) || 0) + 1,
+      });
+      return;
+    }
+    // 5. Cas nominal → disponible
+    await base44.asServiceRole.entities.Livreur.update(course.livreur_id, {
+      statut: 'disponible',
+      courses_du_jour: (Number(livreur.courses_du_jour) || 0) + 1,
+    });
+  } catch (err: any) {
+    console.error('[finaliserLivraisonLivreur] updateLivreurAfterDelivery error:', err?.message);
   }
 }
 

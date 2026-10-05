@@ -1,0 +1,44 @@
+{
+  "name": "Relance Premi\u00e8re Course (DRY-RUN)",
+  "description": "Identifie les clients ayant livr\u00e9 leur premi\u00e8re course et pr\u00e9pare une relance push FCM pour provoquer une deuxi\u00e8me commande. DRY-RUN par d\u00e9faut \u2014 aucun envoi r\u00e9el sans activation explicite. Pas de doublon avec moteurReactivationAuto (first_course_delivered J+1/J+3/J+7).",
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "interval",
+      "cron_expression": null,
+      "one_time_date": null,
+      "timezone": "UTC",
+      "interval_value": 2,
+      "interval_unit": "hours",
+      "interval_anchor": null,
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  },
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "relance_premiere_course_dry_run",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "run_function": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "relancePremiereCourse",
+            "args": {
+              "action": "run",
+              "dry_run": true
+            }
+          },
+          "then": "end"
+        }
+      }
+    ]
+  }
+}

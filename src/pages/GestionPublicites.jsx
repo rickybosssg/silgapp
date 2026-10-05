@@ -75,7 +75,7 @@ export default function GestionPublicites() {
   const [filterCible, setFilterCible] = useState("tous_filtres");
   const fileInputRef = useRef(null);
   const { isGlobal, isPays, countryCode: adminCountryCode, selectedCountry, setSelectedCountry } = useAdminContext();
-  usePaysActifs();
+  const paysActifs = usePaysActifs();
 
   const effectiveCountry = isPays ? adminCountryCode : (selectedCountry || "");
 

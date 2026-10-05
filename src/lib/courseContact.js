@@ -1,4 +1,4 @@
-import { normalizePhone } from "@/lib/phoneUtils";
+import { getCountryConfig, normalizePhone } from "@/lib/phoneUtils";
 
 /**
  * Source de vérité unique pour le contact d'une course selon la phase.

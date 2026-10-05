@@ -8,7 +8,6 @@ import {
   ArrowLeft
 } from "lucide-react";
 import { toast } from "sonner";
-import { SILGAPP_LOGO_URL } from "@/lib/branding";
 
 export default function PinVerification({ onVerify, onCancel, networkName }) {
   const [pin, setPin] = useState("");
@@ -71,7 +70,7 @@ export default function PinVerification({ onVerify, onCancel, networkName }) {
         {/* Header */}
         <div className="text-center space-y-4">
           <img
-            src={SILGAPP_LOGO_URL}
+            src="https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/ecff74f77_IMG-20260523-WA0003.jpg"
             alt="Logo SILGAPP"
             className="w-32 h-32 object-contain mx-auto"
           />

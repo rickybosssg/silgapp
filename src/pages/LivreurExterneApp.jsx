@@ -8,7 +8,6 @@ import { toast } from "sonner";
 import { useHeartbeat } from "@/hooks/useHeartbeat";
 import { useAppVersionSync } from "@/hooks/useAppVersionSync";
 import { useDispatchConfig } from "@/hooks/useDispatchConfig";
-import { useCoursesDisponibles } from "@/hooks/useCoursesDisponibles";
 import { useGPSNatif } from "@/hooks/useGPSNatif";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
@@ -59,6 +58,7 @@ import PassActifBadge from "@/components/livreur/PassActifBadge";
 import HappyHourBadge from "@/components/livreur/HappyHourBadge";
 import PassZeroCommissionSection from "@/components/livreur/PassZeroCommissionSection";
 import LivreurVictoryOverlay from "@/components/livreur/LivreurVictoryOverlay";
+import { useCoursesDisponibles } from "@/hooks/useCoursesDisponibles";
 
 // haversineKm importé depuis priceEstimate (source canonique)
 
@@ -221,10 +221,19 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   // le store est mis à jour et useHeartbeat recrée ses timers automatiquement.
   useDispatchConfig(livreurProfil?.country_code);
 
-  // ── Compteur de courses disponibles (pilote le point rouge) ──
-  // Source partagée avec ActiviteTempsReel et CoursesDisponibles : inclut le filtre enterprise_id.
-  const { eligibleCourses: availableCourses, isV2Enabled } = useCoursesDisponibles(livreurProfil);
-  const availableCoursesCount = availableCourses.length;
+  // ── Vérifier si le dispatch V2 est activé (fil de courses disponibles) ──
+  const { data: isV2Enabled = true } = useQuery({
+    queryKey: ["dispatch-v2-enabled", livreurProfil?.id],
+    queryFn: async () => {
+      const configs = await base44.entities.AppConfig.filter({ cle: "DISPATCH_V2_ENABLED" });
+      return configs?.[0] ? configs[0].valeur !== "false" : true;
+      },
+      enabled: !!livreurProfil?.id,
+      staleTime: 300000,
+  });
+
+  const { eligibleCourses: dashboardAvailableCourses = [] } = useCoursesDisponibles(livreurProfil);
+  const availableCoursesCount = dashboardAvailableCourses.length;
 
   // Le point rouge s'affiche dès qu'il y a des courses disponibles ET que le livreur
   // n'est pas sur l'onglet "Disponibles"
@@ -246,15 +255,15 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles"] });
       }
     });
-    const unsubscribeNotifications = base44.entities.DispatchNotification.subscribe((event) => {
+    const unsubscribeRefus = base44.entities.DispatchNotification.subscribe((event) => {
       if (event.type === "create" || event.type === "update" || event.type === "delete") {
-        queryClient.invalidateQueries({ queryKey: ["dispatch-refused-courses"] });
+        queryClient.invalidateQueries({ queryKey: ["dispatch-refused-courses", livreurProfil.id] });
         queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles"] });
       }
     });
     return () => {
       unsubscribeCourses?.();
-      unsubscribeNotifications?.();
+      unsubscribeRefus?.();
     };
   }, [livreurProfil?.id, queryClient]);
 
@@ -1845,7 +1854,11 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       {/* ── Animation de victoire livreur — 3 secondes, purement visuelle ── */}
       <LivreurVictoryOverlay
         courseId={victoryCourseId}
-        onClose={() => setVictoryCourseId(null)}
+        onClose={() => {
+          setVictoryCourseId(null);
+          // Correction 3: retour automatique à l'onglet Disponibles après la célébration
+          setActiveTab("disponibles");
+        }}
       />
     </DashboardThemeProvider>
   );

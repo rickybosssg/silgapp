@@ -65,7 +65,7 @@ export default function CarteLivreursExterne() {
   const [showPartenaires, setShowPartenaires] = useState(false);
   const [correctionEnCours, setCorrectionEnCours] = useState(false);
   const [categoryDialog, setCategoryDialog] = useState(null); // { category, livreurs }
-  const [showOldPositions, setShowOldPositions] = useState(false);
+  const [showOldPositions, setShowOldPositions] = useState(false); // 📌 positions GPS ≥ 30 min
 
   const handleCorrectionEnCourse = async () => {
     if (!confirm('Corriger les livreurs "en course" sans course active ?')) return;
@@ -87,7 +87,7 @@ export default function CarteLivreursExterne() {
   };
 
   const { isGlobal, isPays, countryCode: adminCountryCode, selectedCountry, setSelectedCountry } = useAdminContext();
-  const { pays: paysActifs } = usePaysActifs();
+  const paysActifs = usePaysActifs();
   const defaultCountry = paysActifs.length === 1 ? paysActifs[0].code : null;
   const effectiveCountry = isPays ? adminCountryCode : (selectedCountry || defaultCountry || "");
 
@@ -112,15 +112,15 @@ export default function CarteLivreursExterne() {
     queryKey: ["livreurs-externes-carte", effectiveCountry],
     queryFn: () => base44.entities.Livreur.filter(livreurFilter),
     initialData: [],
-    refetchInterval: 10000,
-    staleTime: 8000,
+    refetchInterval: 15000,
+    staleTime: 12000,
   });
 
   const { data: clients = [] } = useQuery({
     queryKey: ["clients-externes-carte", effectiveCountry],
     queryFn: () => base44.entities.ClientExterne.filter(clientFilter),
     initialData: [],
-    refetchInterval: 15000,
+    refetchInterval: 30000,
   });
 
   // ── Partenaires : boutiques + restaurants (filtrés par pays) ────────
@@ -129,19 +129,19 @@ export default function CarteLivreursExterne() {
     queryKey: ["boutiques-carte", effectiveCountry],
     queryFn: () => base44.entities.Boutique.filter(partenaireFilter),
     initialData: [],
-    refetchInterval: 30000,
+    refetchInterval: 60000,
   });
   const { data: restaurantsCarte = [] } = useQuery({
     queryKey: ["restaurants-carte", effectiveCountry],
     queryFn: () => base44.entities.Restaurant.filter(partenaireFilter),
     initialData: [],
-    refetchInterval: 30000,
+    refetchInterval: 60000,
   });
   const { data: pharmaciesCarte = [] } = useQuery({
     queryKey: ["pharmacies-carte", effectiveCountry],
     queryFn: () => base44.entities.Pharmacie.filter(partenaireFilter),
     initialData: [],
-    refetchInterval: 30000,
+    refetchInterval: 60000,
   });
 
   // Combiner boutiques + restaurants + pharmacies avec _type pour différenciation visuelle
@@ -159,7 +159,7 @@ export default function CarteLivreursExterne() {
     queryKey: ["courses-attente-carte", effectiveCountry],
     queryFn: () => base44.entities.CourseExterne.filter(coursesAttenteFilter, "-created_date", 100),
     initialData: [],
-    refetchInterval: 15000,
+    refetchInterval: 30000,
   });
 
   // Abonnement temps réel IMMÉDIAT : courses ET livreurs
@@ -294,7 +294,8 @@ export default function CarteLivreursExterne() {
     [clients]
   );
 
-  // Règle d'affichage carte uniquement : ne modifie pas l'éligibilité Dispatch V2.
+  // 📌 Livreurs réellement localisés récemment (GPS < 30 min) — règle d'affichage carte
+  // ⚠️ Ne modifie ni le statut ON/OFF, ni l'éligibilité au Dispatch V2.
   const nbLivreursLocalises = useMemo(() => {
     const now = Date.now();
     return livreurs.filter(l =>
@@ -453,6 +454,13 @@ export default function CarteLivreursExterne() {
               <p className="text-[10px] font-bold text-white/80 mt-1">À dispatcher</p>
             </div>
           </div>
+
+          {/* 📌 Compteur dynamique : livreurs réellement localisés récemment */}
+          <div className="flex items-center gap-2 mt-3 bg-green-500/10 border border-green-500/20 rounded-xl px-3 py-2">
+            <span className="text-sm">📍</span>
+            <span className="text-green-400 font-black text-lg leading-none">{nbLivreursLocalises}</span>
+            <span className="text-white/70 text-xs font-medium">livreur{nbLivreursLocalises !== 1 ? "s" : ""} localisé{nbLivreursLocalises !== 1 ? "s" : ""} récemment (GPS &lt; 30 min)</span>
+          </div>
         </div>
       </div>
 
@@ -511,10 +519,6 @@ export default function CarteLivreursExterne() {
             <span className="flex items-center gap-1.5 text-gray-500">
               <span className="w-2.5 h-2.5 rounded-full bg-green-500 flex-shrink-0" />
               Livreurs avec GPS : <strong className="text-gray-800 ml-0.5">{compteursLivreurs.verts + compteursLivreurs.oranges}</strong>
-            </span>
-            <span className="flex items-center gap-1.5 text-gray-500">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 flex-shrink-0" />
-              Localisés récemment : <strong className="text-gray-800 ml-0.5">{nbLivreursLocalises}</strong>
             </span>
             <span className="flex items-center gap-1.5 text-gray-500">
               <span className="w-2.5 h-2.5 rounded-full bg-gray-300 flex-shrink-0" />
@@ -788,8 +792,8 @@ export default function CarteLivreursExterne() {
                 showClients={showClients}
                 showLivreurs={showLivreurs}
                 showPartenaires={showPartenaires}
-                showOldPositions={showOldPositions}
                 livreurIdsEnCourseReelle={livreurIdsEnCourseReelle}
+                showOldPositions={showOldPositions}
               />
             </div>
             {selectedMarker && (

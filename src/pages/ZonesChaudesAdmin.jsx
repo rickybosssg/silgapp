@@ -182,7 +182,7 @@ export default function ZonesChaudesAdmin() {
   const [onglet, setOnglet] = useState("dashboard");
   const [saving, setSaving] = useState(false);
   const { isPays, countryCode: adminCountryCode, selectedCountry } = useAdminContext();
-  const { pays: paysActifs } = usePaysActifs();
+  const paysActifs = usePaysActifs();
   const [selectedPays, setSelectedPays] = useState("");
   const effectiveCountry = isPays ? adminCountryCode : (selectedCountry || selectedPays || "");
 

@@ -79,7 +79,7 @@ async function findExistingMessage(base44: any, courseId: string): Promise<any[]
 async function attemptCreateMessage(
   base44: any,
   courseId: string,
-  livreurId: string | null | undefined,
+  livreurId: string,
   messageContent: string,
   idempotencyKey: string,
   participantUserIds: string[],

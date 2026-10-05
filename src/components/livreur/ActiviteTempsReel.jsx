@@ -17,12 +17,13 @@ import { hasValidGPS } from "@/lib/dispatchRules";
  * Rayon d'opération (Country.rayon_km) : utilisé uniquement pour le calcul des
  * livreurs à proximité, JAMAIS affiché au livreur (Dispatch V2 ne filtre pas par rayon).
  */
-export default function ActiviteTempsReel({ livreurProfil, isExterne = false }) {
+export default function ActiviteTempsReel({ livreurProfil, mesCourses = [], isExterne = false }) {
   const {
     statut,
     latitude,
     longitude,
     country_code,
+    montant_du_silga = 0,
   } = livreurProfil || {};
 
   const isDisponible = statut === "disponible";
@@ -102,14 +103,14 @@ export default function ActiviteTempsReel({ livreurProfil, isExterne = false }) 
       return "Recherche en cours — nous te préviendrons dès qu'une mission sera disponible.";
     }
     if (loadingCourses) return "Analyse des courses disponibles…";
-    if (eligibleCourses.length === 0) {
+    if (coursesWithDistance.length === 0) {
       return "Aucune course pour le moment. Je continue la recherche.";
     }
-    if (eligibleCourses.length === 1) {
+    if (coursesWithDistance.length === 1) {
       return "1 course disponible.";
     }
-    return `${eligibleCourses.length} courses disponibles.`;
-  }, [isExterne, loadingCourses, eligibleCourses.length]);
+    return `${coursesWithDistance.length} courses disponibles.`;
+  }, [isExterne, loadingCourses, coursesWithDistance.length]);
 
   // ── Rendu ──
   return (
@@ -135,9 +136,9 @@ export default function ActiviteTempsReel({ livreurProfil, isExterne = false }) 
               <Loader2 className="w-4 h-4 text-slate-300 animate-spin" />
             ) : (
               <p className={`text-xl font-black leading-none ${
-                eligibleCourses.length > 0 ? "text-orange-500" : "text-slate-400"
+                coursesWithDistance.length > 0 ? "text-orange-500" : "text-slate-400"
               }`}>
-                {isExterne ? eligibleCourses.length : "—"}
+                {isExterne ? coursesWithDistance.length : "—"}
               </p>
             )}
             <p className="text-[10px] text-slate-500 mt-1">Courses dispo</p>

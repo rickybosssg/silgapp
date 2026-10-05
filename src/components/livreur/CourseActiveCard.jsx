@@ -19,17 +19,15 @@ import { getPrixAffichable, getDeviseAffichable } from "@/utils/getPrixAffichabl
 import { getCourseContactForPhase, normalizePhoneForWhatsapp } from "@/lib/courseContact";
 import { haversineKm as haversine } from "@/lib/priceEstimate";
 
-function isInternalDispatchNote(value) {
-  return /^Accept(?:e|ee|é|ée)e? par \S+ (?:a|à) \d{4}-\d{2}-\d{2}T/i.test(String(value || "").trim());
+// ── Correction 1: détermine si une course utilise le nouveau parcours bouton ──
+// Les NOUVELLES courses n'ont pas de pickup_qr_token généré → parcours bouton.
+// Les ANCIENNES courses (avec QR token) → parcours QR/PIN backward compat.
+function isNewButtonParcours(course) {
+  return !course?.pickup_qr_token;
 }
 
-async function invokeCourseBackend(functionName, payload) {
-  const response = await base44.functions.invoke(functionName, payload);
-  const data = response?.data ?? response;
-  if (data?.success === false || data?.error) {
-    throw new Error(data?.error || `Erreur ${functionName}`);
-  }
-  return data;
+function isInternalDispatchNote(note) {
+  return typeof note === "string" && /^Acceptée par\s+\S+\s+à\s+\d{4}-\d{2}-\d{2}T/.test(note.trim());
 }
 
 // Badge ETA affiché en haut de la carte, calculé depuis la position GPS réelle du livreur
@@ -149,6 +147,9 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   const [showPauseModal, setShowPauseModal] = useState(false);
   const [pauseMotif, setPauseMotif] = useState("");
   const [multiPickupPending, setMultiPickupPending] = useState(false);
+  // ── Correction 1: état pour les boutons directs (nouveau parcours sans QR/PIN) ──
+  const [pickupBoutonPending, setPickupBoutonPending] = useState(false);
+  const [deliveryBoutonPending, setDeliveryBoutonPending] = useState(false);
   // Optimistic status — overrides course.statut immediately on tap
   const [optimisticStatut, setOptimisticStatut] = useState(null);
   // Données de livraison en attente (admin_manuel : saisie montant après validation QR/PIN)
@@ -178,11 +179,9 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
     course.commande_restaurant_id ||
     course.pharmacie_id
   );
-  // ── Étape « Client contacté » : workflow administratif uniquement.
-  // Les courses source=client doivent accéder directement au QR/PIN de récupération.
-  const isAdminColisCourse = !isDeplacement && !isPartnerCourse && (
-    course.source === "admin" || course.pricing_mode === "admin_manuel"
-  );
+  // ── Étape « Client contacté » : visible pour TOUTES les courses (admin + client)
+  //    sauf déplacements et courses partenaire (boutique/restaurant/pharmacie) ──
+  const isAdminColisCourse = !isDeplacement && !isPartnerCourse;
   const isClientContactePhase = isAdminColisCourse && effectiveStatut === "livreur_en_route";
   const isEnRouteExpediteurPending = isAdminColisCourse && effectiveStatut === "client_contacte";
   const adminPreTrip = isClientContactePhase || isEnRouteExpediteurPending;
@@ -212,7 +211,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
 
     const autoSetPrice = async () => {
       try {
-        await invokeCourseBackend("finaliserLivraisonLivreur", {
+        await base44.functions.invoke("finaliserLivraisonLivreur", {
           course_id: course.id,
           prix_final_livreur: Number(course.prix_propose_admin),
         });
@@ -232,8 +231,10 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
       queryClient.setQueryData(['mes-courses-externes'], (old) =>
         (old || []).map(c => c.id === course.id ? { ...c, statut: "en_livraison" } : c)
       );
-      const entity = isExterne ? base44.entities.CourseExterne : base44.entities.Course;
-      entity.update(course.id, { statut: "en_livraison" }).catch(() => null);
+      base44.functions.invoke("transitionStatutLivreur", {
+        course_id: course.id,
+        statut_cible: "en_livraison",
+      }).catch(() => null);
     }, 10000);
     return () => clearTimeout(timer);
   }, [effectiveStatut, course.id, isDeplacement, isExterne]);
@@ -290,8 +291,12 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
         commission_pct: split.commission_pct,
         heure_livraison: new Date().toISOString(),
       };
-      // Le montant reste local jusqu'au bouton final afin d'éviter toute écriture
-      // sensible avant la confirmation explicite du livreur.
+      // On sauvegarde le prix mais on garde statut="arrivee" — le livreur reste en_course
+      base44.functions.invoke("finaliserLivraisonLivreur", {
+        course_id: course.id,
+        prix_final_livreur: montant,
+      }).catch(() => null);
+      queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
       setDeplacementRecap(mergedData);
       setShowPrixModal(false);
       setPrixReel("");
@@ -343,8 +348,10 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   const handleRemarque = () => {
     if (!remarque.trim()) return;
     // Utilise CourseExterne pour le réseau externe, Course pour l'interne
-    const entity = isExterne ? base44.entities.CourseExterne : base44.entities.Course;
-    entity.update(course.id, { remarque_livreur: remarque });
+    base44.functions.invoke("transitionStatutLivreur", {
+      course_id: course.id,
+      remarque: remarque,
+    }).catch(() => null);
     setRemarque("");
     setShowRemarque(false);
     toast.success("Remarque enregistrée");
@@ -406,10 +413,10 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
     }
     const now = new Date().toISOString();
     updateOptimisticStatut("client_contacte", { heure_contact_client: now });
-    await invokeCourseBackend("transitionStatutLivreur", {
+    base44.functions.invoke("transitionStatutLivreur", {
       course_id: course.id,
       statut_cible: "client_contacte",
-    });
+    }).catch(() => null);
     queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
     toast.success("Client contacté. Vous pouvez maintenant démarrer votre trajet.");
   };
@@ -420,10 +427,10 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
       return;
     }
     updateOptimisticStatut("en_route_expediteur", {});
-    await invokeCourseBackend("transitionStatutLivreur", {
+    base44.functions.invoke("transitionStatutLivreur", {
       course_id: course.id,
       statut_cible: "en_route_expediteur",
-    });
+    }).catch(() => null);
     queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
     toast.success("Bon trajet ! En route vers l'expéditeur.");
   };
@@ -485,11 +492,6 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
     });
 
     try {
-      await invokeCourseBackend("transitionStatutLivreur", {
-        course_id: course.id,
-        statut_cible: "colis_recupere",
-      });
-
       const colis = await base44.entities.ColisExterne.filter({ course_id: course.id }, "numero_ordre", 50);
       await Promise.all((colis || [])
         .filter((item) => !["livre", "annule"].includes(item.statut))
@@ -497,6 +499,12 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
           statut: "recupere",
           heure_recuperation: now,
         })));
+
+      await base44.functions.invoke("transitionStatutLivreur", {
+        course_id: course.id,
+        statut_cible: "colis_recupere",
+        confirmation_method: "bouton",
+      });
 
       queryClient.invalidateQueries({ queryKey: ["colis-externes", course.id] });
       queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
@@ -808,7 +816,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
               if (!isClientContactePhase) return;
               const now = new Date().toISOString();
               updateOptimisticStatut("client_contacte", { heure_contact_client: now });
-              invokeCourseBackend("transitionStatutLivreur", {
+              base44.functions.invoke("transitionStatutLivreur", {
                 course_id: course.id,
                 statut_cible: "client_contacte",
               }).catch(() => null);
@@ -987,7 +995,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
             <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 space-y-1">
               <p className="text-sm font-black text-amber-800">Commande récupérée chez le partenaire</p>
               <p className="text-xs font-semibold text-amber-700">
-                Étape suivante : se rendre chez le client puis scanner le QR/PIN client pour terminer la livraison.
+                Étape suivante : se rendre chez le client puis confirmer la livraison.
               </p>
             </div>
           )}
@@ -1056,7 +1064,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                     longitude_prise_en_charge: pos.coords.longitude,
                   };
                   updateOptimisticStatut("pris_en_charge", data);
-                  await invokeCourseBackend("transitionStatutLivreur", {
+                  base44.functions.invoke("transitionStatutLivreur", {
                     course_id: course.id,
                     statut_cible: "pris_en_charge",
                     latitude: pos.coords.latitude,
@@ -1070,7 +1078,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                   const now = new Date().toISOString();
                   const data = { statut: "pris_en_charge", heure_prise_en_charge: now };
                   updateOptimisticStatut("pris_en_charge", data);
-                  invokeCourseBackend("transitionStatutLivreur", {
+                  base44.functions.invoke("transitionStatutLivreur", {
                     course_id: course.id,
                     statut_cible: "pris_en_charge",
                   }).catch(() => null);
@@ -1092,7 +1100,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                     longitude_arrivee_dest: pos.coords.longitude,
                   };
                   updateOptimisticStatut("arrivee", data);
-                  await invokeCourseBackend("transitionStatutLivreur", {
+                  base44.functions.invoke("transitionStatutLivreur", {
                     course_id: course.id,
                     statut_cible: "arrivee",
                     latitude: pos.coords.latitude,
@@ -1107,7 +1115,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                   const now = new Date().toISOString();
                   const data = { statut: "arrivee", heure_arrivee: now };
                   updateOptimisticStatut("arrivee", data);
-                  invokeCourseBackend("transitionStatutLivreur", {
+                  base44.functions.invoke("transitionStatutLivreur", {
                     course_id: course.id,
                     statut_cible: "arrivee",
                   }).catch(() => null);
@@ -1210,37 +1218,84 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                       </button>
                     )}
                   </div>
+                ) : isExterne && isNewButtonParcours(course) && !course.is_multi_colis ? (
+                  /* ── CORRECTION 1: EXTERNE nouveau parcours — bouton direct COLIS RÉCUPÉRÉ ── */
+                  <button
+                    className="w-full h-14 rounded-2xl bg-gradient-to-b from-amber-500 to-amber-600 text-white font-black text-base shadow-lg shadow-amber-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                    onClick={async () => {
+                      if (pickupBoutonPending) return;
+                      setPickupBoutonPending(true);
+                      const now = new Date().toISOString();
+                      updateOptimisticStatut("colis_recupere", {
+                        heure_recuperation: now,
+                        pickup_confirmed_by: "bouton",
+                        pickup_confirmed_at: now,
+                      });
+                      // GPS optionnel — ne pas bloquer la récupération si indisponible
+                      navigator.geolocation.getCurrentPosition(
+                        (pos) => {
+                           base44.functions.invoke("transitionStatutLivreur", {
+                             course_id: course.id,
+                             statut_cible: "colis_recupere",
+                             latitude: pos.coords.latitude,
+                             longitude: pos.coords.longitude,
+                             confirmation_method: "bouton",
+                           }).catch(() => null);
+                          queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+                          onColisRecupere({ ...course, statut: "colis_recupere", heure_recuperation: now });
+                          toast.success("Colis récupéré avec succès !");
+                          setPickupBoutonPending(false);
+                        },
+                        () => {
+                           // GPS indisponible — récupération non bloquée
+                           base44.functions.invoke("transitionStatutLivreur", {
+                             course_id: course.id,
+                             statut_cible: "colis_recupere",
+                             confirmation_method: "bouton",
+                           }).catch(() => null);
+                          queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+                          onColisRecupere({ ...course, statut: "colis_recupere", heure_recuperation: now });
+                          toast.success("Colis récupéré avec succès !");
+                          setPickupBoutonPending(false);
+                        },
+                        { enableHighAccuracy: true, timeout: 5000 }
+                      );
+                    }}
+                    disabled={isPending || pickupBoutonPending}
+                  >
+                    <Package className="w-6 h-6" />
+                    Colis récupéré
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
+                ) : isExterne && course.is_multi_colis ? (
+                  <button
+                    className="w-full h-14 rounded-2xl bg-gradient-to-b from-amber-500 to-amber-600 text-white font-black text-base shadow-lg shadow-amber-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                    onClick={handleMultiColisRecuperes}
+                    disabled={isPending || multiPickupPending}
+                  >
+                    <Package className="w-6 h-6" />
+                     Colis récupérés ({course.nb_colis} colis)
+                  </button>
                 ) : isExterne ? (
-                  /* ── EXTERNE colis : Scanner QR pour récupérer ── */
-                  course.is_multi_colis ? (
+                  /* ── EXTERNE ancien parcours (backward compat) : Scanner QR/PIN pour récupérer ── */
+                  <div className="grid grid-cols-2 gap-2">
                     <button
-                      className="w-full h-14 rounded-2xl bg-gradient-to-b from-amber-500 to-amber-600 text-white font-black text-base shadow-lg shadow-amber-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
-                      onClick={handleMultiColisRecuperes}
-                      disabled={isPending || multiPickupPending}
+                      className="h-14 rounded-2xl bg-gradient-to-b from-amber-500 to-amber-600 text-white font-black text-sm shadow-lg shadow-amber-200 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                      onClick={() => setShowQRScanner({ type: "pickup", mode: "camera" })}
+                      disabled={isPending}
                     >
-                      <Package className="w-6 h-6" />
-                       Colis récupérés ({course.nb_colis} colis)
+                      <QrCode className="w-5 h-5" />
+                      QR Code
                     </button>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        className="h-14 rounded-2xl bg-gradient-to-b from-amber-500 to-amber-600 text-white font-black text-sm shadow-lg shadow-amber-200 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                        onClick={() => setShowQRScanner({ type: "pickup", mode: "camera" })}
-                        disabled={isPending}
-                      >
-                        <QrCode className="w-5 h-5" />
-                        QR Code
-                      </button>
-                      <button
-                        className="h-14 rounded-2xl bg-gradient-to-b from-amber-600 to-amber-700 text-white font-black text-sm shadow-lg shadow-amber-200 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                        onClick={() => setShowQRScanner({ type: "pickup", mode: "code" })}
-                        disabled={isPending}
-                      >
-                        <span className="text-lg"></span>
-                        PIN Code
-                      </button>
-                    </div>
-                  )
+                    <button
+                      className="h-14 rounded-2xl bg-gradient-to-b from-amber-600 to-amber-700 text-white font-black text-sm shadow-lg shadow-amber-200 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                      onClick={() => setShowQRScanner({ type: "pickup", mode: "code" })}
+                      disabled={isPending}
+                    >
+                      <span className="text-lg"></span>
+                      PIN Code
+                    </button>
+                  </div>
                 ) : (
                   /* ── INTERNE : bouton classique ── */
                   <button
@@ -1260,26 +1315,78 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
               ) : (
                 isExterne ? (
                   /* ── EXTERNE multi-colis : géré par MultiColisLivreurView ci-dessus ── */
-                  /* ── EXTERNE colis unique : Scanner QR ou PIN pour livrer ── */
-                  !course.is_multi_colis && (
-                    <div className="grid grid-cols-2 gap-2">
+                  course.is_multi_colis ? null : (
+                    isNewButtonParcours(course) ? (
+                      /* ── CORRECTION 1: EXTERNE nouveau parcours — bouton direct COLIS LIVRÉ ── */
                       <button
-                        className="h-14 rounded-2xl bg-primary text-white font-black text-sm shadow-lg shadow-primary/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                        onClick={() => setShowQRScanner({ type: "delivery", mode: "camera" })}
-                        disabled={isPending}
+                        className="w-full h-14 rounded-2xl bg-primary text-white font-black text-base shadow-lg shadow-primary/20 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                        onClick={async () => {
+                          if (deliveryBoutonPending) return;
+                          // Admin : ouvrir la modale de prix (comme avant)
+                          if (course.pricing_mode === "admin_manuel" || course.source === "admin") {
+                            setPendingDeliveryData({});
+                            setShowPrixModal(true);
+                            return;
+                          }
+                          setDeliveryBoutonPending(true);
+                          try {
+                            const res = await base44.functions.invoke("finaliserLivraisonLivreur", {
+                              course_id: course.id,
+                              confirmation_method: "bouton",
+                            });
+                            const data = res?.data || res || {};
+                            if (data?.success || data?.skipped) {
+                              updateOptimisticStatut("livree", {
+                                heure_livraison: data?.course?.heure_livraison || new Date().toISOString(),
+                              });
+                              queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+                              queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
+                              onColisLivre({ ...(data?.course || course), statut: "livree" }, null);
+                              onDeliveryVictory?.(course.id);
+                            } else {
+                              throw new Error(data?.error || data?.message || "Erreur finalisation");
+                            }
+                          } catch (err) {
+                            // Erreur — rester sur la course, permettre retry
+                            setOptimisticStatut(null);
+                            toast.error(err?.response?.data?.error || err?.response?.data?.message || err?.message || "Erreur lors de la finalisation. Réessayez.");
+                          } finally {
+                            setDeliveryBoutonPending(false);
+                          }
+                        }}
+                        disabled={isPending || deliveryBoutonPending}
                       >
-                        <QrCode className="w-5 h-5" />
-                        QR Code
+                        {deliveryBoutonPending ? (
+                          <div className="w-5 h-5 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                        ) : (
+                          <>
+                            <Check className="w-6 h-6" />
+                            Colis livré
+                            <ChevronRight className="w-5 h-5" />
+                          </>
+                        )}
                       </button>
-                      <button
-                        className="h-14 rounded-2xl bg-primary-dark text-white font-black text-sm shadow-lg shadow-primary/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                        onClick={() => setShowQRScanner({ type: "delivery", mode: "code" })}
-                        disabled={isPending}
-                      >
-                        <span className="text-lg"></span>
-                        PIN Code
-                      </button>
-                    </div>
+                    ) : (
+                      /* ── EXTERNE ancien parcours (backward compat) : Scanner QR/PIN pour livrer ── */
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          className="h-14 rounded-2xl bg-primary text-white font-black text-sm shadow-lg shadow-primary/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                          onClick={() => setShowQRScanner({ type: "delivery", mode: "camera" })}
+                          disabled={isPending}
+                        >
+                          <QrCode className="w-5 h-5" />
+                          QR Code
+                        </button>
+                        <button
+                          className="h-14 rounded-2xl bg-primary-dark text-white font-black text-sm shadow-lg shadow-primary/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                          onClick={() => setShowQRScanner({ type: "delivery", mode: "code" })}
+                          disabled={isPending}
+                        >
+                          <span className="text-lg"></span>
+                          PIN Code
+                        </button>
+                      </div>
+                    )
                   )
                 ) : (
                   /* ── INTERNE : bouton classique avec GPS + récapitulatif ── */
@@ -1351,16 +1458,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
             </div>
           )}
 
-          {/* ── Indicateur PIN secours ── */}
-          {colisLivre && course.delivery_confirmed_by === 'pin_secours' && (
-            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 flex items-center gap-2.5">
-              <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
-              <div>
-                <p className="text-sm font-bold text-amber-800">Livraison validée avec PIN secours 0000</p>
-                <p className="text-xs text-amber-600">Le destinataire ne possédait pas SILGAPP</p>
-              </div>
-            </div>
-          )}
+          {/* ── Correction 1: indicateur PIN secours supprimé du nouveau parcours ── */}
 
           {/* RÉCAPITULATIF DÉPLACEMENT — avant clic TERMINER */}
           {deplacementRecap && (
@@ -1413,10 +1511,10 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                     statut: "livree",
                   };
                   updateOptimisticStatut("livree", finalData);
-                  await invokeCourseBackend("finaliserLivraisonLivreur", {
+                  base44.functions.invoke("finaliserLivraisonLivreur", {
                     course_id: course.id,
                     prix_final_livreur: deplacementRecap.prix_final,
-                  });
+                  }).catch(() => null);
                   queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
                   // Appeler onColisLivre pour libérer le livreur UNIQUEMENT maintenant
                   onColisLivre(finalData, deplacementRecap.prix_final);
@@ -1519,16 +1617,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                     Commission SILGAPP : {commission.toLocaleString()} {course.devise || "F"}
                   </p>
                 )}
-                <button
-                  className="w-full h-12 rounded-2xl bg-primary text-white font-black text-sm shadow-lg shadow-primary/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-                  onClick={() => {
-                    onColisLivre({ ...course, statut: "livree" }, null);
-                    navigateToRecap({ statut: "livree", heure_livraison: course.heure_livraison || new Date().toISOString() });
-                  }}
-                >
-                  <Check className="w-5 h-5" />
-                  Terminer
-                </button>
+                {/* Correction 3: bouton "Terminer" supprimé — retour automatique après Victory Overlay */}
               </div>
             );
           })()}

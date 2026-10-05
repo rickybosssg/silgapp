@@ -50,9 +50,7 @@ export default async function(req: Request): Promise<Response> {
             type: 'generic',
           });
         }
-      } catch (pushErr) {
-        console.error('[validerAchatPass] Échec notification refus Pass', achat_id, pushErr?.message || pushErr);
-      }
+      } catch (_) {}
 
       return Response.json({ success: true, statut: 'refuse' });
     }
@@ -106,9 +104,7 @@ export default async function(req: Request): Promise<Response> {
             type: 'generic',
           });
         }
-      } catch (pushErr) {
-        console.error('[validerAchatPass] Échec notification annulation Pass', achat_id, pushErr?.message || pushErr);
-      }
+      } catch (_) {}
 
       return Response.json({
         success: true,
@@ -167,9 +163,7 @@ export default async function(req: Request): Promise<Response> {
           type: 'generic',
         });
       }
-    } catch (pushErr) {
-      console.error('[validerAchatPass] Échec notification activation Pass', achat_id, pushErr?.message || pushErr);
-    }
+    } catch (_) {}
 
     return Response.json({
       success: true,

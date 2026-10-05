@@ -25,8 +25,7 @@ export default async function(req) {
     // ── Autorisation : admin complet OU permission dédiée can_create_admin_course ──
     // Un agent de saisie a role='user' mais can_create_admin_course=true.
     // Il peut créer des courses admin mais n'a PAS accès au dashboard admin complet.
-    const enterpriseAdmin = isEnterpriseAdmin(user);
-    const isAuthorized = user.role === 'admin' || user.can_create_admin_course === true || enterpriseAdmin;
+    const isAuthorized = user.role === 'admin' || user.can_create_admin_course === true;
     if (!isAuthorized) {
       return Response.json({
         error: 'Réservé aux administrateurs ou agents de saisie autorisés',
@@ -47,8 +46,15 @@ export default async function(req) {
       }
     }
 
+    // [ENTERPRISE] Résolution backend de enterprise_id depuis l'utilisateur authentifié.
+    // - Admin Entreprise (silgapp_role=admin_entreprise) : enterprise_id forcé depuis son compte.
+    //   Il ne peut pas créer de course publique ni de course pour une autre entreprise.
+    // - Super Admin (role=admin, silgapp_role != admin_entreprise) : enterprise_id = null (course publique).
+    // Toute valeur enterprise_id envoyée par le frontend est ignorée (anti-falsification).
+    const enterpriseAdmin = isEnterpriseAdmin(user);
     if (enterpriseAdmin) {
       courseData.enterprise_id = normalizeEnterpriseId(user.enterprise_id);
+      // [ENTERPRISE_SUSPENSION] Bloquer la création si l'entreprise est suspendue.
       const entList = await base44.asServiceRole.entities.Enterprise.filter({
         enterprise_financier_id: courseData.enterprise_id,
       }).catch(() => []);

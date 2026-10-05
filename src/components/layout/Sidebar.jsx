@@ -3,14 +3,14 @@ import { Link, useLocation } from "react-router-dom";
 import { clearPersistedToken } from "@/lib/authPersistence";
 import { 
   LayoutDashboard, MapPin, Plus, Truck, BarChart3, Bell,
-  Package, TrendingUp, ChevronLeft, ChevronRight, LogOut, Wallet, Shield, Globe, Settings, MessageCircle, Users, Megaphone, ChevronDown, Check, UserCheck, ShieldAlert, Store, UtensilsCrossed, Pill, PieChart, Sparkles, Brain, FlaskConical, Cpu, Crown, Zap, Coins, Radio, Trophy, Activity, Ticket, Building2
+  Package, TrendingUp, ChevronLeft, ChevronRight, LogOut, Wallet, Shield, Globe, Settings, MessageCircle, Users, Megaphone, ChevronDown, Check, UserCheck, ShieldAlert, Store, UtensilsCrossed, Pill, PieChart, Sparkles, Brain, FlaskConical, Cpu, Crown, Zap, Coins, Radio, Trophy, Activity, Ticket, Building2, Rocket
 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { useQuery } from "@tanstack/react-query";
 import { useAdminContext } from "@/hooks/useAdminContext.js";
-import { usePaysActifs } from "@/components/international/CountrySelector.jsx";
+import { getCountryFlag, getCountryName, usePaysActifs } from "@/components/international/CountrySelector.jsx";
 import { SILGAPP_LOGO_URL } from "@/lib/branding";
 
 const doLogout = () => {
@@ -39,6 +39,7 @@ export const navItems = [
   { path: "/admin/gestion-pays", label: "Gestion des pays", icon: Settings },
   { path: "/admin/crm-clients", label: "CRM Clients", icon: Users },
   { path: "/admin/growth", label: "Growth", icon: TrendingUp },
+  { path: "/admin/autopilote", label: "Autopilote Acquisition", icon: Rocket },
   { path: "/admin/meta-ads", label: "Publicités Meta", icon: Megaphone },
   { path: "/admin/pass-zero-commission", label: "Pass & Happy Hour", icon: Ticket },
   { path: "/admin/reactivation-clients", label: "Réactivation Clients", icon: Bell },
@@ -85,14 +86,16 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, part
   const effectiveCountry = isPays ? adminCountryCode : selectedCountry;
   const showCountryPicker = reseau === "externe" && !isPays;
   const { pays: paysListe } = usePaysActifs();
+  const selectedCountryInfo = paysListe.find(p => p.code === effectiveCountry);
+  const selectedCountryFlag = getCountryFlag(selectedCountryInfo) || "🌍";
+  const selectedCountryName = getCountryName(selectedCountryInfo, "Choisir un pays");
 
   // ── Badge non-lu pour le Centre de notifications ──
   const { data: inboxUnread = 0 } = useQuery({
-    queryKey: ["admin-inbox-unread-count", effectiveCountry || "ALL"],
+    queryKey: ["admin-inbox-unread-count"],
     queryFn: async () => {
       try {
-        const filter = { status: "unread", ...(effectiveCountry ? { country_code: effectiveCountry } : {}) };
-        const items = await base44.entities.AdminInboxItem.filter(filter, "-created_date", 200);
+        const items = await base44.entities.AdminInboxItem.filter({ status: "unread" }, "-created_date", 200);
         return items?.length || 0;
       } catch { return 0; }
     },
@@ -224,10 +227,10 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, part
               <button
                 onClick={() => setCountryOpen(!countryOpen)}
                 className="w-full flex items-center justify-center h-9 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
-                title={effectiveCountry ? paysListe.find(p => p.code === effectiveCountry)?.nom : "Choisir un pays"}
+                title={effectiveCountry ? selectedCountryName : "Choisir un pays"}
               >
                 <span className="text-base">
-                  {effectiveCountry ? paysListe.find(p => p.code === effectiveCountry)?.emoji_flag || "🌍" : "🌍"}
+                  {effectiveCountry ? selectedCountryFlag : "🌍"}
                 </span>
               </button>
             ) : (
@@ -237,10 +240,10 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, part
               >
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="text-base flex-shrink-0">
-                    {effectiveCountry ? paysListe.find(p => p.code === effectiveCountry)?.emoji_flag || "🌍" : "🌍"}
+                    {effectiveCountry ? selectedCountryFlag : "🌍"}
                   </span>
                   <span className="text-xs font-semibold text-gray-900 truncate">
-                    {effectiveCountry ? paysListe.find(p => p.code === effectiveCountry)?.nom : "Choisir un pays"}
+                    {effectiveCountry ? selectedCountryName : "Choisir un pays"}
                   </span>
                 </div>
                 <ChevronDown className={cn("w-3.5 h-3.5 text-gray-500 flex-shrink-0 transition-transform", countryOpen && "rotate-180")} />
@@ -264,8 +267,8 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, part
                         effectiveCountry === p.code && "bg-blue-50 text-blue-800"
                       )}
                     >
-                      <span className="text-base flex-shrink-0">{p.emoji_flag}</span>
-                      <span className="flex-1 text-left font-medium">{p.nom}</span>
+                      <span className="text-base flex-shrink-0">{getCountryFlag(p)}</span>
+                      <span className="flex-1 text-left font-medium">{getCountryName(p, p.code)}</span>
                       {effectiveCountry === p.code && <Check className="w-3.5 h-3.5 text-blue-700 flex-shrink-0" />}
                     </button>
                   ))}

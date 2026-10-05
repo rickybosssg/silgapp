@@ -19,6 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import CommandeQRPartenaire from "@/components/partenaire/CommandeQRPartenaire";
 import ChatWindow from "@/components/chat/ChatWindow";
+import PreuvePaiementModal from "@/components/partenaire/PreuvePaiementModal";
 
 const STATUTS = {
   commande_envoyee: { label: "Nouvelle", color: "bg-red-50 text-red-700", border: "border-l-red-500", icon: Clock },
@@ -111,6 +112,7 @@ export default function CommandesManager({ type, etablissementId, etablissementN
   const [chatOpenId, setChatOpenId] = useState(null);
   const [actionLoading, setActionLoading] = useState(null);
   const [prepPickerCmdId, setPrepPickerCmdId] = useState(null);
+  const [preuvePaiement, setPreuvePaiement] = useState(null);
 
   const { data: commandes = [], isLoading } = useQuery({
     queryKey: ["commandes", type, etablissementId],
@@ -269,7 +271,17 @@ export default function CommandesManager({ type, etablissementId, etablissementN
                   {cmd.preuve_paiement_url && (
                     <div>
                       <p className="text-[10px] text-gray-400 mb-1 font-medium">Preuve de paiement</p>
-                      <img src={cmd.preuve_paiement_url} alt="Preuve" className="w-full rounded-xl max-h-40 object-cover border border-gray-100" />
+                      <button
+                        type="button"
+                        onClick={() => setPreuvePaiement(cmd)}
+                        className="w-full rounded-xl border border-gray-100 bg-gray-50 p-2 active:scale-[0.99] transition-transform"
+                      >
+                        <img
+                          src={cmd.preuve_paiement_url}
+                          alt="Preuve"
+                          className="w-full rounded-lg max-h-40 object-contain"
+                        />
+                      </button>
                     </div>
                   )}
 
@@ -406,6 +418,7 @@ export default function CommandesManager({ type, etablissementId, etablissementN
           );
         })}
       </div>
+      <PreuvePaiementModal commande={preuvePaiement} onClose={() => setPreuvePaiement(null)} />
     </div>
   );
 }

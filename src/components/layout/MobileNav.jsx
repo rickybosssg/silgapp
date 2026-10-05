@@ -8,8 +8,7 @@ import { Button } from "@/components/ui/button";
 import { base44 } from "@/api/base44Client";
 import { navItems as allNavItems } from "@/components/layout/Sidebar";
 import { useAdminContext } from "@/hooks/useAdminContext.js";
-import { usePaysActifs } from "@/components/international/CountrySelector.jsx";
-import { SILGAPP_LOGO_URL } from "@/lib/branding";
+import { getCountryFlag, getCountryName, usePaysActifs } from "@/components/international/CountrySelector.jsx";
 import { useQuery } from "@tanstack/react-query";
 
 // Bottom tab bar : items communs aux deux réseaux
@@ -79,14 +78,16 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
   const effectiveCountry = isPays ? adminCountryCode : selectedCountry;
   const showCountryPicker = reseau === "externe" && !isPays;
   const { pays: paysListe = [] } = usePaysActifs();
+  const selectedCountryInfo = paysListe.find(p => p.code === effectiveCountry);
+  const selectedCountryFlag = getCountryFlag(selectedCountryInfo) || "🌍";
+  const selectedCountryName = getCountryName(selectedCountryInfo, "Choisir un pays");
 
   // ── Badge non-lu pour le Centre de notifications ──
   const { data: inboxUnread = 0 } = useQuery({
-    queryKey: ["admin-inbox-unread-count", effectiveCountry || "ALL"],
+    queryKey: ["admin-inbox-unread-count"],
     queryFn: async () => {
       try {
-        const filter = { status: "unread", ...(effectiveCountry ? { country_code: effectiveCountry } : {}) };
-        const items = await base44.entities.AdminInboxItem.filter(filter, "-created_date", 200);
+        const items = await base44.entities.AdminInboxItem.filter({ status: "unread" }, "-created_date", 200);
         return items?.length || 0;
       } catch { return 0; }
     },
@@ -99,9 +100,9 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
       <header className="lg:hidden fixed top-0 left-0 right-0 bg-sidebar/95 backdrop-blur-xl border-b border-white/5 z-40 flex items-center justify-between px-4 shadow-sm safe-area-top" style={{ minHeight: '3.5rem' }}>
         <div className="flex items-center gap-2.5">
           <img
-            src={SILGAPP_LOGO_URL}
+            src="/silgapp-logo-official.jpg"
             alt="SILGAPP"
-            className="w-8 h-8 rounded-xl object-cover"
+            className="w-8 h-8 rounded-xl object-cover ring-2 ring-white/10"
           />
           <div>
             <h1 className="font-extrabold text-sm text-white leading-tight">SILGAPP</h1>
@@ -183,41 +184,36 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
                 <div className="relative">
                   <button
                     type="button"
-                    onClick={() => setCountryOpen(open => !open)}
-                    className="w-full flex items-center justify-between gap-2 bg-white text-gray-900 text-sm font-semibold rounded-xl px-3 py-2.5 border border-gray-200 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+                    onClick={() => setCountryOpen(!countryOpen)}
+                    className="w-full flex items-center justify-between gap-2 bg-white text-gray-900 text-sm font-semibold rounded-xl px-3 py-2.5 border border-gray-200 shadow-sm"
                   >
                     <span className="flex items-center gap-2 min-w-0">
-                      <span className="text-base flex-shrink-0">
-                        {effectiveCountry ? paysListe.find(p => p.code === effectiveCountry)?.emoji_flag : ""}
-                      </span>
-                      <span className="truncate">
-                        {effectiveCountry ? paysListe.find(p => p.code === effectiveCountry)?.nom : "Choisir un pays"}
-                      </span>
+                      <span className="text-base flex-shrink-0">{effectiveCountry ? selectedCountryFlag : "🌍"}</span>
+                      <span className="truncate">{effectiveCountry ? selectedCountryName : "Choisir un pays"}</span>
                     </span>
-                    <ChevronDown className={cn("w-4 h-4 text-gray-700 flex-shrink-0 transition-transform", countryOpen && "rotate-180")} />
+                    <ChevronDown className={cn("w-4 h-4 text-gray-500 flex-shrink-0 transition-transform", countryOpen && "rotate-180")} />
                   </button>
-
                   {countryOpen && (
-                    <>
-                      <div className="fixed inset-0 z-[55]" onClick={() => setCountryOpen(false)} />
-                      <div className="absolute left-0 right-0 top-full mt-2 z-[60] max-h-[60vh] overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-2xl">
-                        {paysListe.map((p) => (
-                          <button
-                            key={p.code}
-                            type="button"
-                            onClick={() => { setSelectedCountry(p.code); setCountryOpen(false); }}
-                            className={cn(
-                              "w-full flex items-center gap-3 px-3 py-3 text-sm text-gray-900 border-b border-gray-100 last:border-0 hover:bg-gray-100",
-                              effectiveCountry === p.code && "bg-blue-50 text-blue-800"
-                            )}
-                          >
-                            <span className="text-lg flex-shrink-0">{p.emoji_flag}</span>
-                            <span className="flex-1 text-left font-medium">{p.nom}</span>
-                            {effectiveCountry === p.code && <Check className="w-4 h-4 text-blue-700 flex-shrink-0" />}
-                          </button>
-                        ))}
-                      </div>
-                    </>
+                    <div className="absolute z-50 left-0 right-0 top-full mt-2 bg-white border border-gray-200 rounded-xl shadow-2xl max-h-72 overflow-y-auto">
+                      {paysListe.map((p) => (
+                        <button
+                          key={p.code}
+                          type="button"
+                          onClick={() => {
+                            setSelectedCountry(p.code);
+                            setCountryOpen(false);
+                          }}
+                          className={cn(
+                            "w-full flex items-center gap-3 px-3 py-2.5 text-sm text-gray-900 hover:bg-gray-100 transition-colors",
+                            effectiveCountry === p.code && "bg-blue-50 text-blue-800"
+                          )}
+                        >
+                          <span className="text-base flex-shrink-0">{getCountryFlag(p)}</span>
+                          <span className="flex-1 text-left font-medium">{getCountryName(p, p.code)}</span>
+                          {effectiveCountry === p.code && <Check className="w-3.5 h-3.5 text-blue-700 flex-shrink-0" />}
+                        </button>
+                      ))}
+                    </div>
                   )}
                 </div>
               </div>

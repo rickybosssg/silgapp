@@ -10,7 +10,7 @@ import ContactPickerButton from "@/components/client/ContactPickerButton";
 import CarnetAdresses from "@/components/client/CarnetAdresses";
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
-import { findClientByPhone, getValidContactPhone, phonePlaceholder } from "@/lib/phoneUtils";
+import { findClientByPhone, validateLocalPhone } from "@/lib/phoneUtils";
 
 const TYPE_COLIS_OPTIONS = [
   { value: "petit_colis", label: "Petit", icon: "", desc: "< 2 kg" },
@@ -44,10 +44,18 @@ export default function ColisDestinataireForm({
   const update = (field, value) => onChange(index, field, value);
 
   // ── Auto-recherche destinataire (debounce 600ms + anti-race) ──────────
-  // Recherche automatique sécurisée via findContactByPhoneSecure (backend, RLS-safe).
+  // Remplace l'ancien bouton "Vérifier dans SILGAPP" par une recherche
+  // automatique sécurisée via findContactByPhoneSecure (backend, RLS-safe).
   useEffect(() => {
-    const phone = getValidContactPhone(colisData.destinataire_telephone, countryCode);
+    const phone = colisData.destinataire_telephone || "";
     if (!phone) {
+      setSearching(false);
+      setDestinataireFound(undefined);
+      return;
+    }
+
+    const validation = validateLocalPhone(phone, countryCode);
+    if (!validation.valid) {
       setSearching(false);
       setDestinataireFound(undefined);
       return;
@@ -64,7 +72,7 @@ export default function ColisDestinataireForm({
           setDestinataireFound(client);
           update("destinataire_nom", colisData.destinataire_nom || client.nom || client.prenom || "");
           update("destinataire_client_id", client.id);
-          update("recipient_has_app", client.has_app_account === true);
+          update("recipient_has_app", true);
           const hasGps = !!(client.latitude && client.longitude);
           if (hasGps) {
             update("gps_livraison_lat", client.latitude);
@@ -187,7 +195,7 @@ export default function ColisDestinataireForm({
                 update("destinataire_telephone", e.target.value);
                 setDestinataireFound(undefined);
               }}
-              placeholder={phonePlaceholder(countryCode)}
+              placeholder="+226 XX XX XX XX"
               className="h-12 rounded-xl border-2 border-gray-200 bg-gray-50 focus:bg-white text-sm"
             />
             {/* Actions contacts */}
@@ -220,7 +228,7 @@ export default function ColisDestinataireForm({
             {destinataireFound && (
               <div className="p-3 rounded-xl bg-green-50 border border-green-200 text-xs text-green-800 font-semibold flex items-center gap-2">
                 <CheckCircle className="w-4 h-4 text-green-600" />
-                {destinataireFound.nom || destinataireFound.prenom} — {destinataireFound.has_app_account ? "Contact trouvé dans SILGAPP" : "Contact connu de SILGAPP"}
+                {destinataireFound.nom || destinataireFound.prenom} trouvé dans SILGAPP ✓
               </div>
             )}
             {destinataireFound === null && (

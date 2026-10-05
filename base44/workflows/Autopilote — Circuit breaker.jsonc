@@ -1,0 +1,44 @@
+{
+  "name": "Autopilote \u2014 Circuit breaker",
+  "description": "V\u00e9rifie les budgets Growth (sous-plafonds acquisition, primes, r\u00e9activation + plafond global) toutes les heures. Bloque le moteur concern\u00e9 si un sous-plafond est d\u00e9pass\u00e9. Active le kill switch global si le plafond global est d\u00e9pass\u00e9.",
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "interval",
+      "cron_expression": null,
+      "one_time_date": null,
+      "timezone": "UTC",
+      "interval_value": 1,
+      "interval_unit": "hours",
+      "interval_anchor": null,
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  },
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "autopilote_circuit_breaker",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "check_budget": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "checkGrowthBudgetAutopilote"
+          },
+          "then": "end",
+          "x-base44": {
+            "title": "Circuit breaker budgets",
+            "description": "Sous-plafonds par canal + plafond global"
+          }
+        }
+      }
+    ]
+  }
+}

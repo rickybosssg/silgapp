@@ -55,7 +55,9 @@ export default function LivreurStatsBanner({ mesCourses, totalEncaisse, montantD
           <p className="text-base font-black text-slate-900 leading-none">
             {totalEncaisse > 0 ? totalEncaisse.toLocaleString() : "0"}<span className="text-[10px] font-normal ml-0.5">F</span>
           </p>
-          <p className="text-[10px] text-slate-600 font-semibold mt-1">{isEnterpriseDriver ? "Montant" : "Gains"}</p>
+          <p className="text-[10px] text-slate-600 font-semibold mt-1">
+            {isEnterpriseDriver ? <span>Montant</span> : <span>Gains</span>}
+          </p>
         </div>
         {/* Dû SILGAPP — masqué pour les livreurs Enterprise */}
         {!isEnterpriseDriver && (

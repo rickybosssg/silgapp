@@ -2,23 +2,21 @@ import React, { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   ArrowLeft, ArrowRight, MapPin, Navigation, Package,
   User, FileText, CheckCircle, Truck, AlertCircle,
-  Loader2, Pencil, ChevronDown, ChevronUp, Info, Flame
+  Loader2,
+  Pencil, ChevronDown, ChevronUp, Info, Flame
 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { calculerPrixApproximatif } from "@/lib/priceEstimate";
 import { isPaysTarificationGrandOuaga, calculerTarifGrandOuagaAsync } from "@/lib/tarifGrandOuaga";
 import CarnetAdresses from "@/components/client/CarnetAdresses";
 import ContactPickerButton from "@/components/client/ContactPickerButton";
-import { SILGAPP_COUNTRIES, getValidContactPhone, findClientByPhone } from "@/lib/phoneUtils";
+import { SILGAPP_COUNTRIES, validateLocalPhone, findClientByPhone } from "@/lib/phoneUtils";
 import NombreColisSelector from "@/components/multi-colis/NombreColisSelector";
-import MultiColisFormStep from "@/components/multi-colis/MultiColisFormStep";
 import SmartAddressInput from "@/components/location/SmartAddressInput";
 import { useCountryPricing } from "@/hooks/useCountryPricing";
-import { resolveGpsFromSelection } from "@/lib/resolveGpsFromSelection";
 
 // ─── Palette premium ─────────────────────────────────────────────────────────
 // Vert émeraude #059669 — Bleu ardoise #1E293B — Fond #F8FAFC
@@ -225,8 +223,15 @@ export default function CourseStepForm({
   // Déclenche automatiquement la recherche quand le numéro est valide pour le pays.
   // Aucune recherche tant que le numéro est incomplet. Annule les recherches obsolètes.
   useEffect(() => {
-    const phone = getValidContactPhone(formData.destinataire_telephone, activeCountry);
+    const phone = formData.destinataire_telephone || "";
     if (!phone || !activeCountry) {
+      setDestSearching(false);
+      setDestinataireFound(undefined);
+      return;
+    }
+
+    const validation = validateLocalPhone(phone, activeCountry);
+    if (!validation.valid) {
       setDestSearching(false);
       setDestinataireFound(undefined);
       return;
@@ -237,7 +242,7 @@ export default function CourseStepForm({
       setDestSearching(true);
       setDestinataireFound(undefined);
       try {
-        const client = await findClientByPhone(base44, phone, activeCountry);
+        const client = await findClientByPhone(base44, phone);
         if (requestId !== destSearchRequestId.current) return; // race condition
         if (client) {
           setDestinataireFound(client);
@@ -246,7 +251,7 @@ export default function CourseStepForm({
             ...prev,
             destinataire_nom: prev.destinataire_nom || client.nom || client.prenom || "",
             destinataire_client_id: client.id,
-            recipient_has_app: client.has_app_account === true,
+            recipient_has_app: true,
             ...(hasGps ? {
               gps_arrivee_lat: client.latitude,
               gps_arrivee_lng: client.longitude,
@@ -283,8 +288,15 @@ export default function CourseStepForm({
 
   // ── Auto-recherche expéditeur dans SILGAPP (debounce + anti-race) ──────────
   useEffect(() => {
-    const phone = getValidContactPhone(formData.expediteur_telephone, activeCountry);
+    const phone = formData.expediteur_telephone || "";
     if (!phone || !activeCountry) {
+      setExpSearching(false);
+      setExpediteurFound(undefined);
+      return;
+    }
+
+    const validation = validateLocalPhone(phone, activeCountry);
+    if (!validation.valid) {
       setExpSearching(false);
       setExpediteurFound(undefined);
       return;
@@ -304,7 +316,7 @@ export default function CourseStepForm({
             ...prev,
             expediteur_nom: prev.expediteur_nom || client.nom || client.prenom || "",
             expediteur_client_id: client.id,
-            expediteur_has_app: client.has_app_account === true,
+            expediteur_has_app: true,
             expediteur_gps_available: hasGps,
             expediteur_gps_lat: hasGps ? client.latitude : null,
             expediteur_gps_lng: hasGps ? client.longitude : null,
@@ -342,8 +354,15 @@ export default function CourseStepForm({
 
   // ── Auto-recherche passager dans SILGAPP (debounce + anti-race) ────────────
   useEffect(() => {
-    const phone = getValidContactPhone(formData.passager_telephone, activeCountry);
+    const phone = formData.passager_telephone || "";
     if (!phone || !activeCountry) {
+      setPassagerSearching(false);
+      setPassagerFound(undefined);
+      return;
+    }
+
+    const validation = validateLocalPhone(phone, activeCountry);
+    if (!validation.valid) {
       setPassagerSearching(false);
       setPassagerFound(undefined);
       return;
@@ -454,11 +473,15 @@ export default function CourseStepForm({
   };
 
   // ─── Titre de l'étape courante ──────────────────────────────────────────────
+  // ── CORRECTION 4: parcours client simplifié en 3 étapes ──
+  // ÉTAPE 1: Adresses (récupération + livraison)
+  // ÉTAPE 2: Contact (destinataire / expéditeur / passager)
+  // ÉTAPE 3: Détails + commande (type colis, prix, notes, confirmer)
   const stepTitles = isExpedie
-    ? ["Récupération", "Destinataire", "Livraison", "Détails", "Récapitulatif"]
+    ? ["Adresses", "Destinataire", "Détails"]
     : isRecevoir
-    ? ["Expéditeur", "Récupération", "Détails", "Récapitulatif"]
-    : ["Prise en charge", "Destination", "Passager", "Détails", "Récapitulatif"];
+    ? ["Adresses", "Expéditeur", "Détails"]
+    : ["Adresses", "Passager", "Détails"];
 
   const updateAddress = (side, text, location) => {
     const isDeparture = side === "depart";
@@ -466,32 +489,35 @@ export default function CourseStepForm({
     const lngField = isDeparture ? "gps_depart_lng" : "gps_arrivee_lng";
     const sourceField = isDeparture ? "gps_depart_source" : "gps_arrivee_source";
 
+    // ── INVALIDATION IMMÉDIATE des anciennes coordonnées ──
+    // Si l'utilisateur tape du texte sans sélectionner une suggestion (location=null),
+    // les anciennes coordonnées sont IMMÉDIATEMENT effacées pour empêcher qu'une
+    // adresse nouvellement saisie hérite des coordonnées de l'adresse précédente.
+    const hasValidLocation =
+      location &&
+      Number.isFinite(Number(location.latitude)) &&
+      Number.isFinite(Number(location.longitude)) &&
+      !(Number(location.latitude) === 0 && Number(location.longitude) === 0);
+
     setFormData((previous) => ({
       ...previous,
       [isDeparture ? "adresse_depart" : "adresse_arrivee"]: text,
       [isDeparture ? "quartier_depart" : "quartier_arrivee"]:
         location?.quartier || (location ? location.label : text),
-      ...(location && Number.isFinite(Number(location.latitude)) && Number.isFinite(Number(location.longitude))
+      ...(hasValidLocation
         ? {
             [latField]: Number(location.latitude),
             [lngField]: Number(location.longitude),
             [sourceField]: location?.type === "quartier" ? "quartier" : "geocodage",
             [isDeparture ? "recuperationGPS" : "livraisonGPS"]: true,
           }
-        : {}),
+        : {
+            [latField]: null,
+            [lngField]: null,
+            [sourceField]: null,
+            [isDeparture ? "recuperationGPS" : "livraisonGPS"]: false,
+          }),
     }));
-
-    if (location?.type === "quartier" && location.latitude && location.longitude && activeCountry) {
-      resolveGpsFromSelection(location, activeCountry).then((resolved) => {
-        if (!resolved || resolved.source !== "geocodage") return;
-        setFormData((prev) => ({
-          ...prev,
-          [latField]: resolved.lat,
-          [lngField]: resolved.lng,
-          [sourceField]: resolved.source,
-        }));
-      });
-    }
   };
 
   // ─── Auto-remplir le prix proposé avec l'estimation GPS (conseil uniquement) ──
@@ -553,7 +579,7 @@ export default function CourseStepForm({
                 {isFound ? labelTrouve : (labelConnu || labelTrouve)}
               </p>
               <p className="text-sm mt-1" style={{ color: COLORS.textSecondary }}>
-                <strong>{nom}</strong> {isFound ? "est inscrit dans SILGAPP" : "est connu de SILGAPP"}
+                <strong>{nom}</strong> est inscrit dans SILGAPP
               </p>
               <div className="flex flex-wrap gap-2 mt-2">
                 <span className="text-xs px-2.5 py-1 rounded-full font-medium" style={{ background: COLORS.primaryLight, color: COLORS.primary }}>Synchronisation</span>
@@ -655,18 +681,28 @@ export default function CourseStepForm({
   // ─── RENDU DES ÉTAPES ───────────────────────────────────────────────────────
   // ═══════════════════════════════════════════════════════════════════════════
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // CORRECTION 4 — Parcours 3 étapes
+  // ÉTAPE 0: Adresses (récupération + livraison)
+  // ÉTAPE 1: Contact (destinataire / expéditeur / passager)
+  // ÉTAPE 2: Détails + commande
+  // ═══════════════════════════════════════════════════════════════════════════
   const renderStep = () => {
     switch (step) {
-      // ─── ÉTAPE 0 ───────────────────────────────────────────────────────────
+      // ─── ÉTAPE 0: ADRESSES (récupération + livraison) ──────────────────────
       case 0: {
-        // Déplacement : adresse de prise en charge
-        if (isDeplacement) {
-          return (
-            <div className="space-y-5">
+        return (
+          <div className="space-y-5">
+            {/* ─── RÉCUPÉRATION ─── */}
+            <div className="space-y-4">
               <div className="text-center">
                 <StepIcon icon={MapPin} />
-                <h2 className="text-2xl font-black" style={{ color: COLORS.secondary }}>Point de prise en charge</h2>
-                <p className="text-sm mt-1.5" style={{ color: COLORS.textSecondary }}>Où récupérer le passager ?</p>
+                <h2 className="text-2xl font-black" style={{ color: COLORS.secondary }}>
+                  {isDeplacement ? "Point de prise en charge" : isRecevoir ? "Adresse de récupération" : "Où récupérer le colis ?"}
+                </h2>
+                <p className="text-sm mt-1.5" style={{ color: COLORS.textSecondary }}>
+                  {isDeplacement ? "Où récupérer le passager ?" : isRecevoir ? "Où le livreur doit récupérer le colis" : "Votre adresse de récupération"}
+                </p>
               </div>
               {formData.recuperationGPS ? (
                 <GPSAcquiredCard
@@ -677,21 +713,70 @@ export default function CourseStepForm({
                 />
               ) : (
                 <>
-                  <GPSButton onClick={gpsHandlers?.onGetGPSDepart} loading={gpsLoading?.depart} label="Utiliser ma position actuelle" sublabel="Détection automatique de votre position" />
-                  <Divider />
+                  {!isRecevoir && (
+                    <GPSButton onClick={gpsHandlers?.onGetGPSDepart} loading={gpsLoading?.depart} label="Utiliser ma position actuelle" sublabel="Détection automatique de votre position" />
+                  )}
+                  {!isRecevoir && <Divider />}
                   <SmartAddressInput
                     countryCode={activeCountry}
-                    label="Adresse de prise en charge"
+                    label="Adresse de récupération"
                     value={formData.adresse_depart}
                     onChange={(text, location) => updateAddress("depart", text, location)}
                     placeholder="Quartier, rue, boutique, pharmacie..."
                   />
                 </>
               )}
+              {isExpedie && (
+                <div className="p-3 rounded-2xl border" style={{ background: COLORS.bgCard, borderColor: COLORS.border }}>
+                  <NombreColisSelector
+                    value={formData.nb_colis || 1}
+                    onChange={(nb) => setFormData({ ...formData, nb_colis: nb })}
+                  />
+                </div>
+              )}
             </div>
-          );
-        }
-        // Recevoir : expéditeur
+
+            <Divider />
+
+            {/* ─── LIVRAISON ─── */}
+            <div className="space-y-4">
+              <div className="text-center">
+                <StepIcon icon={Navigation} />
+                <h2 className="text-2xl font-black" style={{ color: COLORS.secondary }}>
+                  {isDeplacement ? "Point de destination" : isRecevoir ? "Votre adresse de livraison" : "Où livrer le colis ?"}
+                </h2>
+                <p className="text-sm mt-1.5" style={{ color: COLORS.textSecondary }}>
+                  {isDeplacement ? "Où déposer le passager ?" : isRecevoir ? "Adresse où livrer le colis" : "Adresse ou quartier d'arrivée"}
+                </p>
+              </div>
+              {formData.livraisonGPS ? (
+                <GPSAcquiredCard
+                  address={formData.adresse_arrivee}
+                  onClear={() => setFormData({ ...formData, livraisonGPS: false, gps_arrivee_lat: null, gps_arrivee_lng: null, adresse_arrivee: "" })}
+                />
+              ) : (
+                <>
+                  <SmartAddressInput
+                    countryCode={activeCountry}
+                    label={isDeplacement ? "Adresse de destination" : "Adresse de livraison"}
+                    hint="Indiquez le quartier, la rue ou un point de repère connu."
+                    value={formData.adresse_arrivee}
+                    onChange={(text, location) => updateAddress("arrivee", text, location)}
+                    placeholder="Quartier, rue, restaurant, pharmacie..."
+                  />
+                  {isDeplacement && (
+                    <GPSButton onClick={gpsHandlers?.onGetGPSArrivee} loading={gpsLoading?.arrivee} label="Utiliser ma position actuelle" sublabel="Définir la destination avec le GPS" />
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        );
+      }
+
+      // ─── ÉTAPE 1: CONTACT (destinataire / expéditeur / passager) ──────────
+      case 1: {
+        // Recevoir : expéditeur (contact)
         if (isRecevoir) {
           return (
             <div className="space-y-5">
@@ -763,213 +848,6 @@ export default function CourseStepForm({
             </div>
           );
         }
-        // Expedier : adresse de récupération
-        return (
-          <div className="space-y-5">
-            <div className="text-center">
-              <StepIcon icon={MapPin} />
-              <h2 className="text-2xl font-black" style={{ color: COLORS.secondary }}>Où récupérer le colis ?</h2>
-              <p className="text-sm mt-1.5" style={{ color: COLORS.textSecondary }}>Votre adresse de récupération</p>
-            </div>
-            {formData.recuperationGPS ? (
-              <GPSAcquiredCard
-                address={formData.adresse_depart}
-                lat={formData.gps_depart_lat}
-                lng={formData.gps_depart_lng}
-                onClear={() => setFormData({ ...formData, recuperationGPS: false, gps_depart_lat: null, gps_depart_lng: null, adresse_depart: "" })}
-              />
-            ) : (
-              <>
-                <GPSButton onClick={gpsHandlers?.onGetGPSDepart} loading={gpsLoading?.depart} label="Utiliser ma position actuelle" sublabel="Détection automatique de votre position" />
-                <Divider />
-                <SmartAddressInput
-                  countryCode={activeCountry}
-                  label="Adresse de récupération"
-                  value={formData.adresse_depart}
-                  onChange={(text, location) => updateAddress("depart", text, location)}
-                  placeholder="Quartier, rue, boutique, pharmacie..."
-                />
-              </>
-            )}
-            {/* Sélecteur nombre de colis — uniquement pour "expedier" */}
-            <div className="p-4 rounded-2xl border" style={{ background: COLORS.bgCard, borderColor: COLORS.border }}>
-              <NombreColisSelector
-                value={formData.nb_colis || 1}
-                onChange={(nb) => setFormData({ ...formData, nb_colis: nb })}
-              />
-            </div>
-          </div>
-        );
-      }
-
-      // ─── ÉTAPE 1 ───────────────────────────────────────────────────────────
-      case 1: {
-        // Déplacement : adresse de destination
-        if (isDeplacement) {
-          return (
-            <div className="space-y-5">
-              <div className="text-center">
-                <StepIcon icon={MapPin} />
-                <h2 className="text-2xl font-black" style={{ color: COLORS.secondary }}>Point de destination</h2>
-                <p className="text-sm mt-1.5" style={{ color: COLORS.textSecondary }}>Où déposer le passager ?</p>
-              </div>
-              <SmartAddressInput
-                countryCode={activeCountry}
-                label="Adresse de destination"
-                hint="Indiquez le quartier, la rue ou un point de repère connu."
-                value={formData.adresse_arrivee}
-                onChange={(text, location) => updateAddress("arrivee", text, location)}
-                placeholder="Quartier, rue, restaurant, pharmacie..."
-                autoFocus
-              />
-              <GPSButton onClick={gpsHandlers?.onGetGPSArrivee} loading={gpsLoading?.arrivee} label="Utiliser ma position actuelle" sublabel="Définir la destination avec le GPS" />
-            </div>
-          );
-        }
-        // Recevoir : adresse de récupération
-        if (isRecevoir) {
-          const gpsDispo = !!(formData.expediteur_gps_lat && formData.expediteur_gps_lng && formData.expediteur_gps_available);
-          return (
-            <div className="space-y-5">
-              <div className="text-center">
-                <StepIcon icon={MapPin} />
-                <h2 className="text-2xl font-black" style={{ color: COLORS.secondary }}>Adresse de récupération</h2>
-                <p className="text-sm mt-1.5" style={{ color: COLORS.textSecondary }}>Où le livreur doit récupérer le colis</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  if (!gpsDispo) return;
-                  const newVal = !(gpsDispo && formData.recuperationGPS);
-                  if (newVal) {
-                    setFormData({ ...formData, recuperationGPS: true, adresse_depart: "Position GPS de l'expéditeur" });
-                  } else {
-                    setFormData({ ...formData, recuperationGPS: false, adresse_depart: formData.adresse_depart === "Position GPS de l'expéditeur" ? "" : formData.adresse_depart });
-                  }
-                }}
-                className={`w-full p-4 rounded-2xl border-2 text-left transition-all ${gpsDispo && formData.recuperationGPS ? "" : gpsDispo ? "" : "opacity-60 cursor-not-allowed"}`}
-                style={{
-                  borderColor: gpsDispo && formData.recuperationGPS ? COLORS.primary : COLORS.border,
-                  background: gpsDispo && formData.recuperationGPS ? COLORS.primaryLight : COLORS.bgCard,
-                }}
-              >
-                <div className="flex items-center gap-3">
-                  <Checkbox
-                    checked={gpsDispo && formData.recuperationGPS}
-                    disabled={!gpsDispo}
-                    className="pointer-events-none"
-                  />
-                  <div className="flex-1">
-                    <p className="font-bold" style={{ color: COLORS.secondary }}>Position GPS de l'expéditeur</p>
-                    {gpsDispo
-                      ? <p className="text-xs mt-0.5" style={{ color: COLORS.primary }}>Position disponible</p>
-                      : <p className="text-xs mt-0.5" style={{ color: COLORS.textHint }}>Non disponible (expéditeur sans GPS)</p>}
-                  </div>
-                </div>
-              </button>
-              {!(gpsDispo && formData.recuperationGPS) && (
-                <SmartAddressInput
-                  countryCode={activeCountry}
-                  label="Adresse de récupération"
-                  value={formData.adresse_depart}
-                  onChange={(text, location) => updateAddress("depart", text, location)}
-                  placeholder="Quartier, rue, boutique, pharmacie..."
-                  autoFocus
-                />
-              )}
-            </div>
-          );
-        }
-        // Expedier : destinataire
-        if (isExpedie && (formData.nb_colis || 1) > 1) {
-          return (
-            <MultiColisFormStep
-              colis={colis || []}
-              onChange={onColisChange}
-              clientId={clientId}
-              countryCode={countryCode}
-              savedLat={savedLat}
-              savedLng={savedLng}
-            />
-          );
-        }
-        if (isExpedie) {
-          return (
-            <div className="space-y-5">
-              <div className="text-center">
-                <StepIcon icon={User} />
-                <h2 className="text-2xl font-black" style={{ color: COLORS.secondary }}>À qui envoyer le colis ?</h2>
-                <p className="text-sm mt-1.5" style={{ color: COLORS.textSecondary }}>Identifiez le destinataire</p>
-              </div>
-              <PremiumInput
-                label="Nom du destinataire"
-                required={false}
-                value={formData.destinataire_nom}
-                onChange={(e) => setFormData({ ...formData, destinataire_nom: e.target.value })}
-                placeholder="Nom complet du destinataire"
-                autoFocus
-              />
-              <div className="space-y-3">
-                <Label className="!text-sm !font-semibold" style={{ color: COLORS.textLabel }}>
-                  Téléphone du destinataire <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  type="tel"
-                  value={formData.destinataire_telephone}
-                  onChange={(e) => {
-                    setFormData({ ...formData, destinataire_telephone: e.target.value });
-                    setDestinataireFound(undefined);
-                  }}
-                  placeholder={phonePlaceholder}
-                  className="h-14 rounded-xl border-2 bg-white px-4 text-base focus:outline-none"
-                  style={{ borderColor: COLORS.borderInput }}
-                />
-                <p className="text-xs pl-1" style={{ color: COLORS.textHint }}>Format : {phonePlaceholder}</p>
-                <div className="flex gap-2 flex-wrap">
-                  <CarnetAdresses
-                    clientId={clientId}
-                    type="destinataire"
-                    onSelect={(contact) => {
-                      setFormData({
-                        ...formData,
-                        destinataire_nom: contact.nom || formData.destinataire_nom,
-                        destinataire_telephone: contact.telephone,
-                      });
-                      setDestinataireFound(undefined);
-                    }}
-                  />
-                  <ContactPickerButton
-                    countryCode={activeCountry}
-                    onSelect={(contact) => {
-                      setFormData({
-                        ...formData,
-                        destinataire_nom: contact.nom || formData.destinataire_nom,
-                        destinataire_telephone: contact.telephone,
-                      });
-                      setDestinataireFound(undefined);
-                    }}
-                  />
-                </div>
-              </div>
-              <VerificationResult
-                found={destinataireFound}
-                searching={destSearching}
-                hasAppAccount={destinataireFound?.has_app_account}
-                nom={destinataireFound?.nom || destinataireFound?.prenom}
-                latitude={destinataireFound?.latitude}
-                longitude={destinataireFound?.longitude}
-                labelTrouve="Contact trouvé dans SILGAPP ✓"
-                labelConnu="Contact connu de SILGAPP ✓"
-                labelNonTrouve="Contact non trouvé dans SILGAPP"
-              />
-            </div>
-          );
-        }
-        return null;
-      }
-
-      // ─── ÉTAPE 2 ───────────────────────────────────────────────────────────
-      case 2: {
         // Déplacement : infos passager
         if (isDeplacement) {
           return (
@@ -1031,56 +909,81 @@ export default function CourseStepForm({
             </div>
           );
         }
-        // Expedier : adresse de livraison
-        if (isExpedie) {
-          const gpsDestDispo = !!(formData.gps_arrivee_lat && formData.gps_arrivee_lng && formData.livraisonGPS);
-          return (
-            <div className="space-y-5">
-              <div className="text-center">
-                <StepIcon icon={MapPin} />
-                <h2 className="text-2xl font-black" style={{ color: COLORS.secondary }}>Où livrer le colis ?</h2>
-                <p className="text-sm mt-1.5" style={{ color: COLORS.textSecondary }}>Adresse ou quartier d'arrivée</p>
-              </div>
-              {gpsDestDispo ? (
-                <GPSAcquiredCard
-                  address={formData.adresse_arrivee}
-                  onClear={() => setFormData({ ...formData, livraisonGPS: false, gps_arrivee_lat: null, gps_arrivee_lng: null, adresse_arrivee: "" })}
-                />
-              ) : (
-                <SmartAddressInput
-                  countryCode={activeCountry}
-                  label="Adresse de livraison"
-                  hint="Indiquez le quartier, la rue ou un point de repère connu."
-                  value={formData.adresse_arrivee}
-                  onChange={(text, location) => updateAddress("arrivee", text, location)}
-                  placeholder="Quartier, rue, restaurant, pharmacie..."
-                  autoFocus
-                />
-              )}
+        // Expedier : destinataire
+        return (
+          <div className="space-y-5">
+            <div className="text-center">
+              <StepIcon icon={User} />
+              <h2 className="text-2xl font-black" style={{ color: COLORS.secondary }}>Destinataire</h2>
+              <p className="text-sm mt-1.5" style={{ color: COLORS.textSecondary }}>Qui reçoit le colis ?</p>
             </div>
-          );
-        }
-        // Recevoir : type de colis + prix proposé + notes (regroupés)
+            <PremiumInput
+              label="Nom du destinataire"
+              required={false}
+              value={formData.destinataire_nom || ""}
+              onChange={(e) => setFormData({ ...formData, destinataire_nom: e.target.value })}
+              placeholder="Nom complet du destinataire"
+              autoFocus
+            />
+            <div className="space-y-3">
+              <Label className="text-sm font-semibold" style={{ color: COLORS.textLabel }}>
+                Téléphone du destinataire <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                type="tel"
+                value={formData.destinataire_telephone || ""}
+                onChange={(e) => {
+                  setFormData({ ...formData, destinataire_telephone: e.target.value });
+                  setDestinataireFound(undefined);
+                }}
+                placeholder={phonePlaceholder}
+                className="h-14 rounded-xl border-2 bg-white px-4 text-base focus:outline-none"
+                style={{ borderColor: COLORS.borderInput }}
+              />
+              <p className="text-xs pl-1" style={{ color: COLORS.textHint }}>Format : {phonePlaceholder}</p>
+              <div className="flex gap-2 flex-wrap">
+                <CarnetAdresses
+                  clientId={clientId}
+                  type="destinataire"
+                  onSelect={(contact) => {
+                    setFormData({
+                      ...formData,
+                      destinataire_nom: contact.nom || formData.destinataire_nom,
+                      destinataire_telephone: contact.telephone,
+                    });
+                    setDestinataireFound(undefined);
+                  }}
+                />
+                <ContactPickerButton
+                  countryCode={activeCountry}
+                  onSelect={(contact) => {
+                    setFormData({
+                      ...formData,
+                      destinataire_nom: contact.nom || formData.destinataire_nom,
+                      destinataire_telephone: contact.telephone,
+                    });
+                  }}
+                />
+              </div>
+            </div>
+            <VerificationResult
+              found={destinataireFound}
+              searching={destSearching}
+              hasAppAccount={destinataireFound?.has_app_account}
+              nom={destinataireFound?.nom || destinataireFound?.prenom}
+              latitude={destinataireFound?.latitude}
+              longitude={destinataireFound?.longitude}
+              labelTrouve="Contact trouvé dans SILGAPP ✓"
+              labelConnu="Contact connu de SILGAPP ✓"
+              labelNonTrouve="Contact non trouvé dans SILGAPP"
+            />
+          </div>
+        );
+      }
+
+      // ─── ÉTAPE 2: DÉTAILS + COMMANDE ─────────────────────────────────────
+      case 2: {
         return renderDetailsStep();
-      }
-
-      // ─── ÉTAPE 3 ───────────────────────────────────────────────────────────
-      case 3: {
-        // Déplacement : prix proposé + notes
-        if (isDeplacement) return renderDetailsStep();
-        // Expedier : type de colis + prix proposé + notes
-        if (isExpedie) return renderDetailsStep();
-        // Recevoir : récapitulatif
-        return renderRecap();
-      }
-
-      // ─── ÉTAPE 4 ───────────────────────────────────────────────────────────
-      case 4: {
-        // Déplacement : récapitulatif
-        if (isDeplacement) return renderRecap();
-        // Expedier : récapitulatif
-        if (isExpedie) return renderRecap();
-        return null;
       }
 
       default:
@@ -1095,6 +998,9 @@ export default function CourseStepForm({
     const lng1 = formData.gps_depart_lng;
     const lat2 = formData.gps_arrivee_lat;
     const lng2 = formData.gps_arrivee_lng;
+    // ── Source unique : distance ORS déjà calculée dans _tarifGrandOuaga ──
+    // Aucun deuxième appel ORS — on réutilise le résultat du useEffect ligne 414.
+    // Fallback Haversine uniquement si ORS n'a pas encore répondu ou a échoué.
     const tarifRoute = formData._tarifGrandOuaga;
     const estimation = tarifRoute
       ? {
@@ -1217,7 +1123,12 @@ export default function CourseStepForm({
                 >
                   <Info className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: COLORS.secondary }} />
                   <p className="text-xs" style={{ color: COLORS.secondary }}>
-                    Estimation GPS indicative : ~{estimation.prix.toLocaleString()} {countryDevise} ({estimation.distance} km).
+                    {estimation.isHorsTarif
+                      ? `Distance par route : ${estimation.distance} km. Tarif personnalisé requis.`
+                      : estimation.isRoute
+                        ? `Distance par route : ${estimation.distance} km — Tarif indicatif : ~${estimation.prix.toLocaleString()} ${countryDevise}.`
+                        : `Distance estimée : ${estimation.distance} km — Tarif indicatif : ~${estimation.prix.toLocaleString()} ${countryDevise}.`
+                    }
                     Le prix reste librement choisi par vous.
                   </p>
                 </div>
@@ -1425,24 +1336,21 @@ export default function CourseStepForm({
   // ─── Logique désactivation bouton Continuer ───────────────────────────────
   const isContinueDisabled = () => {
     const isMulti = isExpedie && (formData.nb_colis || 1) > 1;
+    // Étape 0 : Adresses (départ + arrivée)
     if (step === 0) {
-      if (isRecevoir) return !formData.expediteur_telephone;
+      if (!formData.adresse_depart) return true;
+      if (!formData.adresse_arrivee && !formData.destination_inconnue) return true;
       return false;
     }
+    // Étape 1 : Contact (destinataire / expéditeur / passager)
     if (step === 1) {
-      if (isDeplacement) return false;
-      if (isMulti) return !(colis || []).every(c => !!c.destinataire_telephone);
-      if (isExpedie) return !formData.destinataire_telephone;
-      return false;
-    }
-    if (step === 2) {
+      if (isRecevoir) return !formData.expediteur_telephone;
       if (isDeplacement) return !formData.passager_telephone;
-      if (isRecevoir) return !(formData.prix_propose > 0);
-      return false;
+      if (isMulti) return !(colis || []).every(c => !!c.destinataire_telephone);
+      return !formData.destinataire_telephone;
     }
-    if (step === 3) {
-      if (isDeplacement) return !(formData.prix_propose > 0);
-      if (isExpedie) return !(formData.prix_propose > 0);
+    // Étape 2 : Détails + commande
+    if (step === 2) {
       return false;
     }
     return false;

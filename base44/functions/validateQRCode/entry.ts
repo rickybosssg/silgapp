@@ -179,6 +179,18 @@ Deno.serve(async (req) => {
       // ── DELIVERY validé ──
       const now = new Date().toISOString();
 
+      // ── Garde anti-anomalie : une course source=client ne doit JAMAIS être
+      //    bloquée par pricing_mode=admin_manuel si prix_propose_admin est absent.
+      //    Cette incohérence peut résulter d'un ancien bug ou d'une modification
+      //    de données partielle. On corrige vers 'automatic' (même logique que
+      //    calculPrixCourseExterne) pour permettre la finalisation de la livraison.
+      if (course.source === 'client' && course.pricing_mode === 'admin_manuel' &&
+          (!course.prix_propose_admin || Number(course.prix_propose_admin) <= 0)) {
+        console.warn('[validateQRCode] Course source=client avec pricing_mode=admin_manuel sans prix_propose_admin (anomalie) — correction vers automatic');
+        await base44.asServiceRole.entities.CourseExterne.update(course_id, { pricing_mode: 'automatic' }).catch(() => {});
+        course.pricing_mode = 'automatic';
+      }
+
       // COURSE ADMIN : pas de calcul de prix automatique
       // Le prix est saisi par le livreur dans l'app après scan/PIN livraison.
       // Ne PAS mettre le livreur disponible — il doit d'abord saisir le montant.
@@ -243,14 +255,23 @@ Deno.serve(async (req) => {
         if (distAdmin != null) {
           adminUpdateData.distance_reelle_km = Math.max(Number(distAdmin) || 0, 0.01);
         }
+
+        // ── Enterprise: la commission est payée par l'entreprise, pas le livreur ──
+        // commission_silga = 0 sur la course → le livreur n'est jamais débité.
+        // La commission Enterprise (5%) est comptabilisée dans EnterpriseLedger.
+        // Le chemin public (enterprise_id null) n'est JAMAIS affecté.
         if (normalizeEnterpriseId(course.enterprise_id)) {
           adminUpdateData.commission_silga = 0;
           adminUpdateData.montant_livreur = prixFinalAdmin;
         }
 
         await base44.asServiceRole.entities.CourseExterne.update(course_id, adminUpdateData);
+
+        // ── Comptabiliser la commission Enterprise (uniquement pour les courses entreprise) ──
+        // Le chemin public (enterprise_id null) n'est JAMAIS affecté par cette logique.
         if (normalizeEnterpriseId(course.enterprise_id)) {
-          await comptabiliserCommissionEnterprise(base44.asServiceRole, { ...course, ...adminUpdateData }).catch((err) => {
+          const entCourse = { ...course, ...adminUpdateData };
+          await comptabiliserCommissionEnterprise(base44.asServiceRole, entCourse).catch((err) => {
             console.error('[validateQRCode][comptabiliserCommissionEnterprise admin]', err?.message);
           });
         }
@@ -291,6 +312,7 @@ Deno.serve(async (req) => {
       // CORRECTION PRIX MANUEL : Si la course utilise un prix manuel accepté,
       // ce montant devient le prix officiel. Ne JAMAIS recalculer.
       const isPrixManuel = course.pricing_mode === "manual" && course.manual_price_status === "accepted" && Number(course.manual_price) > 0;
+      const isPrixClient = Number(course.prix_propose_client) > 0;
 
       const latRecup = course.latitude_recuperation;
       const lngRecup = course.longitude_recuperation;
@@ -351,8 +373,37 @@ Deno.serve(async (req) => {
 
       const PRIX_MINIMUM_GLOBAL = 1000;
 
-      if (isPrixManuel) {
-        // ── MODE PRIX MANUEL : utiliser le prix accepté par le client ──
+      if (isPrixClient) {
+        // ── MODE PRIX CLIENT : prix_propose_client est la source de vérité ──
+        // RÈGLE ABSOLUE : un prix explicitement proposé par le client NE DOIT JAMAIS
+        // être écrasé par PRIX_MINIMUM_GLOBAL, distance × km, ou prix_minimum pays.
+        // Le minimum tarifaire concerne uniquement les courses sans prix client explicite.
+        const prixFinal = Number(course.prix_propose_client);
+
+        // Utiliser le taux figé à l'acceptation si disponible (Pass/Happy Hour), sinon taux normal
+        let tauxEffectif = commissionPct;
+        if (course.commission_locked_at && course.commission_taux_applique != null) {
+          tauxEffectif = Number(course.commission_taux_applique);
+        }
+
+        const commission = Math.round(prixFinal * (tauxEffectif / 100));
+        const montantLivreur = prixFinal - commission;
+
+        updateData.prix_final = prixFinal;
+        updateData.commission_silga = commission;
+        updateData.montant_livreur = montantLivreur;
+
+        // Distance réelle pour stats — privilégier distTarifaire (adresse) si distReelle indispo
+        if (distTarifaire != null) {
+          updateData.distance_reelle_km = Math.max(Number(distTarifaire) || 0, 0.01);
+        } else if (distReelle != null) {
+          updateData.distance_reelle_km = Math.max(Number(distReelle) || 0, 0.01);
+        }
+
+        updateData.latitude_arrivee_livraison = gpsLat || null;
+        updateData.longitude_arrivee_livraison = gpsLng || null;
+      } else if (isPrixManuel) {
+        // ── MODE PRIX MANUEL LIVREUR : utiliser le prix accepté par le client ──
         const prixFinal = Number(course.manual_price);
         const commission = Math.round(prixFinal * (commissionPct / 100));
         const montantLivreur = prixFinal - commission;
@@ -406,14 +457,22 @@ Deno.serve(async (req) => {
         }
       }
 
+      // ── Enterprise: la commission est payée par l'entreprise, pas le livreur ──
+      // commission_silga = 0 sur la course → le livreur n'est jamais débité.
+      // La commission Enterprise (5%) est comptabilisée dans EnterpriseLedger.
+      // Le chemin public (enterprise_id null) n'est JAMAIS affecté.
       if (normalizeEnterpriseId(course.enterprise_id)) {
         updateData.commission_silga = 0;
         updateData.montant_livreur = updateData.prix_final;
       }
 
       await base44.asServiceRole.entities.CourseExterne.update(course_id, updateData);
+
+      // ── Comptabiliser la commission Enterprise (uniquement pour les courses entreprise) ──
+      // Le chemin public (enterprise_id null) n'est JAMAIS affecté par cette logique.
       if (normalizeEnterpriseId(course.enterprise_id)) {
-        await comptabiliserCommissionEnterprise(base44.asServiceRole, { ...course, ...updateData }).catch((err) => {
+        const entCourse = { ...course, ...updateData };
+        await comptabiliserCommissionEnterprise(base44.asServiceRole, entCourse).catch((err) => {
           console.error('[validateQRCode][comptabiliserCommissionEnterprise]', err?.message);
         });
       }

@@ -3,7 +3,6 @@ import { Building, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import PinVerification from "@/components/auth/PinVerification";
-import { SILGAPP_LOGO_URL } from "@/lib/branding";
 
 export default function SelectionReseau({ onSelect }) {
   const [loading, setLoading] = useState(false);
@@ -44,7 +43,7 @@ export default function SelectionReseau({ onSelect }) {
       <div className="max-w-2xl w-full space-y-8">
         <div className="text-center space-y-4">
           <img 
-            src={SILGAPP_LOGO_URL}
+            src="https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/962cfba1f_IMG-20260819-WA0003.jpg" 
             alt="Logo SILGAPP" 
             className="w-32 h-32 object-cover mx-auto rounded-2xl"
           />

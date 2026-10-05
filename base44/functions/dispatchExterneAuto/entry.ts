@@ -3,11 +3,15 @@ import { notifierRedispatchClient } from '../../shared/venusRedispatchNotifier.t
 import { STATUTS_ACTIFS_COURSE, STATUTS_ACTIFS_VERIF, normalizeCommissionPct, chargerConfigPays } from '../../shared/dispatchConstants.ts';
 import { verifierPaysCourseLivreur, reponseDejaPrise, generateToken, generatePIN, supprimerNotificationsCourse, journaliserDispatch } from '../../shared/dispatchUtils.ts';
 import { chargerConfigDispatch, chargerConfigVaguesGPS, CYCLE_EPUISE_TIMEOUT_MS } from '../../shared/dispatchConfig.ts';
+// V1 (lancerDispatchMulti) désactivé en runtime — V2 est l'unique moteur de dispatch.
+// import { lancerDispatchMulti } from '../../shared/dispatchEngine.ts';
 import { runWatchdog } from '../../shared/dispatchWatchdog.ts';
 import { marquerRefuse, marquerAccepte, getLivreursNotifies, getLivreursRefuses, resetNotifications as resetNotifsEntity } from '../../shared/dispatchNotifications.ts';
-import { accepterCourseV2, publierCourseDansFil, secoursDispatchV2, isPilotLivreur, DISPATCH_V2_BUNDLE_VERSION } from '../../shared/dispatchV2.ts';
+import { accepterCourseV2, publierCourseDansFil, isV2Enabled, secoursDispatchV2, isPilotLivreur, DISPATCH_V2_BUNDLE_VERSION } from '../../shared/dispatchV2.ts';
+import { resolveCourseParticipantUserIds } from '../../shared/conversationSecurity.ts';
 import { ensureCourseCodeMessage } from '../../shared/courseCodeMessage.ts';
 import { figerCommissionAcceptation } from '../../shared/commissionAvantage.ts';
+import { normalizeEnterpriseId } from '../../shared/enterpriseFinance.ts';
 
 // 🔖 Redéploiement forcé — 2026-08-14-simplified-3 — rappel T+5min re-notifie les mêmes livreurs libres
 console.log(`[DISPATCH_EXTERNE_AUTO] 🔖 dispatchV2 bundle version: ${DISPATCH_V2_BUNDLE_VERSION}`);
@@ -31,29 +35,107 @@ console.log(`[DISPATCH_EXTERNE_AUTO] 🔖 dispatchV2 bundle version: ${DISPATCH_
 const AUTH_ERROR_SIGNATURE = 'You must be logged in to access this app';
 const MAX_AUTH_RETRIES = 2;
 const AUTH_RETRY_DELAY_MS = 500;
+const INFRA_RETRY_DELAY_MS = 1000; // Backoff pour erreurs infrastructure transitoires (rate limit, timeout, réseau)
+
+/**
+ * Classification des erreurs infrastructure transitoires.
+ *
+ * Ces erreurs sont SÛRES à retryer car elles sont par nature temporaires :
+ * - Rate limit (HTTP 429, "rate limit", "traffic volume") — quota API temporaire
+ * - Timeout réseau (ETIMEDOUT, ECONNRESET, ECONNREFUSED, "fetch failed")
+ * - Erreurs MongoDB transitoires ("mongodb.net", connectTimeoutMS)
+ *
+ * NE PAS inclure les HTTP 500 génériques — ils peuvent indiquer une erreur
+ * persistante (bug, configuration) qui ne se résoudra pas avec un retry.
+ *
+ * @returns {boolean} true si l'erreur est transitoire et sûre à retryer
+ */
+function isTransientInfrastructureError(error: any): boolean {
+  const msg = (error?.message || String(error)).toLowerCase();
+  return msg.includes('rate limit') ||
+    msg.includes('rate_limit') ||
+    msg.includes('rate limit exceeded') ||
+    msg.includes('traffic volume') ||
+    msg.includes('429') ||
+    msg.includes('timeout') ||
+    msg.includes('etimedout') ||
+    msg.includes('enotfound') ||
+    msg.includes('econnreset') ||
+    msg.includes('econnrefused') ||
+    msg.includes('mongodb.net') ||
+    msg.includes('connecttimeout') ||
+    msg.includes('network error') ||
+    msg.includes('fetch failed');
+}
 
 /**
  * Wrapper pour les opérations de dispatch critiques.
- * Si une erreur d'authentification transitoire Base44 survient, recrée le client
- * et retente l'opération. Les autres erreurs remontent immédiatement.
+ *
+ * Logique de retry à deux niveaux :
+ *
+ * 1. ERREURS AUTH (transitoires Base44) :
+ *    - Recrée le client et retry (jusqu'à MAX_AUTH_RETRIES = 2 retries).
+ *    - Log: STEP_FAILED=<stepName> à chaque échec.
+ *
+ * 2. ERREURS INFRASTRUCTURE TRANSITOIRES (rate limit, timeout, réseau) :
+ *    - Backoff 1000ms puis UNE seule nouvelle tentative.
+ *    - Log: STEP_FAILED=<stepName> à la première erreur.
+ *    - Log: STEP_RECOVERED=<stepName> si la 2e tentative réussit.
+ *    - Si la 2e tentative échoue → l'erreur remonte vers le catch final.
+ *
+ * 3. AUTRES ERREURS (métier, bugs, config) :
+ *    - Aucun retry — remontent immédiatement.
+ *
+ * Maximum total = 2 tentatives pour les erreurs infrastructure.
+ * Les logs ne font JAMAIS échouer le dispatch (best-effort).
  */
 async function withAuthRetry(req: Request, stepName: string, fn: (base44: any) => Promise<any>) {
   let lastError: any = null;
+  let infraRetried = false;
+  let hadInfraError = false;
+
   for (let attempt = 0; attempt <= MAX_AUTH_RETRIES; attempt++) {
     try {
       const base44 = createClientFromRequest(req);
-      return await fn(base44);
+      const result = await fn(base44);
+      // ✅ STEP_RECOVERED : si on a eu une erreur infra avant et que la retry a réussi
+      if (hadInfraError) {
+        console.log(`[DISPATCH] STEP_RECOVERED=${stepName} — retry réussi après erreur infrastructure transitoire`);
+      }
+      return result;
     } catch (error: any) {
       lastError = error;
       const msg = error?.message || String(error);
       const isAuthError = msg.includes(AUTH_ERROR_SIGNATURE);
-      console.error(`[DISPATCH] STEP_FAILED=${stepName} attempt=${attempt + 1}/${MAX_AUTH_RETRIES + 1} auth_error=${isAuthError} msg="${msg}"`);
-      if (!isAuthError || attempt >= MAX_AUTH_RETRIES) {
-        throw error;
+      const isInfra = isTransientInfrastructureError(error);
+
+      console.error(`[DISPATCH] STEP_FAILED=${stepName} attempt=${attempt + 1}/${MAX_AUTH_RETRIES + 1} auth_error=${isAuthError} infra_error=${isInfra} msg="${msg}"`);
+
+      // ── Erreur infrastructure transitoire (rate limit, timeout, réseau) ──
+      // UNE seule retry avec backoff 1000ms
+      if (isInfra && !infraRetried && attempt < MAX_AUTH_RETRIES) {
+        infraRetried = true;
+        hadInfraError = true;
+        await new Promise(r => setTimeout(r, INFRA_RETRY_DELAY_MS));
+        console.log(`[DISPATCH] 🔄 Retrying ${stepName} after infra error (rate limit/timeout) — attempt ${attempt + 2}/${MAX_AUTH_RETRIES + 1}`);
+        continue;
       }
-      await new Promise(r => setTimeout(r, AUTH_RETRY_DELAY_MS));
-      console.log(`[DISPATCH] 🔄 Retrying ${stepName} with fresh client (attempt ${attempt + 2}/${MAX_AUTH_RETRIES + 1})`);
+
+      // ── Erreur auth transitoire — retry avec client frais ──
+      if (isAuthError && !isInfra && attempt < MAX_AUTH_RETRIES) {
+        await new Promise(r => setTimeout(r, AUTH_RETRY_DELAY_MS));
+        console.log(`[DISPATCH] 🔄 Retrying ${stepName} with fresh client (attempt ${attempt + 2}/${MAX_AUTH_RETRIES + 1})`);
+        continue;
+      }
+
+      // ── Autre erreur ou retries épuisés — remonter ──
+      throw error;
     }
+  }
+
+  // Si on arrive ici avec une erreur infra qui a été retryée, c'est que la 2e tentative a échoué
+  if (infraRetried && lastError) {
+    console.error(`[DISPATCH] STEP_FAILED=${stepName} infra_retry_exhausted — erreur persistante après retry`);
   }
   throw lastError;
 }
@@ -62,9 +144,11 @@ async function withAuthRetry(req: Request, stepName: string, fn: (base44: any) =
 // HANDLER PRINCIPAL
 // ============================================================================
 Deno.serve(async (req) => {
+  let parsedBody: any = null;
   try {
     const base44 = createClientFromRequest(req);
-    const body = await req.json();
+    parsedBody = await req.json();
+    const body = parsedBody;
     let { action, course_id, livreur_id, raison } = body;
 
     // Déclenchement depuis automation entity
@@ -157,16 +241,25 @@ Deno.serve(async (req) => {
       //   T+20s: si la course est toujours libre, push aux non-prioritaires
       //   Si acceptée avant 20s → aucun push non-prioritaire
       // Le premier qui accepte gagne (prioritaire ou non), verrou atomique.
+      const v2Enabled = await isV2Enabled(base44);
+      if (!v2Enabled) {
+        base44.asServiceRole.entities.Notification.create({
+          titre: '🚨 Dispatch V2 désactivé',
+          message: `Course ${course_id} non publiée : Dispatch V2 doit rester l'unique moteur runtime.`,
+          type: 'alerte_critique_dispatch',
+          course_id,
+          lue: false,
+          deduplication_key: `DISPATCH_V2_DISABLED_${course_id}`,
+        }).catch(() => {});
+        return Response.json({
+          success: false,
+          error: 'Dispatch V2 désactivé — fallback V1 interdit',
+          blocked_reason: 'dispatch_v2_disabled',
+        }, { status: 503 });
+      }
+
       const result = await withAuthRetry(req, 'publierCourseDansFil_lancerRecherche', (b44: any) => publierCourseDansFil(b44, course));
-      return Response.json({
-        success: result?.success !== false,
-        v2: true,
-        published: true,
-        noLivreur: Number(result?.notified || 0) === 0,
-        nb_notifies: Number(result?.notified || 0),
-        total_notifies: Number(result?.notified || 0),
-        ...result,
-      });
+      return Response.json({ success: true, v2: true, published: true, ...result });
     }
 
     // ─── 2. Vérifier si un livreur est dans la liste notifiée ─────────────
@@ -241,6 +334,22 @@ Deno.serve(async (req) => {
 
       // 🔥 Course en disponible_push → visible par tous les livreurs éligibles (Push-to-Bid)
       if (course.dispatch_status === 'disponible_push') {
+        // [ENTERPRISE] Vérification backend : course.enterprise_id === livreur.enterprise_id
+        const courseEntId = normalizeEnterpriseId(course.enterprise_id);
+        const livreurEntId = normalizeEnterpriseId(countryGuard.livreur?.enterprise_id);
+        if (courseEntId !== livreurEntId) {
+          return Response.json({ found: false, enterprise_mismatch: true, error: 'Cette course appartient à un autre périmètre.' });
+        }
+        // [ENTERPRISE_SUSPENSION] Masquer la course si l'entreprise est suspendue.
+        if (courseEntId) {
+          const entList = await base44.asServiceRole.entities.Enterprise.filter({
+            enterprise_financier_id: courseEntId,
+          }).catch(() => []);
+          const ent = entList?.[0];
+          if (ent && (ent.actif === false || ent.statut !== 'actif')) {
+            return Response.json({ found: false, enterprise_suspended: true, error: 'Cette entreprise est suspendue.' });
+          }
+        }
         const expired = !!(course.timeout_expires_at && new Date(course.timeout_expires_at) < new Date());
         return Response.json({ found: true, course, expired, disponible_push: true, timeout_expires_at: course.timeout_expires_at });
       }
@@ -263,6 +372,27 @@ Deno.serve(async (req) => {
       const countryGuard = await verifierPaysCourseLivreur(base44, course, livreur_id, 'accepter_course');
       if (!countryGuard.ok) return Response.json(countryGuard.response, { status: countryGuard.status });
       const livreur = countryGuard.livreur;
+
+      // [ENTERPRISE] Vérification backend : course.enterprise_id === livreur.enterprise_id
+      const courseEntId = normalizeEnterpriseId(course.enterprise_id);
+      const livreurEntId = normalizeEnterpriseId(livreur.enterprise_id);
+      if (courseEntId !== livreurEntId) {
+        return Response.json({ success: false, accepted: false, reason: 'enterprise_mismatch', error: 'Cette course appartient à un autre périmètre.' });
+      }
+
+      // [ENTERPRISE_SUSPENSION] Bloquer l'acceptation si l'entreprise est suspendue.
+      if (courseEntId) {
+        const entList = await base44.asServiceRole.entities.Enterprise.filter({
+          enterprise_financier_id: courseEntId,
+        }).catch(() => []);
+        const ent = entList?.[0];
+        if (ent && (ent.actif === false || ent.statut !== 'actif')) {
+          return Response.json({
+            success: false, accepted: false, reason: 'enterprise_suspended',
+            error: 'Votre entreprise est temporairement suspendue. Veuillez contacter SILGAPP.',
+          });
+        }
+      }
 
       // 🚫 Vérifier blocage encours
       if (livreur.bloque_encours) {
@@ -409,20 +539,20 @@ Deno.serve(async (req) => {
         return Response.json(reponseDejaPrise('final_check_already_taken', courseFinal));
       }
 
-      // 🔐 Préserver les tokens/PINs existants — ne JAMAIS les regénérer
-      // (générés une fois à la création de la course pour garantir l'unicité partout)
-      const pickupToken = course.pickup_qr_token || generateToken();
-      const deliveryToken = course.delivery_qr_token || generateToken();
-      const pickupPIN = course.pickup_code_4_digits || generatePIN();
-      const deliveryPIN = course.delivery_code_4_digits || generatePIN();
-      const tokensOntEteGeneres = !!(course.pickup_qr_token && course.pickup_code_4_digits);
-      if (!tokensOntEteGeneres) {
-        console.log(`[DISPATCH] 🔐 Génération nouveaux tokens/PINs pour course ${course_id} (absents à la création)`);
-      } else {
+      // 🔐 Préserver les tokens/PINs existants uniquement — ne pas générer pour les nouvelles courses
+      // Les nouvelles courses (sans QR/PIN à la création) ne reçoivent pas de tokens au dispatch.
+      // Les anciennes courses et les courses partenaire/pharmacie conservent leurs tokens.
+      const pickupToken = course.pickup_qr_token || null;
+      const deliveryToken = course.delivery_qr_token || null;
+      const pickupPIN = course.pickup_code_4_digits || null;
+      const deliveryPIN = course.delivery_code_4_digits || null;
+      if (pickupPIN) {
         console.log(`[DISPATCH] 🔒 Conservation tokens/PINs existants pour course ${course_id}`);
+      } else {
+        console.log(`[DISPATCH] ℹ️ Pas de tokens/PINs pour course ${course_id} (nouveau parcours sans QR/PIN)`);
       }
 
-      const updateData = {
+      const updateData: any = {
         dispatch_status: isManual ? 'propose' : 'accepte',
         statut: isManual ? 'recherche_livreur' : 'livreur_en_route',
         heure_acceptation: isManual ? null : new Date().toISOString(),
@@ -436,10 +566,10 @@ Deno.serve(async (req) => {
         livreur_nombre_avis: livreur.nombre_avis || 0,
         accepted_by_livreur_id: livreur_id,
         accepted_at: isManual ? null : new Date().toISOString(),
-        pickup_qr_token: pickupToken,
-        pickup_code_4_digits: pickupPIN,
-        delivery_qr_token: deliveryToken,
-        delivery_code_4_digits: deliveryPIN,
+        ...(pickupToken ? { pickup_qr_token: pickupToken } : {}),
+        ...(pickupPIN ? { pickup_code_4_digits: pickupPIN } : {}),
+        ...(deliveryToken ? { delivery_qr_token: deliveryToken } : {}),
+        ...(deliveryPIN ? { delivery_code_4_digits: deliveryPIN } : {}),
       };
 
       if (isManual) {
@@ -491,6 +621,7 @@ Deno.serve(async (req) => {
       }
 
       // ── Figer la commission à l'acceptation (Pass Zéro Commission / Happy Hour) ──
+      // Le taux est déterminé au moment exact de l'acceptation et figé sur la course.
       // Redispatch : si un nouveau livreur accepte, le taux est recalculé pour lui.
       if (!isManual && courseVerifie.heure_acceptation && courseVerifie.country_code) {
         await figerCommissionAcceptation(
@@ -620,10 +751,10 @@ Deno.serve(async (req) => {
 
       const etaitVerrouillee = course.livreur_id === livreur_id;
       if (etaitVerrouillee) {
-        // Libérer le verrou + remettre le statut en recherche (sinon reste bloqué à livreur_en_route)
+        // V2 : publier dans le fil (isolation Enterprise automatique via publierCourseDansFil)
         await base44.asServiceRole.entities.CourseExterne.update(course_id, {
           statut: 'recherche_livreur',
-          dispatch_status: 'redispatch',
+          dispatch_status: 'en_attente',
           remarque_livreur: raison || 'Refusé',
           livreur_id: '',
           livreur_nom: '',
@@ -632,14 +763,8 @@ Deno.serve(async (req) => {
           accepted_by_livreur_id: '',
           accepted_at: null,
         });
-        const result = await publierCourseDansFil(base44, { ...course, statut: 'recherche_livreur', dispatch_status: 'en_attente' });
-        return Response.json({
-          success: true,
-          v2: true,
-          noLivreur: Number(result?.notified || 0) === 0,
-          nb_notifies: Number(result?.notified || 0),
-          ...result,
-        });
+        const result = await publierCourseDansFil(base44, course);
+        return Response.json({ success: true, v2: true, ...result });
       }
 
       return Response.json({ success: true, exclu_definitif: true });
@@ -654,11 +779,11 @@ Deno.serve(async (req) => {
 
       // Expiration du verrou actif
       if (expired && course.dispatch_status === 'propose' && course.livreur_id) {
-        console.log(`[DISPATCH] ⏰ Verrou expiré course ${course_id} — redispatch`);
+        console.log(`[DISPATCH] ⏰ Verrou expiré course ${course_id} — redispatch V2`);
 
         await base44.asServiceRole.entities.CourseExterne.update(course_id, {
           statut: 'recherche_livreur',
-          dispatch_status: 'redispatch',
+          dispatch_status: 'en_attente',
           livreur_id: '',
           livreur_nom: '',
           livreur_telephone: '',
@@ -667,55 +792,20 @@ Deno.serve(async (req) => {
           accepted_at: null,
         });
 
-        const result = await publierCourseDansFil(base44, { ...course, statut: 'recherche_livreur', dispatch_status: 'en_attente' });
-        return Response.json({
-          expired: true,
-          redispatched: result?.success !== false,
-          v2: true,
-          noLivreur: Number(result?.notified || 0) === 0,
-          nb_restants: Number(result?.notified || 0),
-          ...result,
-        });
+        const result = await publierCourseDansFil(base44, course);
+        return Response.json({ expired: true, redispatched: true, v2: true, ...result });
       }
 
-      // Expiration vague multi (sans verrou)
+      // Expiration vague multi (sans verrou) — V2 : publier dans le fil
       if (expired && course.dispatch_status === 'propose' && !course.livreur_id) {
-        const currentWave = course.dispatch_wave || 0;
-        if (currentWave > 0) {
-          const gpsCfg = await chargerConfigVaguesGPS(base44);
-          const maxWave = gpsCfg.waves.length;
-
-          const nextWave = currentWave + 1;
-
-          if (nextWave > maxWave) {
-            console.log(`[DISPATCH] 📍 GPS vague ${currentWave} expirée (max: ${maxWave}) — cycle_epuise pour course ${course_id}`);
-            const cycleEpuiseDeadline = new Date(Date.now() + CYCLE_EPUISE_TIMEOUT_MS).toISOString();
-            await base44.asServiceRole.entities.CourseExterne.update(course_id, {
-              dispatch_status: 'cycle_epuise',
-              dispatch_wave: maxWave,
-              timeout_expires_at: cycleEpuiseDeadline,
-            });
-            // Notification WhatsApp VENUS désactivée — le client peut relancer via l'app
-            return Response.json({ expired: true, wave_epuise: true, venus_notifie: false });
-          }
-          console.log(`[DISPATCH] 📍 GPS avancement vague ${currentWave} → ${nextWave} pour course ${course_id}`);
-          await base44.asServiceRole.entities.CourseExterne.update(course_id, {
-            dispatch_status: 'redispatch',
-            dispatch_wave: nextWave,
-          });
-        } else {
-          console.log(`[DISPATCH] ⏰ Vague expirée course ${course_id} — nouvelle sélection`);
-          await base44.asServiceRole.entities.CourseExterne.update(course_id, { dispatch_status: 'redispatch' });
-        }
-
-        const result = await publierCourseDansFil(base44, { ...course, statut: 'recherche_livreur', dispatch_status: 'en_attente' });
-        return Response.json({
-          expired: true,
-          redispatched: result?.success !== false,
-          v2: true,
-          noLivreur: Number(result?.notified || 0) === 0,
-          ...result,
+        console.log(`[DISPATCH] ⏰ Vague expirée course ${course_id} — redispatch V2`);
+        await base44.asServiceRole.entities.CourseExterne.update(course_id, {
+          statut: 'recherche_livreur',
+          dispatch_status: 'en_attente',
         });
+
+        const result = await publierCourseDansFil(base44, course);
+        return Response.json({ expired: true, redispatched: true, v2: true, ...result });
       }
 
       return Response.json({ expired, dispatch_status: course.dispatch_status, livreur_id: course.livreur_id });
@@ -743,6 +833,12 @@ Deno.serve(async (req) => {
       if (aRetenter.length > MAX_COURSES_PER_TICK) {
         console.log(`[DISPATCH] ⚡ ${aRetenter.length} courses à retenter — limitation à ${MAX_COURSES_PER_TICK}/tick`);
       }
+
+      // 📦 Cache config — déjà mis en cache au niveau module (TTL 5 min)
+      const cachedConfig = {
+        dispatch: await chargerConfigDispatch(base44),
+        gps: await chargerConfigVaguesGPS(base44),
+      };
 
       const resultats = [];
       for (const course of coursesToProcess) {
@@ -823,7 +919,7 @@ Deno.serve(async (req) => {
 
         await base44.asServiceRole.entities.CourseExterne.update(course_id, {
           manual_price_status: 'refused', client_price_refused_at: now,
-          statut: 'recherche_livreur', dispatch_status: 'redispatch',
+          statut: 'recherche_livreur', dispatch_status: 'en_attente',
           livreur_id: '', livreur_nom: '', livreur_telephone: '',
           pricing_mode: 'automatic', manual_price: null, proposed_by_livreur_id: '',
         });
@@ -832,16 +928,9 @@ Deno.serve(async (req) => {
           await base44.asServiceRole.entities.Livreur.update(livreurRefuseId, { statut: 'disponible' });
         }
 
-        // Redispatch sans exclure (le refus était côté client, pas livreur)
-        const result = await publierCourseDansFil(base44, { ...course, statut: 'recherche_livreur', dispatch_status: 'en_attente' });
-        return Response.json({
-          success: true,
-          accepted: false,
-          redispatched: result?.success !== false,
-          v2: true,
-          noLivreur: Number(result?.notified || 0) === 0,
-          ...result,
-        });
+        // V2 : publier dans le fil (isolation Enterprise automatique)
+        const result = await publierCourseDansFil(base44, course);
+        return Response.json({ success: true, accepted: false, v2: true, ...result });
       }
     }
 
@@ -938,15 +1027,31 @@ Deno.serve(async (req) => {
       return Response.json({ success: true, stats });
     }
 
-    // ─── 13. Marquer une course comme "vue" par le livreur ──────────────
-    // Remplace l'ancien appel frontend direct base44.entities.DispatchNotification.create()
-    // Sécurisé : résout livreur_user_email côté backend, vérifie l'identité du livreur,
-    // vérifie l'éligibilité de la course, et applique une clé d'idempotence.
+    // ─── 13. Marquer une course comme "vue" par le livreur (TRACKING) ────
+    // Tracking de vue réelle (vue_at). NE FAIT PAS partie du dispatch.
+    // Une erreur ici ne doit JAMAIS produire l'alerte "moteur de dispatch crashé".
     if (action === 'marquer_vue_course') {
       if (!course_id) return Response.json({ error: 'course_id requis' }, { status: 400 });
 
-      // 1. Récupérer l'utilisateur connecté
-      const me = await base44.auth.me();
+      // 0. Vérifier le statut terminal EN PREMIER (asServiceRole, avant auth).
+      //    Une course annulée/livrée ne nécessite pas de tracking vue_at.
+      //    Sécurisé : aucun vue_at n'est écrit sans vérification d'identité.
+      const course = await base44.asServiceRole.entities.CourseExterne.get(course_id);
+      if (!course) {
+        return Response.json({ success: false, error: 'Course introuvable' }, { status: 404 });
+      }
+      if (course.statut === 'annulee' || course.statut === 'livree') {
+        return Response.json({ success: true, ignored: true, reason: 'course_terminal' });
+      }
+
+      // 1. Récupérer l'utilisateur connecté (token expiré/invalide → 401 propre)
+      let me;
+      try {
+        me = await base44.auth.me();
+      } catch (authErr) {
+        // Token expiré/invalide — retourner 401 sans alerte critique dispatch
+        return Response.json({ success: false, error: 'Utilisateur non authentifié' }, { status: 401 });
+      }
       if (!me || !me.email) {
         return Response.json({ success: false, error: 'Utilisateur non authentifié' }, { status: 401 });
       }
@@ -960,82 +1065,110 @@ Deno.serve(async (req) => {
         return Response.json({ success: false, error: 'Aucun profil livreur lié à ce compte' }, { status: 403 });
       }
 
-      // 3. Vérifier que la course existe et est éligible pour ce livreur
-      const course = await base44.asServiceRole.entities.CourseExterne.get(course_id);
-      if (!course) {
-        return Response.json({ success: false, error: 'Course introuvable' }, { status: 404 });
-      }
-
-      // Vérifier que le pays du livreur correspond au pays de la course
+      // 3. Vérifier que le pays du livreur correspond au pays de la course
       const courseCountry = (course.country_code || '').toUpperCase();
       const livreurCountry = (livreur.country_code || '').toUpperCase();
       if (!courseCountry || !livreurCountry || courseCountry !== livreurCountry) {
         return Response.json({ success: false, error: 'country_mismatch' }, { status: 403 });
       }
 
-      // Vérifier que la course est encore disponible (non livrée, non annulée)
-      if (course.statut === 'annulee' || course.statut === 'livree') {
-        return Response.json({ success: true, ignored: true, reason: 'course_terminal' });
-      }
-
       // 4. Tracking de vue réelle — UPDATE du champ vue_at, pas de création de doublon.
       // Le statut existant (push_tente, push_succes, etc.) n'est JAMAIS modifié ici.
-      // La "vue réelle" est mesurée par vue_at, indépendamment du cycle FCM.
       const existing = await base44.asServiceRole.entities.DispatchNotification.filter(
         { course_id: course_id, livreur_id: livreur.id }, '-date_notification', 1
       );
 
       if (existing && existing.length > 0) {
         const existingNotif = existing[0];
+        // Déjà vue → idempotence
         if (existingNotif.vue_at) {
           return Response.json({ success: true, already_viewed: true });
         }
+        // UPDATE uniquement vue_at
         await base44.asServiceRole.entities.DispatchNotification.update(existingNotif.id, {
           vue_at: new Date().toISOString(),
         });
         return Response.json({ success: true, vue_enregistree: true });
       }
 
-      // 5. Aucun enregistrement existant — ne PAS créer de DN artificielle.
-      // Un livreur peut ouvrir une course depuis son feed sans avoir reçu de push.
-      // Créer une DispatchNotification statut=notifie produirait un faux historique.
-      return Response.json({
-        success: true,
-        ignored: true,
-        reason: 'no_dispatch_notification_tracking_only_for_notified_livreurs',
-      });
+      // 5. Aucun enregistrement existant — le livreur a vu la course dans le fil
+      //    (disponible_push) sans recevoir de push. NE PAS créer de DispatchNotification
+      //    avec statut='notifie' : ce statut signifie qu'un push a été tenté, ce qui
+      //    serait faux et trompeur pour l'audit. Le tracking vue_at n'a de sens que
+      //    pour les livreurs réellement notifiés (DN existante → étape 4 ci-dessus).
+      //    CORRECTIF : ne rien créer. Aucun DN = aucun push envoyé = cohérence préservée.
+      return Response.json({ success: true, vue_enregistree: false, reason: 'no_dispatch_notification_tracking_only_for_notified_livreurs' });
     }
 
     return Response.json({ error: 'Action inconnue' }, { status: 400 });
   } catch (error) {
-    const isRateLimit = error.message?.toLowerCase?.().includes('rate limit') || error.message?.toLowerCase?.().includes('rate_limit') || error.message?.toLowerCase?.().includes('traffic volume');
+    const isInfraError = isTransientInfrastructureError(error);
     const isAuthError = error.message?.includes(AUTH_ERROR_SIGNATURE);
-    // 🛡️ Les erreurs auth transitoires ont déjà été retentées par withAuthRetry (2 retries).
-    // Si on arrive ici avec une erreur auth, cela signifie que les retries ont échoué
-    // → c'est une vraie erreur persistante, l'alerte reste justifiée.
-    console.error(`[DISPATCH] STEP_FAILED=dispatchExterneAuto.catch Erreur fatale${isRateLimit ? ' (RATE_LIMIT)' : ''}${isAuthError ? ' (AUTH_EXHAUSTED)' : ''}:`, error.message);
+    // 🛡️ Les erreurs auth et infra transitoires ont déjà été retentées par withAuthRetry.
+    // Si on arrive ici, toutes les tentatives autorisées ont échoué.
+    // → L'alerte n'est créée QUE si tous les retries ont échoué (pas de recovery).
+
+    // ── Classification technique légère (sans appel API supplémentaire) ──
+    // Permet d'identifier la cause exacte lors du diagnostic sans affirmer
+    // "rate limit" sans preuve. Le log console est capturé par la plateforme.
+    const errorClass = isAuthError
+      ? 'AUTH_EXHAUSTED'
+      : isInfraError
+        ? ((): string => {
+            const msg = (error?.message || String(error)).toLowerCase();
+            if (msg.includes('429') || msg.includes('rate limit') || msg.includes('rate_limit')) return 'RATE_LIMIT_429';
+            if (msg.includes('timeout') || msg.includes('etimedout')) return 'TIMEOUT';
+            if (msg.includes('econnreset') || msg.includes('econnrefused') || msg.includes('network error')) return 'NETWORK';
+            if (msg.includes('fetch failed')) return 'FETCH_FAILED';
+            if (msg.includes('mongodb.net') || msg.includes('connecttimeout')) return 'DB_TIMEOUT';
+            return 'INFRA_OTHER';
+          })()
+        : 'FATAL';
+    const httpStatus = error?.response?.status || error?.statusCode || null;
+    const body = parsedBody || {};
+    console.error(`[DISPATCH] STEP_FAILED=dispatchExterneAuto.catch class=${errorClass} http=${httpStatus} action=${body?.action || 'unknown'} course_id=${body?.course_id || 'none'} msg="${error?.message || String(error)}"`);
+
+    // ── Ne pas créer d'alerte critique pour les erreurs de tracking de vue ──
+    // marquer_vue_course est du tracking (vue_at), pas du dispatch.
+    // Son échec ne doit pas déclencher l'alerte "moteur de dispatch crashé".
+    // Les véritables erreurs FATAL des actions de dispatch continuent d'alerter.
+    const isTrackingAction = body?.action === 'marquer_vue_course';
+    if (!isTrackingAction) {
     try {
       const base44 = createClientFromRequest(req);
-      // 🛡️ Anti-spam : ne créer une alerte que si aucune alerte récente (< 30 min) n'existe
-      // Délai augmenté à 30 min pour les rate limits (transitoires) vs 5 min pour les autres erreurs
-      const alertWindow = isRateLimit ? 60 * 60 * 1000 : 5 * 60 * 1000;
-      const recentAlerts = await base44.asServiceRole.entities.Notification.filter({
-        type: 'alerte_critique_dispatch', lue: false,
+      // 🛡️ Anti-spam : déduplication par deduplication_key + fenêtre temporelle.
+      // IMPORTANT : ne PAS filtrer par lue=false — une alerte lue ne doit pas
+      // permettre la recréation d'une nouvelle alerte pour la même fenêtre.
+      const alertWindow = isInfraError ? 60 * 60 * 1000 : 5 * 60 * 1000;
+      const dedupKey = isInfraError
+        ? `ALERT_INFRA_${new Date().toISOString().slice(0, 13)}` // Heure précise — 1 alerte/heure max
+        : `ALERT_FATAL_${new Date().toISOString().slice(0, 16)}`; // Minute précise — 1 alerte/5min max
+
+      const existingAlerts = await base44.asServiceRole.entities.Notification.filter({
+        deduplication_key: dedupKey,
       }, '-created_date', 1);
-      const hasRecent = recentAlerts?.[0] && (Date.now() - new Date(recentAlerts[0].created_date).getTime()) < alertWindow;
+
+      const hasRecent = existingAlerts?.[0] && (Date.now() - new Date(existingAlerts[0].created_date).getTime()) < alertWindow;
       if (!hasRecent) {
-        const msg = isRateLimit
-          ? `Le moteur de dispatch a atteint la limite d'appels API (rate limit). Cela est transitoire — le prochain tick reprendra automatiquement. Si le problème persiste, contactez le support.`
+        // ── Libellé générique : ne pas affirmer "rate limit" sans preuve ──
+        // La classification exacte est dans le log console (errorClass), pas dans
+        // l'alerte admin. L'admin voit un message générique ; le diagnostic
+        // se fait via les logs techniques.
+        const msg = isInfraError
+          ? `Le moteur de dispatch a rencontré une erreur technique temporaire (class=${errorClass}). Le prochain cycle reprendra automatiquement.`
           : isAuthError
-            ? `Le moteur de dispatch a échoué après ${MAX_AUTH_RETRIES + 1} tentatives: ${error.message}. Les courses ne sont plus relancées automatiquement. Intervention requise.`
-            : `Le moteur de dispatch a crashé: ${error.message}. Les courses ne sont plus relancées automatiquement. Intervention requise.`;
+            ? `Le moteur de dispatch a échoué après ${MAX_AUTH_RETRIES + 1} tentatives (class=${errorClass}). Les courses ne sont plus relancées automatiquement. Intervention requise.`
+            : `Le moteur de dispatch a crashé (class=${errorClass}). Les courses ne sont plus relancées automatiquement. Intervention requise.`;
         await base44.asServiceRole.entities.Notification.create({
-          titre: isRateLimit ? '⚠️ Surcharge API temporaire — dispatch' : '🚨 Erreur fatale — dispatch automatique',
+          titre: isInfraError ? '⚠️ Incident API temporaire — dispatch' : '🚨 Erreur fatale — dispatch automatique',
           message: msg,
-          type: 'alerte_critique_dispatch', lue: false,
+          type: 'alerte_critique_dispatch',
+          lue: false,
+          deduplication_key: dedupKey,
         });
       }
     } catch (_) {}
+    } // end if (!isTrackingAction)
     return Response.json({ error: error.message }, { status: 500 });
   }
 });

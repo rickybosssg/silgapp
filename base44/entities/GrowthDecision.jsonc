@@ -1,0 +1,127 @@
+{
+  "name": "GrowthDecision",
+  "type": "object",
+  "properties": {
+    "decision_type": {
+      "type": "string",
+      "enum": [
+        "create_experiment",
+        "pause_experiment",
+        "resume_experiment",
+        "complete_experiment",
+        "adjust_reactivation_config",
+        "adjust_prime_budget",
+        "increase_experiment_budget",
+        "budget_alert",
+        "auto_blocked_budget"
+      ],
+      "description": "Type de d\u00e9cision. create_experiment=nouvelle exp\u00e9rience, pause/complete=gestion exp\u00e9rience existante, adjust_*=ajustement config, budget_alert=alerte seuil, auto_blocked_budget=blocage automatique par circuit breaker."
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "approved",
+        "rejected",
+        "executed",
+        "execution_failed",
+        "expired",
+        "auto_blocked_budget"
+      ],
+      "default": "pending",
+      "description": "Statut de la d\u00e9cision. pending=en attente validation, approved=valid\u00e9e, rejected=refus\u00e9e, executed=ex\u00e9cut\u00e9e avec succ\u00e8s, execution_failed=\u00e9chec d'ex\u00e9cution, expired=expir\u00e9e sans validation, auto_blocked_budget=bloqu\u00e9e par circuit breaker."
+    },
+    "trigger_rule": {
+      "type": "string",
+      "description": "Nom de la r\u00e8gle d\u00e9terministe qui a d\u00e9clench\u00e9 la d\u00e9cision (ex: experiment_zero_conversions_after_7_days, exploration_phase, budget_80_percent)"
+    },
+    "trigger_metrics": {
+      "type": "string",
+      "description": "JSON: m\u00e9triques observ\u00e9es au moment de la d\u00e9cision"
+    },
+    "recommended_action": {
+      "type": "string",
+      "description": "Description lisible de l'action recommand\u00e9e"
+    },
+    "action_payload": {
+      "type": "string",
+      "description": "JSON: param\u00e8tres de l'action (experiment_id, meta_campaign_id, new_budget, etc.)"
+    },
+    "budget_impact": {
+      "type": "number",
+      "default": 0,
+      "description": "Impact budg\u00e9taire estim\u00e9 (FCFA/mois). N\u00e9gatif = r\u00e9duction de d\u00e9pense."
+    },
+    "approved_by": {
+      "type": "string",
+      "description": "Email admin ayant approuv\u00e9"
+    },
+    "approved_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "rejected_by": {
+      "type": "string",
+      "description": "Email admin ayant refus\u00e9"
+    },
+    "rejected_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "rejection_reason": {
+      "type": "string"
+    },
+    "executed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "execution_result": {
+      "type": "string",
+      "description": "JSON: r\u00e9sultat de l'ex\u00e9cution"
+    },
+    "execution_error": {
+      "type": "string"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "La recommandation expire si non valid\u00e9e apr\u00e8s 7 jours"
+    },
+    "autopilot_cycle_id": {
+      "type": "string",
+      "description": "ID du cycle qui a g\u00e9n\u00e9r\u00e9 cette d\u00e9cision"
+    },
+    "experiment_id": {
+      "type": "string",
+      "description": "ID de la GrowthExperiment li\u00e9e (si applicable)"
+    }
+  },
+  "required": [
+    "decision_type",
+    "status",
+    "trigger_rule",
+    "recommended_action"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

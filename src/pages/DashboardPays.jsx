@@ -132,7 +132,7 @@ export default function DashboardPays() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {!isPays && paysListe.length > 1 && (
+          {!isPays && paysActifs.length > 1 && (
             <div className="flex items-center gap-1.5">
               <CountrySelector
                 value={effectiveCode}

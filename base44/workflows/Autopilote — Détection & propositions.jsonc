@@ -1,0 +1,57 @@
+{
+  "name": "Autopilote \u2014 D\u00e9tection & propositions",
+  "description": "D\u00e9tecte les goulots (campagnes sous-performantes, pas de 2\u00e8me course) et propose la prochaine exp\u00e9rience (exploration ou exploitation). Une fois par jour \u00e0 03h15 UTC, apr\u00e8s la collecte des m\u00e9triques.",
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "recurring",
+      "cron_expression": "15 3 * * *",
+      "one_time_date": null,
+      "timezone": "UTC",
+      "interval_value": null,
+      "interval_unit": null,
+      "interval_anchor": null,
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  },
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "autopilote_detect_and_propose",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "detect_bottlenecks": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "detectGrowthBottlenecks"
+          },
+          "then": "propose_actions",
+          "x-base44": {
+            "title": "D\u00e9tection des goulots",
+            "description": "R\u00e8gles d\u00e9terministes sur les exp\u00e9riences actives"
+          }
+        }
+      },
+      {
+        "propose_actions": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "proposeGrowthActions"
+          },
+          "then": "end",
+          "x-base44": {
+            "title": "Proposition d'exp\u00e9rience",
+            "description": "Exploration ou exploitation selon les r\u00e9sultats"
+          }
+        }
+      }
+    ]
+  }
+}

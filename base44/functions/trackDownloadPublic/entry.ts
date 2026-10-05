@@ -13,7 +13,7 @@ Deno.serve(async (req) => {
     if (!event_type) {
       return Response.json({
         success: false,
-        error: "event_type requis (page_visit, download_click, apk_download, ou play_download)"
+        error: "event_type requis (page_visit, download_click, ou apk_download)"
       }, { status: 400 });
     }
 

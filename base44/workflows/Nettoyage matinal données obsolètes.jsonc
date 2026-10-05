@@ -1,0 +1,44 @@
+{
+  "name": "Nettoyage matinal donn\u00e9es obsol\u00e8tes",
+  "description": "Chaque matin \u00e0 5h00 : nettoie les dispatch_status obsol\u00e8tes sur courses termin\u00e9es/annul\u00e9es, efface livreur_id sur courses livr\u00e9es, corrige les livreurs orphelins, annule les courses fant\u00f4mes.",
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "recurring",
+      "cron_expression": "0 5 * * *",
+      "one_time_date": null,
+      "timezone": "UTC",
+      "interval_value": null,
+      "interval_unit": null,
+      "interval_anchor": null,
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  },
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "nettoyage_matinal_donn_es_obsol_tes",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "run_function": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "nettoyageMatinal",
+            "args": {}
+          },
+          "then": "end"
+        }
+      }
+    ]
+  },
+  "x-base44-migrated-from-automation": {
+    "legacy_payload_function": "nettoyageMatinal"
+  }
+}

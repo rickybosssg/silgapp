@@ -3,8 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
-  Zap, Pause, Play, FlaskConical, Settings,
-  Loader2, Power, CheckCircle2,
+  Zap, Pause, Play, FlaskConical, Settings, Loader2, Power, CheckCircle2,
 } from "lucide-react";
 
 export default function ReactivationAutoPanel() {

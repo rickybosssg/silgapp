@@ -12,8 +12,18 @@ import { attributeConversions } from '../../shared/reactivationEngine.ts';
 export default async function(req: Request): Promise<Response> {
   try {
     const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
-    if (!user) return Response.json({ error: 'Authentification requise' }, { status: 401 });
+
+    // ── Auth : accepter les appels service-role (Workflow Base44) ET les appels admin manuels ──
+    // Le Workflow "Attribution automatique des conversions réactivation" appelle cette fonction
+    // toutes les heures sans contexte utilisateur. On utilise le même pattern que syncCrmOnLivraison.
+    try {
+      const user = await base44.auth.me();
+      if (user && user.role !== 'admin') {
+        return Response.json({ error: 'Admin requis' }, { status: 403 });
+      }
+    } catch {
+      // Appel depuis un Workflow Base44 (service role) — pas de contexte utilisateur
+    }
 
     const result = await attributeConversions(base44);
 

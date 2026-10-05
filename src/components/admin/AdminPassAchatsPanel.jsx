@@ -38,7 +38,7 @@ export default function AdminPassAchatsPanel({ countryCode }) {
     return [...new Set(ids)];
   }, [achats]);
 
-  const { data: livreursData, isLoading: livreursLoading, isError: livreursError, error: livreursQueryError } = useQuery({
+  const { data: livreursData, isLoading: livreursLoading } = useQuery({
     queryKey: ["livreurs-by-ids", livreurIds],
     queryFn: async () => {
       if (!livreurIds.length) return {};
@@ -105,12 +105,6 @@ export default function AdminPassAchatsPanel({ countryCode }) {
         ))}
       </div>
 
-      {livreursError && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
-          Erreur chargement livreurs : {livreursQueryError?.message || "impossible de résoudre les profils"}
-        </div>
-      )}
-
       <div className="grid gap-3">
         {(achats || []).map((achat) => (
           <div
@@ -153,18 +147,13 @@ export default function AdminPassAchatsPanel({ countryCode }) {
               const nomComplet = livreur
                 ? `${livreur.prenom || ""} ${livreur.nom || ""}`.trim()
                 : null;
-              const livreurIntrouvable = !livreursLoading && !livreursError && !livreur;
-              const resolutionErreur = livreursError && !livreur;
+              const livreurIntrouvable = !livreursLoading && !livreur;
               return (
-                <div className={`rounded-xl p-3 mb-2 border ${livreurIntrouvable || resolutionErreur ? "bg-red-50 border-red-200" : "bg-slate-50 border-slate-100"}`}>
+                <div className={`rounded-xl p-3 mb-2 border ${livreurIntrouvable ? "bg-red-50 border-red-200" : "bg-slate-50 border-slate-100"}`}>
                   <div className="flex items-center gap-2 mb-1">
                     <User className="w-4 h-4 text-slate-400 shrink-0" />
-                    <p className={`font-semibold text-sm ${livreurIntrouvable || resolutionErreur ? "text-red-700" : "text-slate-800"}`}>
-                      {livreursLoading
-                        ? "Chargement..."
-                        : resolutionErreur
-                          ? "⚠️ Erreur chargement livreur"
-                          : (nomComplet || "⚠️ Livreur introuvable")}
+                    <p className={`font-semibold text-sm ${livreurIntrouvable ? "text-red-700" : "text-slate-800"}`}>
+                      {livreursLoading ? "Chargement..." : (nomComplet || "⚠️ Livreur introuvable")}
                     </p>
                   </div>
                   {livreur?.telephone && (
@@ -205,12 +194,12 @@ export default function AdminPassAchatsPanel({ countryCode }) {
 
             {achat.statut === "en_attente" && (() => {
               const livreur = livreursData?.[achat.livreur_id];
-              const livreurBloqueValidation = (!livreursLoading && !livreur) || livreursError;
+              const livreurBloqueValidation = !livreursLoading && !livreur;
               return (
                 <div className="flex gap-2 mt-2">
                   {livreurBloqueValidation && (
                     <p className="text-xs text-red-600 w-full mb-1 text-center">
-                      ⚠️ Validation bloquée — profil livreur non résolu
+                      ⚠️ Validation bloquée — profil livreur introuvable
                     </p>
                   )}
                   <Button

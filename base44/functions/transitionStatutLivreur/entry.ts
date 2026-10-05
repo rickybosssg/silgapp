@@ -29,6 +29,7 @@ const TRANSITIONS_VALIDES: Record<string, string[]> = {
 };
 
 const GPS_FIELDS_PAR_STATUT: Record<string, string[]> = {
+  'colis_recupere': ['latitude_recuperation', 'longitude_recuperation'],
   'pris_en_charge': ['latitude_prise_en_charge', 'longitude_prise_en_charge'],
   'arrivee': ['latitude_arrivee_dest', 'longitude_arrivee_dest'],
 };
@@ -59,7 +60,7 @@ export default async function(req: Request): Promise<Response> {
     if (!user) return Response.json({ error: 'Non autorisé' }, { status: 401 });
 
     const body = await req.json();
-    const { course_id, statut_cible, latitude, longitude, remarque } = body;
+    const { course_id, statut_cible, latitude, longitude, remarque, confirmation_method } = body;
 
     if (!course_id || !statut_cible) {
       return Response.json({ error: 'course_id et statut_cible requis' }, { status: 400 });
@@ -117,7 +118,9 @@ export default async function(req: Request): Promise<Response> {
     if (statut_cible === 'client_contacte') updateData.heure_contact_client = now;
     if (statut_cible === 'colis_recupere') {
       updateData.heure_recuperation = now;
-      updateData.pickup_confirmed_by = 'livreur';
+      // Correction 1: accepter confirmation_method='bouton' pour le nouveau parcours.
+      // Pour l'ancien parcours (QR/PIN via validateQRCode), pickup_confirmed_by = method ('qr'|'manual_code').
+      updateData.pickup_confirmed_by = confirmation_method === 'bouton' ? 'bouton' : 'livreur';
       updateData.pickup_confirmed_at = now;
     }
     if (statut_cible === 'pris_en_charge') updateData.heure_prise_en_charge = now;

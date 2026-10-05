@@ -18,18 +18,18 @@ let CARTO_API_KEY = "";
 let _initialized = false;
 let _initPromise = null;
 
-const OSM_FALLBACK_URL = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+export const OSM_FALLBACK_URL = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
 
-/** URL principale — fallback OSM sans clé, remplacée par CARTO après initCartoTiles() */
+/** URL Voyager (couleur) — sans clé par défaut, mise à jour après initCartoTiles() */
 export let CARTO_TILE_URL = OSM_FALLBACK_URL;
 
-/** URL claire — fallback OSM sans clé, remplacée par CARTO après initCartoTiles() */
+/** URL Light All (gris clair) — sans clé par défaut, mise à jour après initCartoTiles() */
 export let CARTO_TILE_LIGHT_URL = OSM_FALLBACK_URL;
 
 export const CARTO_TILE_CONFIG = {
   maxZoom: 19,
-  subdomains: "abc",
-  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+  subdomains: "abcd",
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
 };
 
 /**
@@ -49,12 +49,10 @@ export async function initCartoTiles() {
         CARTO_API_KEY = data.voyager_url.split("?key=")[1] || "";
         CARTO_TILE_URL = data.voyager_url;
         CARTO_TILE_LIGHT_URL = data.light_url;
-        CARTO_TILE_CONFIG.subdomains = "abcd";
-        CARTO_TILE_CONFIG.attribution = '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>';
         _initialized = true;
       }
     } catch (e) {
-      // Silencieux — fallback OpenStreetMap sans clé, l'application reste fonctionnelle.
+      // Silencieux — fallback sans clé (watermark visible mais carte fonctionnelle)
       console.warn("[cartTiles] initCartoTiles échec:", e?.message);
     }
   })();

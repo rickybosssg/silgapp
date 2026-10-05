@@ -1,77 +1,51 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
+import { STATUTS_ACTIFS_COURSE } from '../../shared/dispatchConstants.ts';
 
 /**
- * CORRECTION AUTOMATIQUE — Synchronisation statut livreurs ↔ courses
+ * CORRECTION AUTOMATIQUE — Filet de sécurité statut livreurs ↔ courses
  *
- * Cette fonction est appelée :
- * - Manuellement par un admin (depuis le dashboard)
- * - Automatiquement par une automation programmée (toutes les 5 min)
+ * Appelée automatiquement par le workflow "Correction Auto Statut Livreurs"
+ * (toutes les 5 min). Peut aussi être appelée manuellement par un admin.
  *
- * Trois corrections appliquées :
- * 1. Livreur "en_course" SANS course active → "disponible" (anti-blocage)
- * 2. Livreur "disponible" AVEC course active → "en_course" (anti-dispatch parasite)
- * 3. Course "livree" sans prix_final → prix par défaut (1500 F) + commission calculée
+ * Deux corrections de secours :
+ * 1. Livreur "en_course" SANS course active → "disponible" (ou "hors_ligne" si bloque_encours)
+ * 2. Livreur "disponible" AVEC course active → "en_course"
  *
- * Les vérifications admin sont ignorées quand la fonction est appelée par
- * une automation (pas de user context).
+ * Ces corrections ne remplacent JAMAIS les mécanismes temps réel :
+ *   finaliserLivraisonLivreur, libererLivreurCourseLivree,
+ *   syncStatutLivreurOnCourse, Dispatch V2.
+ *
+ * NE MODIFIE PAS : finance, prix, commissions, montant_du_silga, encours,
+ * encours_comptabilise_at, livreur_financier_id, PaiementSilgapp,
+ * GPS, heartbeat, FCM, QR/PIN, redispatch, messagerie, Growth, Meta.
  */
-
-const STATUTS_ACTIFS_LIVREUR = [
-  'livreur_en_route', 'client_contacte', 'en_route_expediteur',
-  'arrive_prise_en_charge', 'colis_recupere', 'passager_embarque',
-  'pris_en_charge', 'en_livraison', 'arrivee',
-];
-
-const PRIX_DEFAUT = 1500;
-// ⚠️ NE JAMAIS hardcoder la commission — toujours la récupérer depuis Country.
-// const COMMISSION_PCT_DEFAUT = 10; // SUPPRIMÉ : causait des commissions à 10% au lieu de 20%
-
-function normalizeCommissionPct(value) {
-  const pct = Number(value);
-  if (!Number.isFinite(pct) || pct < 0 || pct > 100) return null;
-  return pct;
-}
-
-async function chargerCommissionPays(base44, countryCode) {
-  const code = String(countryCode || '').trim().toUpperCase();
-  if (!code) return null;
-  const countries = await base44.asServiceRole.entities.Country.filter({ code, actif: true });
-  return normalizeCommissionPct(countries?.[0]?.commission_pct);
-}
 
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
 
-    // Vérification admin uniquement si appel manuel (user context présent)
-    const user = await base44.auth.me().catch(() => null);
-    const isManualCall = !!user;
-    if (isManualCall && user.role !== 'admin') {
-      return Response.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
-    }
+    console.log('[CORRECTION] Démarrage filet de sécurité statut livreurs');
 
-    console.log('[CORRECTION] Démarrage synchronisation livreurs ↔ courses');
+    // ── 1. Charger uniquement les courses réellement actives ──
+    // (au lieu de charger 500 courses sans filtre statut — bug corrigé)
+    const coursesActives = await base44.asServiceRole.entities.CourseExterne.filter({
+      statut: { $in: STATUTS_ACTIFS_COURSE },
+    }, '-created_date', 200);
 
-    // ── Récupérer tous les livreurs actifs (en_course + disponible) ──
+    const livreurIdsAvecCourseActive = new Set(
+      (coursesActives || [])
+        .filter((c: any) => c.livreur_id)
+        .map((c: any) => c.livreur_id)
+    );
+
+    // ── 2. Correction A : en_course SANS course active → disponible/hors_ligne ──
+    let corrigesVersDisponible = 0;
     const livreursEnCourse = await base44.asServiceRole.entities.Livreur.filter({
       statut: 'en_course',
     });
-    const livreursDisponibles = await base44.asServiceRole.entities.Livreur.filter({
-      statut: 'disponible',
-    });
 
-    // ── Récupérer toutes les courses avec un livreur assigné ──
-    const allCourses = await base44.asServiceRole.entities.CourseExterne.filter({}, "-created_date", 500);
-    const coursesActives = (allCourses || []).filter(c =>
-      STATUTS_ACTIFS_LIVREUR.includes(c.statut) && c.livreur_id
-    );
-    const livreurIdsAvecCourseActive = new Set(coursesActives.map(c => c.livreur_id));
-
-    // ── Correction 1 : en_course SANS course active → disponible ──
-    let corrigesVersDisponible = 0;
     for (const livreur of livreursEnCourse) {
       if (!livreurIdsAvecCourseActive.has(livreur.id)) {
-        // Vérifier bloque_encours → hors_ligne au lieu de disponible
         const nouveauStatut = livreur.bloque_encours ? 'hors_ligne' : 'disponible';
         try {
           await base44.asServiceRole.entities.Livreur.update(livreur.id, { statut: nouveauStatut });
@@ -83,64 +57,35 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ── Correction 2 : disponible AVEC course active → en_course ──
+    // ── 3. Correction B : disponible AVEC course active → en_course ──
+    // Ne charge que les livreurs réellement concernés (ceux avec une course active),
+    // pas les 130 livreurs disponibles.
     let corrigesVersEnCourse = 0;
-    for (const livreur of livreursDisponibles) {
-      if (livreurIdsAvecCourseActive.has(livreur.id)) {
-        try {
+    for (const livreurId of livreurIdsAvecCourseActive) {
+      try {
+        const livreur = await base44.asServiceRole.entities.Livreur.get(livreurId);
+        if (livreur && livreur.statut === 'disponible') {
           await base44.asServiceRole.entities.Livreur.update(livreur.id, { statut: 'en_course' });
           console.log(`[CORRECTION] ${livreur.prenom} ${livreur.nom} : disponible → en_course`);
           corrigesVersEnCourse++;
-        } catch (err) {
-          console.error(`[CORRECTION] Erreur ${livreur.nom}:`, err.message);
         }
-      }
-    }
-
-    // ── Correction 3 : courses "livree" sans prix_final → prix par défaut ──
-    // ⚠️ La commission est récupérée DYNAMIQUEMENT depuis Country (jamais hardcodée).
-    // Si la commission du pays n'est pas configurée, la course est SKIPPÉE (pas de fallback).
-    let coursesPrixCorigees = 0;
-    let coursesPrixSkipped = 0;
-    const coursesSansPrix = (allCourses || []).filter(c =>
-      c.statut === 'livree' && (!c.prix_final || Number(c.prix_final) <= 0)
-    );
-    for (const course of coursesSansPrix) {
-      try {
-        const commissionPct = await chargerCommissionPays(base44, course.country_code);
-        if (commissionPct === null) {
-          console.error(`[CORRECTION] Course ${course.id?.slice(-8)} : commission non configurée pour ${course.country_code} — SKIPPÉE`);
-          coursesPrixSkipped++;
-          continue;
-        }
-        const commissionSilga = Math.round(PRIX_DEFAUT * commissionPct / 100);
-        const montantLivreur = PRIX_DEFAUT - commissionSilga;
-        await base44.asServiceRole.entities.CourseExterne.update(course.id, {
-          prix_final: PRIX_DEFAUT,
-          commission_silga: commissionSilga,
-          montant_livreur: montantLivreur,
-        });
-        console.log(`[CORRECTION] Course ${course.id?.slice(-8)} (${course.livreur_nom}) : prix manquant → ${PRIX_DEFAUT} F (commission ${commissionPct}%)`);
-        coursesPrixCorigees++;
       } catch (err) {
-        console.error(`[CORRECTION] Erreur prix course ${course.id?.slice(-8)}:`, err.message);
+        console.error(`[CORRECTION] Erreur livreur ${livreurId}:`, err.message);
       }
     }
 
     const resultat = {
       livreurs_en_course: livreursEnCourse.length,
-      livreurs_disponibles: livreursDisponibles.length,
       courses_actives: coursesActives.length,
       corriges_vers_disponible: corrigesVersDisponible,
       corriges_vers_en_course: corrigesVersEnCourse,
-      courses_prix_corriges: coursesPrixCorigees,
     };
 
     console.log('[CORRECTION] Résumé:', resultat);
 
     return Response.json({
       success: true,
-      message: `${corrigesVersDisponible + corrigesVersEnCourse + coursesPrixCorigees} correction(s) appliquée(s)`,
+      message: `${corrigesVersDisponible + corrigesVersEnCourse} correction(s) appliquée(s)`,
       ...resultat,
     });
 

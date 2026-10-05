@@ -55,6 +55,16 @@ export default async function(req: Request): Promise<Response> {
       }
     }
 
+    // ═══ SÉCURITÉ ENTERPRISE : les Pass sont réservés au réseau PUBLIC ═══
+    // Un livreur Enterprise ne peut pas acheter de Pass Zéro Commission.
+    if (livreur.enterprise_id) {
+      return Response.json({
+        success: false,
+        error: 'Le Pass Zéro Commission est réservé au réseau public SILGAPP',
+        blocked_reason: 'enterprise_driver_excluded',
+      }, { status: 403 });
+    }
+
     // Créer l'achat en attente
     const now = new Date().toISOString();
     const achat = await base44.asServiceRole.entities.PassAchat.create({
@@ -72,6 +82,29 @@ export default async function(req: Request): Promise<Response> {
       statut: 'en_attente',
       date_demande: now,
     });
+
+    // ═══ ALERTE ADMIN IMMÉDIATE — Nouvel achat de Pass à valider ═══
+    // Envoi un push FCM au Super Admin + création AdminInboxItem persistant.
+    // Réutilise envoiNotificationPush (gère Notification + AdminInboxItem + FCM).
+    // Non-bloquant : un échec d'envoi ne doit pas empêcher l'achat.
+    try {
+      const livreurNom = `${livreur.prenom || ''} ${livreur.nom || ''}`.trim() || livreur.nom || 'Livreur';
+      const montantFmt = Number(montant_paye).toLocaleString('fr-FR');
+      const SUPER_ADMIN_EMAIL = 'weezyh2@gmail.com';
+
+      await base44.asServiceRole.functions.invoke('envoiNotificationPush', {
+        destinataire_email: SUPER_ADMIN_EMAIL,
+        user_type: 'admin',
+        titre: '🎟️ Nouveau Pass à valider',
+        message: `${livreurNom} vient d'acheter le Pass ${passOffer.nom} (${montantFmt} FCFA).\nValidation en attente.`,
+        type: 'pass_achat_en_attente',
+        category: 'pass_achat',
+        course_id: '',
+      });
+    } catch (notifErr) {
+      // Non-bloquant : l'achat est créé, l'admin verra la demande au prochain refresh
+      console.error('[soumettreAchatPass] admin alert error:', notifErr?.message);
+    }
 
     return Response.json({ success: true, achat });
   } catch (error) {
