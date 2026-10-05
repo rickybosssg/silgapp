@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { chargerTauxCommissionEffectif, hasZeroCommissionLock, zeroCommissionFields } from '../../shared/commissionLock.ts';
 
 function normalizeCommissionPct(value) {
   const pct = Number(value);
@@ -162,7 +163,7 @@ async function rollbackPrimeBudget(base44, counterId, primeAmount) {
  *
  * En cas d'échec après réservation, le budget est restauré (rollback).
  */
-Deno.serve(async (req) => {
+export default async function(req) {
   try {
     const base44 = createClientFromRequest(req);
 
@@ -296,10 +297,10 @@ Deno.serve(async (req) => {
     let prixClientPaye, montantLivreur, commissionSilga, proprietaireType;
     try {
       prixClientPaye = prixFinal - PRIME_FIXE;
-      const commissionPct = await chargerCommissionPays(base44, course.country_code);
+      const commissionPct = await chargerTauxCommissionEffectif(course, () => chargerCommissionPays(base44, course.country_code));
       const commissionBrute = Math.round(prixFinal * (commissionPct / 100));
       montantLivreur = prixFinal - commissionBrute;
-      commissionSilga = prixFinal - montantLivreur - PRIME_FIXE;
+      commissionSilga = hasZeroCommissionLock(course) ? 0 : prixFinal - montantLivreur - PRIME_FIXE;
       proprietaireType = codePromo.proprietaire_type || 'client';
 
       prime = await base44.asServiceRole.entities.PrimePromo.create({
@@ -333,6 +334,7 @@ Deno.serve(async (req) => {
       await base44.asServiceRole.entities.CourseExterne.update(course.id, {
         commission_silga: commissionSilga,
         montant_livreur: montantLivreur,
+        ...zeroCommissionFields(course),
       });
 
       // Si le propriétaire est un livreur, réduire son montant_du_silga
@@ -382,4 +384,4 @@ Deno.serve(async (req) => {
     console.error('[validerPrimePromo] Erreur:', error);
     return Response.json({ error: error.message }, { status: 500 });
   }
-});
+}

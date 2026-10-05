@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
 import { chargerConfigPays, normalizeCommissionPct, chargerTarifZone } from '../../shared/dispatchConstants.ts';
+import { tauxCommissionEffectif, isPublicCommission, zeroCommissionFields } from '../../shared/commissionLock.ts';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CONFIRMER PRIX COURSE ADMIN — Confirme manuellement le prix d'une course
@@ -67,7 +68,7 @@ export default async function(req: Request): Promise<Response> {
     // ── Charger la commission du pays ──
     const countryConfig = await chargerConfigPays(base44, course.country_code || '');
     const commissionPct = normalizeCommissionPct(countryConfig?.commission_pct);
-    if (commissionPct === null) {
+    if (commissionPct === null && course.commission_taux_applique == null) {
       return Response.json({
         error: `Commission non configurée pour le pays ${course.country_code}`,
         blocked_reason: 'missing_country_commission_pct',
@@ -77,9 +78,8 @@ export default async function(req: Request): Promise<Response> {
     // ── Calcul commission + montant livreur ──
     // ⚠️ Si la commission a été figée à l'acceptation (Pass/Happy Hour), utiliser
     // le taux figé (commission_taux_applique) au lieu du taux normal du pays.
-    const tauxEffectif = (course.commission_locked_at && course.commission_taux_applique != null)
-      ? Number(course.commission_taux_applique)
-      : commissionPct;
+    const tauxEffectif = isPublicCommission(course) ? tauxCommissionEffectif(course, commissionPct)
+      : ((course.commission_locked_at && course.commission_taux_applique != null) ? Number(course.commission_taux_applique) : commissionPct);
     const commissionSilga = Math.round(montant * (tauxEffectif / 100));
     const montantLivreur = montant - commissionSilga;
     const now = new Date().toISOString();
@@ -89,6 +89,7 @@ export default async function(req: Request): Promise<Response> {
       prix_final: montant,
       commission_silga: commissionSilga,
       montant_livreur: montantLivreur,
+      ...zeroCommissionFields(course),
       prix_a_confirmer: false,
       prix_confirme_par_admin_at: now,
       prix_confirme_par_admin_id: user.email,

@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 import { haversineKm } from '../../shared/geoUtils.ts';
+import { tauxCommissionEffectif, zeroCommissionFields } from '../../shared/commissionLock.ts';
 import { comptabiliserCommissionEnterprise, normalizeEnterpriseId } from '../../shared/enterpriseFinance.ts';
 
 function normalizeCommissionPct(value) {
@@ -8,7 +9,7 @@ function normalizeCommissionPct(value) {
   return pct;
 }
 
-Deno.serve(async (req) => {
+export default async function(req) {
   try {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
@@ -140,7 +141,7 @@ Deno.serve(async (req) => {
             prix_final: course.prix_final || null,
             distance_reelle_km: course.distance_reelle_km || null,
             montant_livreur: course.montant_livreur || null,
-            commission_silga: course.commission_silga || null,
+            commission_silga: course.commission_silga ?? null,
           },
         });
       }
@@ -227,6 +228,7 @@ Deno.serve(async (req) => {
           }
         } catch (_) {}
 
+        adminCommissionPct = tauxCommissionEffectif(course, adminCommissionPct);
         if (adminCommissionPct === null) {
           return Response.json({
             success: false,
@@ -251,6 +253,7 @@ Deno.serve(async (req) => {
           prix_final: prixFinalAdmin,
           commission_silga: adminCommission,
           montant_livreur: adminMontantLivreur,
+          ...zeroCommissionFields(course),
         };
         if (distAdmin != null) {
           adminUpdateData.distance_reelle_km = Math.max(Number(distAdmin) || 0, 0.01);
@@ -286,8 +289,8 @@ Deno.serve(async (req) => {
             longitude_livraison: gpsLng || null,
             distance_reelle_km: adminUpdateData.distance_reelle_km || null,
             prix_final: prixFinalAdmin,
-            commission_silga: adminCommission,
-            montant_livreur: adminMontantLivreur,
+            commission_silga: adminUpdateData.commission_silga,
+            montant_livreur: adminUpdateData.montant_livreur,
           },
         });
       }
@@ -362,6 +365,7 @@ Deno.serve(async (req) => {
         }
       } catch (_) {}
 
+      commissionPct = tauxCommissionEffectif(course, commissionPct);
       if (commissionPct === null) {
         console.error('[validateQRCode][COMMISSION_CONFIG_MISSING]', { course_id, countryCode });
         return Response.json({
@@ -466,6 +470,7 @@ Deno.serve(async (req) => {
         updateData.montant_livreur = updateData.prix_final;
       }
 
+      Object.assign(updateData, zeroCommissionFields(course));
       await base44.asServiceRole.entities.CourseExterne.update(course_id, updateData);
 
       // ── Comptabiliser la commission Enterprise (uniquement pour les courses entreprise) ──
@@ -512,14 +517,14 @@ Deno.serve(async (req) => {
         prix_final: courseFinale.prix_final || null,
         distance_km: courseFinale.distance_reelle_km || null,
         montant_livreur: courseFinale.montant_livreur || null,
-        commission_silga: courseFinale.commission_silga || null,
+        commission_silga: courseFinale.commission_silga ?? null,
         course: {
           // Champs financiers
           statut: 'livree',
           prix_final: courseFinale.prix_final || null,
           distance_reelle_km: courseFinale.distance_reelle_km || null,
           montant_livreur: courseFinale.montant_livreur || null,
-          commission_silga: courseFinale.commission_silga || null,
+          commission_silga: courseFinale.commission_silga ?? null,
           // Champs timestamps — nécessaires pour calcul durée dans LivraisonRecapitulatif
           heure_livraison: courseFinale.heure_livraison || null,
           heure_recuperation: courseFinale.heure_recuperation || null,
@@ -537,4 +542,4 @@ Deno.serve(async (req) => {
     console.error('[validateQRCode]', error);
     return Response.json({ error: error.message }, { status: 500 });
   }
-});
+}

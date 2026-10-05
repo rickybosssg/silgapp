@@ -3,13 +3,14 @@ import { haversineKm } from '../../shared/geoUtils.ts';
 import { normalizeCommissionPct, chargerConfigPays, chargerTarifZone } from '../../shared/dispatchConstants.ts';
 import { evaluerAvantageCommission } from '../../shared/commissionAvantage.ts';
 import { normalizeEnterpriseId } from '../../shared/enterpriseFinance.ts';
+import { tauxCommissionEffectif, zeroCommissionFields } from '../../shared/commissionLock.ts';
 
 // ⚠️ Aucun tarif codé en dur — tous les paramètres proviennent de l'entité Country.
 // Fallback générique unique (ne suppose aucun pays) utilisé uniquement si la BDD
 // est temporairement indisponible. La devise reste inconnue jusqu'à confirmation DB.
 const FALLBACK_TARIF = { prix_par_km: 100, prix_minimum: 500, devise: "FCFA" };
 
-Deno.serve(async (req) => {
+export default async function(req) {
   try {
     const base44 = createClientFromRequest(req);
     const body = await req.json();
@@ -83,7 +84,7 @@ Deno.serve(async (req) => {
       // Fallback silencieux — le blocage commissionPct === null empêche un prix erroné
     }
 
-    if (commissionPct === null) {
+    if (commissionPct === null && course.commission_taux_applique == null) {
       // ── Prix à confirmer : commission non configurée ──
       // La course continue (dispatch, livraison) mais le prix reste à confirmer par l'admin.
       const tarifZoneForSuggestion = await chargerTarifZone(base44, countryCode, course.ville_arrivee || course.ville_depart);
@@ -119,10 +120,7 @@ Deno.serve(async (req) => {
         commissionSilga = 0;
         montantLivreur = prixRetenu;
       } else {
-        let tauxEffectif = commissionPct;
-        if (course.commission_locked_at && course.commission_taux_applique != null) {
-          tauxEffectif = Number(course.commission_taux_applique);
-        }
+        const tauxEffectif = tauxCommissionEffectif(course, commissionPct);
         commissionSilga = Math.round(prixRetenu * (tauxEffectif / 100));
         montantLivreur = prixRetenu - commissionSilga;
       }
@@ -130,6 +128,7 @@ Deno.serve(async (req) => {
         prix_final: prixRetenu,
         commission_silga: commissionSilga,
         montant_livreur: montantLivreur,
+        ...zeroCommissionFields(course),
         statut: 'livree',
         heure_livraison: new Date().toISOString(),
         // ⚠️ livreur_financier_id N'EST PAS fixé ici — calculPrixCourseExterne peut être
@@ -258,10 +257,7 @@ Deno.serve(async (req) => {
       commissionSilga = 0;
       montantLivreur = prixRetenu;
     } else {
-      let tauxEffectif = commissionPct;
-      if (course.commission_locked_at && course.commission_taux_applique != null) {
-        tauxEffectif = Number(course.commission_taux_applique);
-      }
+      const tauxEffectif = tauxCommissionEffectif(course, commissionPct);
       commissionSilga = Math.round(prixRetenu * (tauxEffectif / 100));
       montantLivreur = prixRetenu - commissionSilga;
     }
@@ -272,6 +268,7 @@ Deno.serve(async (req) => {
       prix_final: prixRetenu,
       commission_silga: commissionSilga,
       montant_livreur: montantLivreur,
+      ...zeroCommissionFields(course),
       statut: 'livree',
       heure_livraison: new Date().toISOString(),
       // ⚠️ livreur_financier_id N'EST PAS fixé ici — voir finaliserLivraisonLivreur.
@@ -305,4 +302,4 @@ Deno.serve(async (req) => {
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
   }
-});
+}

@@ -5,6 +5,7 @@
  */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 import { recalculerSoldeLivreur } from '../../shared/recalculerSoldeLivreur.ts';
+import { chargerTauxCommissionEffectif, zeroCommissionFields } from '../../shared/commissionLock.ts';
 
 function normalizeCommissionPct(value) {
   const pct = Number(value);
@@ -36,7 +37,7 @@ async function chargerTarifPays(base44, countryCode) {
 
 import { haversineKm } from '../../shared/geoUtils.ts';
 
-Deno.serve(async (req) => {
+export default async function(req) {
   try {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
@@ -77,7 +78,7 @@ Deno.serve(async (req) => {
       const distSafe = distanceKm;
       const tarif = await chargerTarifPays(base44, course.country_code);
       const prixFinal = Math.max(Math.round(distSafe * tarif.prixParKm), tarif.prixMinimum);
-      const commissionPct = await chargerCommissionPays(base44, course.country_code);
+      const commissionPct = await chargerTauxCommissionEffectif(course, () => chargerCommissionPays(base44, course.country_code));
       const commission = Math.round(prixFinal * (commissionPct / 100));
       const montantLivreur = prixFinal - commission;
 
@@ -86,6 +87,7 @@ Deno.serve(async (req) => {
         prix_final: prixFinal,
         commission_silga: commission,
         montant_livreur: montantLivreur,
+        ...zeroCommissionFields(course),
       });
 
       // Recalculer le solde du livreur depuis les sources financières
@@ -117,4 +119,4 @@ Deno.serve(async (req) => {
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
   }
-});
+}

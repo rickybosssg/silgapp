@@ -1,6 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
 import { chargerConfigPays, normalizeCommissionPct } from '../../shared/dispatchConstants.ts';
 import { comptabiliserCommissionEnterprise, normalizeEnterpriseId } from '../../shared/enterpriseFinance.ts';
+import { tauxCommissionEffectif, zeroCommissionFields } from '../../shared/commissionLock.ts';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // FINALISER LIVRAISON LIVREUR — Source de vérité pour la livraison
@@ -69,15 +70,16 @@ export default async function(req: Request): Promise<Response> {
         const commissionPctFix = normalizeCommissionPct(countryFix?.commission_pct);
         if (commissionPctFix !== null) {
           // ⚠️ Respecter le taux figé à l'acceptation (Pass/Happy Hour)
-          const tauxEffectifFix = (course.commission_locked_at && course.commission_taux_applique != null)
-            ? Number(course.commission_taux_applique)
-            : commissionPctFix;
+          const tauxEffectifFix = normalizeEnterpriseId(course.enterprise_id)
+            ? ((course.commission_locked_at && course.commission_taux_applique != null) ? Number(course.commission_taux_applique) : commissionPctFix)
+            : tauxCommissionEffectif(course, commissionPctFix);
           const commissionFix = Math.round(prixFix * (tauxEffectifFix / 100));
           const montantFix = prixFix - commissionFix;
           await base44.asServiceRole.entities.CourseExterne.update(course_id, {
             prix_final: prixFix,
             commission_silga: commissionFix,
             montant_livreur: montantFix,
+            ...zeroCommissionFields(course),
           });
           console.warn(`[finaliserLivraisonLivreur] TROU CORRIGÉ: course ${course_id} prix_final=${prixFix} (was 0/null, source=prix_propose_admin)`);
         }
@@ -121,10 +123,10 @@ export default async function(req: Request): Promise<Response> {
       const commissionPct = normalizeCommissionPct(countryConfig?.commission_pct);
       // ⚠️ Si la commission a été figée à l'acceptation (Pass/Happy Hour), utiliser
       // le taux figé (commission_taux_applique) au lieu du taux normal du pays.
-      const tauxEffectif = (course.commission_locked_at && course.commission_taux_applique != null)
-        ? Number(course.commission_taux_applique)
-        : commissionPct;
-      if (commissionPct === null) {
+      const tauxEffectif = normalizeEnterpriseId(course.enterprise_id)
+        ? ((course.commission_locked_at && course.commission_taux_applique != null) ? Number(course.commission_taux_applique) : commissionPct)
+        : tauxCommissionEffectif(course, commissionPct);
+      if (commissionPct === null && course.commission_taux_applique == null) {
         return Response.json({
           error: `Commission non configurée pour le pays ${course.country_code}`,
           blocked_reason: 'missing_country_commission_pct',
@@ -154,6 +156,7 @@ export default async function(req: Request): Promise<Response> {
         prix_final: montant,
         commission_silga: commissionSilga,
         montant_livreur: montantLivreur,
+        ...zeroCommissionFields(course),
         // ── Identité financière immuable ──
         // Renseigné côté backend au moment de la livraison, JAMAIS modifié ensuite.
         // Si déjà présent (re-finalisation), on ne l'écrase pas.

@@ -10,7 +10,8 @@ import { marquerRefuse, marquerAccepte, getLivreursNotifies, getLivreursRefuses,
 import { accepterCourseV2, publierCourseDansFil, isV2Enabled, secoursDispatchV2, isPilotLivreur, DISPATCH_V2_BUNDLE_VERSION } from '../../shared/dispatchV2.ts';
 import { resolveCourseParticipantUserIds } from '../../shared/conversationSecurity.ts';
 import { ensureCourseCodeMessage } from '../../shared/courseCodeMessage.ts';
-import { figerCommissionAcceptation } from '../../shared/commissionAvantage.ts';
+import { figerCommissionAcceptation, evaluerAvantageCommission } from '../../shared/commissionAvantage.ts';
+import { tauxCommissionEffectif, champsLockCommission, verifierCoherenceLock, zeroCommissionFields } from '../../shared/commissionLock.ts';
 import { normalizeEnterpriseId } from '../../shared/enterpriseFinance.ts';
 
 // 🔖 Redéploiement forcé — 2026-08-14-simplified-3 — rappel T+5min re-notifie les mêmes livreurs libres
@@ -143,7 +144,7 @@ async function withAuthRetry(req: Request, stepName: string, fn: (base44: any) =
 // ============================================================================
 // HANDLER PRINCIPAL
 // ============================================================================
-Deno.serve(async (req) => {
+export default async function(req) {
   let parsedBody: any = null;
   try {
     const base44 = createClientFromRequest(req);
@@ -878,20 +879,36 @@ Deno.serve(async (req) => {
         } catch (error) {
           console.error('[dispatchExterneAuto] Lecture commission pays impossible', error);
         }
-        if (commissionPct === null) {
+        if (commissionPct === null && course.commission_taux_applique == null) {
           return Response.json({
             error: 'Commission du pays non configurée',
             reason: 'missing_country_commission_pct',
           }, { status: 409 });
         }
+        const acceptanceTime = course.heure_acceptation || now;
+        let lockFields = {};
+        let avantage = null;
+        if (!normalizeEnterpriseId(course.enterprise_id) &&
+            (course.commission_taux_applique == null || !course.heure_acceptation || !course.commission_locked_at)) {
+          try {
+            avantage = await evaluerAvantageCommission(base44, course.livreur_id || course.proposed_by_livreur_id, course.country_code, new Date(acceptanceTime));
+            lockFields = champsLockCommission(avantage, now);
+          } catch (error) {
+            return Response.json({ success: false, retryable: true, reason: 'commission_lookup_error', error: error?.message }, { status: 503 });
+          }
+        }
+        const lockedCourse = { ...course, ...lockFields };
+        commissionPct = tauxCommissionEffectif(lockedCourse, commissionPct);
         const commission = Math.round(prixManuel * (commissionPct / 100));
         const montantLivreur = prixManuel - commission;
 
-        await base44.asServiceRole.entities.CourseExterne.update(course_id, {
+        const updated = await base44.asServiceRole.entities.CourseExterne.update(course_id, {
           manual_price_status: 'accepted', client_price_validated_at: now,
-          statut: 'livreur_en_route', dispatch_status: 'accepte', heure_acceptation: now,
+          statut: 'livreur_en_route', dispatch_status: 'accepte', heure_acceptation: acceptanceTime,
           prix_final: prixManuel, commission_silga: commission, montant_livreur: montantLivreur,
+          ...lockFields, ...zeroCommissionFields(lockedCourse),
         });
+        if (avantage) verifierCoherenceLock(updated, avantage);
 
         if (course.proposed_by_livreur_id) {
           const livreurId = course.proposed_by_livreur_id;
@@ -1174,4 +1191,4 @@ Deno.serve(async (req) => {
     } // end if (!isTrackingAction)
     return Response.json({ error: error.message }, { status: 500 });
   }
-});
+}

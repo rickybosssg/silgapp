@@ -38,7 +38,8 @@ import { notifierLivreursUnifie } from './dispatchPushUnifie.ts';
 import { chargerConfigDispatch } from './dispatchConfig.ts';
 import { resolveCourseParticipantUserIds } from './conversationSecurity.ts';
 import { ensureCourseCodeMessage, buildCodeMessageContent } from './courseCodeMessage.ts';
-import { figerCommissionAcceptation } from './commissionAvantage.ts';
+import { figerCommissionAcceptation, evaluerAvantageCommission } from './commissionAvantage.ts';
+import { champsLockCommission, verifierCoherenceLock } from './commissionLock.ts';
 import { normalizeEnterpriseId } from './enterpriseFinance.ts';
 
 // ── Version du bundle (pour vérifier que la production charge la dernière version) ──
@@ -431,6 +432,18 @@ export async function accepterCourseV2(base44: any, courseId: string, livreurId:
     updateData.timeout_expires_at = new Date(Date.now() + dispatchConfig.manualPriceTimeoutSec * 1000).toISOString();
   }
 
+  // Correction financière autorisée : avantage vérifié AVANT toute attribution.
+  // Le lock public est écrit dans le même CAS que l'acceptation. Aucun fallback sur erreur.
+  let avantageAcceptation = null;
+  if (!isManual && !normalizeEnterpriseId(course.enterprise_id)) {
+    try {
+      avantageAcceptation = await evaluerAvantageCommission(base44, livreurId, course.country_code, new Date(updateData.heure_acceptation));
+      Object.assign(updateData, champsLockCommission(avantageAcceptation, updateData.heure_acceptation));
+    } catch (error) {
+      return { success: false, accepted: false, retryable: true, reason: 'commission_lookup_error', error: error?.message };
+    }
+  }
+
   // Le statut constitue le verrou atomique. Ne pas filtrer livreur_id avec une
   // chaine vide : Base44 stocke aussi l'absence de livreur avec null, ce qui
   // empêchait toute acceptation de ces courses.
@@ -458,11 +471,12 @@ export async function accepterCourseV2(base44: any, courseId: string, livreurId:
     return reponseDejaPrise('race_condition_lost', courseVerifie);
   }
 
-  // 10b. V2 : Figer la commission à l'acceptation (Pass Zéro Commission / Happy Hour)
-  // Le taux est déterminé au moment exact de l'acceptation et figé sur la course.
-  // Redispatch : si un nouveau livreur accepte, le taux est recalculé pour lui.
-  // Non-bloquant : l'acceptation réussit même si le figement échoue (cohérent avec V1).
-  if (!isManual && courseVerifie.heure_acceptation && courseVerifie.country_code) {
+  // 10b. Le lock public est déjà atomique ; contrôler sa cohérence complète.
+  if (avantageAcceptation) {
+    verifierCoherenceLock(courseVerifie, avantageAcceptation);
+  }
+  // Enterprise : préserver le chemin de verrouillage du ledger privé.
+  if (!isManual && normalizeEnterpriseId(courseVerifie.enterprise_id) && courseVerifie.heure_acceptation && courseVerifie.country_code) {
     await figerCommissionAcceptation(
       base44, courseId, livreurId, courseVerifie.country_code, courseVerifie.heure_acceptation
     ).catch((err: any) => {

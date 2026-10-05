@@ -39,6 +39,8 @@
 /**
  * Clé financière d'une course : livreur_financier_id en priorité, fallback livreur_id.
  */
+import { commissionComptabilisable } from './commissionLock.ts';
+
 function getLivreurFinancierId(course: any): string {
   return course.livreur_financier_id || course.livreur_id || '';
 }
@@ -172,7 +174,7 @@ export async function calculerSoldeLivreur(base44: any, livreurId: string): Prom
     ...coursesForCalc.map((c: any) => ({
       type: 'commission' as const,
       date: c.heure_livraison || c.colis_livre_at || c.created_date,
-      amount: Number(c.commission_silga) || 0,
+      amount: commissionComptabilisable(c),
       encours_comptabilise_at: c.encours_comptabilise_at || null,
     })),
     ...paiementsForCalc.map((p: any) => ({
@@ -264,7 +266,7 @@ export async function calculerSoldesLivreursBatch(
     eventsByDriver[fid].push({
       type: 'commission',
       date: d,
-      amount: Number(c.commission_silga) || 0,
+      amount: commissionComptabilisable(c),
       encours_comptabilise_at: c.encours_comptabilise_at || null,
     });
   });

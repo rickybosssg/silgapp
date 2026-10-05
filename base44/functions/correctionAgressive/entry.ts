@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 import { haversineKm } from '../../shared/geoUtils.ts';
+import { chargerTauxCommissionEffectif, zeroCommissionFields } from '../../shared/commissionLock.ts';
 
 function normalizeCommissionPct(value) {
   const pct = Number(value);
@@ -21,7 +22,7 @@ async function chargerCommissionPays(base44, countryCode) {
  * Supprime TOUS les 0, NaN, null parasites
  * Force GPS et prix sur TOUTES les courses
  */
-Deno.serve(async (req) => {
+export default async function(req) {
   try {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
@@ -72,11 +73,12 @@ Deno.serve(async (req) => {
         if (course.statut === "livree" && (!course.prix_final || course.prix_final === 0)) {
           if (course.distance_reelle_km && course.distance_reelle_km > 0) {
             const prixFinal = Math.round(course.distance_reelle_km * 100);
-            const commissionPct = await chargerCommissionPays(base44, course.country_code);
+            const commissionPct = await chargerTauxCommissionEffectif(course, () => chargerCommissionPays(base44, course.country_code));
             const commission = Math.round(prixFinal * (commissionPct / 100));
             updates.prix_final = prixFinal;
             updates.commission_silga = commission;
             updates.montant_livreur = prixFinal - commission;
+            Object.assign(updates, zeroCommissionFields(course));
           }
         }
 
@@ -112,6 +114,4 @@ Deno.serve(async (req) => {
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
   }
-});
-
-
+}

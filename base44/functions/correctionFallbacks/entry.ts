@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 import { haversineKm } from '../../shared/geoUtils.ts';
+import { chargerTauxCommissionEffectif, zeroCommissionFields } from '../../shared/commissionLock.ts';
 
 function normalizeCommissionPct(value) {
   const pct = Number(value);
@@ -33,7 +34,7 @@ async function chargerTarifPays(base44, countryCode) {
  * CORRECTION GLOBALE DES FALLBACKS ERRONÉS
  * Supprime TOUS les fallbacks parasites : prix=0, distance=0, ETA=null, NaN
  */
-Deno.serve(async (req) => {
+export default async function(req) {
   try {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
@@ -88,14 +89,15 @@ Deno.serve(async (req) => {
             Math.round(course.distance_reelle_km * tarif.prixParKm),
             tarif.prixMinimum,
           );
-          const commissionPct = await chargerCommissionPays(base44, course.country_code);
+          const commissionPct = await chargerTauxCommissionEffectif(course, () => chargerCommissionPays(base44, course.country_code));
           const commissionSilga = Math.round(prixFinal * (commissionPct / 100));
           const montantLivreur = prixFinal - commissionSilga;
 
           await base44.entities.CourseExterne.update(course.id, {
             prix_final: prixFinal,
             commission_silga: commissionSilga,
-            montant_livreur: montantLivreur
+            montant_livreur: montantLivreur,
+            ...zeroCommissionFields(course),
           });
           prixCorrected++;
           console.log(`[CORRECTION] Course ${course.id.slice(-6)}: prixFinal=${prixFinal}F`);
@@ -152,6 +154,4 @@ Deno.serve(async (req) => {
     console.error("[CORRECTION] Erreur globale:", error);
     return Response.json({ error: error.message }, { status: 500 });
   }
-});
-
-
+}

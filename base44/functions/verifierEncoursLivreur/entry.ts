@@ -2,6 +2,8 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
 import { emitDriverDebtThreshold } from '../../shared/venusAdminEventBus.ts';
 import { chargerConfigPays } from '../../shared/dispatchConstants.ts';
 import { recalculerSoldeLivreur } from '../../shared/recalculerSoldeLivreur.ts';
+import { runCommissionRegression } from '../../shared/commissionRegression.ts';
+import { corrigerYondoGael } from '../../shared/corrigerYondoGael.ts';
 
 /**
  * Vérifie l'encours d'un livreur après chaque course terminée.
@@ -11,7 +13,7 @@ import { recalculerSoldeLivreur } from '../../shared/recalculerSoldeLivreur.ts';
  *
  * Déclenché par automation entity sur CourseExterne (statut → livree).
  */
-Deno.serve(async (req) => {
+export default async function(req) {
   try {
     const base44 = createClientFromRequest(req);
     const body = await req.json();
@@ -27,6 +29,19 @@ Deno.serve(async (req) => {
     }
 
     // Action manuelle admin : déblocage ou ajustement
+    if (body.action === 'tester_commission' || body.action === 'corriger_yondo_gael') {
+      const user = await base44.auth.me();
+      if (!user || user.role !== 'admin') return Response.json({ error: 'Admin requis' }, { status: 403 });
+      if (body.action === 'tester_commission') return Response.json(await runCommissionRegression());
+      return Response.json(await corrigerYondoGael(base44, user, body.confirm === true));
+    }
+    if (body.action === 'recalculer_solde') {
+      const user = await base44.auth.me();
+      if (!user || user.role !== 'admin') return Response.json({ error: 'Admin requis' }, { status: 403 });
+      if (!body.livreur_id) return Response.json({ error: 'livreur_id requis' }, { status: 400 });
+      const resultat = await recalculerSoldeLivreur(base44, body.livreur_id);
+      return Response.json({ success: true, ...resultat });
+    }
     if (body.action === 'debloquer') {
       return await handleDeblocage(base44, body);
     }
@@ -336,7 +351,7 @@ Deno.serve(async (req) => {
     console.error('[ENCOURS] Erreur:', error);
     return Response.json({ error: error.message }, { status: 500 });
   }
-});
+}
 
 // ─── Déblocage admin ───
 async function handleDeblocage(base44, body) {

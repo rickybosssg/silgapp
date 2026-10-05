@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 import { recalculerSoldeLivreur } from '../../shared/recalculerSoldeLivreur.ts';
+import { chargerTauxCommissionEffectif, zeroCommissionFields } from '../../shared/commissionLock.ts';
 
 function normalizeCommissionPct(value) {
     const pct = Number(value);
@@ -16,7 +17,7 @@ async function chargerCommissionPays(asService, countryCode) {
     return pct;
 }
 
-Deno.serve(async (req) => {
+export default async function(req) {
     try {
         const base44 = createClientFromRequest(req);
         const asService = base44.asServiceRole;
@@ -83,7 +84,7 @@ Deno.serve(async (req) => {
             if (course.pricing_mode !== "admin_manuel" && course.source !== "admin") continue;
 
             const prixDefault = 1000;
-            const commissionPct = await chargerCommissionPays(asService, course.country_code);
+            const commissionPct = await chargerTauxCommissionEffectif(course, () => chargerCommissionPays(asService, course.country_code));
             const commission = Math.round(prixDefault * (commissionPct / 100));
             const gainLivreur = prixDefault - commission;
 
@@ -91,6 +92,7 @@ Deno.serve(async (req) => {
                 prix_final: prixDefault,
                 commission_silga: commission,
                 montant_livreur: gainLivreur,
+                ...zeroCommissionFields(course),
                 notes: (course.notes || "") + " | [AUTO] Prix admin manquant complété",
             });
 
@@ -125,7 +127,7 @@ Deno.serve(async (req) => {
             const diffMin = (now - new Date(heureArrivee).getTime()) / 60000;
             if (diffMin <= 30) continue;
 
-            const commissionPct = await chargerCommissionPays(asService, course.country_code);
+            const commissionPct = await chargerTauxCommissionEffectif(course, () => chargerCommissionPays(asService, course.country_code));
             const commission = Math.round(course.prix_final * (commissionPct / 100));
             const gain = course.prix_final - commission;
 
@@ -134,6 +136,7 @@ Deno.serve(async (req) => {
                 heure_livraison: new Date().toISOString(),
                 commission_silga: commission,
                 montant_livreur: gain,
+                ...zeroCommissionFields(course),
             });
 
             if (course.livreur_id) {
@@ -263,4 +266,4 @@ Deno.serve(async (req) => {
     } catch (error) {
         return Response.json({ error: error.message }, { status: 500 });
     }
-});
+}
