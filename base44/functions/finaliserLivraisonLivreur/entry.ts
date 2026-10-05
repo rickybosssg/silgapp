@@ -37,6 +37,43 @@ import { tauxCommissionEffectif, zeroCommissionFields } from '../../shared/commi
 
 const STATUTS_FINALISABLES = ['arrivee', 'en_livraison', 'colis_recupere', 'pris_en_charge'];
 
+function parsePositiveMoney(value: any): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value === 'number') {
+    return Number.isFinite(value) && value > 0 ? value : null;
+  }
+  const normalized = String(value).replace(/[^\d]/g, '');
+  if (!normalized) return null;
+  const amount = Number(normalized);
+  return Number.isFinite(amount) && amount > 0 ? amount : null;
+}
+
+function resolveClientExplicitPrice(course: any, prixFinalLivreur: any): number | null {
+  const storedClientPrice = parsePositiveMoney(course?.prix_propose_client);
+  if (storedClientPrice) return storedClientPrice;
+
+  // Compat historique: certains brouillons/anciennes courses client ont porté le
+  // même prix sous prix_propose. On le lit uniquement pour les courses client.
+  if (course?.source === 'client') {
+    const legacyClientPrice = parsePositiveMoney(course?.prix_propose);
+    if (legacyClientPrice) return legacyClientPrice;
+  }
+
+  // Filet défensif pour le nouveau parcours bouton: si une course client standard
+  // a perdu son champ prix_propose_client mais que l'app transmet le montant affiché,
+  // on l'accepte seulement hors admin/enterprise et hors prix déjà finalisé.
+  const isPublicClientStandard = course?.source === 'client'
+    && !normalizeEnterpriseId(course?.enterprise_id)
+    && course?.pricing_mode === 'manual'
+    && !course?.prix_final
+    && !course?.prix_propose_admin;
+  if (isPublicClientStandard) {
+    return parsePositiveMoney(prixFinalLivreur);
+  }
+
+  return null;
+}
+
 export default async function(req: Request): Promise<Response> {
   try {
     const base44 = createClientFromRequest(req);
@@ -221,8 +258,8 @@ export default async function(req: Request): Promise<Response> {
     // ── CAS 2: Course client standard avec prix explicite ───────────────
     // RÈGLE PRODUIT : le prix saisi par le client est la source de vérité.
     // Ne jamais le remplacer par distance × tarif au moment de la livraison.
-    const prixClientExplicite = Number(course.prix_propose_client || 0);
-    if (Number.isFinite(prixClientExplicite) && prixClientExplicite > 0) {
+    const prixClientExplicite = resolveClientExplicitPrice(course, prix_final_livreur);
+    if (prixClientExplicite !== null) {
       let commissionSilga: number;
       let montantLivreur: number;
 

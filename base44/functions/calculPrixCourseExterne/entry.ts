@@ -10,6 +10,17 @@ import { tauxCommissionEffectif, zeroCommissionFields } from '../../shared/commi
 // est temporairement indisponible. La devise reste inconnue jusqu'à confirmation DB.
 const FALLBACK_TARIF = { prix_par_km: 100, prix_minimum: 500, devise: "FCFA" };
 
+function parsePositiveMoney(value: any): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value === 'number') {
+    return Number.isFinite(value) && value > 0 ? value : null;
+  }
+  const normalized = String(value).replace(/[^\d]/g, '');
+  if (!normalized) return null;
+  const amount = Number(normalized);
+  return Number.isFinite(amount) && amount > 0 ? amount : null;
+}
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -112,10 +123,12 @@ Deno.serve(async (req) => {
     // ⚠️ Si la commission a été figée à l'acceptation (Pass/Happy Hour), utiliser
     // le taux figé (commission_taux_applique) au lieu du taux normal du pays.
     // ── ENTERPRISE : commission_silga = 0 (payée par l'entreprise via EnterpriseLedger) ──
-    if (course.prix_propose_client && course.prix_propose_client > 0) {
+    const prixClientExplicite = parsePositiveMoney(course.prix_propose_client)
+      || (course.source === 'client' ? parsePositiveMoney(course.prix_propose) : null);
+    if (prixClientExplicite !== null) {
       const prixRetenu = (course.statut === 'livree' && course.prix_final && course.prix_final > 0)
         ? Number(course.prix_final)
-        : Number(course.prix_propose_client);
+        : prixClientExplicite;
       let commissionSilga: number;
       let montantLivreur: number;
       if (normalizeEnterpriseId(course.enterprise_id)) {
@@ -198,8 +211,8 @@ Deno.serve(async (req) => {
     if (course.prix_final && course.prix_final > 0) {
       prixRetenu = course.prix_final;
       prixSource = 'prix_final_existant';
-    } else if (course.prix_propose_client && course.prix_propose_client > 0) {
-      prixRetenu = course.prix_propose_client;
+    } else if (prixClientExplicite !== null) {
+      prixRetenu = prixClientExplicite;
       prixSource = 'prix_propose_client';
     } else {
       // Calcul automatique uniquement si aucun prix humain n'a été défini

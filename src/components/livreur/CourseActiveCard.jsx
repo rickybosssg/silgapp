@@ -968,9 +968,13 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                     <p className="text-[10px] text-green-600 font-medium">
                       Prix convenu avec le client
                     </p>
+                  ) : hasClientPrix ? (
+                    <p className="text-[10px] text-blue-600">
+                      Prix proposé par le client, conservé à la livraison
+                    </p>
                   ) : (
                     <p className="text-[10px] text-blue-600">
-                      Prix final calculé à la livraison selon le tarif du pays
+                      Estimation indicative, sans modification du prix client validé
                     </p>
                   )}
                 </div>
@@ -1333,6 +1337,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                             const res = await base44.functions.invoke("finaliserLivraisonLivreur", {
                               course_id: course.id,
                               confirmation_method: "bouton",
+                              prix_final_livreur: getPrixAffichable(course),
                             });
                             const data = res?.data || res || {};
                             if (data?.success || data?.skipped) {

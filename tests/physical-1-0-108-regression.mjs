@@ -24,10 +24,14 @@ assert.match(stepForm, /const prix = Number\(formData\.prix_propose \|\| 0\)/);
 assert.match(stepForm, /return !Number\.isFinite\(prix\) \|\| prix <= 0/);
 
 const finaliser = read('base44/functions/finaliserLivraisonLivreur/entry.ts');
-const prixClientBranch = finaliser.indexOf('const prixClientExplicite = Number(course.prix_propose_client || 0);');
+const prixClientBranch = finaliser.indexOf('const prixClientExplicite = resolveClientExplicitPrice(course, prix_final_livreur);');
 const delegatedCalc = finaliser.indexOf("functions.invoke('calculPrixCourseExterne'");
 assert.ok(prixClientBranch > 0, 'explicit client price branch missing');
 assert.ok(delegatedCalc > prixClientBranch, 'explicit client price must be handled before calculPrixCourseExterne');
+assert.match(finaliser, /function parsePositiveMoney/);
+assert.ok(finaliser.includes("String(value).replace(/[^\\d]/g, '')"));
+assert.match(finaliser, /course\?\.source === 'client'[\s\S]*parsePositiveMoney\(course\?\.prix_propose\)/);
+assert.match(finaliser, /const isPublicClientStandard = course\?\.source === 'client'/);
 assert.match(finaliser, /prix_final:\s*prixClientExplicite/);
 assert.match(finaliser, /prix_source:\s*'prix_propose_client_explicit'/);
 assert.match(finaliser, /tauxCommissionEffectif\(course,\s*commissionPct\)/);
@@ -37,6 +41,12 @@ assert.match(finaliser, /verifierEncoursLivreur', \{ course_id \}/);
 const calculPrix = read('base44/functions/calculPrixCourseExterne/entry.ts');
 assert.doesNotMatch(calculPrix, /const prixRetenu = course\.prix_final \|\| course\.prix_propose_client/);
 assert.match(calculPrix, /course\.statut === 'livree'/);
+assert.match(calculPrix, /const prixClientExplicite = parsePositiveMoney\(course\.prix_propose_client\)/);
+
+const activeCard = read('src/components/livreur/CourseActiveCard.jsx');
+assert.doesNotMatch(activeCard, /Prix final calculé à la livraison selon le tarif du pays/);
+assert.match(activeCard, /Prix proposé par le client, conservé à la livraison/);
+assert.match(activeCard, /prix_final_livreur:\s*getPrixAffichable\(course\)/);
 
 const transition = read('base44/functions/transitionStatutLivreur/entry.ts');
 const forbiddenStart = transition.indexOf('const FORBIDDEN_FIELDS = [');
