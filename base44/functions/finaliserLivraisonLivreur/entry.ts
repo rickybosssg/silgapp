@@ -68,7 +68,11 @@ export default async function(req: Request): Promise<Response> {
         const countryFix = await chargerConfigPays(base44, course.country_code || '');
         const commissionPctFix = normalizeCommissionPct(countryFix?.commission_pct);
         if (commissionPctFix !== null) {
-          const commissionFix = Math.round(prixFix * (commissionPctFix / 100));
+          // ⚠️ Respecter le taux figé à l'acceptation (Pass/Happy Hour)
+          const tauxEffectifFix = (course.commission_locked_at && course.commission_taux_applique != null)
+            ? Number(course.commission_taux_applique)
+            : commissionPctFix;
+          const commissionFix = Math.round(prixFix * (tauxEffectifFix / 100));
           const montantFix = prixFix - commissionFix;
           await base44.asServiceRole.entities.CourseExterne.update(course_id, {
             prix_final: prixFix,

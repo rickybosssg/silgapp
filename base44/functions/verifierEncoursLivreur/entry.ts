@@ -131,6 +131,25 @@ Deno.serve(async (req) => {
       commission = Math.round(course.prix_final * (pct / 100));
     }
 
+    // ── GARDE-FOU — Pass Zéro Commission / Happy Hour incohérent ──
+    // Une course publique figée avec commission_taux_applique = 0 (pass_zero / happy_hour)
+    // doit TOUJOURS produire commission comptabilisable = 0, même si commission_silga
+    // contient accidentellement une valeur > 0 (bug de finalisation antérieur).
+    // On NE modifie PAS commission_silga sur la course (trace conservée) — on empêche
+    // seulement l'incohérence de se transformer en dette réelle dans le solde.
+    const isPublicCourse = !course.enterprise_id;
+    const isZeroCommissionMode = course.commission_mode === 'pass_zero' || course.commission_mode === 'happy_hour';
+    if (
+      isPublicCourse &&
+      course.commission_locked_at &&
+      Number(course.commission_taux_applique) === 0 &&
+      isZeroCommissionMode &&
+      commission > 0
+    ) {
+      console.warn(`[ENCOURS] ⚠️ ANOMALIE COMPTABLE: course ${courseId} commission_mode=${course.commission_mode} taux_applique=0 mais commission_silga=${commission} — commission forcée à 0 (garde-fou Pass/Happy Hour). commission_silga non modifié sur la course (trace conservée).`);
+      commission = 0;
+    }
+
     // ── FIX: course à 0% (Pass Zéro Commission / Happy Hour) ──
     // Une course avec commission=0 doit QUAND MÊME gagner le CAS atomique et être
     // marquée comme comptabilisée (encours_comptabilise_at set, montant=0).
