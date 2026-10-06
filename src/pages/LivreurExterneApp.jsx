@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { clearPersistedToken } from "@/lib/authPersistence";
@@ -1083,6 +1083,31 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     }
   }, [isV2Enabled, coursesActives.length, mesCourses]);
 
+  const handleVictoryClose = useCallback(async (courseId) => {
+    setVictoryCourseId(null);
+    if (courseId) {
+      queryClient.setQueryData(["mes-courses-externes", livreurId, livreurEmail, notificationCourseId], (old = []) =>
+        (old || []).map((course) =>
+          course.id === courseId
+            ? {
+                ...course,
+                statut: "livree",
+                heure_livraison: course.heure_livraison || new Date().toISOString(),
+              }
+            : course
+        )
+      );
+    }
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] }),
+      queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] }),
+      queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles"] }),
+    ]);
+    setArrivalToastData(null);
+    setHasNewAvailableCourse(false);
+    setActiveTab("courses");
+  }, [queryClient, livreurId, livreurEmail, notificationCourseId]);
+
   // ── Auto-activation GPS au démarrage (si livreur en ligne) ──
   useEffect(() => {
     if (!onboardingTermine || sessionExpired) return;
@@ -1851,14 +1876,10 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       </div>
     </div>
 
-      {/* ── Animation de victoire livreur — 3 secondes, purement visuelle ── */}
+      {/* ── Animation de victoire livreur — environ 9 secondes, purement visuelle ── */}
       <LivreurVictoryOverlay
         courseId={victoryCourseId}
-        onClose={() => {
-          setVictoryCourseId(null);
-          // Correction 3: retour automatique à l'onglet Disponibles après la célébration
-          setActiveTab("disponibles");
-        }}
+        onClose={handleVictoryClose}
       />
     </DashboardThemeProvider>
   );

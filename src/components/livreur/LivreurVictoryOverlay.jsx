@@ -87,10 +87,10 @@ export default function LivreurVictoryOverlay({ courseId, onClose }) {
       })();
     }
 
-    // ── Fermeture automatique à 6 secondes ──
+    // ── Fermeture automatique après la célébration complète ──
     const timer = setTimeout(() => {
       setVisible(false);
-      onClose?.();
+      onClose?.(courseId);
     }, DURATION_MS);
 
     return () => clearTimeout(timer);
@@ -102,11 +102,11 @@ export default function LivreurVictoryOverlay({ courseId, onClose }) {
     typeof window !== "undefined" &&
     window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
-  // Taille de police responsive : le mot remplit presque l'écran à l'échelle 1.
-  // Formule basée sur la longueur du mot pour éviter tout débordement horizontal.
+  // Taille responsive sans retour à la ligne: le mot est réduit sur petit écran
+  // au lieu d'être cassé en deux morceaux.
   const wordLength = word.replace(/\s/g, "").length;
-  const fontSizeVw = Math.floor(180 / wordLength);
-  const fontSize = `clamp(2rem, ${fontSizeVw}vw, 5.5rem)`;
+  const fontSizeVw = Math.floor(124 / wordLength);
+  const fontSize = `clamp(1.35rem, ${fontSizeVw}vw, 4.75rem)`;
 
   return (
     <AnimatePresence>
@@ -121,7 +121,7 @@ export default function LivreurVictoryOverlay({ courseId, onClose }) {
         >
           {/* ── Phase 1+2+3 : le mot de célébration ── */}
           <motion.div
-            className="relative text-center px-4 w-full flex flex-col items-center justify-center"
+            className="relative text-center px-3 w-full max-w-[100vw] flex flex-col items-center justify-center overflow-hidden"
             initial={{ scale: 0.2, opacity: 0 }}
             animate={
               prefersReducedMotion
@@ -142,11 +142,12 @@ export default function LivreurVictoryOverlay({ courseId, onClose }) {
               className="font-black text-white leading-none select-none"
               style={{
                 fontSize,
+                maxWidth: "calc(100vw - 24px)",
                 textShadow:
                   "0 0 30px rgba(52,199,89,0.9), 0 0 60px rgba(0,122,255,0.6), 0 2px 8px rgba(0,0,0,0.5)",
-                wordBreak: "break-word",
-                whiteSpace: "normal",
-                overflowWrap: "break-word",
+                wordBreak: "keep-all",
+                whiteSpace: "nowrap",
+                overflowWrap: "normal",
               }}
             >
               {word}
