@@ -262,7 +262,10 @@ export default async function(req: Request): Promise<Response> {
     }
 
     try {
-      const res = await base44.asServiceRole.functions.invoke('calculPrixCourseExterne', { course_id });
+      const rawRes = await base44.asServiceRole.functions.invoke('calculPrixCourseExterne', { course_id });
+      // ⚠️ asServiceRole.functions.invoke retourne un objet Axios brut (interceptResponses: false)
+      // Le body JSON est dans res.data, pas dans res directement.
+      const res = rawRes?.data ?? rawRes;
       if (res?.success) {
         // ── Garde livreur_financier_id : calculPrixCourseExterne ne le set pas.
         //    Le fixer une seule fois ici, après délégation. Idempotent. ──

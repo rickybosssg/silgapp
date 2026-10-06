@@ -330,7 +330,9 @@ async function finalizeOneCourse(base44: any, course: any, nowIso: string, delay
 
   // ── CAS 3: Course standard — déléguer à calculPrixCourseExterne ──
   try {
-    const res = await base44.asServiceRole.functions.invoke('calculPrixCourseExterne', { course_id: courseId });
+    const rawRes = await base44.asServiceRole.functions.invoke('calculPrixCourseExterne', { course_id: courseId });
+    // ⚠️ asServiceRole.functions.invoke retourne un objet Axios brut (interceptResponses: false)
+    const res = rawRes?.data ?? rawRes;
 
     // Si le calcul a réussi avec un prix déterminable
     if (res?.success && res?.prix_final != null && Number(res.prix_final) > 0) {
