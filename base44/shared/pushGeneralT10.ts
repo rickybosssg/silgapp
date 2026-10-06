@@ -427,7 +427,7 @@ function logException(base44, step, message, countryCode, courseIds) {
  * Critères :
  *   - type_livreur = "externe"
  *   - country_code = course.country_code
- *   - actif = true
+ *   - actif = true OU blocage admin (admin_hors_ligne=true, statut=hors_ligne)
  *   - validation = "valide"
  *   - bloque_encours = false
  *   - manual_hors_ligne != true
@@ -442,13 +442,16 @@ async function getLivreursDestinataires(base44, countryCode) {
     const livreurs = await base44.asServiceRole.entities.Livreur.filter({
       country_code: countryCode,
       type_livreur: 'externe',
-      actif: true,
       validation: 'valide',
       bloque_encours: false,
     }, undefined, 1000);
 
     const eligible = (livreurs || []).filter(l =>
-      l.manual_hors_ligne !== true
+      l.manual_hors_ligne !== true &&
+      (
+        l.actif === true ||
+        (l.statut === 'hors_ligne' && l.admin_hors_ligne === true)
+      )
     );
     if (eligible.length === 0) return [];
 

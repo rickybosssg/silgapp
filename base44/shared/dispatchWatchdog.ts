@@ -408,7 +408,6 @@ export async function runWatchdog(base44, body = {}) {
         const livreurs = await base44.asServiceRole.entities.Livreur.filter({
           type_livreur: 'externe',
           validation: 'valide',
-          actif: true,
           statut: { $in: ['disponible', 'hors_ligne'] },
           country_code: course.country_code,
           bloque_encours: false,
@@ -437,7 +436,7 @@ export async function runWatchdog(base44, body = {}) {
         const candidatsT20 = (livreurs || [])
           .filter((l: any) => {
             const peutRecevoirPush =
-              l.statut === 'disponible' ||
+              (l.statut === 'disponible' && l.actif === true) ||
               (l.statut === 'hors_ligne' && l.admin_hors_ligne === true);
             return peutRecevoirPush && !livreursEnCourseT20.has(l.id) && !refusedT20.includes(l.id) && l.user_email;
           })

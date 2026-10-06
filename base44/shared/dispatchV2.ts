@@ -55,7 +55,7 @@ const V2_FLAG_TTL_MS = 2 * 60 * 1000;
 function peutRecevoirPushNouvelleCourse(livreur: any): boolean {
   if (!livreur) return false;
   if (livreur.manual_hors_ligne === true) return false;
-  if (livreur.statut === 'disponible') return true;
+  if (livreur.statut === 'disponible') return livreur.actif === true;
   return livreur.statut === 'hors_ligne' && livreur.admin_hors_ligne === true;
 }
 
@@ -93,7 +93,6 @@ async function notifierLivreursEligiblesV2(base44: any, course: any, options: an
     base44.asServiceRole.entities.Livreur.filter({
       type_livreur: 'externe',
       validation: 'valide',
-      actif: true,
       statut: { $in: ['disponible', 'hors_ligne'] },
       country_code: course.country_code,
       bloque_encours: false,
@@ -630,7 +629,6 @@ export async function secoursDispatchV2(base44: any, course: any, nbLivreurs: nu
   const livreurs = await base44.asServiceRole.entities.Livreur.filter({
     type_livreur: 'externe',
     validation: 'valide',
-    actif: true,
     statut: { $in: ['disponible', 'hors_ligne'] },
     country_code: course.country_code,
     bloque_encours: false,

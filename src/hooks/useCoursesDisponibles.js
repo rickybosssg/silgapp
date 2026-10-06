@@ -65,13 +65,12 @@ export function useCoursesDisponibles(livreurProfil) {
     livreurProfil?.manual_hors_ligne !== true &&
     livreurProfil?.admin_hors_ligne !== true;
 
-  // ── Visibilité du fil : tous les livreurs validés/actifs du pays voient les courses ──
+  // ── Visibilité du fil : tous les livreurs validés du pays voient les courses ──
   // Un livreur bloqué par l'Admin voit le fil mais ne peut pas accepter.
-  // Exclus : validation != valide, actif=false, autre pays
+  // Exclus : validation != valide, autre pays
   const livreurPeutVoirFil =
     livreurProfil?.type_livreur === "externe" &&
-    livreurProfil?.validation === "valide" &&
-    livreurProfil?.actif === true;
+    livreurProfil?.validation === "valide";
 
   // ── Raison de blocage d'acceptation (null si le livreur peut accepter) ──
   const raisonBlocage = !livreurPeutVoirFil
@@ -80,7 +79,7 @@ export function useCoursesDisponibles(livreurProfil) {
       ? null
       : livreurProfil?.bloque_encours === true
         ? "Régularisez votre situation avant d'accepter"
-        : livreurProfil?.admin_hors_ligne === true
+        : livreurProfil?.admin_hors_ligne === true || livreurProfil?.actif === false
           ? "Votre compte est bloqué par l'administrateur. Vous pouvez consulter les courses disponibles, mais vous ne pouvez pas les accepter tant que votre compte n'est pas débloqué."
         : livreurProfil?.statut === "en_course"
           ? "Vous êtes déjà en course"

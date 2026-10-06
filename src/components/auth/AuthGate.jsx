@@ -417,9 +417,9 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
           if (!livreur.user_email) {
             base44.entities.Livreur.update(livreur.id, { user_email: user.email }).catch(() => {});
           }
-          if (livreur.actif === false) { setBlockedLivreur(livreur); setState("livreur_bloque"); return; }
           if (livreur.validation === "en_attente") { setBlockedLivreur(livreur); setState("livreur_en_attente"); return; }
           if (livreur.validation === "refuse") { setBlockedLivreur(livreur); setState("livreur_refuse"); return; }
+          if (livreur.validation !== "valide") { setBlockedLivreur(livreur); setState("livreur_bloque"); return; }
           registerPushToken(livreur.id, {
             email: user.email,
             user_email: user.email,

@@ -257,7 +257,7 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
         </div>
         <p className="text-sm font-bold text-slate-800">Compte non éligible au fil de courses</p>
         <p className="text-xs text-slate-500">
-          Votre compte doit être validé et actif pour voir les courses disponibles.
+          Votre compte doit être validé pour voir les courses disponibles.
         </p>
       </div>
     );
