@@ -407,12 +407,14 @@ export async function runWatchdog(base44, body = {}) {
           type_livreur: 'externe',
           validation: 'valide',
           actif: true,
-          statut: 'disponible',
+          statut: { $in: ['disponible', 'hors_ligne'] },
           country_code: course.country_code,
           bloque_encours: false,
           manual_hors_ligne: { $ne: true },
           // [CORRECTION 11] admin_hors_ligne retiré du ciblage FCM secours :
           // un livreur bloqué par l'Admin continue à recevoir le push.
+          // [CORRECTION 12] statut élargi à 'hors_ligne' : un livreur bloqué par
+          // l'Admin (statut='hors_ligne') doit recevoir le rappel T+20.
         }, '-last_seen_at', 50);
 
         // Exclure les livreurs en course (fresh check)

@@ -84,13 +84,15 @@ async function notifierLivreursEligiblesV2(base44: any, course: any, options: an
       type_livreur: 'externe',
       validation: 'valide',
       actif: true,
-      statut: 'disponible',
+      statut: { $in: ['disponible', 'hors_ligne'] },
       country_code: course.country_code,
       bloque_encours: false,
       manual_hors_ligne: { $ne: true },
       // [CORRECTION 11] admin_hors_ligne retiré du ciblage FCM : un livreur bloqué
       // par l'Admin continue à recevoir le push "Nouvelle course". L'acceptation
       // reste bloquée côté accepterCourseV2 (livreur.admin_hors_ligne !== true).
+      // [CORRECTION 12] statut élargi à 'hors_ligne' : un livreur bloqué par l'Admin
+      // a statut='hors_ligne'. Le filtre 'disponible' seul l'excluait des push T+0.
       // [ENTERPRISE] Isolation : ne proposer que les livreurs du même périmètre.
       // Pour les courses publiques, on filtre enterprise_id: null qui matche
       // à la fois null et absent (undefined) en MongoDB.
@@ -614,10 +616,12 @@ export async function secoursDispatchV2(base44: any, course: any, nbLivreurs: nu
     type_livreur: 'externe',
     validation: 'valide',
     actif: true,
-    statut: 'disponible',
+    statut: { $in: ['disponible', 'hors_ligne'] },
     country_code: course.country_code,
     bloque_encours: false,
     manual_hors_ligne: { $ne: true },
+    // [CORRECTION 12] statut élargi à 'hors_ligne' : un livreur bloqué par l'Admin
+    // (statut='hors_ligne') doit recevoir les rappels T+5 du secours V2.
     // [ENTERPRISE] Isolation secours : même périmètre que la course.
     ...(courseEnterpriseId
       ? { enterprise_id: courseEnterpriseId }
