@@ -18,6 +18,7 @@ import { getLivreursNotifies, getLivreursRefuses } from './dispatchNotifications
 import { chargerConfigDispatch, chargerConfigVaguesGPS } from './dispatchConfig.ts';
 import { isV2Enabled, secoursDispatchV2, calculerScore, publierCourseDansFil } from './dispatchV2.ts';
 import { gererPushGeneralT10 } from './pushGeneralT10.ts';
+import { normalizeEnterpriseId } from './enterpriseFinance.ts';
 
 /** Crée une alerte admin si aucune alerte récente n'existe pour la même course. */
 async function createAdminAlert(base44, titre, message, courseId, alertDedupMs = 5 * 60 * 1000) {
@@ -403,16 +404,20 @@ export async function runWatchdog(base44, body = {}) {
 
       if (ageMin >= cachedConfig.dispatch.rappelT20DelayMin) {
         // Récupérer les livreurs éligibles (mêmes critères que secoursDispatchV2)
+        const courseEnterpriseId = normalizeEnterpriseId(course.enterprise_id);
         const livreurs = await base44.asServiceRole.entities.Livreur.filter({
           type_livreur: 'externe',
           validation: 'valide',
           actif: true,
-          statut: 'disponible',
+          statut: { $in: ['disponible', 'hors_ligne'] },
           country_code: course.country_code,
           bloque_encours: false,
           manual_hors_ligne: { $ne: true },
           // [CORRECTION 11] admin_hors_ligne retiré du ciblage FCM secours :
           // un livreur bloqué par l'Admin continue à recevoir le push.
+          ...(courseEnterpriseId
+            ? { enterprise_id: courseEnterpriseId }
+            : { enterprise_id: null }),
         }, '-last_seen_at', 50);
 
         // Exclure les livreurs en course (fresh check)
@@ -430,7 +435,12 @@ export async function runWatchdog(base44, body = {}) {
 
         // Filtrer + scorer + trier + slice top N
         const candidatsT20 = (livreurs || [])
-          .filter((l: any) => !livreursEnCourseT20.has(l.id) && !refusedT20.includes(l.id) && l.user_email)
+          .filter((l: any) => {
+            const peutRecevoirPush =
+              l.statut === 'disponible' ||
+              (l.statut === 'hors_ligne' && l.admin_hors_ligne === true);
+            return peutRecevoirPush && !livreursEnCourseT20.has(l.id) && !refusedT20.includes(l.id) && l.user_email;
+          })
           .map((l: any) => ({ ...l, score: calculerScore(l, course) }))
           .sort((a: any, b: any) => b.score - a.score)
           .slice(0, cachedConfig.dispatch.rappelT20NbLivreurs);

@@ -49,6 +49,16 @@ export const DISPATCH_V2_BUNDLE_VERSION = '2026-09-25-v2-only-unique-moteur';
 let V2_FLAG_CACHE: { enabled: boolean; expires: number } | null = null;
 const V2_FLAG_TTL_MS = 2 * 60 * 1000;
 
+// [CORRECTION BLOQUE ADMIN] Sépare l'éligibilité push de l'éligibilité travail.
+// Un livreur bloque par l'Admin est force hors_ligne mais doit recevoir les
+// notifications. Un livreur hors_ligne volontaire (manual_hors_ligne) reste exclu.
+function peutRecevoirPushNouvelleCourse(livreur: any): boolean {
+  if (!livreur) return false;
+  if (livreur.manual_hors_ligne === true) return false;
+  if (livreur.statut === 'disponible') return true;
+  return livreur.statut === 'hors_ligne' && livreur.admin_hors_ligne === true;
+}
+
 export async function isV2Enabled(base44: any): Promise<boolean> {
   if (V2_FLAG_CACHE && Date.now() < V2_FLAG_CACHE.expires) return V2_FLAG_CACHE.enabled;
   try {
@@ -84,7 +94,7 @@ async function notifierLivreursEligiblesV2(base44: any, course: any, options: an
       type_livreur: 'externe',
       validation: 'valide',
       actif: true,
-      statut: 'disponible',
+      statut: { $in: ['disponible', 'hors_ligne'] },
       country_code: course.country_code,
       bloque_encours: false,
       manual_hors_ligne: { $ne: true },
@@ -117,7 +127,11 @@ async function notifierLivreursEligiblesV2(base44: any, course: any, options: an
   }
 
   const exclus = new Set([...(dejaNotifies || []), ...(refuses || [])]);
-  let candidats = (livreurs || []).filter((livreur: any) => livreur.user_email && !exclus.has(livreur.id));
+  let candidats = (livreurs || []).filter((livreur: any) =>
+    livreur.user_email &&
+    !exclus.has(livreur.id) &&
+    peutRecevoirPushNouvelleCourse(livreur)
+  );
 
   // 🚫 Exclure les livreurs déjà en course (même définition que aCourseActive)
   const livreursEnCourse = await getLivreursEnCourse(base44, course.country_code, courseEnterpriseId);
@@ -617,7 +631,7 @@ export async function secoursDispatchV2(base44: any, course: any, nbLivreurs: nu
     type_livreur: 'externe',
     validation: 'valide',
     actif: true,
-    statut: 'disponible',
+    statut: { $in: ['disponible', 'hors_ligne'] },
     country_code: course.country_code,
     bloque_encours: false,
     manual_hors_ligne: { $ne: true },
@@ -649,7 +663,12 @@ export async function secoursDispatchV2(base44: any, course: any, nbLivreurs: nu
 
   // 4. Score + sort + slice top N
   const candidats = livreurs
-    .filter((l: any) => !livreursEnCourse.has(l.id) && !refused.includes(l.id) && !dejaNotifies.includes(l.id))
+    .filter((l: any) =>
+      peutRecevoirPushNouvelleCourse(l) &&
+      !livreursEnCourse.has(l.id) &&
+      !refused.includes(l.id) &&
+      !dejaNotifies.includes(l.id)
+    )
     .map((l: any) => ({ ...l, score: calculerScore(l, course) }))
     .sort((a: any, b: any) => b.score - a.score)
     .slice(0, nbLivreurs);

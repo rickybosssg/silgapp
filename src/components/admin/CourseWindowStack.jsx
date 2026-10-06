@@ -1,12 +1,148 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useAdminCourseWindows } from "@/context/AdminCourseWindowsContext";
 import CourseWindowCard from "./CourseWindowCard";
 import { Layers, X, ChevronRight } from "lucide-react";
+
+const MOBILE_BUTTON_SIZE = 56;
+const MOBILE_BUTTON_MARGIN = 12;
+const MOBILE_BUTTON_BOTTOM_SAFE = 24;
+const MOBILE_BUTTON_DEFAULT_RIGHT = 16;
+const MOBILE_BUTTON_DEFAULT_BOTTOM = 80;
+const MOBILE_BUTTON_DRAG_THRESHOLD = 8;
+const MOBILE_BUTTON_STORAGE_KEY = "silgapp_course_window_stack_button_position";
+
+function clampMobileButtonPosition(position) {
+  if (typeof window === "undefined") return position;
+
+  const maxX = Math.max(MOBILE_BUTTON_MARGIN, window.innerWidth - MOBILE_BUTTON_SIZE - MOBILE_BUTTON_MARGIN);
+  const maxY = Math.max(MOBILE_BUTTON_MARGIN, window.innerHeight - MOBILE_BUTTON_SIZE - MOBILE_BUTTON_BOTTOM_SAFE);
+
+  return {
+    x: Math.min(Math.max(position.x, MOBILE_BUTTON_MARGIN), maxX),
+    y: Math.min(Math.max(position.y, MOBILE_BUTTON_MARGIN), maxY),
+  };
+}
+
+function getDefaultMobileButtonPosition() {
+  if (typeof window === "undefined") {
+    return { x: MOBILE_BUTTON_MARGIN, y: MOBILE_BUTTON_MARGIN };
+  }
+
+  return clampMobileButtonPosition({
+    x: window.innerWidth - MOBILE_BUTTON_SIZE - MOBILE_BUTTON_DEFAULT_RIGHT,
+    y: window.innerHeight - MOBILE_BUTTON_SIZE - MOBILE_BUTTON_DEFAULT_BOTTOM,
+  });
+}
+
+function getInitialMobileButtonPosition() {
+  if (typeof window === "undefined") return getDefaultMobileButtonPosition();
+
+  try {
+    const saved = window.localStorage.getItem(MOBILE_BUTTON_STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Number.isFinite(parsed?.x) && Number.isFinite(parsed?.y)) {
+        return clampMobileButtonPosition(parsed);
+      }
+    }
+  } catch {}
+
+  return getDefaultMobileButtonPosition();
+}
 
 export default function CourseWindowStack() {
   const { windows, removeWindow } = useAdminCourseWindows();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [desktopCollapsed, setDesktopCollapsed] = useState(false);
+  const [mobileButtonPosition, setMobileButtonPosition] = useState(getInitialMobileButtonPosition);
+  const mobileDragRef = useRef(null);
+  const mobileButtonPositionRef = useRef(mobileButtonPosition);
+  const suppressMobileClickRef = useRef(false);
+
+  useEffect(() => {
+    mobileButtonPositionRef.current = mobileButtonPosition;
+  }, [mobileButtonPosition]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setMobileButtonPosition((current) => {
+        const next = clampMobileButtonPosition(current);
+        try {
+          window.localStorage.setItem(MOBILE_BUTTON_STORAGE_KEY, JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+    };
+
+    window.addEventListener("resize", handleResize);
+    window.addEventListener("orientationchange", handleResize);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      window.removeEventListener("orientationchange", handleResize);
+    };
+  }, []);
+
+  const handleMobilePointerDown = (event) => {
+    if (event.button !== undefined && event.button !== 0) return;
+
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    suppressMobileClickRef.current = false;
+    mobileDragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      origin: mobileButtonPositionRef.current,
+      didDrag: false,
+    };
+  };
+
+  const handleMobilePointerMove = (event) => {
+    const drag = mobileDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+
+    const deltaX = event.clientX - drag.startX;
+    const deltaY = event.clientY - drag.startY;
+    const distance = Math.hypot(deltaX, deltaY);
+
+    if (distance < MOBILE_BUTTON_DRAG_THRESHOLD && !drag.didDrag) return;
+
+    event.preventDefault();
+    drag.didDrag = true;
+    suppressMobileClickRef.current = true;
+    setMobileButtonPosition(clampMobileButtonPosition({
+      x: drag.origin.x + deltaX,
+      y: drag.origin.y + deltaY,
+    }));
+  };
+
+  const handleMobilePointerUp = (event) => {
+    const drag = mobileDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+    mobileDragRef.current = null;
+
+    if (drag.didDrag) {
+      const next = clampMobileButtonPosition(mobileButtonPositionRef.current);
+      setMobileButtonPosition(next);
+      try {
+        window.localStorage.setItem(MOBILE_BUTTON_STORAGE_KEY, JSON.stringify(next));
+      } catch {}
+      window.setTimeout(() => {
+        suppressMobileClickRef.current = false;
+      }, 0);
+    }
+  };
+
+  const handleMobileButtonClick = (event) => {
+    if (suppressMobileClickRef.current) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+
+    setMobileOpen(true);
+  };
 
   if (windows.length === 0) return null;
 
@@ -49,8 +185,18 @@ export default function CourseWindowStack() {
       {/* Mobile: floating button + overlay */}
       <div className="lg:hidden">
         <button
-          onClick={() => setMobileOpen(true)}
-          className="fixed bottom-20 right-4 z-40 w-14 h-14 rounded-full bg-primary text-white shadow-xl flex items-center justify-center active:scale-95 transition-transform"
+          onPointerDown={handleMobilePointerDown}
+          onPointerMove={handleMobilePointerMove}
+          onPointerUp={handleMobilePointerUp}
+          onPointerCancel={handleMobilePointerUp}
+          onClick={handleMobileButtonClick}
+          className="fixed z-40 w-14 h-14 rounded-full bg-primary text-white shadow-xl flex items-center justify-center active:scale-95 transition-transform cursor-grab active:cursor-grabbing"
+          style={{
+            left: `${mobileButtonPosition.x}px`,
+            top: `${mobileButtonPosition.y}px`,
+            touchAction: "none",
+          }}
+          aria-label="Ouvrir les courses actives"
         >
           <Layers className="w-6 h-6" />
           <span className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center border-2 border-white">
