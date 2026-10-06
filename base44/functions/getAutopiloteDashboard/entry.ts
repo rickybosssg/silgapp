@@ -116,8 +116,21 @@ export default async function(req: Request): Promise<Response> {
     };
 
     // ── 8. Dernière sync Meta et dernière analyse ──
+    // SOURCE DE VÉRITÉ : META_ADS_LATEST_INSIGHTS.synced_at (écrit par syncMetaAdsSpend).
+    // META_ADS_LAST_SYNC n'est jamais écrit par syncMetaAdsSpend — c'est une clé legacy.
+    // On lit synced_at depuis le JSON de META_ADS_LATEST_INSIGHTS pour obtenir le vrai
+    // timestamp de la dernière synchronisation réussie.
     const lastMetaSyncConfig = configs.find(c => c.cle === 'META_ADS_LAST_SYNC');
-    const lastMetaSync = lastMetaSyncConfig?.valeur || null;
+    let lastMetaSync = lastMetaSyncConfig?.valeur || null;
+    if (!lastMetaSync) {
+      const latestInsightsConfig = configs.find(c => c.cle === 'META_ADS_LATEST_INSIGHTS');
+      if (latestInsightsConfig?.valeur) {
+        try {
+          const parsed = JSON.parse(latestInsightsConfig.valeur);
+          if (parsed?.synced_at) lastMetaSync = parsed.synced_at;
+        } catch {}
+      }
+    }
     const lastAutopiloteAnalysis = recentDecisions?.[0]?.created_date || null;
 
     // ── 9. Assembler le payload ──

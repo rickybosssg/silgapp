@@ -210,6 +210,15 @@ async function storeLatestMetrics(base44, accountId, campaigns, insights) {
     await base44.asServiceRole.entities.AppConfig.create({ cle: 'META_ADS_LATEST_INSIGHTS', valeur });
   }
 
+  // ── Écrire META_ADS_LAST_SYNC pour le dashboard (source de vérité = synced_at) ──
+  const syncTimestamp = metrics.synced_at;
+  const existingSync = await base44.asServiceRole.entities.AppConfig.filter({ cle: 'META_ADS_LAST_SYNC' });
+  if (existingSync && existingSync.length > 0) {
+    await base44.asServiceRole.entities.AppConfig.update(existingSync[0].id, { valeur: syncTimestamp });
+  } else {
+    await base44.asServiceRole.entities.AppConfig.create({ cle: 'META_ADS_LAST_SYNC', valeur: syncTimestamp });
+  }
+
   return metrics;
 }
 
