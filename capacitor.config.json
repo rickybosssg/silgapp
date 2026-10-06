@@ -3,6 +3,8 @@
   "appName": "SILGAPP",
   "webDir": "dist",
   "server": {
+    "url": "https://silga-dispatch-go.base44.app",
+    "cleartext": false,
     "androidScheme": "https",
     "allowNavigation": [
       "silga-dispatch-go.base44.app",

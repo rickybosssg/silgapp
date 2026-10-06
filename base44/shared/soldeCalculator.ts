@@ -228,6 +228,7 @@ export async function calculerSoldesLivreursBatch(
   // 3. Récupérer les livreurs avec base comptable pour filtrage
   const livreurIds = new Set<string>();
   (allCourses || []).forEach((c: any) => {
+    if (c.enterprise_id) return;
     const fid = getLivreurFinancierId(c);
     if (fid) livreurIds.add(fid);
     if (c.livreur_id) livreurIds.add(c.livreur_id);
