@@ -9,7 +9,6 @@ import { toast } from "sonner";
 import CourseStepForm from "@/components/client/CourseStepForm";
 import { sauvegarderContactDB } from "@/components/client/CarnetAdresses";
 import { haversineKm } from "@/lib/priceEstimate";
-import LivreurRechercheAnimation from "@/components/client/LivreurRechercheAnimation";
 import { normalizePhone, phoneVariants } from "@/lib/phoneUtils";
 import { resolveGpsForCourse, GPS_BLOCK_MESSAGE } from "@/lib/gpsResolution";
 import { isPaysTarificationGrandOuaga } from "@/lib/tarifGrandOuaga";
@@ -69,10 +68,7 @@ export default function CourseExterneFormSync() {
   // Restaurer l'étape depuis localStorage si disponible
   const savedStep = parseInt(localStorage.getItem(STEP_KEY) || "0", 10);
   const [currentStep, setCurrentStep] = useState(isNaN(savedStep) ? 0 : savedStep);
-  const [courseCreated, setCourseCreated] = useState(false);
-  const [createdCourse, setCreatedCourse] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false); // verrou anti-double-clic
-  const [invitationModal, setInvitationModal] = useState(null); // { telephone, nom } ou null
   const [gpsLoading, setGpsLoading] = useState({ depart: false, arrivee: false });
   const { forteDemande } = useForteDemande(effectiveCountryCode);
   const { country: countryConfig } = useCountryPricing(effectiveCountryCode);
@@ -405,8 +401,9 @@ export default function CourseExterneFormSync() {
         request_id: _rq || crypto.randomUUID(),
       });
       // Safety: SDK peut wrapper la réponse dans { data: { ... } }
-      const course = createResult?.data?.course || createResult?.course;
-      const isIdempotentReplay = createResult?.data?.idempotent === true || createResult?.idempotent === true;
+      const createPayload = createResult?.data?.data ?? createResult?.data ?? createResult;
+      const course = createPayload?.course || createPayload?.data?.course;
+      const isIdempotentReplay = createPayload?.idempotent === true || createPayload?.data?.idempotent === true;
 
       if (!course?.id) {
         throw new Error("Réponse invalide du serveur — course non créée");
@@ -479,7 +476,6 @@ export default function CourseExterneFormSync() {
       }
 
       toast.success("Course créée — En attente d’un livreur");
-      setCreatedCourse(response);
       // Sauvegarde contacts en base de données (sauf déplacement)
       const cid = clientProfil?.id;
       const ctel = clientProfil?.telephone;
@@ -492,9 +488,6 @@ export default function CourseExterneFormSync() {
           longitude: formData.gps_arrivee_lng || null,
         } : null;
         sauvegarderContactDB(cid, ctel, formData.destinataire_nom, formData.destinataire_telephone, "destinataire", adrData).catch(() => {});
-        if (!formData.destinataire_client_id && formData.destinataire_telephone) {
-          setInvitationModal({ telephone: formData.destinataire_telephone, nom: formData.destinataire_nom });
-        } else { setCourseCreated(true); }
       } else if (formData.type_course === "recevoir") {
         const adrData = formData.adresse_depart ? {
           adresse: formData.adresse_depart,
@@ -504,12 +497,15 @@ export default function CourseExterneFormSync() {
           longitude: formData.gps_depart_lng || null,
         } : null;
         sauvegarderContactDB(cid, ctel, formData.expediteur_nom, formData.expediteur_telephone, "expediteur", adrData).catch(() => {});
-        if (!formData.expediteur_client_id && formData.expediteur_telephone) {
-          setInvitationModal({ telephone: formData.expediteur_telephone, nom: formData.expediteur_nom });
-        } else { setCourseCreated(true); }
-      } else {
-        setCourseCreated(true);
       }
+
+      navigate("/client", {
+        replace: true,
+        state: {
+          open_recherche_course_id: response.id,
+          created_course: response,
+        },
+      });
     },
     onError: (err) => {
       console.error("[CREATE_CLIENT_ERROR]", {
@@ -928,19 +924,6 @@ export default function CourseExterneFormSync() {
     localStorage.removeItem(STEP_KEY);
     navigate("/client");
   };
-
-  if (courseCreated && createdCourse) {
-    return <LivreurRechercheAnimation course={createdCourse} />;
-  }
-
-  // ── Correction 1: invitation WhatsApp non bloquante ──
-  // Le client passe immédiatement à la recherche de livreur / suivi.
-  // L'invitation WhatsApp est diffusée en arrière-plan sans interrompre le flux.
-  if (invitationModal && createdCourse) {
-    // Fire-and-forget: ne pas bloquer le suivi
-    setInvitationModal(null);
-    setCourseCreated(true);
-  }
 
   // ── Blocage client pour frais d'annulation impayés ────────────────────────
   if (clientProfil?.bloque_frais_annulation) {

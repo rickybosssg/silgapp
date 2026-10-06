@@ -12,6 +12,7 @@ import { useGPSNatif } from "@/hooks/useGPSNatif";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
 import { haversineKm } from "@/lib/priceEstimate";
+import { getConfig } from "@/lib/dispatchConfigStore";
 
 import { registerPushToken, subscribeToNotifications, consumePendingNotificationData } from "@/lib/notifications";
 import { usePushTokenRetry } from "@/hooks/usePushTokenRetry";
@@ -358,9 +359,15 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
   // ── GPS natif robuste (remplace le polling navigator.geolocation brut) ──
   const gpsPositionRef = useRef(null);
+  const gpsDynamicConfig = getConfig();
+  const gpsIntervalMs = livreurProfil?.statut === "en_course"
+    ? Math.min(5000, gpsDynamicConfig.gps_native_interval_ms || 5000)
+    : 10000;
+  const gpsDistanceFilterM = gpsDynamicConfig.gps_distance_filter_m || 3;
   const { position: gpsPosition, gpsActif: gpsHookActif, permissionStatut, indicateur: gpsIndicateur, ageMinutes: gpsAge, demanderPermission, actualiserPosition } = useGPSNatif({
     enabled: onboardingTermine && !sessionExpired && livreurProfil?.statut !== "hors_ligne",
-    intervalMs: 10000,
+    intervalMs: gpsIntervalMs,
+    minDistanceM: gpsDistanceFilterM,
     onPosition: (pos) => { gpsPositionRef.current = pos; },
   });
 
@@ -401,8 +408,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     startNativeBackgroundHeartbeat({
       userType: "livreur",
       sessionId: sessionId || "",
-      intervalMs: 5000,
-      distanceFilter: 0,
+      intervalMs: livreurProfil?.statut === "en_course" ? 5000 : getConfig().heartbeat_bg_interval_ms,
+      distanceFilter: getConfig().gps_distance_filter_m,
     }).then((stop) => {
       if (cancelled) stop?.();
       else stopNativeHeartbeat = stop;

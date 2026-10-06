@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { motion } from "framer-motion";
 import { base44 } from "@/api/base44Client";
 import { clearPersistedToken } from "@/lib/authPersistence";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { extractLocalPhone } from "@/lib/phoneUtils";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -85,6 +85,7 @@ function GPSBadge({ profil, onForceSync }) {
 
 export default function ClientExterneApp() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [onboardingDone, setOnboardingDone] = useState(false);
   const [showProfilModal, setShowProfilModal] = useState(false);
   const [position, setPosition] = useState(null);
@@ -272,6 +273,32 @@ export default function ClientExterneApp() {
   const coursePrincipale = useMemo(() =>
     courseAssignee || courseEnRecherche || coursesActives[0] || null
   , [coursesActives, courseEnRecherche, courseAssignee]);
+
+  // ── Ouverture immédiate après creerCourseClient SUCCESS ──
+  // Le formulaire transmet la course créée via state React Router pour éviter
+  // d'attendre le prochain polling dashboard ou une nouvelle acquisition GPS.
+  useEffect(() => {
+    const createdCourse = location.state?.created_course;
+    const createdCourseId = location.state?.open_recherche_course_id || createdCourse?.id;
+    if (!createdCourseId) return;
+
+    const courseForRecherche = createdCourse || coursesActives.find(c => c.id === createdCourseId);
+    if (courseForRecherche) {
+      const normalizedCreatedCourse = {
+        ...courseForRecherche,
+        statut: courseForRecherche.statut || "recherche_livreur",
+      };
+      setCoursesActives((old = []) => {
+        const without = (old || []).filter(c => c.id !== createdCourseId);
+        return [normalizedCreatedCourse, ...without];
+      });
+      lastRechercheCourseId.current = createdCourseId;
+      setShowRecherche(true);
+      setShowSuiviFullscreen(false);
+      setShowMultiCourseSelector(false);
+      navigate("/client", { replace: true, state: {} });
+    }
+  }, [location.state, coursesActives, navigate]);
 
   // ── Auto-ouverture de l'écran "Recherche livreur" quand une nouvelle course entre en recherche ──
   useEffect(() => {
@@ -630,11 +657,12 @@ export default function ClientExterneApp() {
   // syncGpsDestinataire est appelé uniquement dans le watch GPS (15s) pour éviter le rate limit
   useEffect(() => {
     if (!onboardingDone || !clientProfil) return;
+    const intervalMs = (showRecherche || showSuiviFullscreen) ? 5000 : 8000;
     const interval = setInterval(() => {
       checkStatus(position, clientProfil);
-    }, 8000); //  5s → 8s : checkStatus fait 4-5 requêtes imbriquées
+    }, intervalMs); // 5s seulement quand un écran de suivi/recherche est visible
     return () => clearInterval(interval);
-  }, [onboardingDone, clientProfil?.id, position]);
+  }, [onboardingDone, clientProfil?.id, position, showRecherche, showSuiviFullscreen]);
 
   // ── Subscription WebSocket temps réel — met à jour les courses instantanément ──
   // Complète le polling 8s : si un livreur accepte/annule, le client le voit immédiatement

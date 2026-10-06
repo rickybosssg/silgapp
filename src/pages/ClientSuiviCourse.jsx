@@ -209,8 +209,8 @@ export default function ClientSuiviCourse() {
     },
     enabled: !!userId,
     initialData: [],
-    refetchInterval: 10000, // ⚡ 5s → 10s : polling optimisé (ETA géré par useETACourse)
-    staleTime: 5000,
+    refetchInterval: 5000, // fallback léger visible-screen pour positions/course en suivi
+    staleTime: 3000,
   });
 
   // Toutes les courses actives / terminées
