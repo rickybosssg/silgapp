@@ -417,7 +417,13 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
           if (!livreur.user_email) {
             base44.entities.Livreur.update(livreur.id, { user_email: user.email }).catch(() => {});
           }
-          if (livreur.actif === false) { setBlockedLivreur(livreur); setState("livreur_bloque"); return; }
+          // [CORRECTION 13] BLOCAGE ADMIN ≠ COMPTE DÉSACTIVÉ
+          // Un livreur bloqué par l'Admin (actif=false, validation="valide") doit
+          // accéder à son Dashboard : voir les courses, historique, profil.
+          // L'acceptation est bloquée côté backend par accepterCourseV2
+          // (livreur.actif === true + livreur.admin_hors_ligne !== true).
+          // Les inscriptions refusées (validation="refuse") et en attente
+          // (validation="en_attente") continuent d'afficher l'écran de blocage.
           if (livreur.validation === "en_attente") { setBlockedLivreur(livreur); setState("livreur_en_attente"); return; }
           if (livreur.validation === "refuse") { setBlockedLivreur(livreur); setState("livreur_refuse"); return; }
           registerPushToken(livreur.id, {
