@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from "react";
-import { Link } from "react-router-dom";
+import React, { useEffect, useState, useMemo } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, MessageSquare, Sparkles, Package, CreditCard, XCircle, Settings, Check, Archive, Inbox, Megaphone } from "lucide-react";
@@ -36,6 +36,7 @@ function timeAgo(dateStr) {
 }
 
 export default function CentreNotifications() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [activeCategory, setActiveCategory] = useState("all");
 
@@ -46,16 +47,12 @@ export default function CentreNotifications() {
   });
 
   // Realtime subscription
-  useQuery({
-    queryKey: ["admin-inbox-subscription"],
-    queryFn: async () => {
-      const unsub = base44.entities.AdminInboxItem.subscribe(() => {
-        queryClient.invalidateQueries({ queryKey: ["admin-inbox-items"] });
-      });
-      return unsub;
-    },
-    staleTime: Infinity,
-  });
+  useEffect(() => {
+    const unsubscribe = base44.entities.AdminInboxItem.subscribe(() => {
+      queryClient.invalidateQueries({ queryKey: ["admin-inbox-items"] });
+    });
+    return () => unsubscribe?.();
+  }, [queryClient]);
 
   const unreadCount = useMemo(() => items.filter(i => i.status === "unread").length, [items]);
 
@@ -97,14 +94,22 @@ export default function CentreNotifications() {
     const unread = items.filter(i => i.status === "unread");
     if (unread.length === 0) return;
     try {
-      await base44.entities.AdminInboxItem.bulkUpdate(
-        unread.map(i => ({ id: i.id, status: "read", read_at: new Date().toISOString() }))
+      await Promise.all(
+        unread.map(i => base44.entities.AdminInboxItem.update(i.id, {
+          status: "read",
+          read_at: new Date().toISOString(),
+        }))
       );
       queryClient.invalidateQueries({ queryKey: ["admin-inbox-items"] });
       toast.success(`${unread.length} notification(s) marquée(s) comme lues`);
     } catch (e) {
       toast.error("Erreur marquage global");
     }
+  };
+
+  const handleOpenAction = async (item) => {
+    if (item.status === "unread") await handleMarkRead(item);
+    if (item.action_url) navigate(item.action_url);
   };
 
   const categoryCounts = useMemo(() => {
@@ -232,6 +237,14 @@ export default function CentreNotifications() {
                         >
                           <Archive className="w-3 h-3" /> Archiver
                         </button>
+                        {item.action_url && (
+                          <button
+                            onClick={() => handleOpenAction(item)}
+                            className="flex items-center gap-1 px-2 py-1 rounded-lg bg-primary text-white text-[10px] font-semibold hover:bg-primary/90"
+                          >
+                            Ouvrir
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>

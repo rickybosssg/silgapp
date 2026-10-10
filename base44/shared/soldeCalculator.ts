@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// SOLDE CALCULATOR — Formule financière unique (READ-ONLY)
+// SOLDE CALCULATOR — SOURCE DE VÉRITÉ unique, formule financière READ-ONLY
 // ═══════════════════════════════════════════════════════════════════════════
 //
 // RÈGLE MÉTIER DÉFINITIVE (correction 26/08/2026) :

@@ -23,6 +23,20 @@ const PAYS_FALLBACK = [
   { code: "MA", nom: "Maroc", emoji_flag: "🇲🇦", ordre: 15 },
 ];
 
+const LEADING_FLAG_RE = /^([\u{1F1E6}-\u{1F1FF}]{2})\s*/u;
+
+export function getCountryFlag(country) {
+  const explicitFlag = String(country?.emoji_flag || "").trim();
+  if (explicitFlag) return explicitFlag;
+  const nameMatch = String(country?.nom || "").match(LEADING_FLAG_RE);
+  return nameMatch?.[1] || "";
+}
+
+export function getCountryName(country, fallback = "") {
+  const rawName = String(country?.nom || fallback || "").trim();
+  return rawName.replace(LEADING_FLAG_RE, "").trim();
+}
+
 // Hook pour récupérer les pays actifs — dynamique depuis la BDD avec fallback de secours
 export function usePaysActifs() {
   const { data: pays = [], isLoading, error } = useQuery({
@@ -49,6 +63,8 @@ export default function CountrySelector({ value, onChange, className = "" }) {
   const [isOpen, setIsOpen] = useState(false);
 
   const selectedCountry = pays.find(p => p.code === value);
+  const selectedFlag = getCountryFlag(selectedCountry);
+  const selectedName = getCountryName(selectedCountry, "Tous les pays");
 
   return (
     <div className={cn("relative", className)}>
@@ -59,8 +75,8 @@ export default function CountrySelector({ value, onChange, className = "" }) {
         className="flex items-center justify-between gap-2 w-full px-3 py-2 rounded-lg border border-white/20 bg-white text-gray-900 text-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-white/30 transition-all"
       >
         <span className="flex items-center gap-2">
-          <span className="text-lg">{selectedCountry?.emoji_flag || ""}</span>
-          <span>{isLoading ? "Chargement..." : selectedCountry?.nom || "Tous les pays"}</span>
+          <span className="text-lg">{selectedFlag}</span>
+          <span>{isLoading ? "Chargement..." : selectedName}</span>
         </span>
         <ChevronDown className={cn("w-4 h-4 transition-transform", isOpen && "rotate-180")} />
       </button>
@@ -95,8 +111,8 @@ export default function CountrySelector({ value, onChange, className = "" }) {
                 value === p.code && "bg-gray-100"
               )}
               >
-                <span className="text-lg">{p.emoji_flag}</span>
-                <span className="flex-1 text-left">{p.nom}</span>
+                <span className="text-lg">{getCountryFlag(p)}</span>
+                <span className="flex-1 text-left">{getCountryName(p, p.code)}</span>
                 {value === p.code && <Check className="w-4 h-4 text-primary" />}
               </button>
             ))}

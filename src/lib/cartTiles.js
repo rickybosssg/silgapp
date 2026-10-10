@@ -18,11 +18,13 @@ let CARTO_API_KEY = "";
 let _initialized = false;
 let _initPromise = null;
 
+export const OSM_FALLBACK_URL = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+
 /** URL Voyager (couleur) — sans clé par défaut, mise à jour après initCartoTiles() */
-export let CARTO_TILE_URL = "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
+export let CARTO_TILE_URL = OSM_FALLBACK_URL;
 
 /** URL Light All (gris clair) — sans clé par défaut, mise à jour après initCartoTiles() */
-export let CARTO_TILE_LIGHT_URL = "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
+export let CARTO_TILE_LIGHT_URL = OSM_FALLBACK_URL;
 
 export const CARTO_TILE_CONFIG = {
   maxZoom: 19,

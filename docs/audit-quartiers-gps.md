@@ -1,6 +1,6 @@
 # 📋 BILAN — Audit et Fiabilisation du Système Quartier/GPS
 
-**Date :** 20 août 2026  
+**Date :** 20 août 2026
 **Objectif :** Garantir que toutes les courses entrant dans le Dispatch V2 ont des coordonnées GPS valides, sans modification du core Dispatch V2 ni de la logique tarifaire.
 
 ---

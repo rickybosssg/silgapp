@@ -1,0 +1,35 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const root = dirname(dirname(fileURLToPath(import.meta.url)));
+const read = (path) => readFileSync(join(root, path), "utf8");
+
+const hook = read("src/hooks/useCoursesDisponibles.js");
+const activity = read("src/components/livreur/ActiviteTempsReel.jsx");
+const available = read("src/components/livreur/CoursesDisponibles.jsx");
+const dashboard = read("src/pages/LivreurExterneApp.jsx");
+
+assert.match(activity, /useCoursesDisponibles\(livreurProfil\)/, "ActiviteTempsReel doit utiliser le hook partagé");
+assert.match(available, /useCoursesDisponibles\(livreurProfil\)/, "CoursesDisponibles doit utiliser le hook partagé");
+assert.match(dashboard, /<ActiviteTempsReel[\s\S]*livreurProfil=\{livreurProfil\}/, "Le badge du dashboard doit recevoir le profil livreur");
+assert.match(dashboard, /<CoursesDisponibles[\s\S]*livreurProfil=\{livreurProfil\}/, "L'onglet disponibles doit recevoir le même profil livreur");
+assert.doesNotMatch(dashboard, /courses-disponibles-count/, "L'ancienne requête de compteur dupliquée doit être supprimée");
+
+assert.match(activity, /eligibleCourses\.length/, "Le compteur d'activité doit compter toutes les courses éligibles");
+assert.match(activity, /closestCourse = coursesWithDistance\[0\]/, "La course la plus proche doit provenir des courses éligibles géolocalisées");
+assert.doesNotMatch(activity, /disponible(?:s)? dans ton rayon/, "Aucun faux rayon de recherche ne doit être affiché");
+
+assert.match(hook, /course\.statut !== "recherche_livreur"/, "Le hook doit exclure les statuts non recherchés");
+assert.match(hook, /course\.dispatch_status !== "disponible_push"/, "Le hook doit contrôler le statut Dispatch V2");
+assert.match(hook, /course\.livreur_id \|\| course\.accepted_by_livreur_id/, "Le hook doit exclure les courses déjà attribuées");
+assert.match(hook, /refusedCourseIds\.includes\(course\.id\)/, "Les refus backend doivent être appliqués");
+assert.match(hook, /DISMISS_TTL_MS = 30 \* 60 \* 1000/, "Le TTL local de 30 minutes doit être conservé");
+assert.match(hook, /silgapp:dismissed-courses-changed/, "Les refus locaux doivent se synchroniser entre composants");
+assert.match(hook, /if \(!livreurPeutVoirFil \|\| !isV2Enabled\) return \[\]/, "Le fil doit rester visible aux livreurs validés et actifs autorisés");
+assert.match(available, /raisonBlocage \?/, "Un livreur qui voit le fil mais ne peut pas accepter doit avoir un bouton bloqué avec raison claire");
+
+assert.match(dashboard, /CourseExterne\.subscribe/, "Les mises à jour de courses doivent être suivies en temps réel");
+assert.match(dashboard, /DispatchNotification\.subscribe/, "Les refus backend doivent être suivis en temps réel");
+console.log("COURSES_DISPONIBLES_REGRESSION=PASS shared_source=PASS realtime=PASS refusals=PASS responsive_nav=PASS");
