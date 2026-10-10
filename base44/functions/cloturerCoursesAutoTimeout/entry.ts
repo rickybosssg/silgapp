@@ -463,6 +463,18 @@ async function libererLivreur(base44: any, livreurId: string): Promise<void> {
     if (!livreur) return;
     // Ne libérer que si le livreur est en_course (pas s'il est déjà hors_ligne ou disponible)
     if (livreur.statut === 'en_course') {
+      // [ECO] Vérifier si le livreur a une autre course active (mission Eco multi-courses)
+      const STATUTS_ACTIFS = ["livreur_en_route", "client_contacte", "en_route_expediteur", "arrive_prise_en_charge", "colis_recupere", "passager_embarque", "pris_en_charge", "en_livraison", "arrivee"];
+      const autresCourses = await base44.asServiceRole.entities.CourseExterne.filter(
+        { livreur_id: livreurId }, "-created_date", 10
+      ).catch(() => []);
+      const aAutreCourseActive = (autresCourses || []).some((c: any) =>
+        STATUTS_ACTIFS.includes(c.statut)
+      );
+      if (aAutreCourseActive) {
+        // Le livreur a une autre course active — rester en_course
+        return;
+      }
       await base44.asServiceRole.entities.Livreur.update(livreurId, {
         statut: 'disponible',
       });

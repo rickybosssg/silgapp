@@ -325,19 +325,25 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
 
     updateCourseMutation.mutate({ id: course.id, data: updateData });
 
-    saveLivreur(livreurProfil.id, { statut: "disponible" }).then(() => {
-      queryClient.invalidateQueries({ queryKey: ["livreur-profil"] });
-      queryClient.invalidateQueries({ queryKey: ["mes-courses"] });
-    });
+    // [ECO] Ne pas remettre disponible si la course fait partie d'une mission Eco
+    if (!course.eco_mission_id) {
+      saveLivreur(livreurProfil.id, { statut: "disponible" }).then(() => {
+        queryClient.invalidateQueries({ queryKey: ["livreur-profil"] });
+        queryClient.invalidateQueries({ queryKey: ["mes-courses"] });
+      });
+    }
 
     toast.success("Livraison terminée ! ");
   };
 
   const handleClientAnnule = (course) => {
     updateCourseMutation.mutate({ id: course.id, data: { statut: "annulee", remarque_livreur: "Annulé par le client" } });
-    saveLivreur(livreurProfil.id, { statut: "disponible" }).then(() =>
-      queryClient.invalidateQueries({ queryKey: ["livreur-profil"] })
-    );
+    // [ECO] Ne pas remettre disponible si la course fait partie d'une mission Eco
+    if (!course.eco_mission_id) {
+      saveLivreur(livreurProfil.id, { statut: "disponible" }).then(() =>
+        queryClient.invalidateQueries({ queryKey: ["livreur-profil"] })
+      );
+    }
     toast("Course annulée par le client");
   };
 
