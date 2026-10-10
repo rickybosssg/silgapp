@@ -48,6 +48,7 @@ const FORBIDDEN_FIELDS = [
   'client_price_validated_at', 'client_price_refused_at', 'pricing_mode',
   'tracking_token', 'tracking_link', 'tracking_shared_at', 'tracking_opened_count',
   'pickup_qr_token', 'pickup_code_4_digits', 'delivery_qr_token', 'delivery_code_4_digits',
+  'pickup_confirmed_by', 'delivery_confirmed_by',
   'heure_acceptation', 'source', 'country_code', 'type_course', 'is_multi_colis',
   'nb_colis', 'nb_colis_livres', 'nb_colis_annules',
 ];

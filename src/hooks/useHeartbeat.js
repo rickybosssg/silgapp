@@ -112,7 +112,7 @@ export function useHeartbeat({ user_type, position, enabled = true, debugLabel =
           userType: user_type,
           sessionId: session_id || "",
           intervalMs: getConfig().heartbeat_bg_interval_ms,
-          distanceFilter: getConfig().gps_distance_filter_m,
+          distanceFilter: 0,
         }).then((stop) => {
           if (cancelled) stop?.();
           else nativeBgHeartbeatStop = stop;

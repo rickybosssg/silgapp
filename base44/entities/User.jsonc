@@ -30,9 +30,7 @@
         "SN",
         "ML",
         "GN",
-        "NE",
-        "GH",
-        "NG"
+        "NE"
       ],
       "description": "Code pays ISO de l'admin pays (ex: BF, CI). Vide si admin global."
     },

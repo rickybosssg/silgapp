@@ -107,9 +107,9 @@ export default function ActiviteTempsReel({ livreurProfil, mesCourses = [], isEx
       return "Aucune course pour le moment. Je continue la recherche.";
     }
     if (coursesWithDistance.length === 1) {
-      return "1 course disponible.";
+      return "1 course disponible dans ton rayon.";
     }
-    return `${coursesWithDistance.length} courses disponibles.`;
+    return `${coursesWithDistance.length} courses disponibles dans ton rayon.`;
   }, [isExterne, loadingCourses, coursesWithDistance.length]);
 
   // ── Rendu ──

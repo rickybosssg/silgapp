@@ -305,41 +305,7 @@ Deno.serve(async (req) => {
         }
       }
 
-      // ── 5c. Créer d'abord les Inbox admin, puis envoyer les push ──
-      // Règle : un push Admin doit pointer vers un élément persistant déjà créé.
-      const adminInboxIds = new Map<string, string | null>();
-      if (sender_type !== 'admin') {
-        const adminRecipients = [];
-        for (const recipientStr of recipients) {
-          try {
-            const r = JSON.parse(recipientStr);
-            if (r.user_type === 'admin') adminRecipients.push(r);
-          } catch (_) {}
-        }
-        for (const admin of adminRecipients) {
-          try {
-            const inboxItemId = await createAdminInboxItem(base44, {
-              type: 'message',
-              priority: 'P2',
-              title: pushTitle,
-              body: msgPreview,
-              source_entity: 'Message',
-              source_id: message.id,
-              course_id: course_id || undefined,
-              conversation_id: conversation_id || undefined,
-              message_id: message.id,
-              country_code: 'ALL',
-              action_url: conversation_id ? `/admin/messages?conv=${conversation_id}` : (course_id ? `/admin/messages?course=${course_id}` : '/admin/centre-notifications'),
-              deduplication_key: `INBOX_MSG_${message.id}_${admin.email}`,
-            });
-            adminInboxIds.set(admin.email, inboxItemId);
-          } catch (_) {
-            adminInboxIds.set(admin.email, null);
-          }
-        }
-      }
-
-      // ── 5d. Envoyer le push à chaque destinataire unique ──
+      // ── 5c. Envoyer le push à chaque destinataire unique ──
       for (const recipientStr of recipients) {
         try {
           const r = JSON.parse(recipientStr);
@@ -352,7 +318,6 @@ Deno.serve(async (req) => {
             livreur_id: r.livreur_id || undefined,
             course_id: course_id || undefined,
             conversation_id: conversation_id || undefined,
-            inbox_item_id: adminInboxIds.get(r.email) || undefined,
           }).catch(() => {});
         } catch (_) {}
       }
@@ -381,6 +346,39 @@ Deno.serve(async (req) => {
         }
       } catch (waErr) {
         console.warn(`[envoyerMessage] ⚠️ Erreur relayage WhatsApp: ${waErr.message}`);
+      }
+    }
+
+    // ── 7. Créer un AdminInboxItem pour chaque admin destinataire ──
+    // Règle : un message interne dirigé vers l'admin DOIT créer un élément
+    // persistant dans le Centre de notifications, pour le deep link push.
+    if (sender_type !== 'admin') {
+      const adminRecipients = [];
+      for (const recipientStr of recipients) {
+        try {
+          const r = JSON.parse(recipientStr);
+          if (r.user_type === 'admin') adminRecipients.push(r);
+        } catch (_) {}
+      }
+      for (const admin of adminRecipients) {
+        try {
+          await createAdminInboxItem(base44, {
+            type: 'message',
+            priority: 'P2',
+            title: pushTitle,
+            body: msgPreview,
+            source_entity: 'Message',
+            source_id: message.id,
+            course_id: course_id || undefined,
+            conversation_id: conversation_id || undefined,
+            message_id: message.id,
+            country_code: 'ALL',
+            action_url: conversation_id ? `/admin/messages?conv=${conversation_id}` : (course_id ? `/admin/messages?course=${course_id}` : '/admin/centre-notifications'),
+            deduplication_key: `INBOX_MSG_${message.id}_${admin.email}`,
+          });
+        } catch (_) {
+          // Non-bloquant
+        }
       }
     }
 

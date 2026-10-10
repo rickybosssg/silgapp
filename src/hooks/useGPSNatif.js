@@ -20,7 +20,7 @@ const haversineMeters = (lat1, lon1, lat2, lon2) => {
  * - demanderPermission: () => Promise<boolean>
  * - actualiserPosition: () => Promise<void>
  */
-export function useGPSNatif({ enabled = true, intervalMs = 15000, minDistanceM = 10, onPosition } = {}) {
+export function useGPSNatif({ enabled = true, intervalMs = 15000, onPosition } = {}) {
   const [position, setPosition] = useState(null);
   const [gpsActif, setGpsActif] = useState(false);
   const [permissionStatut, setPermissionStatut] = useState("checking");
@@ -61,7 +61,7 @@ export function useGPSNatif({ enabled = true, intervalMs = 15000, minDistanceM =
   // Seuil de précision GPS — assoupli à 200m pour zones à couverture faible (Ouaga)
   const ACCURACY_THRESHOLD = 200;
   // Distance minimale (mètres) pour mettre à jour — évite le bruit GPS
-  const MIN_DISTANCE_M = Math.max(1, Number(minDistanceM) || 10);
+  const MIN_DISTANCE_M = 10;
   // Délai maximum (ms) sans position avant d'accepter n'importe quelle précision
   const FALLBACK_DELAY_MS = 60000;
   const lastPosRef = useRef(null);
@@ -112,7 +112,7 @@ export function useGPSNatif({ enabled = true, intervalMs = 15000, minDistanceM =
     setAgeMinutes(0);
     if (onPosition) onPosition(pos);
     return pos;
-  }, [onPosition, MIN_DISTANCE_M]);
+  }, [onPosition]);
 
   // Demander la permission GPS
   const demanderPermission = useCallback(async () => {

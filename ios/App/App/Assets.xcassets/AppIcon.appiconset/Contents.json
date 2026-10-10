@@ -1,7 +1,7 @@
 {
   "images" : [
     {
-      "filename" : "Silgapp-AppIcon-1024-Opaque.png",
+      "filename" : "AppIcon-512@2x.png",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"

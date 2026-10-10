@@ -2,7 +2,7 @@ import React from "react";
 import { RotateCcw } from "lucide-react";
 
 /**
- * Bouton "RELANCER CETTE COURSE" — affiché sur les courses livrées dans l'historique.
+ * Bouton "Refaire cette course" — affiché sur les courses livrées dans l'historique.
  * Navigue vers le formulaire de création avec les données réutilisables pré-remplies.
  *
  * NE RECOPIE PAS : livreur, dispatch, statut, commission, paiement, prix final garanti.
@@ -21,8 +21,6 @@ export default function RefaireCourseButton({ course, clientProfil, position, on
 
     const prefillData = {
       type_course: course.type_course,
-      country_code: course.country_code || clientProfil?.country_code || "",
-      devise: course.devise || "",
       adresse_depart: course.adresse_depart || "",
       adresse_arrivee: course.adresse_arrivee || "",
       quartier_depart: course.quartier_depart || "",
@@ -45,13 +43,11 @@ export default function RefaireCourseButton({ course, clientProfil, position, on
       nb_passagers: course.nb_passagers || 1,
       notes: "",
       destination_inconnue: course.destination_inconnue || false,
-      prix_propose: Number(course.prix_propose_client || course.prix_final || 0) || 0,
     };
 
     onNavigate?.(route, {
       position,
       clientProfil,
-      country_code: prefillData.country_code,
       prefillCourse: prefillData,
     });
   };
@@ -62,7 +58,7 @@ export default function RefaireCourseButton({ course, clientProfil, position, on
       className="w-full h-11 rounded-2xl bg-primary text-white font-black text-sm shadow-lg shadow-primary/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
     >
       <RotateCcw className="w-4 h-4" />
-      RELANCER CETTE COURSE
+      Refaire cette course
     </button>
   );
 }

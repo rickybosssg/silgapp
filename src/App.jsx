@@ -12,7 +12,6 @@ import SelectionReseau from './pages/SelectionReseau.jsx';
 import AppMaintenanceGate from './components/admin/AppMaintenanceGate.jsx';
 import { restoreTokenFromCookie, syncTokenFromPreferences, clearPersistedToken } from '@/lib/authPersistence';
 import { trackAppInstall } from '@/lib/trackInstall';
-import { consumePendingNotificationData } from '@/lib/notifications';
 import IOSAppStoreBanner from './components/IOSAppStoreBanner.jsx';
 
 // LoadingScreen défini IMMÉDIATEMENT avant lazy loading
@@ -42,7 +41,6 @@ const RecapCourseLivreur = lazy(() => import('./pages/RecapCourseLivreur.jsx'));
 const CourseExterneForm = lazy(() => import('./pages/CourseExterneForm.jsx'));
 const CourseExterneFormSync = lazy(() => import('./pages/CourseExterneFormSync.jsx'));
 const ClientSuiviCourse = lazy(() => import('./pages/ClientSuiviCourse.jsx'));
-const ClientRefaireCourse = lazy(() => import('./pages/ClientRefaireCourse.jsx'));
 const DashboardAdminExterne = lazy(() => import('./pages/DashboardAdminExterne.jsx'));
 const DusLivreursExternes = lazy(() => import('./pages/DusLivreursExternes.jsx'));
 const ClientsExternesPage = lazy(() => import('./pages/ClientsExternesPage.jsx'));
@@ -190,20 +188,6 @@ function AppContent() {
     document.addEventListener('backbutton', handleBackButton, false);
     return () => document.removeEventListener('backbutton', handleBackButton);
   }, [navigate, location]);
-
-  useEffect(() => {
-    const navigateFromNotification = (data = {}) => {
-      const rawTarget = data.action_url || data.url || data.path || data.route || data.deep_link || "";
-      if (typeof rawTarget !== "string" || !rawTarget.startsWith("/")) return;
-      navigate(rawTarget, { replace: false });
-    };
-    const handleNotificationOpened = (event) => navigateFromNotification(event?.detail || {});
-    window.addEventListener("silgapp:notification-opened", handleNotificationOpened);
-    consumePendingNotificationData().then((pending) => {
-      if (pending) navigateFromNotification(pending);
-    }).catch(() => null);
-    return () => window.removeEventListener("silgapp:notification-opened", handleNotificationOpened);
-  }, [navigate]);
 
   // ── Heartbeat d'authentification — empêche la déconnexion involontaire ──
   // Sur Android WebView, localStorage peut être effacé quand l'app passe en
@@ -355,7 +339,6 @@ function AppContent() {
           <Route path="/client/course/recevoir" element={<CourseExterneFormSync />} />
           <Route path="/client/course/deplacement" element={<CourseExterneFormSync />} />
           <Route path="/client/suivi" element={<ClientSuiviCourse />} />
-          <Route path="/client/refaire" element={<ClientRefaireCourse />} />
           <Route path="/client/boutiques" element={<BoutiquesList />} />
           <Route path="/client/boutiques/:id" element={<BoutiqueDetail />} />
           <Route path="/client/restaurants" element={<RestaurantsList />} />

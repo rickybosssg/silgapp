@@ -85,35 +85,6 @@ const REASSURANCE_LIVRAISON = [
   "Livraison en cours, restez informé.",
 ];
 
-function formatGpsAge(timestamp) {
-  if (!timestamp) return null;
-  const ts = new Date(timestamp).getTime();
-  if (!Number.isFinite(ts)) return null;
-  const seconds = Math.max(0, Math.floor((Date.now() - ts) / 1000));
-  if (seconds < 60) return `${seconds} s`;
-  const minutes = Math.floor(seconds / 60);
-  const rest = seconds % 60;
-  if (minutes < 60) return rest ? `${minutes} min ${rest} s` : `${minutes} min`;
-  const hours = Math.floor(minutes / 60);
-  return `${hours} h ${minutes % 60} min`;
-}
-
-function getGpsFreshness(timestamp) {
-  if (!timestamp) {
-    return { label: "GPS livreur en attente", className: "bg-gray-900/70 text-white" };
-  }
-  const ts = new Date(timestamp).getTime();
-  if (!Number.isFinite(ts)) {
-    return { label: "GPS livreur en attente", className: "bg-gray-900/70 text-white" };
-  }
-  const ageSeconds = Math.max(0, Math.floor((Date.now() - ts) / 1000));
-  const ageLabel = formatGpsAge(timestamp);
-  if (ageSeconds <= 15) return { label: `Position mise à jour il y a ${ageLabel}`, className: "bg-emerald-600/90 text-white" };
-  if (ageSeconds <= 30) return { label: `GPS : il y a ${ageLabel}`, className: "bg-blue-600/90 text-white" };
-  if (ageSeconds <= 60) return { label: `GPS en retard : il y a ${ageLabel}`, className: "bg-amber-500/90 text-white" };
-  return { label: `Position ancienne — il y a ${ageLabel}`, className: "bg-red-600/90 text-white" };
-}
-
 export default function SuiviCourseFullscreen({ course, position, onClose, onCall, onMessage, onCancel }) {
   const [showTimeline, setShowTimeline] = useState(false);
   const [livreurPos, setLivreurPos] = useState(null);
@@ -182,8 +153,6 @@ export default function SuiviCourseFullscreen({ course, position, onClose, onCal
 
   // ── ETA unifié : useETACourse (ORS prioritaire, Haversine fallback) ──
   const activeTarget = (isLivraison || isColisRecupere) ? arrivee : depart;
-  const livreurGpsTimestamp = course?._livreur?.derniere_position_date || course?._livreur?.last_seen_at || null;
-  const gpsFreshness = getGpsFreshness(livreurGpsTimestamp);
   const etaHook = useETACourse({
     courseId: course.id,
     phase: isLivraison ? "livraison" : "recuperation",
@@ -193,7 +162,7 @@ export default function SuiviCourseFullscreen({ course, position, onClose, onCal
     toLng: activeTarget?.lng || null,
     countryCode: course.country_code,
     livreurId: course.livreur_id,
-    livreurLastUpdate: livreurGpsTimestamp,
+    livreurLastUpdate: course?._livreur?.derniere_position_date || course?._livreur?.last_seen_at || null,
   });
 
   const eta = etaHook.etaMinutes != null
@@ -357,13 +326,6 @@ export default function SuiviCourseFullscreen({ course, position, onClose, onCal
             </motion.div>
           )}
         </AnimatePresence>
-        {livreurPos?.lat && (
-          <div className="absolute top-32 left-1/2 -translate-x-1/2 z-[1000] px-3 w-full flex justify-center pointer-events-none">
-            <div className={`${gpsFreshness.className} rounded-full px-3 py-1.5 shadow-lg text-[11px] font-bold backdrop-blur-sm max-w-[92vw] truncate`}>
-              {gpsFreshness.label}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Bottom sheet */}
