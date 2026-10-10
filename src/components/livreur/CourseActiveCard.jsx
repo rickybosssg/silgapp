@@ -224,7 +224,15 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
       base44.functions.invoke("transitionStatutLivreur", {
         course_id: course.id,
         statut_cible: "en_livraison",
-      }).catch(() => null);
+      }).then((res) => {
+        if (!res?.success && !res?.skipped) {
+          setOptimisticStatut(null);
+          toast.error(res?.error || "Transition automatique échouée. Réessayez.");
+        }
+      }).catch(() => {
+        setOptimisticStatut(null);
+        toast.error("Erreur réseau lors de la transition automatique.");
+      });
     }, 10000);
     return () => clearTimeout(timer);
   }, [effectiveStatut, course.id, isDeplacement, isExterne]);
@@ -367,12 +375,20 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
     }
     const now = new Date().toISOString();
     updateOptimisticStatut("client_contacte", { heure_contact_client: now });
-    base44.functions.invoke("transitionStatutLivreur", {
-      course_id: course.id,
-      statut_cible: "client_contacte",
-    }).catch(() => null);
-    queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
-    toast.success("Client contacté. Vous pouvez maintenant démarrer votre trajet.");
+    try {
+      const res = await base44.functions.invoke("transitionStatutLivreur", {
+        course_id: course.id,
+        statut_cible: "client_contacte",
+      });
+      if (!res?.success && !res?.skipped) {
+        throw new Error(res?.error || "Erreur lors de la transition");
+      }
+      queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+      toast.success("Client contacté. Vous pouvez maintenant démarrer votre trajet.");
+    } catch (err) {
+      setOptimisticStatut(null);
+      toast.error(err?.message || "Erreur réseau. Réessayez.");
+    }
   };
 
   const handleDemarrerTrajet = async () => {
@@ -381,12 +397,20 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
       return;
     }
     updateOptimisticStatut("en_route_expediteur", {});
-    base44.functions.invoke("transitionStatutLivreur", {
-      course_id: course.id,
-      statut_cible: "en_route_expediteur",
-    }).catch(() => null);
-    queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
-    toast.success("Bon trajet ! En route vers l'expéditeur.");
+    try {
+      const res = await base44.functions.invoke("transitionStatutLivreur", {
+        course_id: course.id,
+        statut_cible: "en_route_expediteur",
+      });
+      if (!res?.success && !res?.skipped) {
+        throw new Error(res?.error || "Erreur lors de la transition");
+      }
+      queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+      toast.success("Bon trajet ! En route vers l'expéditeur.");
+    } catch (err) {
+      setOptimisticStatut(null);
+      toast.error(err?.message || "Erreur réseau. Réessayez.");
+    }
   };
 
   // Annulation livreur (unifiée colis + déplacement)
@@ -748,16 +772,24 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
             const contactRole = contact.role;
 
             // ── Courses admin : le clic sur Appeler/WhatsApp déclenche « Client contacté » ──
-            const triggerClientContacte = () => {
+            const triggerClientContacte = async () => {
               if (!isClientContactePhase) return;
               const now = new Date().toISOString();
               updateOptimisticStatut("client_contacte", { heure_contact_client: now });
-              base44.functions.invoke("transitionStatutLivreur", {
-                course_id: course.id,
-                statut_cible: "client_contacte",
-              }).catch(() => null);
-              queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
-              toast.success("Client contacté. N'oubliez pas de démarrer votre trajet.");
+              try {
+                const res = await base44.functions.invoke("transitionStatutLivreur", {
+                  course_id: course.id,
+                  statut_cible: "client_contacte",
+                });
+                if (!res?.success && !res?.skipped) {
+                  throw new Error(res?.error || "Erreur lors de la transition");
+                }
+                queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+                toast.success("Client contacté. N'oubliez pas de démarrer votre trajet.");
+              } catch (err) {
+                setOptimisticStatut(null);
+                toast.error(err?.message || "Erreur réseau. Réessayez.");
+              }
             };
 
             const handleWhatsApp = () => {
@@ -1167,41 +1199,46 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                         pickup_confirmed_by: "bouton",
                         pickup_confirmed_at: now,
                       });
+                      const invokeTransition = async (lat, lng) => {
+                        try {
+                          const res = await base44.functions.invoke("transitionStatutLivreur", {
+                            course_id: course.id,
+                            statut_cible: "colis_recupere",
+                            ...(lat != null && lng != null ? { latitude: lat, longitude: lng } : {}),
+                            confirmation_method: "bouton",
+                          });
+                          if (res?.success || res?.skipped) {
+                            queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+                            onColisRecupere({ ...course, statut: "colis_recupere", heure_recuperation: now });
+                            toast.success("Colis récupéré avec succès !");
+                          } else {
+                            throw new Error(res?.error || "Erreur lors de la récupération");
+                          }
+                        } catch (err) {
+                          setOptimisticStatut(null);
+                          toast.error(err?.message || "Erreur lors de la récupération. Réessayez.");
+                        } finally {
+                          setPickupBoutonPending(false);
+                        }
+                      };
                       // GPS optionnel — ne pas bloquer la récupération si indisponible
                       navigator.geolocation.getCurrentPosition(
-                        (pos) => {
-                           base44.functions.invoke("transitionStatutLivreur", {
-                             course_id: course.id,
-                             statut_cible: "colis_recupere",
-                             latitude: pos.coords.latitude,
-                             longitude: pos.coords.longitude,
-                             confirmation_method: "bouton",
-                           }).catch(() => null);
-                          queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
-                          onColisRecupere({ ...course, statut: "colis_recupere", heure_recuperation: now });
-                          toast.success("Colis récupéré avec succès !");
-                          setPickupBoutonPending(false);
-                        },
-                        () => {
-                           // GPS indisponible — récupération non bloquée
-                           base44.functions.invoke("transitionStatutLivreur", {
-                             course_id: course.id,
-                             statut_cible: "colis_recupere",
-                             confirmation_method: "bouton",
-                           }).catch(() => null);
-                          queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
-                          onColisRecupere({ ...course, statut: "colis_recupere", heure_recuperation: now });
-                          toast.success("Colis récupéré avec succès !");
-                          setPickupBoutonPending(false);
-                        },
+                        (pos) => invokeTransition(pos.coords.latitude, pos.coords.longitude),
+                        () => invokeTransition(null, null),
                         { enableHighAccuracy: true, timeout: 5000 }
                       );
                     }}
                     disabled={isPending || pickupBoutonPending}
                   >
-                    <Package className="w-6 h-6" />
-                    Colis récupéré
-                    <ChevronRight className="w-5 h-5" />
+                    {pickupBoutonPending ? (
+                      <div className="w-5 h-5 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                    ) : (
+                      <>
+                        <Package className="w-6 h-6" />
+                        Colis récupéré
+                        <ChevronRight className="w-5 h-5" />
+                      </>
+                    )}
                   </button>
                 ) : isExterne && course.is_multi_colis ? (
                   <button
@@ -1216,10 +1253,25 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                   /* ── INTERNE : bouton classique ── */
                   <button
                     className="w-full h-14 rounded-2xl bg-gradient-to-b from-amber-500 to-amber-600 text-white font-black text-base shadow-lg shadow-amber-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
-                    onClick={() => {
-                      // OPTIMISTIC UI: Update cache immediately
-                      updateOptimisticStatut("colis_recupere", { heure_recuperation: new Date().toISOString() });
-                      onColisRecupere(course);
+                    onClick={async () => {
+                      const now = new Date().toISOString();
+                      updateOptimisticStatut("colis_recupere", { heure_recuperation: now });
+                      try {
+                        const res = await base44.functions.invoke("transitionStatutLivreur", {
+                          course_id: course.id,
+                          statut_cible: "colis_recupere",
+                          confirmation_method: "bouton",
+                        });
+                        if (!res?.success && !res?.skipped) {
+                          throw new Error(res?.error || "Erreur lors de la récupération");
+                        }
+                        queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+                        onColisRecupere({ ...course, statut: "colis_recupere", heure_recuperation: now });
+                        toast.success("Colis récupéré avec succès !");
+                      } catch (err) {
+                        setOptimisticStatut(null);
+                        toast.error(err?.message || "Erreur réseau. Réessayez.");
+                      }
                     }}
                     disabled={isPending}
                   >
