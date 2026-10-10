@@ -1,6 +1,6 @@
 {
-  "type": "object",
   "name": "EcoMission",
+  "type": "object",
   "properties": {
     "country_code": {
       "type": "string",
@@ -12,10 +12,10 @@
     },
     "course_ids": {
       "type": "array",
-      "description": "IDs CourseExterne independants inclus dans la mission.",
       "items": {
         "type": "string"
-      }
+      },
+      "description": "IDs CourseExterne independants inclus dans la mission."
     },
     "status": {
       "type": "string",
@@ -70,12 +70,12 @@
     "status"
   ],
   "rls": {
+    "read": {},
     "create": {
       "user_condition": {
         "role": "admin"
       }
     },
-    "read": {},
     "update": {
       "user_condition": {
         "role": "admin"
