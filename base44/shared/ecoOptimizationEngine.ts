@@ -3,6 +3,7 @@ import {
   evaluerAvantageCommission,
   figerCommissionAcceptation,
 } from './commissionAvantage.ts';
+import { chargerConfigPays, normalizeCommissionPct } from './dispatchConstants.ts';
 import {
   champsLockCommission,
   verifierCoherenceLock,
@@ -29,6 +30,16 @@ const DEFAULT_PROPOSAL_EXPIRATION_SEC = 300;
 const DEFAULT_MAX_DETOUR_KM = 6;
 const DEFAULT_MIN_GAIN = 0;
 const ECO_PREFIX = 'ECO';
+
+// ── Seuils configurables pour la chaîne de destination ──
+// Ces valeurs sont des DÉFAUTS. Chaque pays peut les surcharger via AppConfig
+// (clés ECO:<COUNTRY>:CHAIN_*). Elles ne doivent jamais être codées en dur
+// dans la logique de regroupement — toujours lues depuis le config.
+const DEFAULT_CHAIN_MAX_PICKUP_KM = 8;
+const DEFAULT_CHAIN_MAX_DROP_KM = 2.5;
+const DEFAULT_CHAIN_MIN_GAIN_FCFA = 1000;
+const DEFAULT_CHAIN_COST_PER_KM = 75;
+const DEFAULT_CHAIN_MAX_TIME_DIFF_HOURS = 2;
 
 function key(countryCode: string, name: string) {
   return `${ECO_PREFIX}:${String(countryCode || '').toUpperCase()}:${name}`;
@@ -163,11 +174,30 @@ export async function loadEcoConfig(base44: any, countryCode: string) {
       key(code, 'PROPOSAL_EXPIRATION_SEC'),
       key(code, 'MAX_DETOUR_KM'),
       key(code, 'MIN_DRIVER_GAIN'),
+      key(code, 'CHAIN_MAX_PICKUP_KM'),
+      key(code, 'CHAIN_MAX_DROP_KM'),
+      key(code, 'CHAIN_MIN_GAIN_FCFA'),
+      key(code, 'CHAIN_COST_PER_KM'),
+      key(code, 'CHAIN_MAX_TIME_DIFF_HOURS'),
       key(code, 'EMERGENCY_STOP'),
     ] },
-  }, undefined, 20).catch(() => []);
+  }, undefined, 25).catch(() => []);
   const map = new Map((configs || []).map((c: any) => [c.cle, c.valeur]));
   const emergencyStop = parseBool(map.get(key(code, 'EMERGENCY_STOP')), false);
+
+  // ── Charger le taux de commission du pays pour calculer le gain NET livreur ──
+  // Le gain réel du livreur = prix - commission. Sans ce taux, on ne peut pas
+  // évaluer la rentabilité réelle d'un regroupement (Pass/Happy Hour s'appliquent
+  // à l'acceptation, pas au regroupement — on utilise le taux normal ici).
+  let commissionPct: number | null = null;
+  try {
+    const countryConfig = await chargerConfigPays(base44, code);
+    commissionPct = countryConfig?.commission_pct == null ? null : normalizeCommissionPct(countryConfig.commission_pct);
+  } catch {
+    // Si on ne peut pas charger le taux, on ne bloque pas le regroupement —
+    // on utilise le prix brut comme fallback (comportement historique).
+  }
+
   return {
     countryCode: code,
     enabled: !emergencyStop && parseBool(map.get(key(code, 'ENABLED')), false),
@@ -178,6 +208,14 @@ export async function loadEcoConfig(base44: any, countryCode: string) {
     proposalExpirationSec: parseNumber(map.get(key(code, 'PROPOSAL_EXPIRATION_SEC')), DEFAULT_PROPOSAL_EXPIRATION_SEC, 15),
     maxDetourKm: parseNumber(map.get(key(code, 'MAX_DETOUR_KM')), DEFAULT_MAX_DETOUR_KM, 0),
     minDriverGain: parseNumber(map.get(key(code, 'MIN_DRIVER_GAIN')), DEFAULT_MIN_GAIN, 0),
+    // ── Seuils chaîne de destination (configurables par pays) ──
+    chainMaxPickupKm: parseNumber(map.get(key(code, 'CHAIN_MAX_PICKUP_KM')), DEFAULT_CHAIN_MAX_PICKUP_KM, 0),
+    chainMaxDropKm: parseNumber(map.get(key(code, 'CHAIN_MAX_DROP_KM')), DEFAULT_CHAIN_MAX_DROP_KM, 0),
+    chainMinGainFcfa: parseNumber(map.get(key(code, 'CHAIN_MIN_GAIN_FCFA')), DEFAULT_CHAIN_MIN_GAIN_FCFA, 0),
+    chainCostPerKm: parseNumber(map.get(key(code, 'CHAIN_COST_PER_KM')), DEFAULT_CHAIN_COST_PER_KM, 0),
+    chainMaxTimeDiffHours: parseNumber(map.get(key(code, 'CHAIN_MAX_TIME_DIFF_HOURS')), DEFAULT_CHAIN_MAX_TIME_DIFF_HOURS, 0),
+    // ── Taux de commission du pays (pour calcul du gain NET livreur) ──
+    commissionPct,
     emergencyStop,
   };
 }
@@ -223,7 +261,7 @@ export async function shouldHoldEcoCourseOnCreate(base44: any, course: any) {
   return config.enabled && config.groupingEnabled;
 }
 
-function compatibilityScore(a: any, b: any) {
+function compatibilityScore(a: any, b: any, config?: any) {
   if (!hasUsableRoutePoints(a) || !hasUsableRoutePoints(b)) return null;
   const pickupKm = calculerDistance(a.gps_depart_lat, a.gps_depart_lng, b.gps_depart_lat, b.gps_depart_lng);
   const dropKm = calculerDistance(a.gps_arrivee_lat, a.gps_arrivee_lng, b.gps_arrivee_lat, b.gps_arrivee_lng);
@@ -237,29 +275,45 @@ function compatibilityScore(a: any, b: any) {
   // ── Chaîne de destination : départs différents mais destinations proches ──
   // Deux courses allant vers la même zone (dropKm faible) avec des départs éloignés
   // (pickupKm élevé) peuvent être rentables si le livreur enchaîne les livraisons.
-  // Le livreur récupère le colis 1, le livre, puis va récupérer le colis 2 et le livre.
+  // Le livreur récupère le colis 1, le livre, puis va récupère le colis 2 et le livre.
   // Le détour supplémentaire = distance entre les deux départs (pickupKm).
   //
   // VALIDATION DE RENTABILITÉ :
-  //   - Le gain total (somme des prix) doit justifier le détour supplémentaire.
-  //   - Le détour (pickupKm) ne doit pas dépasser un seuil raisonnable.
+  //   - Le gain NET livreur (après commission) doit justifier le détour supplémentaire.
+  //   - Le détour (pickupKm) ne doit pas dépasser un seuil configurable par pays.
   //   - L'ordre des récupérations doit respecter la logique temporelle.
   //   - On ne regroupe PAS uniquement parce que les destinations sont proches :
   //     il faut aussi que le détour soit acceptable ET que le gain le justifie.
-  const CHAIN_MAX_PICKUP_KM = 8;    // Détour max entre les deux départs
-  const CHAIN_MAX_DROP_KM = 2.5;    // Distance max entre les deux destinations
-  const CHAIN_MIN_GAIN_FCFA = 1000; // Gain minimum pour justifier le détour
-  const CHAIN_COST_PER_KM = 75;     // Coût estimé du km supplémentaire (FCFA)
+  //
+  // ⚠️ TOUS les seuils sont configurables par pays via AppConfig.
+  //    Aucune valeur n'est codée en dur — les défauts sont des fallbacks.
+  const chainMaxPickupKm = Number(config?.chainMaxPickupKm) || DEFAULT_CHAIN_MAX_PICKUP_KM;
+  const chainMaxDropKm = Number(config?.chainMaxDropKm) || DEFAULT_CHAIN_MAX_DROP_KM;
+  const chainMinGainFcfa = Number(config?.chainMinGainFcfa) || DEFAULT_CHAIN_MIN_GAIN_FCFA;
+  const chainCostPerKm = Number(config?.chainCostPerKm) || DEFAULT_CHAIN_COST_PER_KM;
+  const chainMaxTimeDiffHours = Number(config?.chainMaxTimeDiffHours) || DEFAULT_CHAIN_MAX_TIME_DIFF_HOURS;
 
-  if (Number(dropKm) <= CHAIN_MAX_DROP_KM && Number(pickupKm) > 3 && Number(pickupKm) <= CHAIN_MAX_PICKUP_KM) {
-    // ── Vérification de rentabilité : gain vs coût du détour ──
-    const gainA = Number(a.prix_final || a.prix_propose_client || a.prix_propose_admin || a.prix_estimate || 0) || 0;
-    const gainB = Number(b.prix_final || b.prix_propose_client || b.prix_propose_admin || b.prix_estimate || 0) || 0;
-    const totalGain = gainA + gainB;
-    const detourCost = Math.round(Number(pickupKm) * CHAIN_COST_PER_KM);
+  if (Number(dropKm) <= chainMaxDropKm && Number(pickupKm) > 3 && Number(pickupKm) <= chainMaxPickupKm) {
+    // ── Calcul du gain NET livreur (après commission) ──
+    // Le regroupement ne doit être validé que si le livreur gagne réellement assez.
+    // Le gain NET = prix - commission. On utilise le taux de commission du pays.
+    // Note : Pass/Happy Hour s'appliquent à l'acceptation, pas au regroupement.
+    //   Si commissionPct est null (taux indisponible), on fallback sur le prix brut
+    //   (comportement historique — ne bloque pas le regroupement).
+    const prixBrutA = prixCourse(a);
+    const prixBrutB = prixCourse(b);
+    const commissionPct = config?.commissionPct;
+    const gainNetA = commissionPct != null
+      ? Math.round(prixBrutA * (1 - Number(commissionPct) / 100))
+      : prixBrutA;
+    const gainNetB = commissionPct != null
+      ? Math.round(prixBrutB * (1 - Number(commissionPct) / 100))
+      : prixBrutB;
+    const totalGainNet = gainNetA + gainNetB;
+    const detourCost = Math.round(Number(pickupKm) * chainCostPerKm);
 
-    // Si le gain ne justifie pas le détour, ne pas regrouper
-    if (totalGain < CHAIN_MIN_GAIN_FCFA || totalGain < detourCost * 2) {
+    // Si le gain NET ne justifie pas le détour, ne pas regrouper
+    if (totalGainNet < chainMinGainFcfa || totalGainNet < detourCost * 2) {
       return standardScore;
     }
 
@@ -270,15 +324,15 @@ function compatibilityScore(a: any, b: any) {
     const dateB = b.date_souhaitee || b.created_date;
     if (dateA && dateB) {
       const timeDiff = Math.abs(new Date(dateA).getTime() - new Date(dateB).getTime());
-      // Si les courses sont espacées de plus de 2 heures, le regroupement n'est pas rentable
-      if (timeDiff > 2 * 60 * 60 * 1000) {
+      const maxDiffMs = chainMaxTimeDiffHours * 60 * 60 * 1000;
+      if (timeDiff > maxDiffMs) {
         return standardScore;
       }
     }
 
     const chainDirectionScore = Math.max(0, 100 - Number(dropKm) * 15);
     const chainDetourScore = Math.max(0, 100 - Number(pickupKm) * 8);
-    const chainProfitScore = Math.min(100, Math.round((totalGain / Math.max(detourCost, 1)) * 20));
+    const chainProfitScore = Math.min(100, Math.round((totalGainNet / Math.max(detourCost, 1)) * 20));
     const chainScore = Math.round(chainDirectionScore * 0.35 + chainDetourScore * 0.35 + chainProfitScore * 0.30);
 
     // Retourner le meilleur score entre standard et chaîne
@@ -353,7 +407,7 @@ export async function processEcoCourseCreated(base44: any, courseId: string) {
     if (!candidate?.id || candidate.id === course.id) continue;
     if (candidate.livreur_id || candidate.accepted_by_livreur_id || candidate.eco_mission_id) continue;
     if (TERMINAL_STATUSES.includes(candidate.statut)) continue;
-    const score = compatibilityScore(course, candidate);
+    const score = compatibilityScore(course, candidate, config);
     if (score == null || score < 55) continue;
     if (score > bestScore) {
       best = candidate;
