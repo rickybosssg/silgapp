@@ -96,6 +96,7 @@ export default function ClientExterneApp() {
   const [courseANoter, setCourseANoter] = useState(null);
   const [notationShownFor, setNotationShownFor] = useState(null);
   const [courseAnnuleeRelance, setCourseAnnuleeRelance] = useState(null); // course annulée auto → proposer relance
+  const [courseDecisionClient, setCourseDecisionClient] = useState(null); // course en attente de décision client (livreur a annulé)
   const [showMessages, setShowMessages] = useState(false);
   const [pendingConversationId, setPendingConversationId] = useState(null);
   const [showNotificationsPanel, setShowNotificationsPanel] = useState(false);
@@ -903,6 +904,16 @@ export default function ClientExterneApp() {
             }
           } catch (_) {}
         }
+
+        // ── Détecter les courses en attente de décision client (livreur a annulé) ──
+        // Une course avec client_decision_attendue=true signifie que le livreur a annulé
+        // et le client doit choisir : chercher un autre livreur ou terminer la course.
+        if (!courseDecisionClient) {
+          const courseEnAttenteDecision = toutes.find(c => c.client_decision_attendue === true);
+          if (courseEnAttenteDecision) {
+            setCourseDecisionClient(courseEnAttenteDecision);
+          }
+        }
       } else {
         setNotifications([]);
       }
@@ -1491,6 +1502,31 @@ export default function ClientExterneApp() {
             });
           }}
           onTerminer={() => setCourseAnnuleeRelance(null)}
+        />
+      )}
+
+      {/* ── DÉCISION CLIENT APRÈS ANNULATION LIVREUR — relancer ou terminer ── */}
+      {courseDecisionClient && (
+        <LivreurAnnulationDecisionModal
+          course={courseDecisionClient}
+          onDecided={async (action) => {
+            try {
+              await base44.functions.invoke("deciderApresAnnulationLivreur", {
+                course_id: courseDecisionClient.id,
+                action,
+              });
+              if (action === "chercher_autre_livreur") {
+                toast.success("Un nouveau livreur est recherché");
+              } else {
+                toast.success("Course terminée");
+              }
+            } catch (err) {
+              toast.error("Erreur lors de la décision");
+            }
+            setCourseDecisionClient(null);
+            checkStatus(position, clientProfil);
+          }}
+          onClose={() => setCourseDecisionClient(null)}
         />
       )}
 
