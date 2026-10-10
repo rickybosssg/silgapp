@@ -1,5 +1,4 @@
 {
-  "name": "SILGAPP Eco \u2014 Conversion diff\u00e9r\u00e9e",
   "description": "Toutes les 10 minutes, convertit les courses Eco isol\u00e9es arriv\u00e9es \u00e0 leur seuil configurable vers Standard. Le seuil par d\u00e9faut reste 45 minutes; ce workflow est seulement un d\u00e9clencheur sobre, pas un polling minute par minute.",
   "trigger": {
     "condition": null,
@@ -12,12 +11,13 @@
       "timezone": "UTC",
       "interval_value": 10,
       "interval_unit": "minutes",
-      "interval_anchor": "2026-10-09T00:00:00.000000",
+      "interval_anchor": "2026-10-09T00:00:00",
       "ends_type": "never",
       "ends_on_date": null,
       "ends_after_count": null
     }
   },
+  "name": "SILGAPP Eco \u2014 Conversion diff\u00e9r\u00e9e",
   "definition": {
     "document": {
       "dsl": "1.0.0",
@@ -51,8 +51,5 @@
         }
       }
     ]
-  },
-  "x-base44-migrated-from-automation": {
-    "legacy_payload_function": "ecoOptimizationOrchestrator"
   }
 }
