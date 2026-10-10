@@ -232,7 +232,24 @@ function compatibilityScore(a: any, b: any) {
   const directionScore = Math.max(0, 100 - Number(dropKm) * 12);
   const proximityScore = Math.max(0, 100 - Number(pickupKm) * 18);
   const detourScore = Math.max(0, 100 - Number(crossKm) * 5);
-  return Math.round(proximityScore * 0.45 + directionScore * 0.35 + detourScore * 0.20);
+  const standardScore = Math.round(proximityScore * 0.45 + directionScore * 0.35 + detourScore * 0.20);
+
+  // ── Chaîne de destination : départs différents mais destinations proches ──
+  // Deux courses allant vers la même zone (dropKm faible) avec des départs éloignés
+  // (pickupKm élevé) peuvent être rentables si le livreur enchaîne les livraisons.
+  // Le livreur récupère le colis 1, le livre, puis va récupérer le colis 2 et le livre.
+  // Le détour supplémentaire = distance entre les deux départs (pickupKm).
+  // Si les destinations sont très proches (dropKm < 3km), le gain de regroupement
+  // compense le détour, tant que pickupKm reste raisonnable (< 10km).
+  if (Number(dropKm) < 3 && Number(pickupKm) > 3 && Number(pickupKm) <= 10) {
+    const chainDirectionScore = Math.max(0, 100 - Number(dropKm) * 15);
+    const chainDetourScore = Math.max(0, 100 - Number(pickupKm) * 8);
+    const chainScore = Math.round(chainDirectionScore * 0.50 + chainDetourScore * 0.50);
+    // Retourner le meilleur score entre standard et chaîne
+    return Math.max(standardScore, chainScore);
+  }
+
+  return standardScore;
 }
 
 function buildRoutePlan(courses: any[]) {

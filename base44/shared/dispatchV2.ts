@@ -236,6 +236,21 @@ export async function publierCourseDansFil(base44: any, course: any) {
     return { success: false, blocked: true, reason: 'client_decision_attendue' };
   }
 
+  // [ECO] Une course Éco isolée ne doit JAMAIS être publiée dans le fil des livreurs.
+  // Elle reste en attente de regroupement. Si aucun regroupement n'est trouvé dans le
+  // délai configuré, le watchdog (convertDueEcoCourses) la convertit en Standard.
+  // Publier une course isolée permettrait à un livreur de l'accepter individuellement,
+  // ce qui contredit le principe du regroupement Éco.
+  if (course.eco_status === 'isolated' && course.delivery_mode === 'eco') {
+    dispatchLog(`[V2] 🌿 Course Éco isolée ${course.id} — publication bloquée, en attente de regroupement`);
+    // Tenter un regroupement immédiat
+    await base44.asServiceRole.functions.invoke('ecoOptimizationOrchestrator', {
+      action: 'process_course_created',
+      course_id: course.id,
+    }).catch(() => null);
+    return { success: false, eco_isolated: true, reason: 'eco_isolated_pending_grouping' };
+  }
+
   await base44.asServiceRole.entities.CourseExterne.updateMany(
     { id: course.id, dispatch_status: { $nin: ['disponible_push', 'accepte', 'propose', 'redispatch'] }, client_decision_attendue: { $ne: true } },
     { $set: {

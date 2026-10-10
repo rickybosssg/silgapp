@@ -30,7 +30,7 @@ const ACTIVE_STATUSES = new Set([
  *   - Le livreur ne perd jamais la 2e course après la 1re livraison.
  *   - Le parcours optimisé (route_plan_json) est respecté.
  */
-export default function EcoMissionDashboard({ mission, livreurProfil, onAllDelivered }) {
+export default function EcoMissionDashboard({ mission, livreurProfil, onAllDelivered, onDeliveryConfirmed }) {
   const queryClient = useQueryClient();
   const [actionPending, setActionPending] = useState(false);
   const livreurId = livreurProfil?.id;
@@ -116,6 +116,10 @@ export default function EcoMissionDashboard({ mission, livreurProfil, onAllDeliv
         queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
         queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
         toast.success("Livraison terminée !");
+        // ── Animation de victoire après chaque livraison confirmée par le backend ──
+        if (onDeliveryConfirmed && res?.success) {
+          onDeliveryConfirmed(courseId);
+        }
       } else {
         throw new Error(res?.error || "Erreur finalisation");
       }

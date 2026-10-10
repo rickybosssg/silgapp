@@ -1777,6 +1777,11 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
                   queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
                   queryClient.invalidateQueries({ queryKey: ["eco-mission-active"] });
                 }}
+                onDeliveryConfirmed={(courseId) => {
+                  if (celebratedCourseIdsRef.current.has(courseId)) return;
+                  celebratedCourseIdsRef.current.add(courseId);
+                  setVictoryCourseId(courseId);
+                }}
               />
             )}
 
