@@ -229,8 +229,15 @@ export async function publierCourseDansFil(base44: any, course: any) {
   // Fix 2026-08-17 : race condition où publierCourseDansFil était rappelé par
   // l'orchestrateur APRÈS une acceptation, effaçant livreur_id et remettant la
   // course dans le fil → double acceptation par un second livreur.
+  // 🛡️ GARDE ANTI-DISPATCH : ne jamais publier une course en attente de décision client
+  // (après annulation par le livreur). Le client doit choisir entre relancer ou terminer.
+  if (course.client_decision_attendue === true) {
+    dispatchLog(`[V2] 🚫 Course ${course.id} en attente de décision client — dispatch BLOQUÉ`);
+    return { success: false, blocked: true, reason: 'client_decision_attendue' };
+  }
+
   await base44.asServiceRole.entities.CourseExterne.updateMany(
-    { id: course.id, dispatch_status: { $nin: ['disponible_push', 'accepte', 'propose', 'redispatch'] } },
+    { id: course.id, dispatch_status: { $nin: ['disponible_push', 'accepte', 'propose', 'redispatch'] }, client_decision_attendue: { $ne: true } },
     { $set: {
       statut: 'recherche_livreur',
       dispatch_status: 'disponible_push',

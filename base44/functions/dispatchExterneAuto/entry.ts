@@ -236,6 +236,12 @@ export default async function(req) {
         console.warn(`[DISPATCH] ⚠️ Course ${course_id} sans GPS`);
       }
 
+      // 🛡️ GARDE ANTI-DISPATCH : ne jamais publier une course en attente de décision client
+      if (course.client_decision_attendue === true) {
+        console.log(`[DISPATCH] 🚫 Course ${course_id} en attente de décision client — dispatch BLOQUÉ`);
+        return Response.json({ success: true, blocked: true, reason: 'client_decision_attendue' });
+      }
+
       // ── V2 : publier dans le fil de courses disponibles ──
       // RÈGLE MÉTIER (2026-08-14) :
       //   T=0  : course visible dans le fil par tous les livreurs éligibles

@@ -152,18 +152,49 @@ Deno.serve(async (req) => {
         }
       }
 
-      // ── ANNULATION LIVREUR : comportement différencié selon l'origine de la course ──
-      // Course source="client" → redispatch automatique (dispatch_status="en_attente" + relance)
-      // Course source="admin"  → redispatch manuel (dispatch_status="redispatch", admin relance)
-      // Le livreur qui a annulé est EXCLU définitivement de cette course précise
-      // (dispatch_refused_ids) mais reste disponible pour les autres courses.
-      const isCourseClient = course.source === 'client';
+      // ═══════════════════════════════════════════════════════════════════
+      // NOUVEAU COMPORTEMENT : SUSPENSION DU REDISPATCH AUTOMATIQUE
+      // ═══════════════════════════════════════════════════════════════════
+      // Le livreur annule → la course passe en "en_attente_decision_client"
+      // AUCUN redispatch automatique n'est déclenché.
+      // Le client reçoit une notification push + une modale de décision.
+      // Le client choisit :
+      //   - "chercher_autre_livreur" → redispatch via deciderApresAnnulationLivreur
+      //   - "terminer_course" → annulation définitive
+      // Tant que client_decision_attendue=true, aucun mécanisme (watchdog,
+      // orchestrator, dispatchExterneAuto) ne peut attribuer cette course.
+      // ═══════════════════════════════════════════════════════════════════
+
       let refusedIds = [];
       try { refusedIds = JSON.parse(course.dispatch_refused_ids || '[]'); } catch {}
       if (livreurId && !refusedIds.includes(livreurId)) refusedIds.push(livreurId);
+
+      // ── Calculer le motif lisible pour le client ──
+      const motifLabel = {
+        client_injoignable: "Client injoignable",
+        mauvaise_adresse: "Mauvaise adresse",
+        colis_inexistant: "Colis inexistant",
+        client_change_avis: "Client a changé d'avis",
+        colis_interdit: "Colis interdit",
+        désaccord_prix: "Désaccord sur le prix",
+        panne_vehicule: "Panne de véhicule",
+        batterie_dechargee: "Batterie déchargée",
+        course_trop_loin: "Course trop loin",
+        prix_insuffisant: "Prix insuffisant",
+        autre_course_conflit_planning: "Conflit de planning",
+        probleme_personnel: "Problème personnel",
+        acceptation_erreur: "Acceptation par erreur",
+        accident: "Accident",
+        autre: motif_detail || "Autre",
+      }[motif] || motif || "non spécifié";
+
       const resetData = {
         statut: "en_attente",
-        dispatch_status: isCourseClient ? "en_attente" : "redispatch",
+        dispatch_status: "en_attente",
+        client_decision_attendue: true,
+        livreur_annulation_motif: motifLabel,
+        client_decision_action: null,
+        client_decision_at: null,
         dispatch_wave: 0,
         livreur_id: null,
         livreur_nom: "",
@@ -172,10 +203,9 @@ Deno.serve(async (req) => {
         livreur_vehicule: null,
         livreur_note_moyenne: 0,
         livreur_nombre_avis: 0,
-        livreur_user_email: null, // ⚠️ Retrait livreur → null pour RLS future
-        // ⚠️ livreur_financier_id N'EST JAMAIS effacé (immuable) — sécurité financière
+        livreur_user_email: null,
         dispatch_notified_ids: "[]",
-        dispatch_refused_ids: JSON.stringify(refusedIds), // ⚠️ livreur annulant EXCLU définitivement
+        dispatch_refused_ids: JSON.stringify(refusedIds),
         heure_acceptation: null,
         heure_recuperation: null,
         heure_livraison: null,
@@ -187,7 +217,7 @@ Deno.serve(async (req) => {
         delivery_confirmed_at: null,
         accepted_by_livreur_id: null,
         accepted_at: null,
-        notes: (course.notes || "") + ` | [ANNULÉ LIVREUR → REDISPATCH] ${motif || "non spécifié"}`,
+        notes: (course.notes || "") + ` | [ANNULÉ LIVREUR → ATTENTE DÉCISION CLIENT] ${motif || "non spécifié"}`,
       };
 
       // Nettoyer prix manuel si applicable
@@ -295,7 +325,7 @@ Deno.serve(async (req) => {
         lue: false,
       }).catch(() => null);
 
-      // ── Notification + Push au client ────────────────────────────
+      // ── Notification + Push au client : modale de décision requise ──
       let clientEmail = null;
       if (course.expediteur_client_id) {
         const expediteur = await asService.entities.ClientExterne.get(course.expediteur_client_id).catch(() => null);
@@ -307,65 +337,40 @@ Deno.serve(async (req) => {
       }
 
       if (clientEmail) {
-        const motifLabel = {
-          client_injoignable: "Client injoignable",
-          mauvaise_adresse: "Mauvaise adresse",
-          colis_inexistant: "Colis inexistant",
-          client_change_avis: "Client a changé d'avis",
-          colis_interdit: "Colis interdit",
-          désaccord_prix: "Désaccord sur le prix",
-          panne_vehicule: "Panne de véhicule",
-          accident: "Accident",
-          autre: motif_detail || "Autre",
-        }[motif] || motif || "non spécifié";
-
         await asService.entities.Notification.create({
-          titre: "⏸ Votre course est en attente",
-          message: `Votre livreur a annulé la course (motif: ${motifLabel}). Votre demande est en attente — un nouveau livreur vous sera assigné après validation de notre équipe.`,
-          type: "course_modifiee",
+          titre: "🚫 Votre livreur a annulé",
+          message: `Motif: ${motifLabel}. Ouvrez SILGAPP pour choisir la suite.`,
+          type: "course_annulee_livreur",
           course_id,
           destinataire_email: clientEmail,
           lue: false,
         }).catch(() => null);
 
         await base44.asServiceRole.functions.invoke('envoiNotificationPush', {
-          titre: "⏸ Votre course est en attente",
-          message: `Votre livreur a annulé (motif: ${motifLabel}). Votre demande est en attente de validation par notre équipe.`,
-          type: "course_modifiee",
+          titre: "SILGAPP — Votre livreur a annulé",
+          message: `Motif: ${motifLabel}. Ouvrez SILGAPP pour choisir la suite.`,
+          type: "course_annulee_livreur",
           destinataire_email: clientEmail,
           user_type: "client",
           course_id,
         }).catch(() => null);
 
         // ── Notification WhatsApp via VENUS au client (source: livreur) ──
-        // La cliente communique via WhatsApp avec VENUS ; sans ce message,
-        // elle n'est pas informée de l'annulation et du redispatch en cours.
         await base44.asServiceRole.functions.invoke('envoyerSuiviWhatsApp', {
           course_id,
-          evenement: 'livreur_annule_redispatch',
+          evenement: 'livreur_annule_attente_decision',
           motif_label: motifLabel,
         }).catch((err) => {
           console.error('[ANNULATION] ❌ Envoi WhatsApp client échoué:', err?.message || String(err));
         });
       }
 
-      // ── Redispatch automatique pour les courses créées par le client ──
-      // La course est en dispatch_status="en_attente" (pas "redispatch") pour que
-      // publierCourseDansFil (V2) l'accepte via sa garde $nin.
-      if (isCourseClient) {
-        try {
-          await base44.asServiceRole.functions.invoke('dispatchExterneAuto', {
-            action: 'lancer_recherche_auto',
-            course_id,
-          });
-          console.log(`[ANNULATION] Redispatch automatique déclenché pour course client ${course_id}`);
-        } catch (dispatchErr) {
-          console.error(`[ANNULATION] Erreur redispatch auto course client ${course_id}:`, dispatchErr?.message);
-        }
-      } else {
-        // Course admin — dispatch manuel conservé. L'admin doit la relancer manuellement.
-        console.log(`[ANNULATION] Course admin ${course_id} — redispatch manuel (source=admin)`);
-      }
+      // ── AUCUN REDISPATCH AUTOMATIQUE ──
+      // La course reste en client_decision_attendue=true jusqu'à la décision du client.
+      // Le client choisira via la fonction deciderApresAnnulationLivreur :
+      //   - chercher_autre_livreur → redispatch
+      //   - terminer_course → annulation définitive
+      console.log(`[ANNULATION] Course ${course_id} — attente décision client (redispatch SUSPENDU)`);
 
     } else {
       // ── ANNULATION CLIENT OU ADMIN : course définitivement annulée ──

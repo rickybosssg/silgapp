@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import LivreurRatingDialog from "@/components/client/LivreurRatingDialog";
 import CourseAnnuleeRelanceDialog from "@/components/client/CourseAnnuleeRelanceDialog";
+import LivreurAnnulationDecisionModal from "@/components/client/LivreurAnnulationDecisionModal";
 import VenusFloatingButton from "@/components/client/VenusFloatingButton";
 import LiveCounterBadge from "@/components/ui/LiveCounterBadge";
 import SilgappLiveStats from "@/components/shared/SilgappLiveStats";

@@ -91,6 +91,28 @@
       "type": "number",
       "description": "Score technique de compatibilite Eco calcule par le moteur, uniquement pour audit."
     },
+    "client_decision_attendue": {
+      "type": "boolean",
+      "default": false,
+      "description": "True quand la course est en attente de decision du client apres annulation par le livreur. Aucun redispatch automatique ne doit se produire tant que ce champ est true. Le client doit choisir entre chercher un autre livreur (relance dispatch) ou terminer la course (annulation definitive)."
+    },
+    "livreur_annulation_motif": {
+      "type": "string",
+      "description": "Motif d'annulation renseigne par le livreur, affiche au client dans la modale de decision. Snapshot fige au moment de l'annulation."
+    },
+    "client_decision_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date/heure a laquelle le client a pris sa decision apres annulation livreur."
+    },
+    "client_decision_action": {
+      "type": "string",
+      "enum": [
+        "chercher_autre_livreur",
+        "terminer_course"
+      ],
+      "description": "Action choisie par le client apres annulation livreur. chercher_autre_livreur = redispatch, terminer_course = annulation definitive."
+    },
     "created_by_venus": {
       "type": "boolean",
       "default": false,
@@ -350,7 +372,7 @@
     "push_general_t10_couvert_at": {
       "type": "string",
       "format": "date-time",
-      "description": "Date a laquelle la course a ete couverte par un push general recent du meme pays (cooldown), SANS avoir declenche d'envoi propre. Permet de distinguer les courses ayant benefici d'un rappel de celles ayant participe a un envoi."
+      "description": "Date a laquelle la course a ete couverte par un push general recent du meme pays (cooldown), SANS ayant declenche d'envoi propre. Permet de distinguer les courses ayant benefici d'un rappel de celles ayant participe a un envoi."
     },
     "push_rappel_t20_envoye": {
       "type": "boolean",
@@ -679,7 +701,7 @@
     },
     "commande_boutique_id": {
       "type": "string",
-      "description": "ID de la CommandeBoutique liee"
+      "description": "ID de la CommandeBoutique lieee"
     },
     "commande_restaurant_id": {
       "type": "string",

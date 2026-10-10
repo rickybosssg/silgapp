@@ -167,7 +167,8 @@ Deno.serve(async (req) => {
     // ── 2. Dispatch retry (uniquement si statut → recherche_livreur) ──
     // On ne relance le dispatch QUE si la course revient en recherche_livreur
     // (redispatch après refus, annulation, ou prix manuel refusé)
-    if (statutChanged && newStatut === 'recherche_livreur') {
+    // 🛡️ SAUF si la course est en attente de décision client (annulation livreur)
+    if (statutChanged && newStatut === 'recherche_livreur' && course.client_decision_attendue !== true) {
       const v2Enabled = await isV2Enabled(base44);
       if (v2Enabled) {
         await fireInvoke('dispatchExterneAuto', {
@@ -251,4 +252,3 @@ Deno.serve(async (req) => {
     return Response.json({ error: error?.message || String(error) }, { status: 500 });
   }
 });
-

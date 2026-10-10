@@ -54,6 +54,8 @@ export async function runWatchdog(base44, body = {}) {
   const courses = [...coursesRecherche, ...coursesNouvelles].filter(c => {
     if (seenIds.has(c.id)) return false;
     seenIds.add(c.id);
+    // 🛡️ Exclure les courses en attente de décision client (annulation livreur)
+    if (c.client_decision_attendue === true) return false;
     return true;
   });
 
