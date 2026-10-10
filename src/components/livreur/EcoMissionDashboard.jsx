@@ -249,11 +249,16 @@ export default function EcoMissionDashboard({ mission, livreurProfil, onAllDeliv
                   {isLivre ? "✓ Livré" : isAnnule ? "Annulé" : isRecupere ? "Récupéré" : "À récupérer"}
                 </span>
               </div>
-              <div className="flex items-center gap-2 text-[11px]">
-                <MapPin className="w-3 h-3 text-green-600 flex-shrink-0" />
-                <span className="font-semibold text-slate-700">{course.quartier_depart || "—"}</span>
-                <ArrowRight className="w-3 h-3 text-slate-400" />
-                <span className="font-semibold text-slate-700">{course.quartier_arrivee || "—"}</span>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 text-[11px]">
+                  <MapPin className="w-3 h-3 text-green-600 flex-shrink-0" />
+                  <span className="font-semibold text-slate-700">{course.quartier_depart || "—"}</span>
+                  <ArrowRight className="w-3 h-3 text-slate-400" />
+                  <span className="font-semibold text-slate-700">{course.quartier_arrivee || "—"}</span>
+                </div>
+                <p className="text-[10px] text-slate-500 leading-snug pl-5">
+                  {course.adresse_depart || "Adresse à confirmer"} → {course.adresse_arrivee || "Adresse à confirmer"}
+                </p>
               </div>
               {prix > 0 && (
                 <p className="text-[11px] font-bold text-slate-600">{prix.toLocaleString()} {course.devise || "FCFA"}</p>

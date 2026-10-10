@@ -150,13 +150,17 @@ export default function EcoMissionCard({ mission, livreurProfil, onAcceptSuccess
           <div className="flex items-center gap-1.5 flex-wrap">
             {routePlan.map((step, i) => {
               const course = courses.find(c => c.id === step.course_id);
-              const label = step.type === "pickup" ? "Récup" : "Livraison";
+              const label = step.type === "pickup" ? "Récup" : "Livr.";
+              const quartier = course
+                ? (step.type === "pickup" ? course.quartier_depart : course.quartier_arrivee)
+                : null;
               return (
                 <div key={i} className="flex items-center gap-1.5">
                   <div className={`px-2 py-1 rounded-md text-[9px] font-bold ${
                     step.type === "pickup" ? "bg-green-50 text-green-700" : "bg-blue-50 text-blue-700"
                   }`}>
                     {label} {course ? courses.indexOf(course) + 1 : "?"}
+                    {quartier && <span className="font-normal ml-1">· {quartier}</span>}
                   </div>
                   {i < routePlan.length - 1 && <span className="text-slate-300 text-[10px]">→</span>}
                 </div>
