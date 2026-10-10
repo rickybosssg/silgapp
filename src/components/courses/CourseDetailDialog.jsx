@@ -404,33 +404,7 @@ export default function CourseDetailDialog({ course: courseProp, open, onClose, 
             <MultiColisAdminView course={course} />
           )}
 
-          {/* Codes PIN récupération / livraison */}
-          {reseau === "externe" && (course.pickup_code_4_digits || course.delivery_code_4_digits) && (
-            <div className="grid grid-cols-2 gap-2">
-              {course.pickup_code_4_digits && (
-                <button
-                  onClick={() => { navigator.clipboard?.writeText(course.pickup_code_4_digits); toast.success("Code récupération copié"); }}
-                  className="flex flex-col items-center gap-1 bg-amber-50 border border-amber-200 rounded-xl p-3 hover:bg-amber-100 transition"
-                >
-                  <KeyRound className="w-4 h-4 text-amber-600" />
-                  <span className="text-[10px] font-bold text-amber-700 uppercase">Récupération</span>
-                  <span className="text-xl font-black text-amber-800 tracking-widest">{course.pickup_code_4_digits}</span>
-                  <Copy className="w-3 h-3 text-amber-400" />
-                </button>
-              )}
-              {course.delivery_code_4_digits && (
-                <button
-                  onClick={() => { navigator.clipboard?.writeText(course.delivery_code_4_digits); toast.success("Code livraison copié"); }}
-                  className="flex flex-col items-center gap-1 bg-green-50 border border-green-200 rounded-xl p-3 hover:bg-green-100 transition"
-                >
-                  <KeyRound className="w-4 h-4 text-green-600" />
-                  <span className="text-[10px] font-bold text-green-700 uppercase">Livraison</span>
-                  <span className="text-xl font-black text-green-800 tracking-widest">{course.delivery_code_4_digits}</span>
-                  <Copy className="w-3 h-3 text-green-400" />
-                </button>
-              )}
-            </div>
-          )}
+          {/* [CORRECTION PIN/QR] Codes PIN supprimés — parcours bouton sans PIN/QR */}
 
           {/* Raison d'annulation du livreur */}
           {annulationLivreur && (

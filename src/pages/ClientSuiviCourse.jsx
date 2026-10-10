@@ -24,7 +24,6 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import LivreurRatingDialog from "@/components/client/LivreurRatingDialog";
 import DestinataireReactionButton from "@/components/client/DestinataireReactionButton";
-import QRCodeDisplay from "@/components/client/QRCodeDisplay";
 import AnnulerCourseDialog from "@/components/client/AnnulerCourseDialog";
 import LivreurAnnulationDialog from "@/components/client/LivreurAnnulationDialog";
 import ChatWindow from "@/components/chat/ChatWindow";

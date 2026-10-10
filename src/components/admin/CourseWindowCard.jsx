@@ -80,8 +80,7 @@ export default function CourseWindowCard({ courseId, formData, onClose }) {
     `Livraison : ${course.adresse_arrivee || "—"}`,
     `Ref : ${course.id?.slice(-8) || course.id}`,
     ``,
-    `*Code de recuperation : ${course.pickup_code_4_digits}*`,
-    `Donnez ce code au livreur lors de la prise en charge.`,
+    `Donnez le colis au livreur lors de la prise en charge.`,
     ``,
     `*Suivi en temps reel :*`,
     `${trackingUrl}`,
@@ -98,8 +97,7 @@ export default function CourseWindowCard({ courseId, formData, onClose }) {
     ``,
     `${expediteurName ? `Expediteur : ${expediteurName}\n` : ""}Ref : ${course.id?.slice(-8) || course.id}`,
     ``,
-    `*Code de livraison : ${course.delivery_code_4_digits}*`,
-    `Presentez ce code au livreur a la reception.`,
+    `Presentez le colis au livreur a la reception.`,
     ``,
     `*Suivez votre colis :*`,
     `${trackingUrl}`,
@@ -164,17 +162,7 @@ export default function CourseWindowCard({ courseId, formData, onClose }) {
             <p className="text-xs font-medium text-gray-700 truncate">{course.adresse_arrivee || "—"}</p>
           </div>
 
-          {/* PINs */}
-          <div className="grid grid-cols-2 gap-2">
-            <div className="bg-amber-50 border border-amber-100 rounded-lg p-2 text-center">
-              <p className="text-[9px] text-amber-700 uppercase font-semibold">PIN récup.</p>
-              <p className="text-lg font-black text-primary tracking-widest">{course.pickup_code_4_digits}</p>
-            </div>
-            <div className="bg-amber-50 border border-amber-100 rounded-lg p-2 text-center">
-              <p className="text-[9px] text-amber-700 uppercase font-semibold">PIN livr.</p>
-              <p className="text-lg font-black text-primary tracking-widest">{course.delivery_code_4_digits}</p>
-            </div>
-          </div>
+          {/* [CORRECTION PIN/QR] PINs supprimés — parcours bouton sans PIN/QR */}
 
           {/* Lien de suivi */}
           <div className="bg-blue-50 border border-blue-100 rounded-lg p-2 flex items-center gap-2">

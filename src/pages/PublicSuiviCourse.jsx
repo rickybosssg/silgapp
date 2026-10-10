@@ -25,7 +25,6 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import QRCodeDisplay from "@/components/client/QRCodeDisplay";
 import { CARTO_TILE_URL, CARTO_TILE_CONFIG } from "@/lib/cartTiles";
 
 const APK_DOWNLOAD_URL = "/telecharger-app";
@@ -481,32 +480,7 @@ export default function PublicSuiviCourse() {
         )}
 
         {/* QR Code de livraison - visible automatiquement pour le destinataire */}
-        {course.livreur_id && ["colis_recupere", "en_livraison"].includes(course.statut) && (
-          <Card className="p-6 border-2 border-dashed border-primary/30 bg-blue-50">
-            <div className="flex items-center gap-2 mb-3">
-              <QrCode className="w-6 h-6 text-primary" />
-              <h2 className="font-bold text-lg text-primary">Votre code de réception</h2>
-            </div>
-            <p className="text-sm text-muted-foreground mb-4">
-              Le livreur est en route. Présentez ce code ou QR code pour confirmer la réception.
-            </p>
-            <QRCodeDisplay course={course} type="delivery" />
-          </Card>
-        )}
-
-        {/* QR Code de récupération - pour le statut livreur_en_route */}
-        {course.livreur_id && ["livreur_en_route", "en_route_expediteur"].includes(course.statut) && (
-          <Card className="p-6 border-2 border-dashed border-amber-300 bg-amber-50">
-            <div className="flex items-center gap-2 mb-3">
-              <QrCode className="w-6 h-6 text-amber-600" />
-              <h2 className="font-bold text-lg text-amber-700">Code de récupération</h2>
-            </div>
-            <p className="text-sm text-amber-700 mb-4">
-              Le livreur arrive bientôt. Présentez ce code pour confirmer la prise en charge.
-            </p>
-            <QRCodeDisplay course={course} type="pickup" />
-          </Card>
-        )}
+        {/* [CORRECTION PIN/QR] QR Codes supprimés — parcours bouton sans PIN/QR */}
 
         {/* Détails course */}
         <Card className="p-6">
