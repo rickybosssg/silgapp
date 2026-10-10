@@ -1,6 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
 import { ensureCourseCodeMessage } from '../../shared/courseCodeMessage.ts';
 import { normalizeEnterpriseId, isEnterpriseAdmin } from '../../shared/enterpriseFinance.ts';
+import { prepareEcoCreationFields } from '../../shared/ecoOptimizationEngine.ts';
 
 /**
  * Création sécurisée d'une course administrative.
@@ -34,6 +35,7 @@ export default async function(req) {
     }
 
     const courseData = await req.json();
+    const requestedDeliveryMode = courseData.delivery_mode;
 
     // ── Garde-fou backend : aucune course admin sans client_telephone ──
     if (courseData.source === 'admin') {
@@ -69,6 +71,21 @@ export default async function(req) {
       courseData.enterprise_id = null;
     }
 
+    delete courseData.delivery_mode;
+    delete courseData.eco_status;
+    delete courseData.eco_mission_id;
+    delete courseData.eco_created_at;
+    delete courseData.eco_convert_after_at;
+    delete courseData.eco_converted_at;
+    delete courseData.eco_conversion_reason;
+    delete courseData.eco_candidate_score;
+
+    const ecoFields = await prepareEcoCreationFields(base44, {
+      ...courseData,
+      delivery_mode: requestedDeliveryMode,
+    });
+    Object.assign(courseData, ecoFields);
+
     const course = await base44.entities.CourseExterne.create(courseData);
 
     // ── Messages automatiques (prix + PIN récupération + PIN livraison) ──
@@ -96,3 +113,4 @@ export default async function(req) {
     return Response.json({ error: error.message }, { status: 500 });
   }
 }
+
