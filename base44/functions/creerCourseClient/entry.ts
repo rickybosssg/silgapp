@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
 import { ensureCourseCodeMessage } from '../../shared/courseCodeMessage.ts';
+import { prepareEcoCreationFields } from '../../shared/ecoOptimizationEngine.ts';
 
 const CREATION_MUTEX_KEY = 'COURSE_CREATION_MUTEX';
 const LOCK_TTL_MS = 15_000;
@@ -187,6 +188,9 @@ const FORBIDDEN_FIELDS = [
   'manual_price', 'manual_price_status', 'proposed_by_livreur_id',
   'client_price_validated_at', 'client_price_refused_at',
   'crm_stats_synced', 'encours_comptabilise_at', 'encours_comptabilise_montant',
+  'delivery_mode', 'eco_status', 'eco_mission_id', 'eco_created_at',
+  'eco_convert_after_at', 'eco_converted_at', 'eco_conversion_reason',
+  'eco_candidate_score',
   'latitude_prise_en_charge', 'longitude_prise_en_charge',
   'latitude_arrivee_dest', 'longitude_arrivee_dest',
   'latitude_recuperation', 'longitude_recuperation',
@@ -223,6 +227,7 @@ export default async function(req: Request): Promise<Response> {
     try {
 
     // ── Nettoyer les champs sensibles ──
+    const requestedDeliveryMode = course_data.delivery_mode;
     const cleanData = { ...course_data };
     for (const field of FORBIDDEN_FIELDS) {
       delete cleanData[field];
@@ -243,6 +248,13 @@ export default async function(req: Request): Promise<Response> {
     // n'est pas prise en charge par le dispatch automatique.
     cleanData.statut = 'nouvelle';
     cleanData.dispatch_status = 'en_attente';
+
+    const ecoFields = await prepareEcoCreationFields(base44, {
+      ...cleanData,
+      delivery_mode: requestedDeliveryMode,
+      enterprise_id: null,
+    });
+    Object.assign(cleanData, ecoFields);
 
     // ── S'assurer que les champs multi-colis sont préservés ──
     // is_multi_colis, nb_colis, nb_colis_livres, nb_colis_annules ne sont pas sensibles
@@ -314,3 +326,4 @@ export default async function(req: Request): Promise<Response> {
     return Response.json({ error: error.message }, { status: 500 });
   }
 }
+
