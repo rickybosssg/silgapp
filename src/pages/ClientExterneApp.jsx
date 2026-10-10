@@ -434,6 +434,15 @@ export default function ClientExterneApp() {
         setPendingConversationId(convId || null);
         setShowMessages(true);
       }
+
+      // ── Livreur a annulé : déclencher checkStatus immédiatement pour afficher la modale de décision ──
+      if (data.type === "course_annulee_livreur" && data.course_id) {
+        const pos = positionRef.current;
+        const profil = clientProfilRef.current;
+        if (pos && profil) {
+          checkStatusRef.current?.(pos, profil);
+        }
+      }
     };
     window.addEventListener("silgapp:notification-opened", handleNotificationOpened);
     // Cold start : vérifier si l'app a été ouverte depuis une notification

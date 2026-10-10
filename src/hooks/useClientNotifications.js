@@ -13,6 +13,7 @@ const CLIENT_IMPORTANT_TYPES = [
   "course_livree",
   "course_bloquee",
   "course_annulee",
+  "course_annulee_livreur",
   "rappel_reponse",
   "prix_manuel_propose",
 ];
@@ -26,6 +27,7 @@ const TYPE_LABELS = {
   course_livree: " Colis livré !",
   course_bloquee: " Course bloquée",
   course_annulee: " Course annulée",
+  course_annulee_livreur: "🚫 Votre livreur a annulé",
   rappel_reponse: "⏰ Rappel",
 };
 
