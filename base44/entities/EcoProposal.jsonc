@@ -1,6 +1,6 @@
 {
-  "type": "object",
   "name": "EcoProposal",
+  "type": "object",
   "properties": {
     "country_code": {
       "type": "string"
@@ -33,11 +33,11 @@
     },
     "proposal_scenario": {
       "type": "string",
-      "description": "Type de compatibilite: sur le trajet actuel ou enchainement proche de la destination.",
       "enum": [
         "on_route",
         "destination_chain"
-      ]
+      ],
+      "description": "Type de compatibilite: sur le trajet actuel ou enchainement proche de la destination."
     },
     "status": {
       "type": "string",
@@ -77,12 +77,12 @@
     "status"
   ],
   "rls": {
+    "read": {},
     "create": {
       "user_condition": {
         "role": "admin"
       }
     },
-    "read": {},
     "update": {
       "user_condition": {
         "role": "admin"
