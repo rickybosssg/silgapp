@@ -58,6 +58,7 @@ import PassActifBadge from "@/components/livreur/PassActifBadge";
 import HappyHourBadge from "@/components/livreur/HappyHourBadge";
 import PassZeroCommissionSection from "@/components/livreur/PassZeroCommissionSection";
 import LivreurVictoryOverlay from "@/components/livreur/LivreurVictoryOverlay";
+import EcoMissionDashboard from "@/components/livreur/EcoMissionDashboard";
 
 // haversineKm importé depuis priceEstimate (source canonique)
 
@@ -909,6 +910,38 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     [mesCourses, livreurProfil?.id]
   );
 
+  // ─── Mission Éco active (si le livreur a accepté une mission Éco) ──
+  // Garantit que les DEUX courses de la mission restent visibles dans l'onglet
+  // « Courses » via le EcoMissionDashboard, même après la 1re livraison.
+  const activeEcoMissionId = useMemo(() => {
+    const ecoCourse = coursesActives.find(c => c.eco_mission_id && c.delivery_mode === "eco");
+    return ecoCourse?.eco_mission_id || null;
+  }, [coursesActives]);
+
+  const { data: activeEcoMission = null } = useQuery({
+    queryKey: ["eco-mission-active", activeEcoMissionId],
+    queryFn: async () => {
+      if (!activeEcoMissionId) return null;
+      const mission = await base44.entities.EcoMission.get(activeEcoMissionId).catch(() => null);
+      if (!mission || ["completed", "cancelled", "invalidated"].includes(mission.status)) return null;
+      return mission;
+    },
+    enabled: !!activeEcoMissionId,
+    refetchInterval: 10000,
+    staleTime: 5000,
+  });
+
+  const activeEcoCourseIds = useMemo(() => {
+    if (!activeEcoMission?.course_ids?.length) return new Set();
+    return new Set(activeEcoMission.course_ids);
+  }, [activeEcoMission]);
+
+  // Courses non-Éco — affichées par CourseActiveCard individuellement
+  const nonEcoCoursesActives = useMemo(
+    () => coursesActives.filter(c => !activeEcoCourseIds.has(c.id)),
+    [coursesActives, activeEcoCourseIds]
+  );
+
   // Détecter la réponse du client sur une proposition de prix manuel
   // Statuts finaux pour lesquels on n'affiche JAMAIS la modale
   const FINAL_STATUSES = ['livree', 'annulee', 'completed', 'delivered', 'canceled'];
@@ -1736,9 +1769,20 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
             </Link>
             )}
 
-            {coursesActives.length > 0 && (
+            {activeEcoMission && (
+              <EcoMissionDashboard
+                mission={activeEcoMission}
+                livreurProfil={livreurProfil}
+                onAllDelivered={() => {
+                  queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+                  queryClient.invalidateQueries({ queryKey: ["eco-mission-active"] });
+                }}
+              />
+            )}
+
+            {nonEcoCoursesActives.length > 0 && (
               <div className="space-y-3">
-                {coursesActives.map(course => (
+                {nonEcoCoursesActives.map(course => (
                   <CourseActiveCard
                     key={course.id}
                     course={course}
@@ -1751,7 +1795,6 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
                     livreurId={livreurProfil?.id}
                     livreurNom={`${livreurProfil?.prenom || ""} ${livreurProfil?.nom || ""}`.trim()}
                     onDeliveryVictory={(courseId) => {
-                      // Anti-doublon : un même courseId ne déclenche qu'une seule célébration
                       if (celebratedCourseIdsRef.current.has(courseId)) return;
                       celebratedCourseIdsRef.current.add(courseId);
                       setVictoryCourseId(courseId);
@@ -1878,8 +1921,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         courseId={victoryCourseId}
         onClose={() => {
           setVictoryCourseId(null);
-          // [ECO] Si des courses actives restent (mission Eco), rester sur l'onglet "courses"
-          if (coursesActives.length > 0) {
+          // [ECO] Si une mission Éco est active ou des courses restent, rester sur "courses"
+          if (activeEcoMission || coursesActives.length > 0) {
             setActiveTab("courses");
           } else {
             setActiveTab("disponibles");

@@ -673,6 +673,7 @@ export async function acceptEcoMission(base44: any, missionId: string, livreurId
     livreur_vehicule: livreur.vehicule || livreur.type_vehicule || 'moto',
     livreur_note_moyenne: livreur.note_moyenne || 0,
     livreur_nombre_avis: livreur.nombre_avis || 0,
+    livreur_user_email: livreur.user_email || null,
     accepted_by_livreur_id: livreurId,
     accepted_at: now,
   };
