@@ -1371,7 +1371,10 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         prix_final_livreur: montantSaisi,
       });
       await verifierEncoursApresCourse(course.id);
-      await remettreDisponibleSiAutorise();
+      // [ECO] Ne pas remettre disponible si la course fait partie d'une mission Eco
+      if (!course.eco_mission_id) {
+        await remettreDisponibleSiAutorise();
+      }
       toast.success(`Livraison terminée ! ${montantSaisi.toLocaleString()} F`);
       return;
     }
@@ -1419,7 +1422,10 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     }
 
     await verifierEncoursApresCourse(course.id);
-    await remettreDisponibleSiAutorise();
+    // [ECO] Ne pas remettre disponible si la course fait partie d'une mission Eco
+    if (!course.eco_mission_id) {
+      await remettreDisponibleSiAutorise();
+    }
     toast.success("Livraison terminée ! ");
   };
 
