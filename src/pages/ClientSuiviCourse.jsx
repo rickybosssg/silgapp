@@ -47,18 +47,11 @@ function buildWhatsAppMessage(course) {
   const SILGAPP_APPLE = "https://apps.apple.com/bf/app/silgapp/id6782046749?l=fr-FR";
   const expediteurName = course.expediteur_nom || course.client_nom || "Expéditeur";
   const numeroCourse = course.id?.slice(-8) || course.id;
-  const pinLivraison = course.delivery_code_4_digits || "";
-  const qrLivraison = course.delivery_qr_token
-    ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(course.delivery_qr_token)}`
-    : "";
   return [
     `📦 *Un colis vous est destiné !*`,
     ``,
     `👤 *Expéditeur :* ${expediteurName}`,
     `#️⃣ *N° de course :* ${numeroCourse}`,
-    ``,
-    `🔐 *PIN de livraison :* *${pinLivraison}*`,
-    `📱 *QR Code livraison :* ${qrLivraison}`,
     ``,
     `📍 *Suivez votre colis en temps réel :*`,
     trackingUrl,
@@ -708,19 +701,7 @@ export default function ClientSuiviCourse() {
           <MultiColisClientView course={maCourse} />
         )}
 
-        {/* QR Codes — dès que les codes existent */}
-        {!["livree", "annulee"].includes(maCourse.statut) && (
-          <div className="space-y-4">
-            {/* Pickup QR — visible avant récupération */}
-            {maCourse.pickup_qr_token && !maCourse.pickup_confirmed_at && (
-              <QRCodeDisplay course={maCourse} type="pickup" />
-            )}
-            {/* Delivery QR — visible après récupération ou dès que le code existe */}
-            {maCourse.delivery_qr_token && (maCourse.pickup_confirmed_at || ["colis_recupere", "en_livraison"].includes(maCourse.statut)) && !maCourse.delivery_confirmed_at && (
-              <QRCodeDisplay course={maCourse} type="delivery" />
-            )}
-          </div>
-        )}
+        {/* [CORRECTION PIN/QR] QR Codes supprimés — parcours bouton sans PIN/QR */}
 
         {/* Bouton partage WhatsApp destinataire — si expéditeur */}
         {maCourse.type_course === "expedier" && maCourse.destinataire_telephone && !["livree", "annulee"].includes(maCourse.statut) && (

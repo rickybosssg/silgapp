@@ -360,7 +360,9 @@ async function scanErreursQRPIN(base44, bugs, corrections, recommandations) {
 
   for (const c of coursesActives) {
     if (isOlderThanHours(c.updated_date, 0.5)) {
-      if (!c.pickup_qr_token || !c.pickup_code_4_digits) {
+      // [CORRECTION PIN/QR] Vérification QR/PIN supprimée — les PIN/QR ne sont plus utilisés.
+      // Les courses peuvent être finalisées sans ces codes (parcours bouton).
+      if (false) {
         bugs.push({
           categorie: "qr_pin_manquant",
           severity: "haute",

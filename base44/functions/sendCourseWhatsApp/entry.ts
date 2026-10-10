@@ -29,8 +29,6 @@ Deno.serve(async (req) => {
     let telephone, nom, statutField, erreurField;
     let message = '';
 
-    const pickupCode = course.pickup_code_4_digits || 'N/A';
-    const deliveryCode = course.delivery_code_4_digits || 'N/A';
     const ref = course.id?.slice(-6) || 'N/A';
 
     if (type_destinataire === 'expediteur') {
@@ -71,12 +69,6 @@ Deno.serve(async (req) => {
           `Type : ${course.type_course === 'expedier' ? 'Expedition' : 'Reception'}`,
           `Depart : ${lieuDepart}`,
           `Arrivee : ${lieuArrivee}`,
-          ``,
-          `*Code de recuperation :*`,
-          `PIN : *${pickupCode}*`,
-          ``,
-          `Montrez ce code au livreur lors de la recuperation.`,
-          ``,
           `*Telechargez SILGAPP :*`,
           `Play Store : https://play.google.com/store/apps/details?id=com.base6a0ec08f3af5e1d1284254c1.app`,
           `App Store : https://apps.apple.com/bf/app/silgapp/id6782046749?l=fr-FR`,
@@ -96,12 +88,6 @@ Deno.serve(async (req) => {
         `Un colis est en route pour vous.\n`,
         `*Details :*`,
         `Livraison : ${lieuArrivee}`,
-        ``,
-        `*Code de livraison :*`,
-        `PIN : *${deliveryCode}*`,
-        ``,
-        `Montrez ce code au livreur a la livraison.`,
-        ``,
         `*Telechargez SILGAPP :*`,
         `Play Store : https://play.google.com/store/apps/details?id=com.base6a0ec08f3af5e1d1284254c1.app`,
         `App Store : https://apps.apple.com/bf/app/silgapp/id6782046749?l=fr-FR`,

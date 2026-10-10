@@ -19,14 +19,6 @@ const TYPE_OPTIONS = [
   { key: "deplacement", label: "Déplacement", icon: "👤", desc: "Transport personne" },
 ];
 
-function generarQRData() {
-  const pickupQrToken = crypto.randomUUID().replace(/-/g, "");
-  const deliveryQrToken = crypto.randomUUID().replace(/-/g, "");
-  const pickupCode4 = String(Math.floor(1000 + Math.random() * 9000));
-  const deliveryCode4 = String(Math.floor(1000 + Math.random() * 9000));
-  return { pickupQrToken, deliveryQrToken, pickupCode4, deliveryCode4 };
-}
-
 export default function CourseCreateTab({ enterprise, onCreated }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -106,7 +98,6 @@ export default function CourseCreateTab({ enterprise, onCreated }) {
 
     setSubmitting(true);
     try {
-      const qr = generarQRData();
       const requestId = crypto.randomUUID();
 
       const payload = {
@@ -133,10 +124,6 @@ export default function CourseCreateTab({ enterprise, onCreated }) {
         type_colis: typeColis,
         notes: notes || undefined,
         prix_propose_admin: prixProposeAdmin ? Number(prixProposeAdmin) : undefined,
-        pickup_qr_token: qr.pickupQrToken,
-        delivery_qr_token: qr.deliveryQrToken,
-        pickup_code_4_digits: qr.pickupCode4,
-        delivery_code_4_digits: qr.deliveryCode4,
       };
 
       await base44.functions.invoke("creerCourseEnterprise", payload);

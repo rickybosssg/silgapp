@@ -625,25 +625,9 @@ async function actionEnvoyerInfoLivreur(base44: any, donnees: Record<string, any
   };
 }
 
+// [CORRECTION PIN/QR] actionEnvoyerQrPin supprimée — les PIN/QR ne sont plus utilisés.
 async function actionEnvoyerQrPin(base44: any, donnees: Record<string, any>): Promise<any> {
-  if (!donnees._course_id) return { success: false, message: 'Pas de course' };
-  const course = await base44.asServiceRole.entities.CourseExterne.get(donnees._course_id);
-  let pin = course?.pickup_code_4_digits;
-  let qrToken = course?.pickup_qr_token;
-  if (!pin) {
-    pin = String(Math.floor(1000 + Math.random() * 9000));
-    qrToken = `pk_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
-    await base44.asServiceRole.entities.CourseExterne.update(donnees._course_id, {
-      pickup_code_4_digits: pin,
-      pickup_qr_token: qrToken,
-    });
-  }
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrToken)}`;
-  return {
-    success: true,
-    message: 'QR et PIN générés',
-    donnees_update: { _pin: pin, _qr_url: qrUrl },
-  };
+  return { success: true, message: 'PIN/QR supprimés — parcours bouton', donnees_update: {} };
 }
 
 async function actionAnnoncerPrix(base44: any, donnees: Record<string, any>): Promise<any> {

@@ -308,22 +308,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ── Phase QR/PIN : générer et envoyer le QR Code + PIN ──
-    // Le QR Code est généré à partir du token officiel SILGAPP (pickup_qr_token).
-    // L'URL publique du QR Code est passée directement à Twilio comme MediaUrl.
-    let qrImageUrl: string | null = null;
-    let messageEvenement = evenement;
-
-    if (evenement === 'livreur_assigne' && course.pickup_qr_token && course.pickup_code_4_digits) {
-      // URL publique du QR Code générée depuis le token officiel SILGAPP
-      // Twilio téléchargera cette image automatiquement lors de l'envoi
-      qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&margin=2&color=000000&bgcolor=ffffff&data=${encodeURIComponent(course.pickup_qr_token)}`;
-      messageEvenement = 'livreur_assigne_qr';
-      console.log(`[SuiviWhatsApp] 📱 QR Code URL: ${qrImageUrl.substring(0, 80)}...`);
-    }
-
-    // Construire le message (avec PIN si livreur_assigne_qr)
-    const message = construireMessage(course, messageEvenement, { is_redispatch });
+    // [CORRECTION PIN/QR] Phase QR/PIN supprimée — les PIN/QR ne sont plus utilisés.
+    const message = construireMessage(course, evenement, { is_redispatch });
 
     // Envoyer via Twilio
     const twilioSid = Deno.env.get('TWILIO_ACCOUNT_SID');

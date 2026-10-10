@@ -643,10 +643,9 @@ export async function handlePrixManuelResponse(base44: any, conversation: any, u
         await base44.asServiceRole.functions.invoke('envoyerSuiviWhatsApp', {
           course_id: courseEnAttente.id, evenement: 'livreur_assigne',
         });
-      } catch (e) { console.warn(`[WebhookVenus] Envoi QR/PIN échoué:`, e.message); }
+      } catch (e) { console.warn(`[WebhookVenus] Envoi WhatsApp échoué:`, e.message); }
 
-      const pin = courseEnAttente.pickup_code_4_digits || '';
-      return `✅ Parfait ! Vous avez accepté le prix de ${prix.toLocaleString()} ${devise}.\n\n🚗 Votre livreur ${courseEnAttente.livreur_nom || ''} est maintenant en route vers le point de récupération.${pin ? `\n\n🔐 Votre code PIN de récupération : ${pin}` : ''}${trackingLink ? `\n\n🔗 Suivez votre livreur en temps réel :\n${trackingLink}` : ''}\n\n📱 Le QR Code de récupération vous a également été envoyé. Ne le partagez qu'au moment de la récupération du colis.`;
+      return `✅ Parfait ! Vous avez accepté le prix de ${prix.toLocaleString()} ${devise}.\n\n🚗 Votre livreur ${courseEnAttente.livreur_nom || ''} est maintenant en route vers le point de récupération.${trackingLink ? `\n\n🔗 Suivez votre livreur en temps réel :\n${trackingLink}` : ''}`;
     } else {
       console.log(`[WebhookVenus] 💰 ❌ Prix refusé pour course ${courseEnAttente.id} — redispatch`);
       return `D'accord, j'ai bien noté votre refus. Je recherche immédiatement un autre livreur pour votre course. Je vous informerai dès qu'un nouveau livreur aura accepté.`;
