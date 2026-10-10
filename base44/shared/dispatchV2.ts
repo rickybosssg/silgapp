@@ -37,7 +37,8 @@ import { enregistrerNotification, enregistrerNotificationsBulk, enregistrerInbox
 import { notifierLivreursUnifie } from './dispatchPushUnifie.ts';
 import { chargerConfigDispatch } from './dispatchConfig.ts';
 import { resolveCourseParticipantUserIds } from './conversationSecurity.ts';
-import { ensureCourseCodeMessage, buildCodeMessageContent } from './courseCodeMessage.ts';
+// [CORRECTION PIN/QR] ensureCourseCodeMessage supprimé — les PIN/QR ne sont plus utilisés.
+// import { ensureCourseCodeMessage, buildCodeMessageContent } from './courseCodeMessage.ts';
 import { figerCommissionAcceptation, evaluerAvantageCommission } from './commissionAvantage.ts';
 import { champsLockCommission, verifierCoherenceLock } from './commissionLock.ts';
 import { normalizeEnterpriseId } from './enterpriseFinance.ts';
@@ -518,34 +519,9 @@ export async function accepterCourseV2(base44: any, courseId: string, livreurId:
     await base44.asServiceRole.entities.Livreur.update(livreurId, { statut: 'en_course' });
     await marquerAccepte(base44, courseId, livreurId);
 
-    // 13. Message code récupération + push notification (TOUTES courses avec PIN)
-    //     Délégué au helper idempotent ensureCourseCodeMessage (retry + anti-doublon).
-    //     ⚠️ Effet secondaire uniquement — n'échoue jamais l'acceptation.
-    //     Corrigé : appelé pour toute course disposant du PIN, indépendamment de la source.
-    if (pickupPIN) {
-      const codeMsgResult = await ensureCourseCodeMessage(
-        base44, course, livreurId, pickupPIN, deliveryPIN, '[V2]'
-      ).catch((err: any) => {
-        console.error('[V2] ⚠️ ensureCourseCodeMessage threw (non-blocking):', err?.message);
-        return { created: false, idempotent: false, error: err?.message };
-      });
-
-      // 📤 Push notification au livreur avec PIN + prix (uniquement si message créé ou idempotent)
-      if (livreur.user_email && codeMsgResult && (codeMsgResult.created || codeMsgResult.idempotent)) {
-        const messageContent = buildCodeMessageContent(
-          pickupPIN, deliveryPIN,
-          course.prix_propose_admin, course.prix_estimate, course.devise
-        );
-        base44.asServiceRole.functions.invoke('envoiNotificationPush', {
-          destinataire_email: livreur.user_email,
-          livreur_id: livreurId,
-          titre: '🔑 Code PIN + Prix de course',
-          message: messageContent,
-          type: 'nouveau_message',
-          course_id: courseId,
-        }).catch((err: any) => console.error('[V2] ❌ Push PIN/prix:', err?.message));
-      }
-    }
+    // [CORRECTION PIN/QR] Message code récupération + push notification PIN supprimés.
+    // Les PIN/QR ne sont plus utilisés dans SILGAPP (Standard, Éco, Entreprise).
+    // Le prix reste disponible dans les écrans de la course.
 
     // 14. Suivi WhatsApp
     base44.asServiceRole.functions.invoke('envoyerSuiviWhatsApp', {

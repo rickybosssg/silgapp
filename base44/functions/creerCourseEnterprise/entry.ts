@@ -101,21 +101,7 @@ export default async function(req: Request): Promise<Response> {
 
     const course = await base44.asServiceRole.entities.CourseExterne.create(courseData);
 
-    // ── Messages automatiques (prix + PIN récupération + PIN livraison) ──
-    if (course?.pickup_code_4_digits && course?.delivery_code_4_digits) {
-      try {
-        await ensureCourseCodeMessage(
-          base44,
-          course,
-          null,
-          course.pickup_code_4_digits,
-          course.delivery_code_4_digits,
-          '[CODE_MSG_ENT]'
-        );
-      } catch (err: any) {
-        console.error('[creerCourseEnterprise] Erreur message codes (non-bloquant):', err?.message);
-      }
-    }
+    // [CORRECTION PIN/QR] Message automatique des codes supprimé — les PIN/QR ne sont plus utilisés.
 
     return Response.json({ success: true, course, client });
   } catch (error) {

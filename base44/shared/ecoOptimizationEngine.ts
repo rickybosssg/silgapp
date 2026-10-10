@@ -197,7 +197,7 @@ export async function prepareEcoCreationFields(base44: any, rawCourseData: any) 
   const publicOnly = normalizeEnterpriseId(rawCourseData?.enterprise_id) === null;
   const price = Number(rawCourseData?.prix_propose_client || rawCourseData?.prix_propose_admin || rawCourseData?.prix_estimate || 0) || 0;
 
-  if (!config.enabled || !publicOnly || price < 1000) {
+  if (!config.enabled || !publicOnly) {
     return {
       delivery_mode: 'standard',
       eco_status: config.enabled && publicOnly ? 'disabled' : 'none',
@@ -597,6 +597,32 @@ export async function respondToOnRouteProposal(base44: any, proposalId: string, 
   return { success: true, accepted: true, course_id: course.id, proposal_id: proposal.id };
 }
 
+export async function completeEcoMissionIfNeeded(base44: any, courseId: string) {
+  const course = await base44.asServiceRole.entities.CourseExterne.get(courseId).catch(() => null);
+  if (!course?.eco_mission_id) return { completed: false, reason: 'no_mission' };
+
+  const mission = await base44.asServiceRole.entities.EcoMission.get(course.eco_mission_id).catch(() => null);
+  if (!mission || ['completed', 'cancelled', 'invalidated'].includes(mission.status)) {
+    return { completed: false, reason: 'mission_terminal' };
+  }
+
+  const courseIds = Array.isArray(mission.course_ids) ? mission.course_ids : [];
+  if (courseIds.length === 0) return { completed: false, reason: 'no_courses' };
+
+  const courses = await Promise.all(
+    courseIds.map((id: string) => base44.asServiceRole.entities.CourseExterne.get(id).catch(() => null))
+  );
+
+  const allDelivered = courses.every((c: any) => c && (c.statut === 'livree' || c.statut === 'annulee'));
+  if (!allDelivered) return { completed: false, reason: 'courses_pending' };
+
+  await base44.asServiceRole.entities.EcoMission.update(mission.id, {
+    status: 'completed',
+  }).catch(() => null);
+
+  return { completed: true, mission_id: mission.id };
+}
+
 export async function acceptEcoMission(base44: any, missionId: string, livreurId: string) {
   const mission = await base44.asServiceRole.entities.EcoMission.get(missionId).catch(() => null);
   const livreur = await base44.asServiceRole.entities.Livreur.get(livreurId).catch(() => null);
@@ -671,4 +697,3 @@ export async function acceptEcoMission(base44: any, missionId: string, livreurId
   await Promise.all(courseIds.map((id) => marquerAccepte(base44, id, livreurId).catch(() => null)));
   return { success: true, accepted: true, mission_id: mission.id, course_ids: courseIds, livreur_id: livreurId };
 }
-

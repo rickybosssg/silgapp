@@ -640,23 +640,7 @@ export default async function(req) {
         await supprimerNotificationsCourse(base44, course_id);
         console.log(`[DISPATCH] 🎉 Course ${course_id} verrouillée (auto) par ${livreur_id}`);
 
-        // ── Message automatique : Code de récupération pour courses admin ET VENUS ──
-        // Envoie le code de récupération (pickup_code_4_digits) dans la messagerie
-        // interne de la course, visible par le livreur assigné et l'admin.
-        // Concerné : courses admin (source='admin') et courses créées par VENUS
-        // (created_by_venus=true). Clé idempotente par (course_id, livreur_id) pour
-        // éviter les doublons et permettre un nouveau message si réassignation.
-        // ── Message système des codes (récupération + livraison + prix) ──
-        // Helper idempotent : vérifie l'existence, retry une fois, jamais d'échec bloquant.
-        // Utilise le même helper que le path V2 pour garantir un contenu identique.
-        // Corrigé : appelé pour toute course disposant du PIN, indépendamment de la source.
-        if (pickupPIN) {
-          await ensureCourseCodeMessage(
-            base44, course, livreur_id, pickupPIN, deliveryPIN, '[V1]'
-          ).catch((err: any) => {
-            console.error(`[DISPATCH] ⚠️ ensureCourseCodeMessage threw (non-blocking):`, err?.message || String(err));
-          });
-        }
+        // [CORRECTION PIN/QR] Message automatique des codes supprimé — les PIN/QR ne sont plus utilisés.
 
         // ── Phase 9 + QR/PIN : Suivi WhatsApp automatique avec QR Code et Code PIN ──
         // Détecter si c'est une réaffectation (livreur précédent a annulé)

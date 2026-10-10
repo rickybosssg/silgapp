@@ -88,24 +88,7 @@ export default async function(req) {
 
     const course = await base44.entities.CourseExterne.create(courseData);
 
-    // ── Messages automatiques (prix + PIN récupération + PIN livraison) ──
-    // Même mécanisme que le flux client : ensureCourseCodeMessage (idempotent).
-    // livreurId = null à la création (aucun livreur assigné).
-    // Non-bloquant : un échec n'empêche pas la création de la course.
-    if (course?.pickup_code_4_digits && course?.delivery_code_4_digits) {
-      try {
-        await ensureCourseCodeMessage(
-          base44,
-          course,
-          null, // livreurId = null à la création
-          course.pickup_code_4_digits,
-          course.delivery_code_4_digits,
-          '[CODE_MSG_ADMIN]'
-        );
-      } catch (err: any) {
-        console.error('[creerCourseAdmin] Erreur message codes (non-bloquant):', err?.message || String(err));
-      }
-    }
+    // [CORRECTION PIN/QR] Message automatique des codes supprimé — les PIN/QR ne sont plus utilisés.
 
     return Response.json({ success: true, course });
   } catch (error) {
@@ -113,4 +96,3 @@ export default async function(req) {
     return Response.json({ error: error.message }, { status: 500 });
   }
 }
-
