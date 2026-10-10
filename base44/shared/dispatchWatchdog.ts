@@ -118,6 +118,12 @@ export async function runWatchdog(base44, body = {}) {
     const ageMs = now.getTime() - new Date(course.created_date).getTime();
     if (ageMs <= WATCHDOG_GRACE_MS) continue;
     if (courseIdsWithNotifs.has(course.id)) continue;
+    // [ECO] Ne pas forcer le dispatch d'une course Eco isolée en attente de regroupement.
+    // Le workflow de conversion différée s'en chargera après le délai configurable (45 min).
+    if (course.delivery_mode === 'eco' && course.eco_status === 'isolated' &&
+        course.eco_convert_after_at && new Date(course.eco_convert_after_at) > now) {
+      continue;
+    }
 
     const ageMin = Math.round(ageMs / 60000);
     anomalies.push({ course_id: course.id, type: 'nouvelle_jamais_traitee', severity: 'critique', description: `Course nouvelle depuis ${ageMin}min sans notification` });

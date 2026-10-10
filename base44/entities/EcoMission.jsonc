@@ -22,6 +22,7 @@
       "enum": [
         "candidate",
         "available",
+        "accepting",
         "accepted",
         "in_progress",
         "completed",
