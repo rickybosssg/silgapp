@@ -41,6 +41,56 @@
       "default": "client",
       "description": "Origine de la creation"
     },
+    "delivery_mode": {
+      "type": "string",
+      "enum": [
+        "standard",
+        "eco"
+      ],
+      "default": "standard",
+      "description": "Mode de livraison. standard = dispatch V2 historique inchang\u00e9. eco = course publique eligible au regroupement SILGAPP Eco tant que les interrupteurs pays l'autorisent."
+    },
+    "eco_status": {
+      "type": "string",
+      "enum": [
+        "none",
+        "isolated",
+        "grouped",
+        "proposed",
+        "converted",
+        "expired",
+        "disabled"
+      ],
+      "default": "none",
+      "description": "Etat SILGAPP Eco. isolated = en attente de regroupement, grouped = rattachee a une mission Eco, converted = convertie en Standard, none = course Standard."
+    },
+    "eco_mission_id": {
+      "type": "string",
+      "description": "ID de la mission Eco regroupant cette course. Null si course Standard ou Eco isolee."
+    },
+    "eco_created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date de creation du mode Eco pour calculer le delai de conversion automatique."
+    },
+    "eco_convert_after_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Seuil d'eligibilite a la conversion Eco -> Standard. Le watchdog peut l'executer quelques minutes apres selon sa frequence."
+    },
+    "eco_converted_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date de conversion automatique de Eco vers Standard."
+    },
+    "eco_conversion_reason": {
+      "type": "string",
+      "description": "Raison de conversion Eco -> Standard, par exemple no_grouping_after_delay."
+    },
+    "eco_candidate_score": {
+      "type": "number",
+      "description": "Score technique de compatibilite Eco calcule par le moteur, uniquement pour audit."
+    },
     "created_by_venus": {
       "type": "boolean",
       "default": false,

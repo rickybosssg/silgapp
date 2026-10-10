@@ -1,0 +1,97 @@
+{
+  "type": "object",
+  "name": "EcoProposal",
+  "properties": {
+    "country_code": {
+      "type": "string"
+    },
+    "enterprise_id": {
+      "type": "string",
+      "description": "Perimetre de securite. null = public. Les propositions ne melangent jamais Public et Enterprise."
+    },
+    "course_id": {
+      "type": "string",
+      "description": "CourseExterne supplementaire proposee."
+    },
+    "mission_id": {
+      "type": "string",
+      "description": "Mission Eco cible si applicable."
+    },
+    "livreur_id": {
+      "type": "string"
+    },
+    "livreur_user_email": {
+      "type": "string"
+    },
+    "proposal_type": {
+      "type": "string",
+      "enum": [
+        "eco_grouping",
+        "on_route_offer"
+      ],
+      "default": "on_route_offer"
+    },
+    "proposal_scenario": {
+      "type": "string",
+      "description": "Type de compatibilite: sur le trajet actuel ou enchainement proche de la destination.",
+      "enum": [
+        "on_route",
+        "destination_chain"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "accepted",
+        "refused",
+        "expired",
+        "invalidated"
+      ],
+      "default": "pending"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "gain_amount": {
+      "type": "number",
+      "description": "Gain supplementaire affiche au livreur."
+    },
+    "route_delta_json": {
+      "type": "string",
+      "description": "JSON d'audit du detour estime. Ne contient pas de donnees personnelles d'autres clients."
+    },
+    "invalidation_reason": {
+      "type": "string",
+      "description": "Raison technique/metier si la proposition est invalidee."
+    },
+    "responded_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "course_id",
+    "livreur_id",
+    "status"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {},
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

@@ -1,0 +1,90 @@
+{
+  "type": "object",
+  "name": "EcoMission",
+  "properties": {
+    "country_code": {
+      "type": "string",
+      "description": "Pays de la mission Eco. V1: toutes les courses d'une mission ont le meme pays."
+    },
+    "enterprise_id": {
+      "type": "string",
+      "description": "Toujours null en V1. SILGAPP Eco V1 est reserve aux courses publiques."
+    },
+    "course_ids": {
+      "type": "array",
+      "description": "IDs CourseExterne independants inclus dans la mission.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "candidate",
+        "available",
+        "accepted",
+        "in_progress",
+        "completed",
+        "cancelled",
+        "invalidated"
+      ],
+      "default": "candidate"
+    },
+    "livreur_id": {
+      "type": "string"
+    },
+    "livreur_user_email": {
+      "type": "string"
+    },
+    "route_plan_json": {
+      "type": "string",
+      "description": "JSON des etapes pickup/delivery. Une livraison ne peut jamais preceder sa recuperation."
+    },
+    "active_step_index": {
+      "type": "number",
+      "default": 0
+    },
+    "total_price": {
+      "type": "number",
+      "description": "Somme informative des prix des courses. Ne sert pas a la comptabilite."
+    },
+    "total_driver_amount": {
+      "type": "number",
+      "description": "Somme informative des montants livreur. Chaque CourseExterne reste la source financiere."
+    },
+    "compatibility_score": {
+      "type": "number"
+    },
+    "locked_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "accepted_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "country_code",
+    "course_ids",
+    "status"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {},
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
