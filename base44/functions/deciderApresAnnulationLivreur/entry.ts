@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
 import { normalizeEnterpriseId } from '../../shared/enterpriseFinance.ts';
+import { completeEcoMissionIfNeeded } from '../../shared/ecoOptimizationEngine.ts';
 
 /**
  * deciderApresAnnulationLivreur
@@ -150,17 +151,14 @@ Deno.serve(async (req) => {
         }).catch(() => null);
       }
 
-      // ── [ECO] Si la course fait partie d'une mission Eco, vérifier l'impact ──
+      // ── [ECO] Réévaluer la mission Éco après annulation définitive ──
+      // La course passe en "annulee" (terminal). Si elle faisait partie d'une mission Éco,
+      // on vérifie si toutes les courses sont désormais annulées → mission "cancelled".
+      // Si une seule course est annulée, l'autre reste accessible et la mission reste inchangée.
       if (course.eco_mission_id) {
-        try {
-          const mission = await asService.entities.EcoMission.get(course.eco_mission_id).catch(() => null);
-          if (mission && mission.status === "in_progress") {
-            // La mission reste active — l'autre course continue normalement
-            console.log(`[DÉCISION CLIENT] Course ${course_id} fait partie de la mission Eco ${mission.id} — mission conservée`);
-          }
-        } catch (e) {
-          console.error("[DÉCISION CLIENT] Erreur vérification mission Eco:", e?.message);
-        }
+        await completeEcoMissionIfNeeded(base44, course_id).catch((e: any) =>
+          console.error("[DÉCISION CLIENT] completeEcoMissionIfNeeded error:", e?.message)
+        );
       }
 
       return Response.json({

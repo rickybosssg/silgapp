@@ -566,6 +566,7 @@ export async function respondToOnRouteProposal(base44: any, proposalId: string, 
     livreur_vehicule: livreur.vehicule || livreur.type_vehicule || 'moto',
     livreur_note_moyenne: livreur.note_moyenne || 0,
     livreur_nombre_avis: livreur.nombre_avis || 0,
+    livreur_user_email: livreur.user_email || null,
     accepted_by_livreur_id: livreurId,
     accepted_at: now,
   };
@@ -622,14 +623,34 @@ export async function completeEcoMissionIfNeeded(base44: any, courseId: string) 
     courseIds.map((id: string) => base44.asServiceRole.entities.CourseExterne.get(id).catch(() => null))
   );
 
-  const allDelivered = courses.every((c: any) => c && (c.statut === 'livree' || c.statut === 'annulee'));
-  if (!allDelivered) return { completed: false, reason: 'courses_pending' };
+  // ── Toutes les courses doivent être dans un statut terminal ──
+  const allTerminal = courses.every((c: any) => c && (c.statut === 'livree' || c.statut === 'annulee'));
+  if (!allTerminal) return { completed: false, reason: 'courses_pending' };
 
+  // ── Toutes livrées → completed ──
+  const allDelivered = courses.every((c: any) => c && c.statut === 'livree');
+  if (allDelivered) {
+    await base44.asServiceRole.entities.EcoMission.update(mission.id, {
+      status: 'completed',
+    }).catch(() => null);
+    return { completed: true, mission_id: mission.id, final_status: 'completed' };
+  }
+
+  // ── Toutes annulées → cancelled ──
+  const allCancelled = courses.every((c: any) => c && c.statut === 'annulee');
+  if (allCancelled) {
+    await base44.asServiceRole.entities.EcoMission.update(mission.id, {
+      status: 'cancelled',
+    }).catch(() => null);
+    return { completed: true, mission_id: mission.id, final_status: 'cancelled' };
+  }
+
+  // ── Mixte (au moins une livrée + au moins une annulée) → cancelled ──
+  // Une mission contenant des courses annulées n'est jamais déclarée "completed".
   await base44.asServiceRole.entities.EcoMission.update(mission.id, {
-    status: 'completed',
+    status: 'cancelled',
   }).catch(() => null);
-
-  return { completed: true, mission_id: mission.id };
+  return { completed: true, mission_id: mission.id, final_status: 'cancelled' };
 }
 
 export async function acceptEcoMission(base44: any, missionId: string, livreurId: string) {

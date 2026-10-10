@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
 import { normalizeEnterpriseId } from '../../shared/enterpriseFinance.ts';
+import { completeEcoMissionIfNeeded } from '../../shared/ecoOptimizationEngine.ts';
 
 const MOTIFS_VALIDES = [
   "client_injoignable",
@@ -230,6 +231,18 @@ Deno.serve(async (req) => {
       await asService.entities.CourseExterne.update(course_id, resetData);
       courseRedispatch = true;
 
+      // ── [ECO] Réévaluer la mission Éco après annulation livreur ──
+      // La course est en "en_attente" (pas terminal), mais si elle faisait partie
+      // d'une mission Éco, on vérifie si les autres courses sont déjà annulées.
+      // La course actuelle n'étant pas terminal, la mission ne changera pas de statut
+      // ici — sauf si toutes les autres sont déjà annulées ET que la course courante
+      // est en "en_attente" (non terminal). Dans ce cas, la mission reste inchangée.
+      if (course.eco_mission_id) {
+        await completeEcoMissionIfNeeded(base44, course_id).catch((err: any) =>
+          console.error('[ANNULATION] completeEcoMissionIfNeeded error (livreur):', err?.message)
+        );
+      }
+
       // Archiver toutes les notifications 'nouvelle_course' pour cette course
       // pour que les livreurs ne voient plus une course qui est retournée en dispatch
       const notifsNouvelleCourse = await asService.entities.Notification.filter({
@@ -403,6 +416,16 @@ Deno.serve(async (req) => {
       }
 
       await asService.entities.CourseExterne.update(course_id, annulData);
+
+      // ── [ECO] Réévaluer la mission Éco après annulation client/admin ──
+      // La course passe en "annulee" (terminal). Si elle faisait partie d'une mission Éco,
+      // on vérifie si toutes les courses sont désormais annulées → mission "cancelled".
+      // Si une seule course est annulée, l'autre reste accessible et la mission reste inchangée.
+      if (course.eco_mission_id) {
+        await completeEcoMissionIfNeeded(base44, course_id).catch((err: any) =>
+          console.error('[ANNULATION] completeEcoMissionIfNeeded error (client/admin):', err?.message)
+        );
+      }
 
       // Archiver notifications
       const notifs = await asService.entities.Notification.filter({
