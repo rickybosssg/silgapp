@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
-import { ensureCourseCodeMessage } from '../../shared/courseCodeMessage.ts';
+// [CORRECTION PIN/QR] ensureCourseCodeMessage supprimé — les PIN/QR ne sont plus utilisés.
+// import { ensureCourseCodeMessage } from '../../shared/courseCodeMessage.ts';
 import { prepareEcoCreationFields } from '../../shared/ecoOptimizationEngine.ts';
 
 const CREATION_MUTEX_KEY = 'COURSE_CREATION_MUTEX';

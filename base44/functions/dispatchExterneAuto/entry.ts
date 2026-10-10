@@ -9,7 +9,8 @@ import { runWatchdog } from '../../shared/dispatchWatchdog.ts';
 import { marquerRefuse, marquerAccepte, getLivreursNotifies, getLivreursRefuses, resetNotifications as resetNotifsEntity } from '../../shared/dispatchNotifications.ts';
 import { accepterCourseV2, publierCourseDansFil, isV2Enabled, secoursDispatchV2, isPilotLivreur, DISPATCH_V2_BUNDLE_VERSION } from '../../shared/dispatchV2.ts';
 import { resolveCourseParticipantUserIds } from '../../shared/conversationSecurity.ts';
-import { ensureCourseCodeMessage } from '../../shared/courseCodeMessage.ts';
+// [CORRECTION PIN/QR] ensureCourseCodeMessage supprimé — les PIN/QR ne sont plus utilisés.
+// import { ensureCourseCodeMessage } from '../../shared/courseCodeMessage.ts';
 import { figerCommissionAcceptation, evaluerAvantageCommission } from '../../shared/commissionAvantage.ts';
 import { tauxCommissionEffectif, champsLockCommission, verifierCoherenceLock, zeroCommissionFields } from '../../shared/commissionLock.ts';
 import { normalizeEnterpriseId } from '../../shared/enterpriseFinance.ts';

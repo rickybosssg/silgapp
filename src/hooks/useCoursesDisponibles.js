@@ -113,6 +113,24 @@ export function useCoursesDisponibles(livreurProfil) {
     staleTime: 15000,
   });
 
+  // ── Missions Eco disponibles ──
+  const { data: ecoMissions = [] } = useQuery({
+    queryKey: ["eco-missions-available", livreurId, countryCode],
+    queryFn: async () => {
+      if (!countryCode) return [];
+      const missions = await base44.entities.EcoMission.filter({
+        country_code: countryCode,
+        enterprise_id: null,
+        status: 'available',
+      }, '-created_date', 20);
+      return missions || [];
+    },
+    enabled: !!livreurId && !!countryCode && livreurPeutVoirFil,
+    refetchInterval: 10000,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+  });
+
   // ── Courses dismissées localement (localStorage, TTL 30 min) ──
   const [refusedIds, setRefusedIds] = useState(() => {
     try {
@@ -158,5 +176,6 @@ export function useCoursesDisponibles(livreurProfil) {
     raisonBlocage,
     refusedCourseIds,
     setRefusedIds,
+    ecoMissions,
   };
 }

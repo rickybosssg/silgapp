@@ -41,13 +41,7 @@ function clearDraft() {
   try { sessionStorage.removeItem(DRAFT_KEY); } catch (_) {}
 }
 
-function generarQRData() {
-  const pickupQrToken = crypto.randomUUID().replace(/-/g, "");
-  const deliveryQrToken = crypto.randomUUID().replace(/-/g, "");
-  const pickupCode4 = String(Math.floor(1000 + Math.random() * 9000));
-  const deliveryCode4 = String(Math.floor(1000 + Math.random() * 9000));
-  return { pickupQrToken, deliveryQrToken, pickupCode4, deliveryCode4 };
-}
+// [CORRECTION PIN/QR] generarQRData supprimé — les PIN/QR ne sont plus utilisés.
 
 const PAYS = [
   { code: "BF", nom: "Burkina Faso", drapeau: "🇧🇫" },
@@ -75,6 +69,7 @@ export default function AdminCourseForm() {
   const [submitting, setSubmitting] = useState(false);
 
   const [typeCourse, setTypeCourse] = useState("expedier");
+  const [deliveryMode, setDeliveryMode] = useState("standard");
   const [adresseDepart, setAdresseDepart] = useState("");
   const [adresseArrivee, setAdresseArrivee] = useState("");
   const [countryCode, setCountryCode] = useState(adminCountryCode || "");
@@ -310,7 +305,6 @@ export default function AdminCourseForm() {
     }
     setSubmitting(true);
     try {
-      const { pickupQrToken, deliveryQrToken, pickupCode4, deliveryCode4 } = generarQRData();
       const trackingToken = crypto.randomUUID().replace(/-/g, "");
       const trackingLink = `https://silga-dispatch-go.base44.app/suivi-public/${trackingToken}`;
 
@@ -402,6 +396,7 @@ export default function AdminCourseForm() {
       const courseData = {
         country_code: countryCode,
         source: "admin",
+        delivery_mode: deliveryMode,
         type_course: typeCourse,
         adresse_depart: adresseDepart.trim() || "—",
         adresse_arrivee: adresseArrivee.trim() || "—",
@@ -431,10 +426,7 @@ export default function AdminCourseForm() {
         distance_tarifaire_source: prixApproximatif?.distanceSource || null,
         tracking_token: trackingToken,
         tracking_link: trackingLink,
-        pickup_qr_token: pickupQrToken,
-        pickup_code_4_digits: pickupCode4,
-        delivery_qr_token: deliveryQrToken,
-        delivery_code_4_digits: deliveryCode4,
+        // [CORRECTION PIN/QR] Champs QR/PIN supprimés — parcours bouton uniquement.
         passager_nom: typeCourse === "deplacement" ? (clientNom.trim() || "Passager") : null,
         passager_telephone: typeCourse === "deplacement" ? (clientTelephone.trim() || null) : null,
         nb_passagers: typeCourse === "deplacement" ? 1 : null,
@@ -589,6 +581,47 @@ export default function AdminCourseForm() {
               })}
             </div>
           </div>
+        </div>
+
+        {/* Mode de livraison */}
+        <div className="bg-white rounded-[1.5rem] border border-gray-100 shadow-lg shadow-gray-100/50 p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-1 h-4 bg-gradient-to-b from-green-500 to-emerald-500 rounded-full" />
+            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Mode de livraison</p>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setDeliveryMode("standard")}
+              className={`relative flex flex-col items-center gap-1 p-3 rounded-2xl border-2 transition-all ${
+                deliveryMode === "standard"
+                  ? "border-transparent bg-gradient-to-br from-blue-50 to-sky-50 shadow-lg ring-1 ring-blue-200 scale-[1.04]"
+                  : "border-gray-100 hover:border-gray-200 hover:bg-gray-50/50"
+              }`}
+            >
+              <span className="text-xl">🚀</span>
+              <span className={`text-xs font-bold ${deliveryMode === "standard" ? "text-blue-700" : "text-gray-500"}`}>Standard</span>
+              <span className="text-[9px] text-center text-gray-400">Livraison directe</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setDeliveryMode("eco")}
+              className={`relative flex flex-col items-center gap-1 p-3 rounded-2xl border-2 transition-all ${
+                deliveryMode === "eco"
+                  ? "border-transparent bg-gradient-to-br from-green-50 to-emerald-50 shadow-lg ring-1 ring-green-200 scale-[1.04]"
+                  : "border-gray-100 hover:border-gray-200 hover:bg-gray-50/50"
+              }`}
+            >
+              <span className="text-xl">🌿</span>
+              <span className={`text-xs font-bold ${deliveryMode === "eco" ? "text-green-700" : "text-gray-500"}`}>Éco</span>
+              <span className="text-[9px] text-center text-gray-400">Regroupement possible</span>
+            </button>
+          </div>
+          {deliveryMode === "eco" && (
+            <p className="mt-2 text-[10px] text-green-600 bg-green-50 rounded-lg p-2 leading-relaxed">
+              🌿 Le mode Éco permet de regrouper plusieurs courses compatibles pour optimiser les trajets. Votre prix est conservé tel quel. Si aucun regroupement n'est trouvé dans les 45 minutes, la course passe automatiquement en mode Standard.
+            </p>
+          )}
         </div>
 
         {/* Contacts */}

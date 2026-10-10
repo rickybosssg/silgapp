@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { startUrgentCourseAlert, stopUrgentCourseAlert } from "@/lib/livreurUrgentAlert";
 import { getPrixAffichable } from "@/utils/getPrixAffichable";
 import { useCoursesDisponibles } from "@/hooks/useCoursesDisponibles";
+import EcoMissionCard from "@/components/livreur/EcoMissionCard";
 // Correction 2: AcceptConfirmationModal supprimé — acceptation en un seul clic
 
 function calculerDistance(lat1, lng1, lat2, lng2) {
@@ -56,7 +57,7 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
   const livreurLng = livreurProfil?.longitude;
 
   // ── Source unique de vérité : hook partagé avec ActiviteTempsReel ──
-  const { eligibleCourses, courses, isLoading, isV2Enabled, livreurDisponible, livreurPeutVoirFil, raisonBlocage, refusedCourseIds, setRefusedIds } = useCoursesDisponibles(livreurProfil);
+  const { eligibleCourses, courses, isLoading, isV2Enabled, livreurDisponible, livreurPeutVoirFil, raisonBlocage, refusedCourseIds, setRefusedIds, ecoMissions } = useCoursesDisponibles(livreurProfil);
 
   // ── Tracking vue_at — DÉDUPLICATION LOCALE (Option C) ──
   // Un seul appel marquer_vue_course par course et par session composant.
@@ -263,6 +264,16 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
           {coursesWithDistance.length}
         </span>
       </div>
+
+      {/* ── Missions Eco disponibles ── */}
+      {ecoMissions && ecoMissions.length > 0 && ecoMissions.map(mission => (
+        <EcoMissionCard
+          key={mission.id}
+          mission={mission}
+          livreurProfil={livreurProfil}
+          onAcceptSuccess={onAcceptSuccess}
+        />
+      ))}
 
       {coursesWithDistance.map(course => (
         <div

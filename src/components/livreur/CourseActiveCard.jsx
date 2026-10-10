@@ -23,7 +23,8 @@ import { haversineKm as haversine } from "@/lib/priceEstimate";
 // Les NOUVELLES courses n'ont pas de pickup_qr_token généré → parcours bouton.
 // Les ANCIENNES courses (avec QR token) → parcours QR/PIN backward compat.
 function isNewButtonParcours(course) {
-  return !course?.pickup_qr_token;
+  // [CORRECTION PIN/QR] Toujours utiliser le parcours bouton — les PIN/QR sont supprimés.
+  return true;
 }
 
 // Badge ETA affiché en haut de la carte, calculé depuis la position GPS réelle du livreur

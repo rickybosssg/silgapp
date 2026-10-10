@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
-import { ensureCourseCodeMessage } from '../../shared/courseCodeMessage.ts';
+// [CORRECTION PIN/QR] ensureCourseCodeMessage supprimé — les PIN/QR ne sont plus utilisés.
+// import { ensureCourseCodeMessage } from '../../shared/courseCodeMessage.ts';
 import { normalizeEnterpriseId, isEnterpriseAdmin } from '../../shared/enterpriseFinance.ts';
 import { prepareEcoCreationFields } from '../../shared/ecoOptimizationEngine.ts';
 

@@ -1382,7 +1382,11 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
       queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
       await verifierEncoursApresCourse(course.id);
-      await remettreDisponibleSiAutorise();
+      // [ECO] Ne pas remettre disponible si la course fait partie d'une mission Eco
+      // — d'autres courses de la mission sont peut-être encore actives.
+      if (!course.eco_mission_id) {
+        await remettreDisponibleSiAutorise();
+      }
       toast.success("Livraison terminée ! ");
       return;
     }
@@ -1868,8 +1872,12 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         courseId={victoryCourseId}
         onClose={() => {
           setVictoryCourseId(null);
-          // Correction 3: retour automatique à l'onglet Disponibles après la célébration
-          setActiveTab("disponibles");
+          // [ECO] Si des courses actives restent (mission Eco), rester sur l'onglet "courses"
+          if (coursesActives.length > 0) {
+            setActiveTab("courses");
+          } else {
+            setActiveTab("disponibles");
+          }
         }}
       />
     </DashboardThemeProvider>

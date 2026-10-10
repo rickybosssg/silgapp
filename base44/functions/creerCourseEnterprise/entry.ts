@@ -1,7 +1,8 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.51';
 import { normalizeEnterpriseId, isEnterpriseAdmin } from '../../shared/enterpriseFinance.ts';
 import { normalizePhone, phoneVariants, loadCountryDialCodes } from '../../shared/phoneUtils.ts';
-import { ensureCourseCodeMessage } from '../../shared/courseCodeMessage.ts';
+// [CORRECTION PIN/QR] ensureCourseCodeMessage supprimé — les PIN/QR ne sont plus utilisés.
+// import { ensureCourseCodeMessage } from '../../shared/courseCodeMessage.ts';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // creerCourseEnterprise — Création de course Enterprise avec déduplication client
