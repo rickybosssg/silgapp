@@ -332,8 +332,16 @@ export async function accepterCourseV2(base44: any, courseId: string, livreurId:
   }
 
   // 3. Get livreur + verify country
-  const livreur = await base44.asServiceRole.entities.Livreur.get(livreurId);
-  if (!livreur) return { success: false, error: 'Livreur introuvable' };
+  // ── [SÉCURITÉ] Vérification d'identité obligatoire avant toute logique de dispatch ──
+  // Le livreur_id provient du frontend. On vérifie qu'il appartient à l'utilisateur authentifié.
+  // Ce guard s'exécute AVANT les vérifications d'éligibilité, de scoring et de commission.
+  // Il ne modifie pas la logique de Dispatch V2 — c'est un middleware de sécurité.
+  const { verifyLivreurIdentity } = await import('./livreurIdentityGuard.ts');
+  const identityCheck = await verifyLivreurIdentity(base44, livreurId);
+  if (!identityCheck.verified) {
+    return { success: false, accepted: false, reason: 'identity_mismatch', error: identityCheck.error || 'Vérification d\'identité échouée' };
+  }
+  const livreur = identityCheck.livreur;
 
   const livreurEligible =
     livreur.type_livreur === 'externe' &&

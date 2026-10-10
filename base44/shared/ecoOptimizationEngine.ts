@@ -522,6 +522,15 @@ export async function respondToOnRouteProposal(base44: any, proposalId: string, 
   const proposal = await base44.asServiceRole.entities.EcoProposal.get(proposalId).catch(() => null);
   if (!proposal || proposal.status !== 'pending') return { success: false, reason: 'proposal_unavailable' };
   if (String(proposal.livreur_id) !== String(livreurId)) return { success: false, reason: 'proposal_owner_mismatch' };
+
+  // ── [SÉCURITÉ] Vérification d'identité obligatoire avant acceptation de proposal ──
+  if (response === 'accept') {
+    const { verifyLivreurIdentity } = await import('./livreurIdentityGuard.ts');
+    const identityCheck = await verifyLivreurIdentity(base44, livreurId);
+    if (!identityCheck.verified) {
+      return { success: false, reason: 'identity_mismatch', error: identityCheck.error || 'Vérification d\'identité échouée' };
+    }
+  }
   if (proposal.expires_at && new Date(proposal.expires_at) < new Date()) {
     await base44.asServiceRole.entities.EcoProposal.update(proposal.id, { status: 'expired', responded_at: new Date().toISOString() }).catch(() => null);
     return { success: false, reason: 'proposal_expired' };
@@ -625,9 +634,15 @@ export async function completeEcoMissionIfNeeded(base44: any, courseId: string) 
 
 export async function acceptEcoMission(base44: any, missionId: string, livreurId: string) {
   const mission = await base44.asServiceRole.entities.EcoMission.get(missionId).catch(() => null);
-  const livreur = await base44.asServiceRole.entities.Livreur.get(livreurId).catch(() => null);
   if (!mission || mission.status !== 'available') return { success: false, reason: 'mission_unavailable' };
-  if (!livreur) return { success: false, reason: 'missing_driver' };
+
+  // ── [SÉCURITÉ] Vérification d'identité obligatoire avant toute logique d'acceptation ──
+  const { verifyLivreurIdentity } = await import('./livreurIdentityGuard.ts');
+  const identityCheck = await verifyLivreurIdentity(base44, livreurId);
+  if (!identityCheck.verified) {
+    return { success: false, reason: 'identity_mismatch', error: identityCheck.error || 'Vérification d\'identité échouée' };
+  }
+  const livreur = identityCheck.livreur;
   if (normalizeEnterpriseId(mission.enterprise_id) !== normalizeEnterpriseId(livreur.enterprise_id)) {
     return { success: false, reason: 'enterprise_mismatch' };
   }

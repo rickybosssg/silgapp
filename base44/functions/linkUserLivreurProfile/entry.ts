@@ -60,6 +60,19 @@ export default async function(req: Request): Promise<Response> {
     const emailMatches = livreurEmail === userEmail;
     const userEmailMatches = livreurUserEmail === userEmail;
 
+    // ── SÉCURITÉ : ne pas écraser une liaison existante appartenant à un autre utilisateur ──
+    // Si user_email est déjà lié à un DIFFÉRENT utilisateur, refuser catégoriquement.
+    // Cela empêche un utilisateur malveillant de voler le profil d'un autre livreur
+    // même si livreur.email correspond (cas: email changé, user_email déjà lié ailleurs).
+    if (livreurUserEmail && livreurUserEmail !== userEmail) {
+      return Response.json({
+        success: false,
+        linked: false,
+        reason: 'already_linked_to_other_user',
+        error: 'Ce profil livreur est déjà lié à un autre compte utilisateur.',
+      }, { status: 403 });
+    }
+
     if (!userEmailMatches && !emailMatches) {
       // L'email du livreur ne correspond pas à l'utilisateur authentifié
       // → refuser la liaison (sécurité : ne jamais lier un profil à un mauvais utilisateur)
@@ -71,7 +84,8 @@ export default async function(req: Request): Promise<Response> {
       }, { status: 403 });
     }
 
-    // 4. Si user_email est manquant ou différent, le corriger avec asServiceRole
+    // 4. Si user_email est manquant, le corriger avec asServiceRole
+    //    (user_email ne peut pas appartenir à un autre utilisateur — vérifié au point 3)
     if (!userEmailMatches) {
       await base44.asServiceRole.entities.Livreur.update(livreur.id, {
         user_email: user.email,
