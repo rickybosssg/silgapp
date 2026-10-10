@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { TrendingUp, Package, CheckCircle, AlertCircle } from "lucide-react";
+import { TrendingUp, Package, CheckCircle } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import LivreurFiabiliteCard from "./LivreurFiabiliteCard";
 

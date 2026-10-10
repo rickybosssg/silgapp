@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
-import { MapPin, Clock, User, ArrowRight, RotateCw, AlertTriangle, X } from "lucide-react";
+import { MapPin, Clock, ArrowRight, RotateCw, AlertTriangle, X } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";

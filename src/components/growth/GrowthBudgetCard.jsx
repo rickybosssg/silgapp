@@ -1,6 +1,5 @@
 import React from "react";
 import { Card } from "@/components/ui/card";
-import { Wallet, TrendingDown } from "lucide-react";
 
 export default function GrowthBudgetCard({
   title,

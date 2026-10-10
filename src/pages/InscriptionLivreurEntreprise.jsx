@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Building2, Loader2, CheckCircle, ArrowLeft, Mail, Phone, User, MapPin } from "lucide-react";
+import { Building2, Loader2, CheckCircle, Mail, Phone, User, MapPin } from "lucide-react";
 
 export default function InscriptionLivreurEntreprise() {
   const [phase, setPhase] = useState("verify");

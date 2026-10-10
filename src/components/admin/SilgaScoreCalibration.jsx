@@ -2,9 +2,8 @@ import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import {
-  Trophy, RefreshCw, ChevronDown, ChevronUp, Truck, Star,
-  AlertTriangle, TrendingUp, TrendingDown, Wallet, Clock,
-  Award, AlertCircle, Info, Shield, BarChart3,
+  Trophy, RefreshCw, ChevronDown, ChevronUp, Truck,
+  AlertTriangle, TrendingUp, Clock, AlertCircle, Info, Shield, BarChart3,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";

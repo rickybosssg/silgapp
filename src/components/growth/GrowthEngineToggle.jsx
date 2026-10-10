@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Clock, Users, Send, CheckCircle2, AlertTriangle, Power } from "lucide-react";
+import { Clock, Users, Send, CheckCircle2, Power } from "lucide-react";
 
 const STATUS_STYLE = {
   "LIVE": "bg-emerald-100 text-emerald-700 border-emerald-300",

@@ -128,7 +128,7 @@ public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
                 eventData.put("platform", "android");
                 new Handler(Looper.getMainLooper()).post(() -> {
                     try {
-                        plugin.notifyListeners("silgapp:fcm-token-refreshed", eventData, false);
+                        plugin.emitFcmTokenRefreshed(eventData);
                     } catch (Exception ignored) {}
                 });
                 android.util.Log.i("SilgappFCM", "onNewToken: notification plugin envoyée");
@@ -435,7 +435,6 @@ public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
             .setVibrate(null)
             .setSound(null)
             .setContentIntent(fullScreenPendingIntent)
-            .setFullScreenIntent(fullScreenPendingIntent, true)
             .setShowWhen(true)
             .setTimeoutAfter(durationMs + 5000L);
 

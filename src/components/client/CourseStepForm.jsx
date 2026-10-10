@@ -2,22 +2,19 @@ import React, { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   ArrowLeft, ArrowRight, MapPin, Navigation, Package,
   User, FileText, CheckCircle, Truck, AlertCircle,
-  Loader2, Search, Send, Inbox, Sparkles, Car, DollarSign,
+  Loader2,
   Pencil, ChevronDown, ChevronUp, Info, Flame
 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
-import { toast } from "sonner";
 import { calculerPrixApproximatif } from "@/lib/priceEstimate";
 import { isPaysTarificationGrandOuaga, calculerTarifGrandOuagaAsync } from "@/lib/tarifGrandOuaga";
 import CarnetAdresses from "@/components/client/CarnetAdresses";
 import ContactPickerButton from "@/components/client/ContactPickerButton";
 import { SILGAPP_COUNTRIES, validateLocalPhone, findClientByPhone } from "@/lib/phoneUtils";
 import NombreColisSelector from "@/components/multi-colis/NombreColisSelector";
-import MultiColisFormStep from "@/components/multi-colis/MultiColisFormStep";
 import SmartAddressInput from "@/components/location/SmartAddressInput";
 import { useCountryPricing } from "@/hooks/useCountryPricing";
 

@@ -10,10 +10,9 @@ import CourseStepForm from "@/components/client/CourseStepForm";
 import { sauvegarderContactDB } from "@/components/client/CarnetAdresses";
 import { haversineKm } from "@/lib/priceEstimate";
 import LivreurRechercheAnimation from "@/components/client/LivreurRechercheAnimation";
-import InvitationWhatsAppModal from "@/components/client/InvitationWhatsAppModal";
 import { normalizePhone, phoneVariants } from "@/lib/phoneUtils";
 import { resolveGpsForCourse, GPS_BLOCK_MESSAGE } from "@/lib/gpsResolution";
-import { isPaysTarificationGrandOuaga, calculerTarifGrandOuagaAsync } from "@/lib/tarifGrandOuaga";
+import { isPaysTarificationGrandOuaga } from "@/lib/tarifGrandOuaga";
 import { useForteDemande } from "@/hooks/useForteDemande";
 import { useCountryPricing } from "@/hooks/useCountryPricing";
 

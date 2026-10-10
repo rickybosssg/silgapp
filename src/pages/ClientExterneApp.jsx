@@ -17,7 +17,7 @@ import { useQueryClient, useQuery } from "@tanstack/react-query";
 import {
   MapPin, Navigation, MessageCircle, User, Package,
   Clock, ChevronRight, TrendingUp, Loader2, ArrowLeft, RefreshCw, Wallet,
-  Store, UtensilsCrossed, Bell, Pill, Inbox, Car, Headphones, ShieldCheck,
+  Store, UtensilsCrossed, Bell, Inbox, Car, Headphones, ShieldCheck,
   Zap, CheckCircle2, RotateCcw
 } from "lucide-react";
 import LivreurRatingDialog from "@/components/client/LivreurRatingDialog";
@@ -44,7 +44,6 @@ import EcranFinCourse from "@/components/client/EcranFinCourse";
 import MultiCourseSelector from "@/components/client/MultiCourseSelector";
 import QuickOrderPanel from "@/components/client/QuickOrderPanel";
 import QuickOrderProPanel from "@/components/client/QuickOrderProPanel";
-import { haversineKm as haversineDistance } from "@/lib/priceEstimate";
 import { COURSE_STATUSES, isTerminalStatus } from "@/lib/courseStatuses";
 import SuivreCourseCard from "@/components/client/SuivreCourseCard";
 import { useForteDemande } from "@/hooks/useForteDemande";

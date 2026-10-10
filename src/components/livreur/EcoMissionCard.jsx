@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { Check, Leaf, MapPin, Navigation } from "lucide-react";
+import { Check, Leaf, Navigation } from "lucide-react";
 import { toast } from "sonner";
 import { parseRoutePlan, prixCourseEco, totalPriceEco, totalDistanceKm } from "@/lib/ecoMissionHelpers";
 

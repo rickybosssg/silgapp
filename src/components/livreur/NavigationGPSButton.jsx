@@ -1,7 +1,7 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { Navigation, Phone } from "lucide-react";
-import { SILGAPP_COUNTRIES, normalizePhone } from "@/lib/phoneUtils";
+import { normalizePhone } from "@/lib/phoneUtils";
 
 /**
  * Navigation GPS intelligente pour livreurs

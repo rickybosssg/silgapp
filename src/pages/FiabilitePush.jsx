@@ -6,7 +6,6 @@ import {
   Truck, Users, RefreshCw, Zap, TrendingDown, Activity, Clock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import LivreursInjoignablesList from "@/components/admin/LivreursInjoignablesList";

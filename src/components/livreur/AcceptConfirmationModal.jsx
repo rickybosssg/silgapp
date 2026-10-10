@@ -1,5 +1,5 @@
 import React from "react";
-import { MapPin, Navigation, Package, AlertCircle } from "lucide-react";
+import { Navigation, Package, AlertCircle } from "lucide-react";
 import { getPrixAffichable, getDeviseAffichable } from "@/utils/getPrixAffichable";
 
 /**

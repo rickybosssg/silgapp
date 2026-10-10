@@ -19,7 +19,6 @@ import {
   Download,
   Star,
   Truck,
-  QrCode,
   AlertCircle,
   Search
 } from "lucide-react";

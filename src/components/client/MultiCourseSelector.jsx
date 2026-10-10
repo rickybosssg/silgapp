@@ -1,5 +1,5 @@
 import React from "react";
-import { X, ChevronRight, MapPin } from "lucide-react";
+import { X, MapPin } from "lucide-react";
 import MultiColisProgressBadge from "@/components/multi-colis/MultiColisProgressBadge";
 import { getPrixAffichable } from "@/utils/getPrixAffichable";
 

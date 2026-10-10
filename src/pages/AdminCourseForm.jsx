@@ -16,7 +16,7 @@ import { upsertCourseAddresses } from "@/lib/addressBook";
 import { upsertClientsFromCourseContacts, normalizePhone } from "@/lib/crmUtils";
 import { calculerPrixApproximatif } from "@/lib/priceEstimate";
 import { isPaysTarificationGrandOuaga, calculerTarifGrandOuagaAsync } from "@/lib/tarifGrandOuaga";
-import { resolveGpsForCourse, isGpsValid, GPS_BLOCK_MESSAGE } from "@/lib/gpsResolution";
+import { resolveGpsForCourse, GPS_BLOCK_MESSAGE } from "@/lib/gpsResolution";
 import { resolveGpsFromSelection } from "@/lib/resolveGpsFromSelection";
 
 const DRAFT_KEY = "silgapp_admin_course_draft";

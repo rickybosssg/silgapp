@@ -1,9 +1,9 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import {
   Leaf, Phone, Navigation, Package, Check, MapPin, ChevronRight,
-  ArrowRight, Clock, Ruler,
+  ArrowRight, Ruler,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -11,7 +11,6 @@ import {
   parseRoutePlan, prixCourseEco, totalPriceEco, totalDistanceKm,
   computeActiveStepIndex, getStepCourse,
 } from "@/lib/ecoMissionHelpers";
-import { haversineKm } from "@/lib/priceEstimate";
 import { getCourseContactForPhase, normalizePhoneForWhatsapp } from "@/lib/courseContact";
 import { getPrixAffichable, getDeviseAffichable } from "@/utils/getPrixAffichable";
 

@@ -6,7 +6,6 @@ import {
   ChevronDown, ChevronUp, AlertCircle, Zap, MapPin,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
 
 function formatRelative(dateStr) {
   if (!dateStr) return "—";

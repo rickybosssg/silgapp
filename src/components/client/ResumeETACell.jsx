@@ -1,5 +1,5 @@
 import React from "react";
-import { Ruler, Clock, Banknote } from "lucide-react";
+import { Clock } from "lucide-react";
 import { useETACourse } from "@/hooks/useETACourse";
 
 /**

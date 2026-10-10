@@ -1,8 +1,7 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback } from "react";
 import { Menu, X, LogOut, RefreshCw } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import EnterpriseSidebar, { enterpriseNavItems } from "./EnterpriseSidebar";
-import { cn } from "@/lib/utils";
 
 const doLogout = () => {
   ["base44_access_token", "access_token", "base44_token", "token"].forEach(k => {

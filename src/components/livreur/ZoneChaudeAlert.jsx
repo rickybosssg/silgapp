@@ -1,5 +1,5 @@
 import React from "react";
-import { Flame, MapPin, X, Navigation } from "lucide-react";
+import { Flame, X, Navigation } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 /**

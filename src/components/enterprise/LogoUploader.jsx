@@ -1,6 +1,6 @@
 import React, { useRef, useState } from "react";
 import { base44 } from "@/api/base44Client";
-import { Camera, ImagePlus, Loader2, Trash2, Building2 } from "lucide-react";
+import { Camera, ImagePlus, Loader2, Building2 } from "lucide-react";
 
 /**
  * LogoUploader — Sélection et upload de logo entreprise (caméra + galerie).

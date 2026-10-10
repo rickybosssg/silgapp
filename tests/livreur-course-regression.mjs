@@ -50,6 +50,10 @@ const coursesDisponiblesSource = readFileSync(
   new URL("../src/components/livreur/CoursesDisponibles.jsx", import.meta.url),
   "utf8",
 );
+const useCoursesDisponiblesSource = readFileSync(
+  new URL("../src/hooks/useCoursesDisponibles.js", import.meta.url),
+  "utf8",
+);
 const dispatchSource = readFileSync(
   new URL("../base44/functions/dispatchExterneAuto/entry.ts", import.meta.url),
   "utf8",
@@ -62,10 +66,13 @@ const nativePushSource = readFileSync(
 assert.match(livreurAppSource, /id:\s*"disponibles"/, "l'onglet Disponibles doit etre declare");
 assert.match(livreurAppSource, /activeTab === "disponibles"/, "l'onglet Disponibles doit etre rendu");
 assert.match(livreurAppSource, /<CoursesDisponibles/, "le composant CoursesDisponibles doit etre monte");
-assert.match(coursesDisponiblesSource, /\$in:\s*\["disponible_push",\s*"propose",\s*"en_attente"\]/, "la liste V2 doit charger le fil et les propositions compatibles");
-assert.match(coursesDisponiblesSource, /country_code:\s*countryCode/, "la liste doit rester isolee par pays");
-assert.match(coursesDisponiblesSource, /refusedCourseIds\.includes\(course\.id\)/, "une course refusee ne doit pas reapparaitre");
-assert.match(coursesDisponiblesSource, /livreurDisponible/, "un livreur hors ligne ne doit pas charger les courses disponibles");
+assert.match(coursesDisponiblesSource, /useCoursesDisponibles\(livreurProfil\)/, "la liste doit utiliser le hook partage");
+assert.match(useCoursesDisponiblesSource, /\$in:\s*\["disponible_push",\s*"propose"\]/, "le hook doit charger le fil V2 et les propositions compatibles");
+assert.match(useCoursesDisponiblesSource, /eco_status:\s*"isolated"/, "les courses Eco isolees doivent rester visibles");
+assert.match(useCoursesDisponiblesSource, /country_code:\s*countryCode/, "la liste doit rester isolee par pays");
+assert.match(useCoursesDisponiblesSource, /refusedCourseIds\.includes\(course\.id\)/, "une course refusee ne doit pas reapparaitre");
+assert.match(useCoursesDisponiblesSource, /admin_hors_ligne === true \|\| livreurProfil\?\.actif === false/, "un livreur bloque admin doit voir le fil mais pas accepter");
+assert.match(coursesDisponiblesSource, /Course Eco en attente de regroupement/, "une course Eco isolee ne doit pas etre acceptable directement");
 assert.match(coursesDisponiblesSource, /durationSeconds:\s*10/, "la sonnerie V2 doit durer dix secondes");
 assert.match(coursesDisponiblesSource, /action:\s*"accepter_course_v2"/, "l'acceptation doit utiliser le verrou V2 compatible avec en_attente");
 assert.match(coursesDisponiblesSource, /persistDismissedCourse\(course\.id\)/, "un refus doit rester masque apres navigation");

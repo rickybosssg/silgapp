@@ -1,8 +1,7 @@
-import React, { useState } from "react";
+import React from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { ChevronRight, Pause, Play, Rocket } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import MetaAdsCampaignActions from "./MetaAdsCampaignActions";
 
 const STATUS_BADGES = {

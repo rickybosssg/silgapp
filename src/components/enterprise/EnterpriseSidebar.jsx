@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { LayoutDashboard, Map, Package, Plus, Truck, Users, MessageCircle, Wallet, Settings, X } from "lucide-react";
+import React from "react";
+import { LayoutDashboard, Map, Package, Plus, Truck, Users, MessageCircle, Wallet, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export const enterpriseNavItems = [

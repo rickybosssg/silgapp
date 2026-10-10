@@ -275,7 +275,13 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
         />
       ))}
 
-      {coursesWithDistance.map(course => (
+      {coursesWithDistance.map(course => {
+        const isEcoIsolated =
+          course.delivery_mode === "eco" &&
+          course.eco_status === "isolated" &&
+          course.dispatch_status === "en_attente";
+
+        return (
         <div
           key={course.id}
           className="overflow-hidden rounded-lg border border-border bg-card shadow-[0_8px_22px_rgba(15,23,42,0.07)]"
@@ -284,7 +290,14 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-[11px] font-bold uppercase text-slate-400">Nouvelle mission</span>
+                  <span className="text-[11px] font-bold uppercase text-slate-400">
+                    {isEcoIsolated ? "Course Eco" : "Course Standard"}
+                  </span>
+                  {isEcoIsolated && (
+                    <span className="rounded-full bg-green-50 px-2 py-1 text-[10px] font-bold text-green-700">
+                      En attente de regroupement
+                    </span>
+                  )}
                   {course.priority === "urgente" && (
                     <span className="rounded-full bg-red-50 px-2 py-1 text-[10px] font-bold text-red-600">Urgente</span>
                   )}
@@ -353,7 +366,12 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
           </div>
 
           <div className="grid grid-cols-[1fr_52px] gap-2.5 border-t border-slate-100 bg-muted p-3">
-            {raisonBlocage ? (
+            {isEcoIsolated ? (
+              <div className="h-12 rounded-lg bg-green-50 text-xs font-bold text-green-700 flex items-center justify-center gap-1.5 px-2 text-center">
+                <Lock className="h-3.5 w-3.5 shrink-0" />
+                <span className="leading-tight">Course Eco en attente de regroupement</span>
+              </div>
+            ) : raisonBlocage ? (
               <div className="h-12 rounded-lg bg-slate-100 text-xs font-medium text-slate-500 flex items-center justify-center gap-1.5 px-2 text-center">
                 <Lock className="h-3.5 w-3.5 shrink-0" />
                 <span className="leading-tight">{raisonBlocage}</span>
@@ -387,7 +405,8 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
             </button>
           </div>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

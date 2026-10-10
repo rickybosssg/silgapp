@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { ShieldCheck, AlertTriangle, TrendingDown, Info } from "lucide-react";
+import { ShieldCheck, AlertTriangle, Info } from "lucide-react";
 import { calculerFiabiliteLivreur, getFiabiliteBadge } from "@/lib/livreurFiabiliteClient";
 
 /**

@@ -3,7 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { RefreshCw, CheckCircle2, XCircle, AlertTriangle, FlaskConical, TrendingUp, Wallet, Users, Repeat, Percent, Globe } from 'lucide-react';
+import { RefreshCw, CheckCircle2, XCircle, FlaskConical, TrendingUp, Wallet, Users, Repeat, Percent, Globe } from 'lucide-react';
 import AutopiloteStatusCard from '@/components/growth/AutopiloteStatusCard';
 
 const STATUS_COLORS = {

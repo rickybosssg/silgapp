@@ -26,7 +26,6 @@ public class MainActivity extends BridgeActivity {
         super.onCreate(savedInstanceState);
         bridge.getWebView().setWebChromeClient(new SilgappWebChromeClient(bridge));
         SilgappPushPlugin.handleNotificationIntent(getIntent(), "launch");
-        SilgappFirebaseMessagingService.stopUrgentCourseAlert();
     }
 
     @Override
@@ -34,13 +33,6 @@ public class MainActivity extends BridgeActivity {
         super.onNewIntent(intent);
         setIntent(intent);
         SilgappPushPlugin.handleNotificationIntent(intent, "new_intent");
-        SilgappFirebaseMessagingService.stopUrgentCourseAlert();
-    }
-
-    @Override
-    public void onResume() {
-        super.onResume();
-        SilgappFirebaseMessagingService.stopUrgentCourseAlert();
     }
 
     private void createDefaultNotificationChannel() {

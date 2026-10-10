@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { base44 } from "@/api/base44Client";
-import { MapPin, Search, Loader2 } from "lucide-react";
+import { Search, Loader2 } from "lucide-react";
 
 // ═══════════════════════════════════════════════════════════════════════
 // AdminAddressAutocomplete — Suggestions d'adresses pour création de course admin

@@ -2,10 +2,9 @@ import React, { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
-  X, Bell, AlertTriangle, Info, CheckCircle2, Truck, Wallet, User,
-  Eye, EyeOff, Package, Clock,
+  X, AlertTriangle, Info, CheckCircle2, Truck, Wallet,
+  Eye, EyeOff,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";

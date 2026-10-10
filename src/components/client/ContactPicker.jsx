@@ -9,7 +9,6 @@ import { Preferences } from "@capacitor/preferences";
 import { Capacitor } from "@capacitor/core";
 import { Contacts } from "@capacitor-community/contacts";
 import { pickNativeContact } from "@/lib/nativeAndroid";
-import { getDialCodeSync } from "@/lib/countryService";
 import { normalizePhone, formatPhoneDisplay } from "@/lib/phoneUtils";
 
 const FREQUENT_CONTACTS_KEY = "silgapp_frequent_contacts";

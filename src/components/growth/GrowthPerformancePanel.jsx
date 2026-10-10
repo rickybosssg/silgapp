@@ -1,6 +1,5 @@
 import React from "react";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Send, Eye, Package, CheckCircle2 } from "lucide-react";
 
 function PerformanceRow({ label, sent, opened, courseCreated, courseDelivered }) {

@@ -1,7 +1,6 @@
 import React from 'react';
 import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Rocket, AlertTriangle, CheckCircle2, XCircle, Zap, RefreshCw, Activity, Eye, Target, DollarSign, MousePointerClick, Smartphone, UserPlus, TrendingUp, Repeat, Percent } from 'lucide-react';
+import { Rocket, AlertTriangle, Activity, Eye, Target, DollarSign, MousePointerClick, Smartphone, UserPlus, TrendingUp, Repeat, Percent } from 'lucide-react';
 
 const META_USD_TO_FCFA = 600;
 

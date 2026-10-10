@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { base44 } from "@/api/base44Client";
-import { RotateCcw, MapPin, Loader2, ChevronRight } from "lucide-react";
+import { RotateCcw, ChevronRight } from "lucide-react";
 import {
   fetchDeliveredCourses,
   fetchClientAddresses,

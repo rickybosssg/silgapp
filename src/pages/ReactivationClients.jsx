@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Bell, Users, Smartphone, Mail, UserX, TrendingUp, Filter, Send, Loader2, ChevronRight, FlaskConical, ShieldOff, Copy, Eye, DollarSign, Activity, Zap } from "lucide-react";
+import { Bell, Users, Smartphone, Mail, UserX, TrendingUp, Send, Loader2, ChevronRight, FlaskConical, ShieldOff, Eye, DollarSign, Activity, Zap } from "lucide-react";
 import { MESSAGE_TEMPLATES } from "@/lib/reactivationMessages";
 import { computeCampaignStats } from "@/lib/reactivationStats";
 import ReactivationAutoPanel from "@/components/admin/ReactivationAutoPanel";

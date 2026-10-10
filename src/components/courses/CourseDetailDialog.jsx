@@ -4,7 +4,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MapPin, Phone, User, Package, Clock, Truck, ArrowDown, Navigation, XCircle, KeyRound, Copy, RotateCcw } from "lucide-react";
+import { MapPin, Phone, User, Package, Clock, Truck, ArrowDown, Navigation, XCircle, RotateCcw } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import CourseStatusBadge from "./CourseStatusBadge";

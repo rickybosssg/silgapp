@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Phone, MapPin, User, Truck, Calendar, Wallet, Navigation, MessageSquare, XCircle, AlertTriangle } from "lucide-react";
+import { Phone, MapPin, User, Truck, Calendar, Navigation, MessageSquare, XCircle, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { base44 } from "@/api/base44Client";
 import { STATUS_LABELS, PROGRESSION_STEPS, getProgressionStep } from "./courseStatus.js";
