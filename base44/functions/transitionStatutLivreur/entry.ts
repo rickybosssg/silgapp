@@ -102,7 +102,22 @@ export default async function(req: Request): Promise<Response> {
     const livreur = await base44.asServiceRole.entities.Livreur.get(course.livreur_id).catch(() => null);
     if (!livreur) return Response.json({ error: 'Livreur introuvable' }, { status: 404 });
     if (livreur.user_email !== user.email) {
-      return Response.json({ error: 'Vous n\'êtes pas le livreur assigné à cette course' }, { status: 403 });
+      // ── Fallback : auto-liaison si email correspond mais user_email est null/différent ──
+      // Corrige le bug où un livreur créé par admin sans user_email peut accepter des courses
+      // mais pas les terminer (accepterCourseV2 ne vérifie pas user_email).
+      const livreurEmailNorm = (livreur.email || '').trim().toLowerCase();
+      const userEmailNorm = (user.email || '').trim().toLowerCase();
+      if (livreurEmailNorm && livreurEmailNorm === userEmailNorm) {
+        await base44.asServiceRole.entities.Livreur.update(course.livreur_id, {
+          user_email: user.email,
+        }).catch(() => {});
+        const livreurRelu = await base44.asServiceRole.entities.Livreur.get(course.livreur_id).catch(() => null);
+        if (!livreurRelu || livreurRelu.user_email !== user.email) {
+          return Response.json({ error: 'Vous n\'êtes pas le livreur assigné à cette course' }, { status: 403 });
+        }
+      } else {
+        return Response.json({ error: 'Vous n\'êtes pas le livreur assigné à cette course' }, { status: 403 });
+      }
     }
 
     // Validation spécifique: client_contacte réservé aux courses admin

@@ -101,7 +101,20 @@ export default async function(req: Request): Promise<Response> {
     const livreur = await base44.asServiceRole.entities.Livreur.get(course.livreur_id).catch(() => null);
     if (!livreur) return Response.json({ error: 'Livreur introuvable' }, { status: 404 });
     if (livreur.user_email !== user.email) {
-      return Response.json({ error: 'Vous n\'êtes pas le livreur assigné' }, { status: 403 });
+      // ── Fallback : auto-liaison si email correspond mais user_email est null/différent ──
+      const livreurEmailNorm = (livreur.email || '').trim().toLowerCase();
+      const userEmailNorm = (user.email || '').trim().toLowerCase();
+      if (livreurEmailNorm && livreurEmailNorm === userEmailNorm) {
+        await base44.asServiceRole.entities.Livreur.update(course.livreur_id, {
+          user_email: user.email,
+        }).catch(() => {});
+        const livreurRelu = await base44.asServiceRole.entities.Livreur.get(course.livreur_id).catch(() => null);
+        if (!livreurRelu || livreurRelu.user_email !== user.email) {
+          return Response.json({ error: 'Vous n\'êtes pas le livreur assigné' }, { status: 403 });
+        }
+      } else {
+        return Response.json({ error: 'Vous n\'êtes pas le livreur assigné' }, { status: 403 });
+      }
     }
 
     const now = new Date().toISOString();

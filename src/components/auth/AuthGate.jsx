@@ -415,7 +415,11 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
         if (livreurs && livreurs.length > 0) {
           const livreur = livreurs[0];
           if (!livreur.user_email) {
-            base44.entities.Livreur.update(livreur.id, { user_email: user.email }).catch(() => {});
+            // ── Correction durable : utiliser asServiceRole via fonction backend ──
+            // L'update direct via SDK est bloqué par RLS quand user_email est null
+            // (data.user_email === user.email → null !== email → false → RLS bloque).
+            // linkUserLivreurProfile contourne le RLS avec asServiceRole + vérification d'identité.
+            base44.functions.invoke('linkUserLivreurProfile', {}).catch(() => {});
           }
           // [CORRECTION 13] BLOCAGE ADMIN ≠ COMPTE DÉSACTIVÉ
           // Un livreur bloqué par l'Admin (actif=false, validation="valide") doit
