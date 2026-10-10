@@ -66,6 +66,7 @@ export default function CourseExterneFormSync() {
   const [isSubmitting, setIsSubmitting] = useState(false); // verrou anti-double-clic
   const [invitationModal, setInvitationModal] = useState(null); // { telephone, nom } ou null
   const [gpsLoading, setGpsLoading] = useState({ depart: false, arrivee: false });
+  const [deliveryMode, setDeliveryMode] = useState("standard");
   const { forteDemande } = useForteDemande(clientProfil?.country_code);
   const { country: countryConfig } = useCountryPricing(clientProfil?.country_code);
   // Source tarifaire unique : Country.prix_minimum (jamais codé en dur)
@@ -866,6 +867,7 @@ export default function CourseExterneFormSync() {
       passager_telephone: isDeplacement ? (formData.passager_telephone || "") : "",
       nb_passagers: isDeplacement ? (formData.nb_passagers || 1) : 1,
       // Champs multi-colis
+      delivery_mode: deliveryMode,
       is_multi_colis: isMulti,
       nb_colis: nbColis,
       nb_colis_livres: 0,
@@ -967,6 +969,44 @@ export default function CourseExterneFormSync() {
               Programmer
             </button>
           </div>
+        </div>
+
+        {/* Mode de livraison : Standard ou Éco */}
+        <div className="mb-4">
+          <p className="text-xs font-bold mb-2" style={{ color: "#64748B" }}>Mode de livraison</p>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setDeliveryMode("standard")}
+              className={`flex flex-col items-center gap-1 p-3 rounded-2xl border-2 transition-all ${
+                deliveryMode === "standard"
+                  ? "border-transparent bg-gradient-to-br from-blue-50 to-sky-50 shadow-lg ring-1 ring-blue-200 scale-[1.04]"
+                  : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+              }`}
+            >
+              <span className="text-xl"></span>
+              <span className={`text-xs font-bold ${deliveryMode === "standard" ? "text-blue-700" : "text-gray-500"}`}>Standard</span>
+              <span className="text-[9px] text-center text-gray-400">Livraison directe</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setDeliveryMode("eco")}
+              className={`flex flex-col items-center gap-1 p-3 rounded-2xl border-2 transition-all ${
+                deliveryMode === "eco"
+                  ? "border-transparent bg-gradient-to-br from-green-50 to-emerald-50 shadow-lg ring-1 ring-green-200 scale-[1.04]"
+                  : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+              }`}
+            >
+              <span className="text-xl"></span>
+              <span className={`text-xs font-bold ${deliveryMode === "eco" ? "text-green-700" : "text-gray-500"}`}>Éco</span>
+              <span className="text-[9px] text-center text-gray-400">Regroupement possible</span>
+            </button>
+          </div>
+          {deliveryMode === "eco" && (
+            <p className="mt-2 text-[10px] text-green-600 bg-green-50 rounded-lg p-2 leading-relaxed">
+               Le mode Éco permet de regrouper plusieurs courses compatibles pour optimiser les trajets. Votre prix est conservé. Si aucun regroupement n'est trouvé, la course passe automatiquement en Standard.
+            </p>
+          )}
         </div>
 
         {!formData.mode_immediat && (

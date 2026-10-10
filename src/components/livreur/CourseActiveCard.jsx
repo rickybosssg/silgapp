@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { MapPin, Phone, Navigation, Package, Check, X, AlertTriangle, ChevronRight, QrCode, Clock, Ruler } from "lucide-react";
+import { MapPin, Phone, Navigation, Package, Check, X, AlertTriangle, ChevronRight, Clock, Ruler } from "lucide-react";
 import MultiColisProgressBadge from "@/components/multi-colis/MultiColisProgressBadge";
 import MultiColisLivreurView from "@/components/multi-colis/MultiColisLivreurView";
 import { Input } from "@/components/ui/input";
@@ -9,7 +9,6 @@ import { base44 } from "@/api/base44Client";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import QRScannerModal from "./QRScannerModal";
 import NavigationGPS from "./NavigationGPS";
 import { normalizeCommissionPct, resolveStoredOrDynamicSplit, splitAmountByCommission } from "@/lib/commissionUtils";
 import ChatWindow from "@/components/chat/ChatWindow";
@@ -19,13 +18,8 @@ import { getPrixAffichable, getDeviseAffichable } from "@/utils/getPrixAffichabl
 import { getCourseContactForPhase, normalizePhoneForWhatsapp } from "@/lib/courseContact";
 import { haversineKm as haversine } from "@/lib/priceEstimate";
 
-// ── Correction 1: détermine si une course utilise le nouveau parcours bouton ──
-// Les NOUVELLES courses n'ont pas de pickup_qr_token généré → parcours bouton.
-// Les ANCIENNES courses (avec QR token) → parcours QR/PIN backward compat.
-function isNewButtonParcours(course) {
-  // [CORRECTION PIN/QR] Toujours utiliser le parcours bouton — les PIN/QR sont supprimés.
-  return true;
-}
+// [CORRECTION PIN/QR] Les PIN/QR sont supprimés de tous les parcours.
+// Le parcours bouton (COLIS RÉCUPÉRÉ / COLIS LIVRÉ) est utilisé pour toutes les courses.
 
 // Badge ETA affiché en haut de la carte, calculé depuis la position GPS réelle du livreur
 function ETABadge({ course, colisRecupere }) {
@@ -140,7 +134,6 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   const [showPrixModal, setShowPrixModal] = useState(false);
   const [remarque, setRemarque] = useState("");
   const [showRemarque, setShowRemarque] = useState(false);
-  const [showQRScanner, setShowQRScanner] = useState(null);
   const [showPauseModal, setShowPauseModal] = useState(false);
   const [pauseMotif, setPauseMotif] = useState("");
   const [multiPickupPending, setMultiPickupPending] = useState(false);
@@ -354,42 +347,6 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
     toast.success("Remarque enregistrée");
   };
 
-  // Handler succès scan QR pickup (externe) — GPS déjà validé côté QRScannerModal
-  const handleQRPickupSuccess = (courseData) => {
-    setShowQRScanner(null);
-    const now = courseData?.heure_recuperation || new Date().toISOString();
-    const pickupData = {
-      ...courseData,
-      statut: "colis_recupere",
-      heure_recuperation: now,
-    };
-    // OPTIMISTIC UI: Update cache immediately
-    updateOptimisticStatut("colis_recupere", pickupData);
-    onColisRecupere({ ...course, ...pickupData });
-    toast.success(isPartnerCourse ? "Commande récupérée chez le partenaire." : "Colis récupéré avec succès !");
-  };
-
-  // Handler succès scan QR delivery (externe) — livraison confirmée par le backend
-  const handleQRDeliverySuccess = (courseData) => {
-    setShowQRScanner(null);
-    // Admin : intercepter pour saisie du montant AVANT le récapitulatif
-    if (course.pricing_mode === "admin_manuel" || course.source === "admin") {
-      setPendingDeliveryData(courseData);
-      setShowPrixModal(true);
-      return;
-    }
-    // OPTIMISTIC UI: Update cache immediately
-    updateOptimisticStatut("livree", {
-      heure_livraison: new Date().toISOString(),
-      ...courseData
-    });
-    navigateToRecap(courseData);
-    setTimeout(() => {
-      queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
-      queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
-    }, 1200);
-  };
-
   const handlePauseSubmit = () => {
     if (!pauseMotif) {
       toast.error("Veuillez sélectionner un motif");
@@ -518,24 +475,6 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
 
   return (
     <>
-      {/* Modal scan QR (externe) */}
-      {showQRScanner && (() => {
-        const scanType = typeof showQRScanner === "string" ? showQRScanner : showQRScanner.type;
-        const scanMode = typeof showQRScanner === "string" ? "camera" : (showQRScanner.mode || "camera");
-        return (
-          <QRScannerModal
-            course={course}
-            type={scanType}
-            initialMode={scanMode}
-            onSuccess={scanType === "pickup" ? handleQRPickupSuccess : handleQRDeliverySuccess}
-            onClose={() => setShowQRScanner(null)}
-            livreurLat={livreurLat}
-            livreurLng={livreurLng}
-            onDeliveryVictory={onDeliveryVictory}
-          />
-        );
-      })()}
-
       {/* Modal annulation livreur (unifié colis + déplacement) */}
       {showAnnulerCourse && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
@@ -1215,8 +1154,8 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                       </button>
                     )}
                   </div>
-                ) : isExterne && isNewButtonParcours(course) && !course.is_multi_colis ? (
-                  /* ── CORRECTION 1: EXTERNE nouveau parcours — bouton direct COLIS RÉCUPÉRÉ ── */
+                ) : isExterne && !course.is_multi_colis ? (
+                   /* ── EXTERNE : bouton direct COLIS RÉCUPÉRÉ (parcours bouton) ── */
                   <button
                     className="w-full h-14 rounded-2xl bg-gradient-to-b from-amber-500 to-amber-600 text-white font-black text-base shadow-lg shadow-amber-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
                     onClick={async () => {
@@ -1273,26 +1212,6 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                     <Package className="w-6 h-6" />
                      Colis récupérés ({course.nb_colis} colis)
                   </button>
-                ) : isExterne ? (
-                  /* ── EXTERNE ancien parcours (backward compat) : Scanner QR/PIN pour récupérer ── */
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      className="h-14 rounded-2xl bg-gradient-to-b from-amber-500 to-amber-600 text-white font-black text-sm shadow-lg shadow-amber-200 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                      onClick={() => setShowQRScanner({ type: "pickup", mode: "camera" })}
-                      disabled={isPending}
-                    >
-                      <QrCode className="w-5 h-5" />
-                      QR Code
-                    </button>
-                    <button
-                      className="h-14 rounded-2xl bg-gradient-to-b from-amber-600 to-amber-700 text-white font-black text-sm shadow-lg shadow-amber-200 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                      onClick={() => setShowQRScanner({ type: "pickup", mode: "code" })}
-                      disabled={isPending}
-                    >
-                      <span className="text-lg"></span>
-                      PIN Code
-                    </button>
-                  </div>
                 ) : (
                   /* ── INTERNE : bouton classique ── */
                   <button
@@ -1313,8 +1232,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                 isExterne ? (
                   /* ── EXTERNE multi-colis : géré par MultiColisLivreurView ci-dessus ── */
                   course.is_multi_colis ? null : (
-                    isNewButtonParcours(course) ? (
-                      /* ── CORRECTION 1: EXTERNE nouveau parcours — bouton direct COLIS LIVRÉ ── */
+                      /* ── EXTERNE : bouton direct COLIS LIVRÉ (parcours bouton) ── */
                       <button
                         className="w-full h-14 rounded-2xl bg-primary text-white font-black text-base shadow-lg shadow-primary/20 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
                         onClick={async () => {
@@ -1360,27 +1278,6 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                           </>
                         )}
                       </button>
-                    ) : (
-                      /* ── EXTERNE ancien parcours (backward compat) : Scanner QR/PIN pour livrer ── */
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          className="h-14 rounded-2xl bg-primary text-white font-black text-sm shadow-lg shadow-primary/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                          onClick={() => setShowQRScanner({ type: "delivery", mode: "camera" })}
-                          disabled={isPending}
-                        >
-                          <QrCode className="w-5 h-5" />
-                          QR Code
-                        </button>
-                        <button
-                          className="h-14 rounded-2xl bg-primary-dark text-white font-black text-sm shadow-lg shadow-primary/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                          onClick={() => setShowQRScanner({ type: "delivery", mode: "code" })}
-                          disabled={isPending}
-                        >
-                          <span className="text-lg"></span>
-                          PIN Code
-                        </button>
-                      </div>
-                    )
                   )
                 ) : (
                   /* ── INTERNE : bouton classique avec GPS + récapitulatif ── */
