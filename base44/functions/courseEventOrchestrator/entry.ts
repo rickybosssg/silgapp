@@ -1,6 +1,10 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
 import { isV2Enabled, DISPATCH_V2_BUNDLE_VERSION } from '../../shared/dispatchV2.ts';
 import {
+  processEcoCourseCreated,
+  shouldHoldEcoCourseOnCreate,
+} from '../../shared/ecoOptimizationEngine.ts';
+import {
   emitCourseCreated,
   emitCourseAccepted,
   emitCourseCancelled,
@@ -67,6 +71,40 @@ Deno.serve(async (req) => {
     // ÉVÉNEMENT CREATE
     // ════════════════════════════════════════════════════════════════════
     if (eventType === 'create') {
+      const holdEcoCourse = await shouldHoldEcoCourseOnCreate(base44, course).catch((error) => {
+        const msg = error?.message || String(error);
+        console.error('[COURSE_ORCHESTRATOR] ❌ eco hold check:', msg);
+        errors.push({ module: 'ecoOptimizationHoldCheck', error: msg });
+        return false;
+      });
+
+      if (holdEcoCourse) {
+        const ecoResult = await processEcoCourseCreated(base44, courseId).catch((error) => {
+          const msg = error?.message || String(error);
+          console.error('[COURSE_ORCHESTRATOR] ❌ ecoOptimization:', msg);
+          errors.push({ module: 'ecoOptimization', error: msg });
+          return { success: false, error: msg };
+        });
+        called.push('ecoOptimization');
+
+        await fireInvoke('notifyClientSync', {
+          event,
+          data,
+        });
+
+        await emitCourseCreated(base44, course).catch(() => {});
+
+        return Response.json({
+          success: true,
+          event: 'create',
+          course_id: courseId,
+          eco_hold: true,
+          eco_result: ecoResult,
+          called,
+          errors,
+        });
+      }
+
       // 1. Dispatch : V2 (fil) ou V1 (vagues) selon feature flag
       const v2Enabled = await isV2Enabled(base44);
       if (v2Enabled) {
@@ -213,3 +251,4 @@ Deno.serve(async (req) => {
     return Response.json({ error: error?.message || String(error) }, { status: 500 });
   }
 });
+
