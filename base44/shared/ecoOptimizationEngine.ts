@@ -239,12 +239,48 @@ function compatibilityScore(a: any, b: any) {
   // (pickupKm élevé) peuvent être rentables si le livreur enchaîne les livraisons.
   // Le livreur récupère le colis 1, le livre, puis va récupérer le colis 2 et le livre.
   // Le détour supplémentaire = distance entre les deux départs (pickupKm).
-  // Si les destinations sont très proches (dropKm < 3km), le gain de regroupement
-  // compense le détour, tant que pickupKm reste raisonnable (< 10km).
-  if (Number(dropKm) < 3 && Number(pickupKm) > 3 && Number(pickupKm) <= 10) {
+  //
+  // VALIDATION DE RENTABILITÉ :
+  //   - Le gain total (somme des prix) doit justifier le détour supplémentaire.
+  //   - Le détour (pickupKm) ne doit pas dépasser un seuil raisonnable.
+  //   - L'ordre des récupérations doit respecter la logique temporelle.
+  //   - On ne regroupe PAS uniquement parce que les destinations sont proches :
+  //     il faut aussi que le détour soit acceptable ET que le gain le justifie.
+  const CHAIN_MAX_PICKUP_KM = 8;    // Détour max entre les deux départs
+  const CHAIN_MAX_DROP_KM = 2.5;    // Distance max entre les deux destinations
+  const CHAIN_MIN_GAIN_FCFA = 1000; // Gain minimum pour justifier le détour
+  const CHAIN_COST_PER_KM = 75;     // Coût estimé du km supplémentaire (FCFA)
+
+  if (Number(dropKm) <= CHAIN_MAX_DROP_KM && Number(pickupKm) > 3 && Number(pickupKm) <= CHAIN_MAX_PICKUP_KM) {
+    // ── Vérification de rentabilité : gain vs coût du détour ──
+    const gainA = Number(a.prix_final || a.prix_propose_client || a.prix_propose_admin || a.prix_estimate || 0) || 0;
+    const gainB = Number(b.prix_final || b.prix_propose_client || b.prix_propose_admin || b.prix_estimate || 0) || 0;
+    const totalGain = gainA + gainB;
+    const detourCost = Math.round(Number(pickupKm) * CHAIN_COST_PER_KM);
+
+    // Si le gain ne justifie pas le détour, ne pas regrouper
+    if (totalGain < CHAIN_MIN_GAIN_FCFA || totalGain < detourCost * 2) {
+      return standardScore;
+    }
+
+    // ── Vérification de l'ordre des récupérations ──
+    // L'ordre doit respecter la logique temporelle : la course créée en premier
+    // doit être récupérée en premier (sauf si la deuxième course a une date_souhaitee plus tôt).
+    const dateA = a.date_souhaitee || a.created_date;
+    const dateB = b.date_souhaitee || b.created_date;
+    if (dateA && dateB) {
+      const timeDiff = Math.abs(new Date(dateA).getTime() - new Date(dateB).getTime());
+      // Si les courses sont espacées de plus de 2 heures, le regroupement n'est pas rentable
+      if (timeDiff > 2 * 60 * 60 * 1000) {
+        return standardScore;
+      }
+    }
+
     const chainDirectionScore = Math.max(0, 100 - Number(dropKm) * 15);
     const chainDetourScore = Math.max(0, 100 - Number(pickupKm) * 8);
-    const chainScore = Math.round(chainDirectionScore * 0.50 + chainDetourScore * 0.50);
+    const chainProfitScore = Math.min(100, Math.round((totalGain / Math.max(detourCost, 1)) * 20));
+    const chainScore = Math.round(chainDirectionScore * 0.35 + chainDetourScore * 0.35 + chainProfitScore * 0.30);
+
     // Retourner le meilleur score entre standard et chaîne
     return Math.max(standardScore, chainScore);
   }

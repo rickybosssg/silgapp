@@ -16,6 +16,7 @@ import { resolveGpsForCourse, GPS_BLOCK_MESSAGE } from "@/lib/gpsResolution";
 import { isPaysTarificationGrandOuaga, calculerTarifGrandOuagaAsync } from "@/lib/tarifGrandOuaga";
 import { useForteDemande } from "@/hooks/useForteDemande";
 import { useCountryPricing } from "@/hooks/useCountryPricing";
+import CourseConfirmationModal from "@/components/client/CourseConfirmationModal";
 
 // Génère les IDs de colis : A, B, C...
 const COLIS_LETTERS = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"];
@@ -65,6 +66,8 @@ export default function CourseExterneFormSync() {
   const [createdCourse, setCreatedCourse] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false); // verrou anti-double-clic
   const [invitationModal, setInvitationModal] = useState(null); // { telephone, nom } ou null
+  const [pendingRecap, setPendingRecap] = useState(null); // récapitulatif avant confirmation
+  const [confirming, setConfirming] = useState(false); // mutation en cours après confirmation
   const [gpsLoading, setGpsLoading] = useState({ depart: false, arrivee: false });
   const [deliveryMode, setDeliveryMode] = useState("standard");
   const { forteDemande } = useForteDemande(clientProfil?.country_code);
@@ -444,6 +447,8 @@ export default function CourseExterneFormSync() {
       queryClient.setQueryData(['courses-externes-client'], (old) =>
         (old || []).filter(c => c.id !== `temp_${Date.now()}`).concat(response)
       );
+      setPendingRecap(null);
+      setConfirming(false);
       setIsSubmitting(false);
       submitRequestIdRef.current = null;
       submitSignatureRef.current = null;
@@ -499,6 +504,7 @@ export default function CourseExterneFormSync() {
       // OPTIMISTIC UI: Retirer le brouillon en cas d'erreur
       queryClient.setQueryData(['courses-externes-client'], (old) => (old || []).filter(c => !c.id?.startsWith('temp_')));
       toast.error("Erreur : " + err.message);
+      setConfirming(false);
       setIsSubmitting(false);
     },
   });
@@ -818,63 +824,91 @@ export default function CourseExterneFormSync() {
       submitRequestIdRef.current = crypto.randomUUID();
       submitSignatureRef.current = _submissionSignature;
     }
-    createMutation.mutate({
-      request_id: submitRequestIdRef.current,
-      country_code: courseCountryCode,
-      client_nom: finalClientNom,
-      client_telephone: finalClientTel,
-      contact_createur_course: contactCreateurCourse,
+
+    // ── Confirmation explicite du client avant création ──
+    // Aucune course n'est créée tant que le client n'a pas cliqué sur "Confirmer".
+    // Le mode de livraison (Standard / Éco) est conservé dans le récapitulatif.
+    setPendingRecap({
       type_course: formData.type_course,
-      expediteur_nom: expediteurNom || "Expéditeur",
-      expediteur_telephone: expediteurTel,
-      expediteur_phone_normalized: expediteurPhoneNormalized,
-      expediteur_client_id: expediteurClientId,
-      destinataire_nom: destinataireNomFinal,
-      destinataire_telephone: destinataireTelFinal,
-      destinataire_phone_normalized: isMulti ? "" : destinatairePhoneNormalized,
-      destinataire_client_id: isMulti ? null : destinataireClientId,
-      recipient_has_app: false,
-      expediteur_has_app: false,
+      delivery_mode: deliveryMode,
       adresse_depart: isDeplacement ? (formData.adresse_depart || (formData.recuperationGPS ? "Position GPS" : "À définir")) : (formData.adresse_depart || (formData.recuperationGPS ? "Position GPS" : "À définir")),
       adresse_arrivee: adresseArriveeFinale,
       quartier_depart: formData.quartier_depart || null,
       quartier_arrivee: formData.quartier_arrivee || null,
-      type_colis: isDeplacement ? "autre" : (isMulti ? (colis[0]?.type_colis || "petit_colis") : formData.type_colis),
-      notes: formData.notes,
-      gps_depart_lat: departGps?.lat || null,
-      gps_depart_lng: departGps?.lng || null,
-      gps_depart_source: departGps?.source || null,
-      gps_arrivee_lat: isMulti ? null : (arriveeGps?.lat || null),
-      gps_arrivee_lng: isMulti ? null : (arriveeGps?.lng || null),
-      gps_arrivee_source: isMulti ? null : (arriveeGps?.source || null),
-      destination_inconnue: destInconnue,
-      // prix_estimate = prix automatique conseillé par SILGAPP (jamais modifié par l'utilisateur)
-      // prix_propose_client = prix réellement choisi par le client (formData.prix_propose)
-      prix_estimate: isMulti ? 0 : prixEstime,
-      prix_propose_admin: 0, // Jamais défini par le client — réservé à l'admin
-      prix_propose_client: isMulti ? 0 : (formData.prix_propose || prixEstime),
-      distance_tarifaire_km: isMulti ? null : distanceTarifaireKm,
-      distance_tarifaire_source: isMulti ? null : distanceTarifaireSource,
-      // Un prix explicitement saisi par le client est TOUJOURS 'manual',
-      // même s'il est numériquement égal à l'estimation. L'égalité ne signifie
-      // pas que le client n'a pas validé ce prix.
-      pricing_mode: isMulti ? "automatic" : (formData.prix_propose ? "manual" : "automatic"),
-      statut: formData.date_souhaitee ? "programmee" : "recherche_livreur",
-      dispatch_status: "en_attente",
+      contact_createur: finalClientNom,
+      destinataire: destinataireNomFinal,
+      expediteur: expediteurNom || null,
+      passager_nom: isDeplacement ? (formData.passager_nom || "") : null,
+      passager_telephone: isDeplacement ? (formData.passager_telephone || "") : null,
+      prix: isMulti ? 0 : (formData.prix_propose || prixEstime),
+      devise: countryConfig?.devise_symbole || "FCFA",
       date_souhaitee: formData.date_souhaitee || null,
-      // Champs déplacement
-      passager_nom: isDeplacement ? (formData.passager_nom || "") : "",
-      passager_telephone: isDeplacement ? (formData.passager_telephone || "") : "",
-      nb_passagers: isDeplacement ? (formData.nb_passagers || 1) : 1,
-      // Champs multi-colis
-      delivery_mode: deliveryMode,
+      notes: formData.notes,
       is_multi_colis: isMulti,
       nb_colis: nbColis,
-      nb_colis_livres: 0,
-      nb_colis_annules: 0,
-      // Données internes pour création des sous-colis (non persistées sur la course)
-      _colisData: isMulti ? colis : null,
+      _mutationPayload: {
+        request_id: submitRequestIdRef.current,
+        country_code: courseCountryCode,
+        client_nom: finalClientNom,
+        client_telephone: finalClientTel,
+        contact_createur_course: contactCreateurCourse,
+        type_course: formData.type_course,
+        expediteur_nom: expediteurNom || "Expéditeur",
+        expediteur_telephone: expediteurTel,
+        expediteur_phone_normalized: expediteurPhoneNormalized,
+        expediteur_client_id: expediteurClientId,
+        destinataire_nom: destinataireNomFinal,
+        destinataire_telephone: destinataireTelFinal,
+        destinataire_phone_normalized: isMulti ? "" : destinatairePhoneNormalized,
+        destinataire_client_id: isMulti ? null : destinataireClientId,
+        recipient_has_app: false,
+        expediteur_has_app: false,
+        adresse_depart: isDeplacement ? (formData.adresse_depart || (formData.recuperationGPS ? "Position GPS" : "À définir")) : (formData.adresse_depart || (formData.recuperationGPS ? "Position GPS" : "À définir")),
+        adresse_arrivee: adresseArriveeFinale,
+        quartier_depart: formData.quartier_depart || null,
+        quartier_arrivee: formData.quartier_arrivee || null,
+        type_colis: isDeplacement ? "autre" : (isMulti ? (colis[0]?.type_colis || "petit_colis") : formData.type_colis),
+        notes: formData.notes,
+        gps_depart_lat: departGps?.lat || null,
+        gps_depart_lng: departGps?.lng || null,
+        gps_depart_source: departGps?.source || null,
+        gps_arrivee_lat: isMulti ? null : (arriveeGps?.lat || null),
+        gps_arrivee_lng: isMulti ? null : (arriveeGps?.lng || null),
+        gps_arrivee_source: isMulti ? null : (arriveeGps?.source || null),
+        destination_inconnue: destInconnue,
+        prix_estimate: isMulti ? 0 : prixEstime,
+        prix_propose_admin: 0,
+        prix_propose_client: isMulti ? 0 : (formData.prix_propose || prixEstime),
+        distance_tarifaire_km: isMulti ? null : distanceTarifaireKm,
+        distance_tarifaire_source: isMulti ? null : distanceTarifaireSource,
+        pricing_mode: isMulti ? "automatic" : (formData.prix_propose ? "manual" : "automatic"),
+        statut: formData.date_souhaitee ? "programmee" : "recherche_livreur",
+        dispatch_status: "en_attente",
+        date_souhaitee: formData.date_souhaitee || null,
+        passager_nom: isDeplacement ? (formData.passager_nom || "") : "",
+        passager_telephone: isDeplacement ? (formData.passager_telephone || "") : "",
+        nb_passagers: isDeplacement ? (formData.nb_passagers || 1) : 1,
+        delivery_mode: deliveryMode,
+        is_multi_colis: isMulti,
+        nb_colis: nbColis,
+        nb_colis_livres: 0,
+        nb_colis_annules: 0,
+        _colisData: isMulti ? colis : null,
+      },
     });
+    setIsSubmitting(false); // Libérer le verrou — la confirmation gère la suite
+  };
+
+  // ── Création réelle après confirmation explicite du client ──
+  const handleConfirmCreation = () => {
+    if (!pendingRecap?._mutationPayload || confirming) return;
+    setConfirming(true);
+    createMutation.mutate(pendingRecap._mutationPayload);
+  };
+
+  const handleCloseConfirmation = () => {
+    setPendingRecap(null);
+    setConfirming(false);
   };
 
   const handleNext = () => setCurrentStep((prev) => prev + 1);
@@ -1058,7 +1092,16 @@ export default function CourseExterneFormSync() {
             />
           </form>
         </Card>
-      </div>
-    </div>
-  );
-}
+        </div>
+
+        {/* ── Modal de confirmation explicite avant création ── */}
+        <CourseConfirmationModal
+        open={!!pendingRecap}
+        onClose={handleCloseConfirmation}
+        onConfirm={handleConfirmCreation}
+        recap={pendingRecap}
+        isLoading={confirming || createMutation.isPending}
+        />
+        </div>
+        );
+        }

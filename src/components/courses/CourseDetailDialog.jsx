@@ -4,7 +4,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MapPin, Phone, User, Package, Clock, Truck, ArrowDown, Navigation, XCircle, KeyRound, Copy, RotateCcw } from "lucide-react";
+import { MapPin, Phone, User, Package, Clock, Truck, ArrowDown, Navigation, XCircle, KeyRound, Copy, RotateCcw, Leaf } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import CourseStatusBadge from "./CourseStatusBadge";
@@ -24,6 +24,7 @@ import { MessageSquareWarning } from "lucide-react";
 import AdminETABadge from "./AdminETABadge";
 import { getPrixAffichable } from "@/utils/getPrixAffichable";
 import { COURSE_STATUSES } from "@/lib/courseStatuses";
+import EcoMissionAdminView from "@/components/admin/EcoMissionAdminView";
 
 const STATUTS_INTERNE = [
   "nouvelle", "en_attente_livreur", "acceptee", "en_route_recuperation",
@@ -45,6 +46,7 @@ export default function CourseDetailDialog({ course: courseProp, open, onClose, 
   const [reattributing, setReattributing] = React.useState(false);
   const [relaunching, setRelaunching] = React.useState(false);
   const [showManualAssign, setShowManualAssign] = React.useState(false);
+  const [showEcoMission, setShowEcoMission] = React.useState(false);
   const countryMismatch = reseau === "externe" && isPays && courseProp?.country_code && courseProp.country_code !== adminCountryCode;
 
   React.useEffect(() => {
@@ -426,6 +428,26 @@ export default function CourseDetailDialog({ course: courseProp, open, onClose, 
             <div className="text-sm text-muted-foreground bg-muted/30 p-3 rounded-lg">
               {course.notes}
             </div>
+          )}
+
+          {/* ── Suivi mission Éco (admin) ── */}
+          {reseau === "externe" && course.eco_mission_id && (
+            <Button
+              variant="outline"
+              className="w-full border-green-300 text-green-700 hover:bg-green-50 font-bold"
+              onClick={() => setShowEcoMission(true)}
+            >
+              <Leaf className="w-4 h-4 mr-2" />
+              Voir la mission Éco
+            </Button>
+          )}
+
+          {showEcoMission && (
+            <EcoMissionAdminView
+              course={course}
+              open={showEcoMission}
+              onClose={() => setShowEcoMission(false)}
+            />
           )}
 
           {/* Relance depuis la vague 0 — visible quand le cycle dispatch est épuisé */}
