@@ -52,13 +52,32 @@ export default function EcoMissionCard({ mission, livreurProfil, onAcceptSuccess
         mission_id: mission.id,
         livreur_id: livreurProfil.id,
       });
-      if (res?.success && res?.accepted) {
+      // ⚠️ Le SDK peut wrapper la réponse dans { data: { ... } }
+      const data = res?.data ?? res;
+      if (data?.success && data?.accepted) {
         toast.success("Mission Éco acceptée !");
         queryClient.invalidateQueries({ queryKey: ["eco-missions-available"] });
         queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
         onAcceptSuccess?.();
       } else {
-        toast.error(res?.error || res?.reason || "Erreur lors de l'acceptation");
+        // ── Traduire les codes d'erreur en messages compréhensibles ──
+        const reasonMessages = {
+          mission_unavailable: "Cette mission n'est plus disponible.",
+          mission_race_lost: "Cette mission vient d'être acceptée par un autre livreur.",
+          course_race_lost: "Une course de la mission vient d'être prise par un autre livreur.",
+          identity_mismatch: "Vérification d'identité échouée. Reconnectez-vous.",
+          enterprise_mismatch: "Cette mission appartient à un autre périmètre.",
+          livreur_indisponible: "Vous n'êtes pas disponible pour accepter cette mission.",
+          missing_course: "Une course de la mission est introuvable.",
+          course_not_claimable: "Une course de la mission n'est plus disponible.",
+          mission_incomplete: "La mission est incomplète.",
+        };
+        const errorMsg = data?.error
+          || reasonMessages[data?.reason]
+          || (data?.reason ? `Erreur: ${data.reason}` : null)
+          || "Erreur lors de l'acceptation";
+        toast.error(errorMsg);
+        queryClient.invalidateQueries({ queryKey: ["eco-missions-available"] });
       }
     } catch (err) {
       toast.error("Erreur réseau lors de l'acceptation");

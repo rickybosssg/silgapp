@@ -168,7 +168,7 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
         course_id: course.id,
         livreur_id: livreurId,
       });
-      const data = res;
+      const data = res?.data ?? res;
       if (data?.success && data?.accepted !== false) {
         stopUrgentCourseAlert("v2-course-accepted");
         toast.success("Course acceptée !");
@@ -205,7 +205,7 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
         livreur_id: livreurId,
         raison: "Refusé depuis Courses disponibles",
       });
-      const data = res;
+      const data = res?.data ?? res;
       if (data?.success !== true) {
         toast.error(data?.error || "Le refus n'a pas pu être confirmé par le serveur.");
         return;

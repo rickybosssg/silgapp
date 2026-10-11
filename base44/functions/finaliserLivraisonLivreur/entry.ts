@@ -2,7 +2,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
 import { chargerConfigPays, normalizeCommissionPct } from '../../shared/dispatchConstants.ts';
 import { comptabiliserCommissionEnterprise, normalizeEnterpriseId } from '../../shared/enterpriseFinance.ts';
 import { tauxCommissionEffectif, zeroCommissionFields } from '../../shared/commissionLock.ts';
-import { completeEcoMissionIfNeeded } from '../../shared/ecoOptimizationEngine.ts';
+import { completeEcoMissionIfNeeded, updateEcoMissionRouteProgress } from '../../shared/ecoOptimizationEngine.ts';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // FINALISER LIVRAISON LIVREUR — Source de vérité pour la livraison
@@ -205,7 +205,8 @@ export default async function(req: Request): Promise<Response> {
       // ── Correction 1: mettre à jour le livreur (courses_du_jour +1, statut disponible) ──
       await updateLivreurAfterDelivery(base44, course);
 
-      // [ECO] Vérifier si toutes les courses de la mission Eco sont livrées → completed
+      // [ECO] Mettre à jour le route plan + vérifier si la mission est terminée
+      await updateEcoMissionRouteProgress(base44, course_id).catch(() => null);
       await completeEcoMissionIfNeeded(base44, course_id).catch(() => null);
 
       return Response.json({
@@ -266,7 +267,8 @@ export default async function(req: Request): Promise<Response> {
       // ── Correction 1: mettre à jour le livreur (courses_du_jour +1, statut disponible) ──
       await updateLivreurAfterDelivery(base44, course);
 
-      // [ECO] Vérifier si toutes les courses de la mission Eco sont livrées → completed
+      // [ECO] Mettre à jour le route plan + vérifier si la mission est terminée
+      await updateEcoMissionRouteProgress(base44, course_id).catch(() => null);
       await completeEcoMissionIfNeeded(base44, course_id).catch(() => null);
 
       return Response.json({
@@ -324,7 +326,8 @@ export default async function(req: Request): Promise<Response> {
         // ── Correction 1: mettre à jour le livreur (courses_du_jour +1, statut disponible) ──
         await updateLivreurAfterDelivery(base44, course);
 
-        // [ECO] Vérifier si toutes les courses de la mission Eco sont livrées → completed
+        // [ECO] Mettre à jour le route plan + vérifier si la mission est terminée
+        await updateEcoMissionRouteProgress(base44, course_id).catch(() => null);
         await completeEcoMissionIfNeeded(base44, course_id).catch(() => null);
 
         return Response.json({
@@ -357,7 +360,8 @@ export default async function(req: Request): Promise<Response> {
         // ── Correction 1: mettre à jour le livreur (courses_du_jour +1, statut disponible) ──
         await updateLivreurAfterDelivery(base44, course);
 
-        // [ECO] Vérifier si toutes les courses de la mission Eco sont livrées → completed
+        // [ECO] Mettre à jour le route plan + vérifier si la mission est terminée
+        await updateEcoMissionRouteProgress(base44, course_id).catch(() => null);
         await completeEcoMissionIfNeeded(base44, course_id).catch(() => null);
 
         return Response.json({

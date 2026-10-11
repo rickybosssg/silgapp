@@ -7,6 +7,7 @@ import { fr } from "date-fns/locale";
 import CourseStatusBadge from "./CourseStatusBadge";
 import UrgenceBadge from "./UrgenceBadge";
 import MultiColisProgressBadge from "@/components/multi-colis/MultiColisProgressBadge";
+import { Leaf } from "lucide-react";
 
 export default function CourseListItem({ course, onAssign, onView }) {
   return (
@@ -58,6 +59,12 @@ export default function CourseListItem({ course, onAssign, onView }) {
               nbAnnules={course.nb_colis_annules || 0}
               size="sm"
             />
+            {course.eco_mission_id && (
+              <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-bold flex items-center gap-1">
+                <Leaf className="w-2.5 h-2.5" />
+                Livraison groupée
+              </span>
+            )}
             <span className="text-[10px] text-muted-foreground flex items-center gap-1">
               <Clock className="w-3 h-3" />
               {format(new Date(course.created_date), "HH:mm", { locale: fr })}

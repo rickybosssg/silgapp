@@ -127,6 +127,8 @@ function ProgressBar({ statut, isDeplacement, isAdminColis }) {
   );
 }
 
+import { confirmDelivery } from "@/lib/deliveryConfirmation";
+
 export default function CourseActiveCard({ course, onColisRecupere, onColisLivre, onClientAnnule, onMettrePause, isPending, isExterne = false, livreurLat, livreurLng, livreurId, livreurNom, onDeliveryVictory }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -1296,17 +1298,13 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                             return;
                           }
                           setDeliveryBoutonPending(true);
-                          // Optimistic UI
-                          updateOptimisticStatut("livree", { heure_livraison: new Date().toISOString() });
                           try {
-                            const res = await base44.functions.invoke("finaliserLivraisonLivreur", {
-                              course_id: course.id,
-                            });
+                            const res = await confirmDelivery(base44, course.id);
                             if (res?.success || res?.skipped) {
                               queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
                               queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
-                              onColisLivre({ ...course, statut: "livree" }, null);
                               onDeliveryVictory?.(course.id);
+                              await onColisLivre({ ...course, statut: "livree" }, null);
                             } else {
                               throw new Error(res?.error || "Erreur finalisation");
                             }

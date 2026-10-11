@@ -13,6 +13,7 @@ import {
 } from "@/lib/ecoMissionHelpers";
 import { getCourseContactForPhase, normalizePhoneForWhatsapp } from "@/lib/courseContact";
 import { getPrixAffichable, getDeviseAffichable } from "@/utils/getPrixAffichable";
+import { confirmDelivery, functionBody } from "@/lib/deliveryConfirmation";
 
 const ACTIVE_STATUSES = new Set([
   "livreur_en_route", "client_contacte", "en_route_expediteur",
@@ -75,6 +76,11 @@ export default function EcoMissionDashboard({ mission, livreurProfil, onAllDeliv
   const total = Number(mission?.total_price) || totalPriceEco(courses);
   const totalDist = useMemo(() => totalDistanceKm(courses, routePlan), [courses, routePlan]);
   const devise = courses[0]?.devise || "FCFA";
+  // ── Label dynamique : "Mission Éco" si toutes les courses sont Éco, sinon "Mission en cours" ──
+  const missionLabel = useMemo(() => {
+    if (courses.length > 0 && courses.every(c => c.delivery_mode === "eco")) return "Mission Éco";
+    return "Mission en cours";
+  }, [courses]);
 
   // ── Détection de fin de mission ──
   const allDone = courses.length > 0 && courses.every(c =>
@@ -89,15 +95,17 @@ export default function EcoMissionDashboard({ mission, livreurProfil, onAllDeliv
     if (actionPending) return;
     setActionPending(true);
     try {
-      await base44.functions.invoke("transitionStatutLivreur", {
+      const response = await base44.functions.invoke("transitionStatutLivreur", {
         course_id: courseId,
         statut_cible: statutCible,
         ...extraData,
       });
+      const result = functionBody(response);
+      if (result?.success === false) throw new Error(result.error || "Mise à jour refusée");
       queryClient.invalidateQueries({ queryKey: ["eco-mission-active-courses", mission.id] });
       queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
     } catch (err) {
-      toast.error("Erreur lors de la mise à jour");
+      toast.error(err?.message || "Erreur lors de la mise à jour");
     } finally {
       setActionPending(false);
     }
@@ -107,9 +115,7 @@ export default function EcoMissionDashboard({ mission, livreurProfil, onAllDeliv
     if (actionPending) return;
     setActionPending(true);
     try {
-      const res = await base44.functions.invoke("finaliserLivraisonLivreur", {
-        course_id: courseId,
-      });
+      const res = await confirmDelivery(base44, courseId);
       if (res?.success || res?.skipped) {
         queryClient.invalidateQueries({ queryKey: ["eco-mission-active-courses", mission.id] });
         queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
@@ -171,7 +177,7 @@ export default function EcoMissionDashboard({ mission, livreurProfil, onAllDeliv
           <div className="flex items-center gap-2">
             <Leaf className="w-5 h-5 text-white" />
             <div>
-              <p className="text-[11px] font-bold uppercase text-green-100">Mission Éco</p>
+              <p className="text-[11px] font-bold uppercase text-green-100">{missionLabel}</p>
               <p className="text-sm font-bold text-white">{courses.length} livraisons</p>
             </div>
           </div>

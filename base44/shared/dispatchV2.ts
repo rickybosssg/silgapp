@@ -198,6 +198,13 @@ export async function isPilotLivreur(base44: any, livreurId: string): Promise<bo
 export async function publierCourseDansFil(base44: any, course: any) {
   if (!course?.id) return { error: 'no_course_id' };
 
+  // ── Re-fetch systématique pour éviter les lectures obsolètes (race condition) ──
+  // L'objet course passé en paramètre peut être stale (lu avant que les champs
+  // Éco ne soient écrits par prepareEcoCreationFields). On re-lit toujours la
+  // course depuis la base avant d'évaluer les guards.
+  const freshCourse = await base44.asServiceRole.entities.CourseExterne.get(course.id).catch(() => null);
+  if (freshCourse) course = freshCourse;
+
   // 🔖 Log de version bundle — pour vérifier que la production charge la dernière version
   dispatchLog(`[V2] 🔖 publierCourseDansFil — bundle version: ${DISPATCH_V2_BUNDLE_VERSION} — course ${course.id}`);
 

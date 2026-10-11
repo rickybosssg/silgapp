@@ -519,7 +519,9 @@ export async function convertDueEcoCourses(base44: any, countryCode?: string, li
           eco_status: 'converted',
           eco_converted_at: now,
           eco_conversion_reason: 'no_grouping_after_delay',
-          statut: 'nouvelle',
+          statut: 'recherche_livreur',
+          dispatch_status: 'disponible_push',
+          heure_sollicitation: now,
         },
       }
     );
@@ -622,6 +624,44 @@ export async function createOnRouteProposal(base44: any, courseId: string, livre
       note: 'ORS reserved for top candidates only',
     }),
   });
+
+  // ── Notification au livreur (bannière in-app + push FCM) ──
+  // Uniquement pour les nouvelles propositions (pas les idempotent).
+  // 1. Crée un enregistrement Notification (pour la bannière in-app au retour)
+  // 2. Tente l'envoi FCM via envoiNotificationPush (non-bloquant)
+  if (livreur.user_email) {
+    const notifTitle = 'SILGAPP — Livraison sur votre trajet !';
+    const notifMessage = 'Une nouvelle livraison compatible avec votre trajet est disponible. Ouvrez SILGAPP pour consulter votre gain supplémentaire.';
+    try {
+      await base44.asServiceRole.entities.Notification.create({
+        titre: notifTitle,
+        message: notifMessage,
+        type: 'on_route_proposal',
+        destinataire_email: livreur.user_email,
+        course_id: courseId,
+        lue: false,
+        deduplication_key: `ON_ROUTE_PROPOSAL_${proposal.id}`,
+      });
+    } catch (notifError: any) {
+      console.error('[createOnRouteProposal] Notification record failed:', notifError?.message || String(notifError));
+    }
+    try {
+      await base44.asServiceRole.functions.invoke('envoiNotificationPush', {
+        titre: notifTitle,
+        message: notifMessage,
+        type: 'on_route_proposal',
+        destinataire_email: livreur.user_email,
+        livreur_id: livreurId,
+        course_id: courseId,
+        category: 'on_route_proposal',
+        alert_duration_seconds: config.proposalExpirationSec,
+      });
+    } catch (pushError: any) {
+      // Non-bloquant : la notification in-app est déjà créée.
+      console.error('[createOnRouteProposal] FCM push failed:', pushError?.message || String(pushError));
+    }
+  }
+
   return { success: true, proposal };
 }
 
@@ -711,6 +751,78 @@ export async function respondToOnRouteProposal(base44: any, proposalId: string, 
     await figerCommissionAcceptation(base44, course.id, livreurId, fresh.country_code, now).catch(() => null);
   }
   await marquerAccepte(base44, course.id, livreurId).catch(() => null);
+
+  // ── Multi-delivery mission creation ──
+  // When a driver accepts an on-route proposal, link the new course with the
+  // driver's currently active course(s) in an EcoMission. This enables the
+  // multi-delivery dashboard (EcoMissionDashboard) for Standard courses too.
+  // A Standard course stays Standard — only the mission grouping changes.
+  // The route plan is computed via Haversine (ORS reserved for top candidates only).
+  try {
+    const activeCoursesForMission = await base44.asServiceRole.entities.CourseExterne.filter({
+      livreur_id: livreurId,
+      country_code: fresh.country_code,
+      statut: { $in: ACTIVE_STATUSES },
+    }, '-updated_date', 10).catch(() => []);
+
+    const otherActiveCourses = (activeCoursesForMission || []).filter(
+      (c: any) => c.id !== fresh.id && !TERMINAL_STATUSES.includes(c.statut)
+    );
+
+    if (otherActiveCourses.length > 0) {
+      const config = await loadEcoConfig(base44, fresh.country_code);
+      const courseWithMission = otherActiveCourses.find((c: any) => c.eco_mission_id);
+
+      if (courseWithMission?.eco_mission_id) {
+        // ── Add the new course to the existing mission ──
+        const existingMission = await base44.asServiceRole.entities.EcoMission.get(courseWithMission.eco_mission_id).catch(() => null);
+        if (existingMission && !['completed', 'cancelled', 'invalidated'].includes(existingMission.status)) {
+          const currentCourseIds = Array.isArray(existingMission.course_ids) ? existingMission.course_ids : [];
+          if (currentCourseIds.length < config.maxCoursesPerMission) {
+            const updatedCourseIds = [...new Set([...currentCourseIds, fresh.id])];
+            const allCoursesForMission = [...otherActiveCourses, fresh].filter(c => updatedCourseIds.includes(c.id));
+            await base44.asServiceRole.entities.EcoMission.update(existingMission.id, {
+              course_ids: updatedCourseIds,
+              route_plan_json: JSON.stringify(routePlanForEcoMission(allCoursesForMission)),
+              total_price: allCoursesForMission.reduce((sum, c) => sum + prixCourse(c), 0),
+              total_driver_amount: allCoursesForMission.reduce((sum, c) => sum + Math.max(0, prixCourse(c) - (Number(c.commission_silga) || 0)), 0),
+            }).catch(() => null);
+            await base44.asServiceRole.entities.CourseExterne.update(fresh.id, {
+              eco_mission_id: existingMission.id,
+            }).catch(() => null);
+          }
+        }
+      } else {
+        // ── Create a new mission with the active course + new course ──
+        const allCoursesForMission = [...otherActiveCourses.slice(0, config.maxCoursesPerMission - 1), fresh];
+        const nowIso = new Date().toISOString();
+        const newMission = await base44.asServiceRole.entities.EcoMission.create({
+          country_code: fresh.country_code,
+          enterprise_id: null,
+          course_ids: allCoursesForMission.map(c => c.id),
+          status: 'accepted',
+          livreur_id: livreurId,
+          livreur_user_email: livreur.user_email || null,
+          route_plan_json: JSON.stringify(routePlanForEcoMission(allCoursesForMission)),
+          active_step_index: 0,
+          total_price: allCoursesForMission.reduce((sum, c) => sum + prixCourse(c), 0),
+          total_driver_amount: allCoursesForMission.reduce((sum, c) => sum + Math.max(0, prixCourse(c) - (Number(c.commission_silga) || 0)), 0),
+          accepted_at: nowIso,
+        }).catch(() => null);
+
+        if (newMission) {
+          await base44.asServiceRole.entities.CourseExterne.updateMany(
+            { id: { $in: allCoursesForMission.map(c => c.id) } },
+            { $set: { eco_mission_id: newMission.id } }
+          ).catch(() => null);
+        }
+      }
+    }
+  } catch (missionError: any) {
+    console.error('[respondToOnRouteProposal] Mission creation failed:', missionError?.message || String(missionError));
+    // Non-blocking: the course is already claimed, the driver can proceed.
+  }
+
   return { success: true, accepted: true, course_id: course.id, proposal_id: proposal.id };
 }
 
@@ -758,6 +870,211 @@ export async function completeEcoMissionIfNeeded(base44: any, courseId: string) 
     status: 'cancelled',
   }).catch(() => null);
   return { completed: true, mission_id: mission.id, final_status: 'cancelled' };
+}
+
+// ── Correction 8 : Mettre à jour le route plan quand une course est livrée ──
+// Met à jour les steps du route_plan_json et active_step_index quand une course
+// passe en statut terminal (livree ou annulee). Les étapes terminées restent terminées.
+// Gère les annulations partielles sans corrompre la mission.
+export async function updateEcoMissionRouteProgress(base44: any, courseId: string) {
+  const course = await base44.asServiceRole.entities.CourseExterne.get(courseId).catch(() => null);
+  if (!course?.eco_mission_id) return { updated: false, reason: 'no_mission' };
+
+  const mission = await base44.asServiceRole.entities.EcoMission.get(course.eco_mission_id).catch(() => null);
+  if (!mission || ['completed', 'cancelled', 'invalidated'].includes(mission.status)) {
+    return { updated: false, reason: 'mission_terminal' };
+  }
+
+  const courseIds = Array.isArray(mission.course_ids) ? mission.course_ids : [];
+  if (courseIds.length === 0) return { updated: false, reason: 'no_courses' };
+
+  // Récupérer toutes les courses de la mission
+  const courses = await Promise.all(
+    courseIds.map((id: string) => base44.asServiceRole.entities.CourseExterne.get(id).catch(() => null))
+  );
+
+  // Construire un map de statut par course_id
+  const courseStatusMap = new Map<string, string>();
+  for (const c of courses) {
+    if (c) courseStatusMap.set(c.id, c.statut);
+  }
+
+  // Mettre à jour le route_plan_json
+  let routePlan: any[] = [];
+  try {
+    routePlan = mission.route_plan_json ? JSON.parse(mission.route_plan_json) : [];
+  } catch {
+    routePlan = [];
+  }
+
+  let updated = false;
+  let maxCompletedOrder = 0;
+
+  for (const step of routePlan) {
+    if (!step?.course_id) continue;
+    const statut = courseStatusMap.get(step.course_id);
+    if (!statut) continue;
+
+    const isTerminal = statut === 'livree' || statut === 'annulee';
+    if (isTerminal && step.status !== 'completed') {
+      step.status = 'completed';
+      updated = true;
+    }
+    if (isTerminal && step.order > maxCompletedOrder) {
+      maxCompletedOrder = step.order;
+    }
+  }
+
+  // Calculer active_step_index = premier step non-complété
+  const firstPendingStep = routePlan.find((s: any) => s?.status !== 'completed');
+  const newActiveStepIndex = firstPendingStep ? Math.max(0, (Number(firstPendingStep.order) || 1) - 1) : routePlan.length;
+
+  if (updated || mission.active_step_index !== newActiveStepIndex) {
+    await base44.asServiceRole.entities.EcoMission.update(mission.id, {
+      route_plan_json: JSON.stringify(routePlan),
+      active_step_index: newActiveStepIndex,
+    }).catch(() => null);
+    return { updated: true, mission_id: mission.id, active_step_index: newActiveStepIndex };
+  }
+
+  return { updated: false, reason: 'no_changes' };
+}
+
+// ── Correction 5 : Nettoyer les missions Éco bloquées ──
+// Scanne toutes les missions non-terminales et vérifie si leurs courses
+// sont toutes terminales. Si oui, met à jour le statut de la mission.
+// Cette fonction est idempotente et peut être appelée par un workflow périodique.
+export async function cleanupStuckEcoMissions(base44: any, countryCode?: string, limit = 50) {
+  const filter: any = { status: { $in: ['accepted', 'available', 'accepting'] } };
+  if (countryCode) filter.country_code = String(countryCode).toUpperCase();
+  const missions = await base44.asServiceRole.entities.EcoMission.filter(filter, '-created_date', limit).catch(() => []);
+  const results = [];
+
+  for (const mission of missions || []) {
+    const courseIds = Array.isArray(mission.course_ids) ? mission.course_ids : [];
+    if (courseIds.length === 0) continue;
+
+    const courses = await Promise.all(
+      courseIds.map((id: string) => base44.asServiceRole.entities.CourseExterne.get(id).catch(() => null))
+    );
+
+    const allTerminal = courses.every((c: any) => c && (c.statut === 'livree' || c.statut === 'annulee'));
+    if (!allTerminal) {
+      results.push({ mission_id: mission.id, status: mission.status, action: 'skipped', reason: 'courses_pending' });
+      continue;
+    }
+
+    const allDelivered = courses.every((c: any) => c && c.statut === 'livree');
+    const allCancelled = courses.every((c: any) => c && c.statut === 'annulee');
+    const finalStatus = allDelivered ? 'completed' : 'cancelled';
+
+    await base44.asServiceRole.entities.EcoMission.update(mission.id, { status: finalStatus }).catch(() => null);
+
+    // Libérer le livreur si la mission était acceptée
+    if (mission.livreur_id && mission.status === 'accepted') {
+      const livreur = await base44.asServiceRole.entities.Livreur.get(mission.livreur_id).catch(() => null);
+      if (livreur && livreur.statut === 'en_course') {
+        const STATUTS_ACTIFS = ['livreur_en_route', 'client_contacte', 'en_route_expediteur', 'arrive_prise_en_charge', 'colis_recupere', 'passager_embarque', 'pris_en_charge', 'en_livraison', 'arrivee'];
+        const autresCourses = await base44.asServiceRole.entities.CourseExterne.filter(
+          { livreur_id: mission.livreur_id }, '-created_date', 10
+        ).catch(() => []);
+        const aAutreCourseActive = (autresCourses || []).some((c: any) =>
+          c.id !== courseIds[0] && STATUTS_ACTIFS.includes(c.statut)
+        );
+        await base44.asServiceRole.entities.Livreur.update(mission.livreur_id, {
+          statut: aAutreCourseActive ? 'en_course' : (livreur.manual_hors_ligne === true ? 'hors_ligne' : 'disponible'),
+        }).catch(() => null);
+      }
+    }
+
+    results.push({ mission_id: mission.id, status: mission.status, action: 'fixed', final_status: finalStatus });
+  }
+
+  return { success: true, checked: (missions || []).length, results };
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// DÉCLENCHEMENT AUTOMATIQUE DES PROPOSITIONS SUR TRAJET
+// ════════════════════════════════════════════════════════════════════════
+// Appelé par courseEventOrchestrator quand une nouvelle course est créée.
+// Trouve les livreurs en cours de livraison compatibles et crée des propositions.
+//
+// CONTRAINTES :
+// - Déclenchement événementiel (appelé par l'orchestrateur, pas de polling)
+// - Respecte ON_ROUTE_ENABLED (désactivé si false)
+// - Aucune proposition si la course est groupée (mission Éco)
+// - Isolation pays + entreprise/public
+// - Préfiltrage économique avant calcul d'itinéraire
+// - Proposition explicite au livreur, jamais d'attribution automatique
+// - Protection contre les doublons (createOnRouteProposal est idempotent)
+// - Compatible courses Standard et Éco
+export async function triggerOnRouteProposalsForNewCourse(base44: any, courseId: string) {
+  const course = await base44.asServiceRole.entities.CourseExterne.get(courseId).catch(() => null);
+  if (!course) return { success: false, reason: 'course_not_found' };
+
+  // Course déjà assignée ou terminée → pas de proposition
+  if (TERMINAL_STATUSES.includes(course.statut) || course.livreur_id || course.accepted_by_livreur_id) {
+    return { success: true, proposals_created: 0, reason: 'course_unavailable' };
+  }
+
+  // Course Éco groupée → fait partie d'une mission, pas de proposition individuelle
+  if (course.eco_status === 'grouped' && course.eco_mission_id) {
+    return { success: true, proposals_created: 0, reason: 'course_grouped' };
+  }
+
+  // Course sans GPS utilisable → pas de calcul de compatibilité possible
+  if (!hasUsableRoutePoints(course)) {
+    return { success: true, proposals_created: 0, reason: 'no_gps_points' };
+  }
+
+  const config = await loadEcoConfig(base44, course.country_code);
+  if (!config.enabled || !config.onRouteEnabled) {
+    return { success: true, proposals_created: 0, reason: 'on_route_disabled' };
+  }
+
+  // ── Trouver les livreurs avec des courses actives dans le même scope ──
+  const courseEnterpriseId = normalizeEnterpriseId(course.enterprise_id);
+  const activeCourses = await base44.asServiceRole.entities.CourseExterne.filter({
+    country_code: course.country_code,
+    statut: { $in: ACTIVE_STATUSES },
+    livreur_id: { $exists: true },
+  }, '-updated_date', 50).catch(() => []);
+
+  // Grouper par livreur_id (un livreur peut avoir plusieurs courses actives)
+  const driverIds = new Set<string>();
+  for (const ac of activeCourses || []) {
+    if (!ac?.livreur_id) continue;
+    // Isolation entreprise/public
+    if (normalizeEnterpriseId(ac.enterprise_id) !== courseEnterpriseId) continue;
+    driverIds.add(ac.livreur_id);
+  }
+
+  if (driverIds.size === 0) {
+    return { success: true, proposals_created: 0, reason: 'no_active_drivers' };
+  }
+
+  // ── Pour chaque livreur, créer une proposition si compatible ──
+  // createOnRouteProposal fait le préfiltrage de compatibilité (détour, gain, etc.)
+  // et est idempotent (pas de doublon si une proposition pending existe déjà)
+  let proposalsCreated = 0;
+  const errors: any[] = [];
+  for (const livreurId of driverIds) {
+    try {
+      const result = await createOnRouteProposal(base44, courseId, livreurId);
+      if (result?.success && !result?.idempotent) {
+        proposalsCreated++;
+      }
+    } catch (e: any) {
+      errors.push({ livreur_id: livreurId, error: e?.message || String(e) });
+    }
+  }
+
+  return {
+    success: true,
+    proposals_created: proposalsCreated,
+    drivers_checked: driverIds.size,
+    errors: errors.length > 0 ? errors : undefined,
+  };
 }
 
 export async function acceptEcoMission(base44: any, missionId: string, livreurId: string) {

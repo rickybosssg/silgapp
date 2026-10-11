@@ -59,6 +59,8 @@ import HappyHourBadge from "@/components/livreur/HappyHourBadge";
 import PassZeroCommissionSection from "@/components/livreur/PassZeroCommissionSection";
 import LivreurVictoryOverlay from "@/components/livreur/LivreurVictoryOverlay";
 import EcoMissionDashboard from "@/components/livreur/EcoMissionDashboard";
+import OnRouteProposalCard from "@/components/livreur/OnRouteProposalCard";
+import { useOnRouteProposals } from "@/hooks/useOnRouteProposals";
 
 // haversineKm importé depuis priceEstimate (source canonique)
 
@@ -139,6 +141,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   // ── Animation de victoire livreur (livraison validée par PIN/QR) ──
   const [victoryCourseId, setVictoryCourseId] = useState(null);
   const celebratedCourseIdsRef = useRef(new Set());
+  // ── Propositions sur trajet dismissées (modal fermée manuellement) ──
+  const [dismissedProposalIds, setDismissedProposalIds] = useState(() => new Set());
 
   const [sessionId, setSessionId] = useState(() => {
     try { return localStorage.getItem("silgapp_livreur_session_id") || null; } catch { return null; }
@@ -914,8 +918,11 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   // Garantit que les DEUX courses de la mission restent visibles dans l'onglet
   // « Courses » via le EcoMissionDashboard, même après la 1re livraison.
   const activeEcoMissionId = useMemo(() => {
-    const ecoCourse = coursesActives.find(c => c.eco_mission_id && c.delivery_mode === "eco");
-    return ecoCourse?.eco_mission_id || null;
+    // ── Détecte toute mission active, pas seulement les missions Éco ──
+    // Les courses Standard acceptées via proposition sur trajet ont aussi un
+    // eco_mission_id et doivent déclencher le dashboard multi-livraisons.
+    const courseWithMission = coursesActives.find(c => c.eco_mission_id);
+    return courseWithMission?.eco_mission_id || null;
   }, [coursesActives]);
 
   const { data: activeEcoMission = null } = useQuery({
@@ -935,6 +942,14 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     if (!activeEcoMission?.course_ids?.length) return new Set();
     return new Set(activeEcoMission.course_ids);
   }, [activeEcoMission]);
+
+  // ─── Propositions "sur trajet" (livraisons supplémentaires compatibles) ──
+  // Affichées uniquement quand le livreur a au moins une course active.
+  // Le hook interroge le backend toutes les 15s ; le backend filtre par livreur_id,
+  // vérifie la disponibilité des courses et l'isolation pays/entreprise.
+  const { proposals: onRouteProposals } = useOnRouteProposals(
+    coursesActives.length > 0 ? livreurProfil : null
+  );
 
   // Courses non-Éco — affichées par CourseActiveCard individuellement
   const nonEcoCoursesActives = useMemo(
@@ -1408,6 +1423,11 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       if (!course.eco_mission_id) {
         await remettreDisponibleSiAutorise();
       }
+      // ── Animation Victory après confirmation backend ──
+      if (!celebratedCourseIdsRef.current.has(course.id)) {
+        celebratedCourseIdsRef.current.add(course.id);
+        setVictoryCourseId(course.id);
+      }
       toast.success(`Livraison terminée ! ${montantSaisi.toLocaleString()} F`);
       return;
     }
@@ -1422,6 +1442,11 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       // — d'autres courses de la mission sont peut-être encore actives.
       if (!course.eco_mission_id) {
         await remettreDisponibleSiAutorise();
+      }
+      // ── Animation Victory après confirmation backend ──
+      if (!celebratedCourseIdsRef.current.has(course.id)) {
+        celebratedCourseIdsRef.current.add(course.id);
+        setVictoryCourseId(course.id);
       }
       toast.success("Livraison terminée ! ");
       return;
@@ -1458,6 +1483,11 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     // [ECO] Ne pas remettre disponible si la course fait partie d'une mission Eco
     if (!course.eco_mission_id) {
       await remettreDisponibleSiAutorise();
+    }
+    // ── Animation Victory après confirmation backend (parcours interne) ──
+    if (!celebratedCourseIdsRef.current.has(course.id)) {
+      celebratedCourseIdsRef.current.add(course.id);
+      setVictoryCourseId(course.id);
     }
     toast.success("Livraison terminée ! ");
   };
@@ -1568,6 +1598,21 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         userId={livreurProfil?.id}
         userType="livreur"
       />
+
+      {/* ── Modale : Proposition de livraison sur trajet ── */}
+      {onRouteProposals && onRouteProposals.length > 0 && (() => {
+        const topProposal = onRouteProposals.find(p => !dismissedProposalIds.has(p.proposal_id));
+        if (!topProposal) return null;
+        return (
+          <OnRouteProposalCard
+            proposal={topProposal}
+            livreurProfil={livreurProfil}
+            onDismiss={() =>
+              setDismissedProposalIds(prev => new Set([...prev, topProposal.proposal_id]))
+            }
+          />
+        );
+      })()}
 
       {/* Modal plein écran si course en attente */}
       {courseEnAttente && (
@@ -1768,6 +1813,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
               </div>
             </Link>
             )}
+
+            {/* ── Propositions "sur trajet" — affichées en modale (voir plus bas) ── */}
 
             {activeEcoMission && (
               <EcoMissionDashboard

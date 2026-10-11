@@ -185,16 +185,16 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
                   <select
                     value={effectiveCountry || ""}
                     onChange={(e) => setSelectedCountry(e.target.value)}
-                    className="w-full appearance-none bg-white/5 text-slate-200 text-sm font-medium rounded-xl pl-10 pr-8 py-2.5 border border-white/5 focus:outline-none focus:ring-1 focus:ring-sidebar-primary/40 cursor-pointer"
+                    className="w-full appearance-none bg-white text-gray-900 text-sm font-medium rounded-xl pl-10 pr-8 py-2.5 border border-gray-200 focus:outline-none focus:ring-1 focus:ring-sidebar-primary/40 cursor-pointer"
                   >
-                    <option value="" className="bg-sidebar-accent text-slate-400">Choisir un pays</option>
+                    <option value="" className="bg-white text-gray-900">Choisir un pays</option>
                     {paysListe.map((p) => (
-                      <option key={p.code} value={p.code} className="bg-sidebar-accent text-slate-200">
-                        {p.emoji_flag} {p.nom}
+                      <option key={p.code} value={p.code} className="bg-white text-gray-900">
+                        {p.nom}
                       </option>
                     ))}
                   </select>
-                  <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <ChevronDown className="w-4 h-4 text-gray-700 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 </div>
               </div>
             )}

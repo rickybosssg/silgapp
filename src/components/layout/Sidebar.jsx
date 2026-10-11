@@ -234,17 +234,18 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, part
             ) : (
               <button
                 onClick={() => setCountryOpen(!countryOpen)}
-                className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-white hover:bg-gray-50 transition-colors"
+                style={{ backgroundColor: '#ffffff', color: '#111827' }}
+                className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl transition-colors"
               >
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="text-base flex-shrink-0">
                     {effectiveCountry ? paysListe.find(p => p.code === effectiveCountry)?.emoji_flag || "🌍" : "🌍"}
                   </span>
-                  <span className="text-xs font-semibold text-gray-900 truncate">
+                  <span className="text-xs font-semibold truncate" style={{ color: '#111827' }}>
                     {effectiveCountry ? paysListe.find(p => p.code === effectiveCountry)?.nom : "Choisir un pays"}
                   </span>
                 </div>
-                <ChevronDown className={cn("w-3.5 h-3.5 text-gray-500 flex-shrink-0 transition-transform", countryOpen && "rotate-180")} />
+                <ChevronDown className="w-3.5 h-3.5 flex-shrink-0 transition-transform" style={{ color: '#6b7280' }} />
               </button>
             )}
 
@@ -253,24 +254,24 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, part
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setCountryOpen(false)} />
                 <div className={cn(
-                  "absolute z-50 bg-sidebar-accent border border-white/5 rounded-xl shadow-2xl max-h-72 overflow-y-auto",
-                  collapsed ? "left-14 bottom-0 w-52" : "left-3 right-3 bottom-full mb-2"
-                )}>
-                  {paysListe.map((p) => (
-                    <button
-                      key={p.code}
-                      onClick={() => { setSelectedCountry(p.code); setCountryOpen(false); }}
-                      className={cn(
-                        "w-full flex items-center gap-3 px-3 py-2.5 text-sm transition-colors hover:bg-white/5",
-                        effectiveCountry === p.code ? "bg-sidebar-primary/10 text-sidebar-primary" : "text-slate-400"
-                      )}
-                    >
-                      <span className="text-base flex-shrink-0">{p.emoji_flag}</span>
-                      <span className="flex-1 text-left font-medium">{p.nom}</span>
-                      {effectiveCountry === p.code && <Check className="w-3.5 h-3.5 text-primary flex-shrink-0" />}
-                    </button>
-                  ))}
-                </div>
+                   "absolute z-50 bg-white border border-gray-200 rounded-xl shadow-2xl max-h-72 overflow-y-auto",
+                   collapsed ? "left-14 bottom-0 w-52" : "left-3 right-3 bottom-full mb-2"
+                 )}>
+                   {paysListe.map((p) => (
+                     <button
+                       key={p.code}
+                       onClick={() => { setSelectedCountry(p.code); setCountryOpen(false); }}
+                       className={cn(
+                         "w-full flex items-center gap-3 px-3 py-2.5 text-sm transition-colors hover:bg-gray-100",
+                         effectiveCountry === p.code ? "bg-blue-50 text-blue-700" : "text-gray-900"
+                       )}
+                     >
+                       <span className="text-base flex-shrink-0">{p.emoji_flag}</span>
+                       <span className="flex-1 text-left font-medium">{p.nom}</span>
+                       {effectiveCountry === p.code && <Check className="w-3.5 h-3.5 text-primary flex-shrink-0" />}
+                     </button>
+                   ))}
+                 </div>
               </>
             )}
           </div>

@@ -34,7 +34,8 @@
         "message_client",
         "incident_detecte",
         "course_modifiee",
-        "zone_chaude"
+        "zone_chaude",
+        "on_route_proposal"
       ],
       "description": "Type de notification"
     },

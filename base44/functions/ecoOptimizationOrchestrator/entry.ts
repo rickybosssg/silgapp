@@ -1,12 +1,16 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.53';
+// Redéploiement 2026-10-11 — notification push pour propositions sur trajet
 import {
   acceptEcoMission,
+  cleanupStuckEcoMissions,
   convertDueEcoCourses,
   createOnRouteProposal,
   expirePendingProposals,
   invalidatePendingProposals,
   processEcoCourseCreated,
   respondToOnRouteProposal,
+  triggerOnRouteProposalsForNewCourse,
+  updateEcoMissionRouteProgress,
 } from '../../shared/ecoOptimizationEngine.ts';
 
 Deno.serve(async (req) => {
@@ -36,11 +40,19 @@ Deno.serve(async (req) => {
     if (action === 'accept_eco_mission') {
       return Response.json(await acceptEcoMission(base44, body.mission_id, body.livreur_id));
     }
+    if (action === 'cleanup_stuck_missions') {
+      return Response.json(await cleanupStuckEcoMissions(base44, body.country_code, body.limit || 50));
+    }
+    if (action === 'update_route_progress') {
+      return Response.json(await updateEcoMissionRouteProgress(base44, body.course_id));
+    }
+    if (action === 'trigger_on_route_proposals') {
+      return Response.json(await triggerOnRouteProposalsForNewCourse(base44, body.course_id));
+    }
 
-    return Response.json({ success: true, service: 'ecoOptimizationOrchestrator', actions: ['course_created', 'convert_due', 'expire_proposals', 'invalidate_pending', 'create_on_route_proposal', 'respond_proposal', 'accept_eco_mission'] });
+    return Response.json({ success: true, service: 'ecoOptimizationOrchestrator', actions: ['course_created', 'convert_due', 'expire_proposals', 'invalidate_pending', 'create_on_route_proposal', 'respond_proposal', 'accept_eco_mission', 'cleanup_stuck_missions', 'update_route_progress', 'trigger_on_route_proposals'] });
   } catch (error) {
     console.error('[EcoOrchestrator] Fatal:', error?.message || String(error));
     return Response.json({ success: false, error: error?.message || String(error) }, { status: 500 });
   }
 });
-
