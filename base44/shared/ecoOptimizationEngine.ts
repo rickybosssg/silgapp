@@ -760,6 +760,127 @@ export async function completeEcoMissionIfNeeded(base44: any, courseId: string) 
   return { completed: true, mission_id: mission.id, final_status: 'cancelled' };
 }
 
+// ── Correction 8 : Mettre à jour le route plan quand une course est livrée ──
+// Met à jour les steps du route_plan_json et active_step_index quand une course
+// passe en statut terminal (livree ou annulee). Les étapes terminées restent terminées.
+// Gère les annulations partielles sans corrompre la mission.
+export async function updateEcoMissionRouteProgress(base44: any, courseId: string) {
+  const course = await base44.asServiceRole.entities.CourseExterne.get(courseId).catch(() => null);
+  if (!course?.eco_mission_id) return { updated: false, reason: 'no_mission' };
+
+  const mission = await base44.asServiceRole.entities.EcoMission.get(course.eco_mission_id).catch(() => null);
+  if (!mission || ['completed', 'cancelled', 'invalidated'].includes(mission.status)) {
+    return { updated: false, reason: 'mission_terminal' };
+  }
+
+  const courseIds = Array.isArray(mission.course_ids) ? mission.course_ids : [];
+  if (courseIds.length === 0) return { updated: false, reason: 'no_courses' };
+
+  // Récupérer toutes les courses de la mission
+  const courses = await Promise.all(
+    courseIds.map((id: string) => base44.asServiceRole.entities.CourseExterne.get(id).catch(() => null))
+  );
+
+  // Construire un map de statut par course_id
+  const courseStatusMap = new Map<string, string>();
+  for (const c of courses) {
+    if (c) courseStatusMap.set(c.id, c.statut);
+  }
+
+  // Mettre à jour le route_plan_json
+  let routePlan: any[] = [];
+  try {
+    routePlan = mission.route_plan_json ? JSON.parse(mission.route_plan_json) : [];
+  } catch {
+    routePlan = [];
+  }
+
+  let updated = false;
+  let maxCompletedOrder = 0;
+
+  for (const step of routePlan) {
+    if (!step?.course_id) continue;
+    const statut = courseStatusMap.get(step.course_id);
+    if (!statut) continue;
+
+    const isTerminal = statut === 'livree' || statut === 'annulee';
+    if (isTerminal && step.status !== 'completed') {
+      step.status = 'completed';
+      updated = true;
+    }
+    if (isTerminal && step.order > maxCompletedOrder) {
+      maxCompletedOrder = step.order;
+    }
+  }
+
+  // Calculer active_step_index = premier step non-complété
+  const firstPendingStep = routePlan.find((s: any) => s?.status !== 'completed');
+  const newActiveStepIndex = firstPendingStep ? Math.max(0, (Number(firstPendingStep.order) || 1) - 1) : routePlan.length;
+
+  if (updated || mission.active_step_index !== newActiveStepIndex) {
+    await base44.asServiceRole.entities.EcoMission.update(mission.id, {
+      route_plan_json: JSON.stringify(routePlan),
+      active_step_index: newActiveStepIndex,
+    }).catch(() => null);
+    return { updated: true, mission_id: mission.id, active_step_index: newActiveStepIndex };
+  }
+
+  return { updated: false, reason: 'no_changes' };
+}
+
+// ── Correction 5 : Nettoyer les missions Éco bloquées ──
+// Scanne toutes les missions non-terminales et vérifie si leurs courses
+// sont toutes terminales. Si oui, met à jour le statut de la mission.
+// Cette fonction est idempotente et peut être appelée par un workflow périodique.
+export async function cleanupStuckEcoMissions(base44: any, countryCode?: string, limit = 50) {
+  const filter: any = { status: { $in: ['accepted', 'available', 'accepting'] } };
+  if (countryCode) filter.country_code = String(countryCode).toUpperCase();
+  const missions = await base44.asServiceRole.entities.EcoMission.filter(filter, '-created_date', limit).catch(() => []);
+  const results = [];
+
+  for (const mission of missions || []) {
+    const courseIds = Array.isArray(mission.course_ids) ? mission.course_ids : [];
+    if (courseIds.length === 0) continue;
+
+    const courses = await Promise.all(
+      courseIds.map((id: string) => base44.asServiceRole.entities.CourseExterne.get(id).catch(() => null))
+    );
+
+    const allTerminal = courses.every((c: any) => c && (c.statut === 'livree' || c.statut === 'annulee'));
+    if (!allTerminal) {
+      results.push({ mission_id: mission.id, status: mission.status, action: 'skipped', reason: 'courses_pending' });
+      continue;
+    }
+
+    const allDelivered = courses.every((c: any) => c && c.statut === 'livree');
+    const allCancelled = courses.every((c: any) => c && c.statut === 'annulee');
+    const finalStatus = allDelivered ? 'completed' : 'cancelled';
+
+    await base44.asServiceRole.entities.EcoMission.update(mission.id, { status: finalStatus }).catch(() => null);
+
+    // Libérer le livreur si la mission était acceptée
+    if (mission.livreur_id && mission.status === 'accepted') {
+      const livreur = await base44.asServiceRole.entities.Livreur.get(mission.livreur_id).catch(() => null);
+      if (livreur && livreur.statut === 'en_course') {
+        const STATUTS_ACTIFS = ['livreur_en_route', 'client_contacte', 'en_route_expediteur', 'arrive_prise_en_charge', 'colis_recupere', 'passager_embarque', 'pris_en_charge', 'en_livraison', 'arrivee'];
+        const autresCourses = await base44.asServiceRole.entities.CourseExterne.filter(
+          { livreur_id: mission.livreur_id }, '-created_date', 10
+        ).catch(() => []);
+        const aAutreCourseActive = (autresCourses || []).some((c: any) =>
+          c.id !== courseIds[0] && STATUTS_ACTIFS.includes(c.statut)
+        );
+        await base44.asServiceRole.entities.Livreur.update(mission.livreur_id, {
+          statut: aAutreCourseActive ? 'en_course' : (livreur.manual_hors_ligne === true ? 'hors_ligne' : 'disponible'),
+        }).catch(() => null);
+      }
+    }
+
+    results.push({ mission_id: mission.id, status: mission.status, action: 'fixed', final_status: finalStatus });
+  }
+
+  return { success: true, checked: (missions || []).length, results };
+}
+
 export async function acceptEcoMission(base44: any, missionId: string, livreurId: string) {
   const mission = await base44.asServiceRole.entities.EcoMission.get(missionId).catch(() => null);
   if (!mission || mission.status !== 'available') return { success: false, reason: 'mission_unavailable' };

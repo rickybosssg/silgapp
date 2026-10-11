@@ -967,7 +967,7 @@ export default function CourseExterneFormSync() {
     );
   }
 
-  const totalSteps = 3;
+  const totalSteps = 3; // Doit être défini avant handleSubmit (utilisé dans la garde anti-submit)
 
   return (
     <div className="min-h-screen p-4" style={{ background: "#F8FAFC" }}>
@@ -1060,6 +1060,11 @@ export default function CourseExterneFormSync() {
         <Card className="p-5 sm:p-6" style={{ background: "#FFFFFF", borderRadius: "1rem", borderColor: "#E2E8F0" }}>
           <form onSubmit={(e) => {
             e.preventDefault();
+            // ── Ne pas soumettre si on n'est pas sur la dernière étape ──
+            // La touche Entrée dans un input déclenche le submit du formulaire.
+            // Sans cette garde, la confirmation s'ouvre prématurément avant
+            // que le client ait choisi son type de colis et son prix.
+            if (currentStep < totalSteps - 1) return;
             handleSubmit(e).catch((err) => {
               console.error("[CREATE_CLIENT_UNCAUGHT_ERROR]", {
                 error: err?.message,
@@ -1069,6 +1074,10 @@ export default function CourseExterneFormSync() {
               toast.error("Erreur lors de la création : " + (err?.message || "erreur inconnue"));
               setIsSubmitting(false);
             });
+          }} onKeyDown={(e) => {
+            if (e.key === "Enter" && currentStep < totalSteps - 1) {
+              e.preventDefault();
+            }
           }}>
             <CourseStepForm
               step={currentStep}

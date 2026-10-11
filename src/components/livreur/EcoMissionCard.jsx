@@ -52,13 +52,15 @@ export default function EcoMissionCard({ mission, livreurProfil, onAcceptSuccess
         mission_id: mission.id,
         livreur_id: livreurProfil.id,
       });
-      if (res?.success && res?.accepted) {
+      // ⚠️ Le SDK peut wrapper la réponse dans { data: { ... } }
+      const data = res?.data ?? res;
+      if (data?.success && data?.accepted) {
         toast.success("Mission Éco acceptée !");
         queryClient.invalidateQueries({ queryKey: ["eco-missions-available"] });
         queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
         onAcceptSuccess?.();
       } else {
-        toast.error(res?.error || res?.reason || "Erreur lors de l'acceptation");
+        toast.error(data?.error || data?.reason || "Erreur lors de l'acceptation");
       }
     } catch (err) {
       toast.error("Erreur réseau lors de l'acceptation");
