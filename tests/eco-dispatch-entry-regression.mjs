@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+const source=readFileSync(new URL('../base44/functions/dispatchExterneAuto/entry.ts',import.meta.url),'utf8');
+const marker="if (course.delivery_mode === 'eco' && course.eco_status === 'isolated')";
+const start=source.indexOf(marker);
+assert.ok(start>=0);
+const block=source.slice(start,source.indexOf('// ── V2',start));
+assert.ok(block.includes("reason: 'eco_isolated_pending_grouping'"));
+assert.ok(block.includes('return Response.json'));
+assert.ok(!block.includes('functions.invoke'));
+assert.ok(!source.includes("action: 'process_course_created'"));
+console.log('ECO_DISPATCH_ENTRY=PASS (source guard, not backend execution)');

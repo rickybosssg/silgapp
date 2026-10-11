@@ -45,6 +45,9 @@ backend risks. Preserve these additional tests:
 - `tests/october-delivery-regression.mjs`: delivery readback and route progress.
 - `tests/eco-october-policy-regression.mjs`: no silent Eco downgrade; free price.
 - `tests/eco-route-order-regression.mjs`: six precedence-safe geographic orders.
+- `tests/eco-dispatch-entry-regression.mjs`: isolated Eco returns before V2;
+  dispatch retries never invoke an unknown grouping action or start a second
+  grouping writer. Remote guard deployed and pulled back on 2026-10-11.
 
 These local tests do not prove backend transactions or Android behavior.
 

@@ -60,7 +60,8 @@ assert.match(orchestrator, /eco_hold:\s*true/);
 const dispatchAuto = read('base44/functions/dispatchExterneAuto/entry.ts');
 assert.match(dispatchAuto, /course\.delivery_mode === 'eco' && course\.eco_status === 'isolated'/);
 assert.match(dispatchAuto, /eco_isolated_pending_grouping/);
-assert.match(dispatchAuto, /ecoOptimizationOrchestrator/);
+// Grouping remains event-driven above; dispatch retries only hold isolated Eco.
+assert.doesNotMatch(dispatchAuto, /action:\s*'process_course_created'/);
 
 const dispatchV2 = read('base44/shared/dispatchV2.ts');
 assert.match(dispatchV2, /course\.eco_status === 'isolated' && course\.delivery_mode === 'eco'/);

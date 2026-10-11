@@ -247,13 +247,7 @@ export default async function(req) {
       // retry manuel) afin qu'elle ne devienne jamais une course Standard acceptable
       // avant regroupement ou conversion différée explicite.
       if (course.delivery_mode === 'eco' && course.eco_status === 'isolated') {
-        await base44.asServiceRole.functions.invoke('ecoOptimizationOrchestrator', {
-          action: 'process_course_created',
-          course_id,
-        }).catch((error: any) => {
-          console.warn('[DISPATCH] ⚠️ Eco optimisation trigger failed:', error?.message || String(error));
-          return null;
-        });
+        // Grouping is triggered by courseEventOrchestrator, not by dispatch retries.
         return Response.json({
           success: true,
           blocked: true,
