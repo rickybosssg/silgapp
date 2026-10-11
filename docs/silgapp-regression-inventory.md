@@ -1,5 +1,15 @@
 # SILGAPP Regression Inventory
 
+## Correction 17 - SDK Proposal Responses
+
+Integrated origin/main 9135d80b: unwrap SDK data in useOnRouteProposals and
+both accept/refuse handlers in OnRouteProposalCard. Preserve expiry checks,
+identity checks and existing query invalidation. No Dispatch V2 changes.
+Protection: on-route-proposals-regression.mjs (13 simulated assertions) and
+on-route-sdk-source-regression.mjs (source wiring checks). These do not prove
+live acceptance, refusal or expiration; controlled pending proposals and an
+authenticated eligible test driver are still required for device validation.
+
 This file is the local reference used before Base44 -> Codex integrations and
 before Android/iOS delivery builds.
 
