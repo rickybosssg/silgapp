@@ -9,6 +9,12 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.PowerManager;
 import android.provider.Settings;
+import android.graphics.Color;
+import android.view.View;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
 
 import com.getcapacitor.BridgeActivity;
 
@@ -24,8 +30,24 @@ public class MainActivity extends BridgeActivity {
         createUrgentCourseChannel();
         requestBatteryOptimizationExemption();
         super.onCreate(savedInstanceState);
+        configureWindowInsets();
         bridge.getWebView().setWebChromeClient(new SilgappWebChromeClient(bridge));
         SilgappPushPlugin.handleNotificationIntent(getIntent(), "launch");
+    }
+
+    private void configureWindowInsets() {
+        View content = findViewById(android.R.id.content);
+        content.setBackgroundColor(Color.rgb(245, 247, 249));
+        WindowCompat.getInsetsController(getWindow(), content).setAppearanceLightStatusBars(true);
+        WindowCompat.getInsetsController(getWindow(), content).setAppearanceLightNavigationBars(true);
+        ViewCompat.setOnApplyWindowInsetsListener(content, (view, windowInsets) -> {
+            int types = WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout();
+            Insets bars = windowInsets.getInsets(types);
+            view.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+            // Forward IME changes, but do not apply the system-bar padding twice in WebView.
+            return new WindowInsetsCompat.Builder(windowInsets).setInsets(types, Insets.NONE).build();
+        });
+        ViewCompat.requestApplyInsets(content);
     }
 
     @Override

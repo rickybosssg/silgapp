@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Mic, Square, Send, Loader2, Play, Pause, Settings, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { buildClientMessageId } from "@/lib/chatUtils";
 
 function getSupportedMimeType() {
   if (typeof MediaRecorder === "undefined") return null;
@@ -34,6 +35,8 @@ export default function AudioRecorder({ onSend, disabled }) {
   const timerRef = useRef(null);
   const streamRef = useRef(null);
   const audioRef = useRef(null);
+  const uploadedAudioRef = useRef(null);
+  const uploadingRef = useRef(false);
 
   useEffect(() => {
     const clearError = () => {
@@ -67,6 +70,7 @@ export default function AudioRecorder({ onSend, disabled }) {
   };
 
   const startRecording = async () => {
+    uploadedAudioRef.current = null;
     try {
       setPermissionError("");
       if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
@@ -133,15 +137,23 @@ export default function AudioRecorder({ onSend, disabled }) {
   };
 
   const handleUploadAndSend = async () => {
-    if (!audioBlob) return;
+    if (!audioBlob || uploadingRef.current || disabled) return;
+    uploadingRef.current = true;
     setUploading(true);
     try {
       const { base44 } = await import("@/api/base44Client");
       const ext = audioBlob.type.includes("mp4") ? "m4a" : audioBlob.type.includes("mpeg") ? "mp3" : "webm";
       const file = new File([audioBlob], `audio_${Date.now()}.${ext}`, { type: audioBlob.type });
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
-      const sent = await onSend({ message_type: "audio", audio_url: file_url, content: "" });
+      if (!uploadedAudioRef.current) {
+        const { file_url } = await base44.integrations.Core.UploadFile({ file });
+        if (!file_url) throw new Error('Audio non confirmé');
+        uploadedAudioRef.current = { message_type: "audio", audio_url: file_url, content: "",
+          client_message_id: buildClientMessageId('audio', 'clip', '') };
+      }
+      const sent = await onSend(uploadedAudioRef.current);
       if (sent === false) return;
+      uploadedAudioRef.current = null;
+      if (audioUrl) URL.revokeObjectURL(audioUrl);
       setAudioBlob(null);
       setAudioUrl(null);
       setDuration(0);
@@ -149,11 +161,13 @@ export default function AudioRecorder({ onSend, disabled }) {
       console.error("Upload audio error:", err);
       alert("Erreur lors de l'envoi de l'audio");
     } finally {
+      uploadingRef.current = false;
       setUploading(false);
     }
   };
 
   const cancelRecording = () => {
+    uploadedAudioRef.current = null;
     setAudioBlob(null);
     if (audioUrl) URL.revokeObjectURL(audioUrl);
     setAudioUrl(null);
@@ -187,7 +201,7 @@ export default function AudioRecorder({ onSend, disabled }) {
           <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
           <span className="text-xs font-bold text-red-600 tabular-nums">{formatTime(duration)}</span>
         </div>
-        <Button variant="destructive" size="icon" className="h-8 w-8 rounded-full" onClick={stopRecording}>
+        <Button aria-label="Arrêter l'enregistrement" variant="destructive" size="icon" className="h-8 w-8 rounded-full" onClick={stopRecording}>
           <Square className="w-3.5 h-3.5" />
         </Button>
       </div>
@@ -201,11 +215,11 @@ export default function AudioRecorder({ onSend, disabled }) {
           {playing ? <Pause className="w-3.5 h-3.5 text-blue-600" /> : <Play className="w-3.5 h-3.5 text-blue-600" />}
           <span className="text-xs font-bold text-blue-600 tabular-nums">{formatTime(duration)}</span>
         </Button>
-        <Button size="sm" className="h-8 rounded-full gap-1" onClick={handleUploadAndSend} disabled={uploading}>
+        <Button size="sm" className="h-8 rounded-full gap-1" onClick={handleUploadAndSend} disabled={uploading || disabled}>
           {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
           Envoyer
         </Button>
-        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-gray-400" onClick={cancelRecording}>
+        <Button aria-label="Annuler l'enregistrement" variant="ghost" size="icon" className="h-8 w-8 rounded-full text-gray-400" onClick={cancelRecording} disabled={uploading}>
           <X className="w-3.5 h-3.5" />
         </Button>
       </div>

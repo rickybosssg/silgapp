@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import { lastChatRead, markChatRead, isChatUnread } from '../src/lib/chatReadState.js';
+const values = new Map();
+globalThis.localStorage = { getItem: key => values.get(key), setItem: (key, value) => values.set(key, value) };
+globalThis.window = new EventTarget();
+const message = { sender_type: 'livreur', sender_id: 'driver', created_date: '2026-10-11T10:00:00Z' };
+assert.equal(isChatUnread(message, 'client', 'a', 'course_id:one'), true);
+markChatRead('client', 'a', 'course_id:one', message.created_date);
+assert.equal(isChatUnread(message, 'client', 'a', 'course_id:one'), false);
+assert.equal(isChatUnread(message, 'client', 'b', 'course_id:one'), true);
+assert.equal(isChatUnread(message, 'client', 'a', 'course_id:two'), true);
+markChatRead('client', 'a', 'course_id:one', '2020-01-01');
+assert.equal(lastChatRead('client', 'a', 'course_id:one'), Date.parse(message.created_date));
+console.log('PASS local unread watermarks: account/scope isolation and monotonicity; not cross-device sync');

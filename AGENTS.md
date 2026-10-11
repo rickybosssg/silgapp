@@ -75,6 +75,17 @@ Do not consider a SILGAPP Android release fully delivered until the `origin/ios`
 
 Never modify `origin/main` for this release flow. If conflicts, test failures, or unsafe changes appear, stop before pushing and report the blocker precisely.
 
+Run additional Deno checks from an isolated source snapshot outside this npm/Capacitor
+project. Do not enable Deno's automatic node_modules installation in this repository:
+it can replace native plugin packages and leave Android sources unavailable.
+Use the existing package-lock for npm restoration; never repair this by changing
+the signing configuration or removing native plugins.
+
+Base44 `functions pull` snapshots must be treated as export archives, not blindly
+redeployed. Verify the entry path and all bundled relative imports in a controlled
+temporary folder, target the official app explicitly, and re-read deployed sources.
+Do not use `eject` for a read-only snapshot: the observed CLI flow creates a new app.
+
 Do not publish automatically to Google Play or the App Store.
 
 ## Base44 to Codex integration guard

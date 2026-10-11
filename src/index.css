@@ -236,6 +236,10 @@
     padding-top: max(env(safe-area-inset-top), 28px);
   }
 
+  .android-insets-native .safe-area-top {
+    padding-top: 12px;
+  }
+
   .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;

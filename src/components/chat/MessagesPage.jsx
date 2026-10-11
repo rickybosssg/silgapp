@@ -8,6 +8,8 @@ import { fr } from "date-fns/locale";
 import NewConversationDialog from "@/components/chat/NewConversationDialog";
 import CourseChatPanel from "@/components/chat/CourseChatPanel";
 import ChatWindow from "@/components/chat/ChatWindow";
+import useChatViewport from "@/hooks/useChatViewport";
+import { isChatUnread } from "@/lib/chatReadState";
 
 const PARTNER_TYPES = ["partner", "partenaire", "boutique", "restaurant", "pharmacie"];
 const normalizeParticipantType = (type) => PARTNER_TYPES.includes(type) ? "partenaire" : type;
@@ -35,7 +37,7 @@ function getInitials(name) {
   return name.slice(0, 2).toUpperCase();
 }
 
-function ConversationItem({ conv, myType, myId, active, onClick }) {
+function ConversationItem({ conv, myType, myId, active, onClick, unread = false }) {
   const [otherParticipant, setOtherParticipant] = useState(null);
 
   useEffect(() => {
@@ -52,14 +54,15 @@ function ConversationItem({ conv, myType, myId, active, onClick }) {
 
   // Détermine si la conversation est non lue
   const isUnread = useMemo(() => {
+    if (myType !== "admin") return unread;
     if (!conv.last_message_date) return false;
     if (conv.last_sender_type === myType) return false; // dernier message = moi → lu
     if (myType === "admin") {
       if (!conv.admin_last_read_date) return true;
       return new Date(conv.last_message_date) > new Date(conv.admin_last_read_date);
     }
-    return false;
-  }, [conv.last_message_date, conv.last_sender_type, conv.admin_last_read_date, myType]);
+    return unread;
+  }, [conv.last_message_date, conv.last_sender_type, conv.admin_last_read_date, myType, unread]);
 
   // Couleurs par rôle
   const avatarColors = roleKey === "livreur" ? "from-blue-500 to-blue-700" :
@@ -146,8 +149,9 @@ function ConversationItem({ conv, myType, myId, active, onClick }) {
 }
 
 function GeneralChatWindow({ conversationId, myType, myId, myName, onBack }) {
+  const viewport = useChatViewport();
   return (
-    <div className="flex flex-col h-full min-h-0 bg-[#16191d]">
+    <div style={viewport} className="fixed inset-x-0 z-[80] flex flex-col min-h-0 bg-[#16191d]">
       <div className="safe-area-top p-3 bg-[#0f1216] text-white">
         <button onClick={onBack} aria-label="Retour aux messages" className="p-2">
           <ArrowLeft className="w-5 h-5" />
@@ -166,6 +170,49 @@ export default function MessagesPage({ myType, myId, myName, onBack, initialConv
   const [loading, setLoading] = useState(true);
   const [showNewConv, setShowNewConv] = useState(false);
   const [courseThreads, setCourseThreads] = useState([]);
+  const [latestMessages, setLatestMessages] = useState({});
+  const [, refreshReadState] = useState(0);
+
+  useEffect(() => {
+    const refresh = () => refreshReadState(value => value + 1);
+    window.addEventListener('silgapp:chat-read', refresh);
+    window.addEventListener('storage', refresh);
+    return () => {
+      window.removeEventListener('silgapp:chat-read', refresh);
+      window.removeEventListener('storage', refresh);
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    const filters = [];
+    if (courseThreads.length) filters.push({ course_id: { $in: courseThreads.map(c => c.id) } });
+    if (conversations.length) filters.push({ conversation_id: { $in: conversations.map(c => c.id) } });
+    if (!myId || !filters.length) { setLatestMessages({}); return; }
+    const load = async () => {
+      try {
+        const rows = await base44.entities.Message.filter({ $or: filters }, '-created_date', 200);
+        const latest = {};
+        for (const message of rows) {
+          const scope = message.course_id ? `course_id:${message.course_id}` : `conversation_id:${message.conversation_id}`;
+          if (!latest[scope]) latest[scope] = message;
+        }
+        if (active) setLatestMessages(latest);
+      } catch { /* RLS remains authoritative; never query with service privileges here. */ }
+    };
+    load();
+    let timer;
+    const unsubscribe = base44.entities.Message.subscribe(event => {
+      const message = event.data;
+      if (!message || (!courseThreads.some(c => c.id === message.course_id) &&
+          !conversations.some(c => c.id === message.conversation_id))) return;
+      clearTimeout(timer);
+      timer = setTimeout(load, 250);
+    });
+    const resume = () => { if (document.visibilityState === 'visible') load(); };
+    document.addEventListener('visibilitychange', resume);
+    return () => { active = false; clearTimeout(timer); unsubscribe?.(); document.removeEventListener('visibilitychange', resume); };
+  }, [myId, courseThreads, conversations]);
 
   useEffect(() => {
     setActiveCourseId(initialCourseId || null);
@@ -338,6 +385,8 @@ export default function MessagesPage({ myType, myId, myName, onBack, initialConv
           <button key={course.id} onClick={() => setActiveCourseId(course.id)}
             className="w-full text-left p-3 rounded-lg border border-gray-200 bg-white">
             <p className="text-sm font-semibold text-gray-900">Course #{course.id.slice(-6)}</p>
+            {isChatUnread(latestMessages[`course_id:${course.id}`], myType, myId, `course_id:${course.id}`) &&
+              <span className="text-xs font-semibold text-red-700" aria-label="Message non lu">Nouveau message</span>}
             <p className="text-xs text-gray-600 truncate">{course.adresse_depart} → {course.adresse_arrivee}</p>
           </button>
         ))}
@@ -348,6 +397,7 @@ export default function MessagesPage({ myType, myId, myName, onBack, initialConv
             myType={myType}
             myId={myId}
             active={conv.id === activeConvId}
+            unread={isChatUnread(latestMessages[`conversation_id:${conv.id}`], myType, myId, `conversation_id:${conv.id}`)}
             onClick={(c) => { setActiveConvId(c.id); markConversationRead(c.id); }}
           />
         ))}

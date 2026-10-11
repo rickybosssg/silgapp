@@ -117,6 +117,13 @@ export default async function(req: Request): Promise<Response> {
       }
     }
 
+    if (course.eco_mission_id) {
+      const mission = await base44.asServiceRole.entities.EcoMission.get(course.eco_mission_id).catch(() => null);
+      if (!mission || !['accepted', 'in_progress'].includes(mission.status)) {
+        return Response.json({ error: 'Attribution de la mission en cours de vérification. Réessayez après actualisation.' }, { status: 409 });
+      }
+    }
+
     if (course.statut === statut_cible) {
       if (course.eco_mission_id) await updateEcoMissionRouteProgress(base44, course_id).catch(() => null);
       return Response.json({ success: true, skipped: 'already_at_target', course_id, statut: statut_cible });
@@ -172,6 +179,6 @@ export default async function(req: Request): Promise<Response> {
       : undefined;
     return Response.json({ success: true, course: updated, statut: statut_cible, eco_progress: ecoProgress });
   } catch (error) {
-    return Response.json({ error: error.message }, { status: 500 });
+    return Response.json({ error: error instanceof Error ? error.message : 'Erreur de transition' }, { status: 500 });
   }
 }

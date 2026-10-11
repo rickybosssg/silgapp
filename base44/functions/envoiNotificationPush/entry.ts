@@ -243,6 +243,8 @@ Deno.serve(async (req) => {
       category,
     } = body;
     const targetEmail = String(destinataire_email || '').trim().toLowerCase();
+    // Keep the deep-link push type; the persisted Notification enum uses message_client.
+    const recordType = type === 'nouveau_message' ? 'message_client' : (type || 'generic');
 
     if (!titre || !message || !targetEmail) {
       return Response.json({ error: 'Missing required fields: titre, message, destinataire_email' }, { status: 400 });
@@ -303,7 +305,7 @@ Deno.serve(async (req) => {
         try { desactivees = JSON.parse(userPrefs); } catch (_) {}
         if (Array.isArray(desactivees) && desactivees.some(c => notifCategory.includes(c.toLowerCase()))) {
           const skippedNotif = await base44.asServiceRole.entities.Notification.create({
-            titre, message, type: type || 'generic', course_id: course_id || '',
+            titre, message, type: recordType, course_id: course_id || '',
             destinataire_email: targetEmail, lue: false,
           });
           return Response.json({
@@ -355,7 +357,7 @@ Deno.serve(async (req) => {
     const notification = await base44.asServiceRole.entities.Notification.create({
       titre: personalizedTitre,
       message: personalizedMessage,
-      type: type || 'generic',
+      type: recordType,
       course_id: course_id || '',
       destinataire_email: targetEmail,
       lue: false,

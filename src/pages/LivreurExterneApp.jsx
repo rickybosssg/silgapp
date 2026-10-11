@@ -1943,6 +1943,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         )}
 
         {activeTab === "messages" && (
+          <div className="fixed inset-0 z-50 h-[100dvh] min-h-0 overflow-hidden bg-background">
           <MessagesPage
             myType="livreur"
             myId={livreurProfil?.id}
@@ -1950,6 +1951,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
             initialConversationId={pendingConversationId}
             onBack={() => { setPendingConversationId(null); setActiveTab("courses"); }}
           />
+          </div>
         )}
 
         {activeTab === "promo" && livreurHasPromoCode && (

@@ -13,6 +13,7 @@ const {chromium} = createRequire(path.join(process.env.SILGAPP_PLAYWRIGHT_ROOT |
   build.onLoad({filter:/.*/,namespace:'mock'},args=>{
    if(args.path==='@/api/base44Client')return{contents:'export const base44=window.testApi;',loader:'js'};
    if(args.path.includes('chatUtils'))return{contents:require('node:fs').readFileSync(path.join(root,'src/lib/chatUtils.js'),'utf8'),loader:'js'};
+   if(args.path.includes('chatReadState'))return{contents:require('node:fs').readFileSync(path.join(root,'src/lib/chatReadState.js'),'utf8'),loader:'js'};
    if(args.path.includes('ChatBubble'))return{contents:`import React from 'react';export default({message})=><div data-message={message.id}>{message.content}</div>;`,loader:'jsx',resolveDir:root};
    if(args.path.includes('AudioRecorder'))return{contents:'export default()=>null;',loader:'js'};
    if(args.path.includes('useSonEtVibration'))return{contents:'export const playNotificationSound=()=>{};',loader:'js'};
@@ -49,6 +50,19 @@ const {chromium} = createRequire(path.join(process.env.SILGAPP_PLAYWRIGHT_ROOT |
  await page.waitForSelector('[data-message="b-99"]');
  assert.equal(await page.locator('[data-message^="a-"]').count(),0);
  assert.equal(await page.locator('textarea').inputValue(),'');
- console.log('PASS: actual ChatWindow pagination 205 messages, failed text retained, stable retry key, course isolation (mock backend, desktop Chrome).');
+ await page.evaluate(()=>{
+  window.uploads=0;
+  window.testApi.integrations={Core:{UploadFile:async()=>{window.uploads++;return {file_url:'https://example.invalid/test-video.mp4'};}}};
+ });
+ await page.locator('input[type="file"]').setInputFiles({name:'test-video.mp4',mimeType:'video/mp4',buffer:Buffer.from('isolated-fixture')});
+ await page.getByRole('button',{name:"Réessayer l'envoi du fichier"}).waitFor();
+ const media=await page.evaluate(()=>window.sent.at(-1));
+ assert.equal(media.message_type,'video');
+ await page.getByRole('button',{name:"Réessayer l'envoi du fichier"}).click();
+ await page.waitForFunction(()=>window.sent.length===4);
+ assert.equal(await page.evaluate(()=>window.uploads),1);
+ assert.equal(await page.evaluate(()=>window.sent.at(-1).client_message_id),media.client_message_id);
+ assert.equal(await page.evaluate(()=>window.sent.at(-1).video_url),media.video_url);
+ console.log('PASS: actual ChatWindow pagination 205 messages, failed text/media retained, stable retry key without reupload, course isolation (mock backend, desktop Chrome).');
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

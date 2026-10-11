@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
-import { Send, Loader2, MessageCircle, ImagePlus, X } from "lucide-react";
+import { Send, Loader2, MessageCircle, ImagePlus, X, RotateCcw } from "lucide-react";
+import { markChatRead } from "@/lib/chatReadState";
 import ChatBubble from "@/components/chat/ChatBubble";
 import AudioRecorder from "@/components/chat/AudioRecorder";
 import { toast } from "sonner";
@@ -27,7 +28,10 @@ function CourseChatWindow({ courseId, conversationId, senderType, senderId, send
   const [sending, setSending] = useState(false);
   const [open, setOpen] = useState(!compact);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [pendingMedia, setPendingMedia] = useState(null);
+  const uploadingRef = useRef(false);
   const bottomRef = useRef(null);
+  const followLatestRef = useRef(true);
   const sendingRef = useRef(false);
   const pendingSendRef = useRef(null);
   const knownIdsRef = useRef(new Set());
@@ -52,8 +56,11 @@ function CourseChatWindow({ courseId, conversationId, senderType, senderId, send
       const enriched = enrichMessagesWithProfiles(list, profiles);
       enriched.forEach(m => knownIdsRef.current.add(getMessageKey(m)));
       setMessages(prev => dedupeAndSortMessages([...prev, ...enriched]));
+      if (document.visibilityState === 'visible' && list.length) {
+        markChatRead(senderType, senderId, `${scopeField}:${scopeId}`, list[list.length - 1].created_date);
+      }
     } catch (_) {}
-  }, [scopeId, scopeField]);
+  }, [scopeId, scopeField, senderType, senderId]);
 
   const loadOlder = async () => {
     if (loadingOlder || !scopeId) return;
@@ -95,6 +102,7 @@ function CourseChatWindow({ courseId, conversationId, senderType, senderId, send
           navigator.vibrate?.([200, 100, 200]);
         }
         setMessages(prev => mergeMessageList(prev, event.data));
+        if (document.visibilityState === 'visible') markChatRead(senderType, senderId, `${scopeField}:${scopeId}`, event.data.created_date);
       }
     });
     return () => unsub?.();
@@ -168,7 +176,7 @@ function CourseChatWindow({ courseId, conversationId, senderType, senderId, send
       const saved = olderScrollRef.current;
       container.scrollTop = saved.top + container.scrollHeight - saved.height;
       olderScrollRef.current = null;
-    } else if (container) container.scrollTop = container.scrollHeight;
+    } else if (container && followLatestRef.current) container.scrollTop = container.scrollHeight;
   }, [messages]);
 
   // Envoi sécurisé via la fonction backend envoyerMessage
@@ -192,6 +200,7 @@ function CourseChatWindow({ courseId, conversationId, senderType, senderId, send
       const newMsg = res?.message || res?.data?.message;
       if (!newMsg?.id) throw new Error(res?.data?.error || res?.error || "Envoi non confirmé");
       if (newMsg) {
+        followLatestRef.current = true;
         // Anti-doublon : ne pas ajouter si déjà présent
         const key = getMessageKey(newMsg);
         if (!knownIdsRef.current.has(key)) {
@@ -225,16 +234,23 @@ function CourseChatWindow({ courseId, conversationId, senderType, senderId, send
 
   const handlePhotoSend = async (e) => {
     const file = e.target.files?.[0];
-    if (!file || sendingRef.current) return;
+    if (!file || sendingRef.current || uploadingRef.current) return;
+    uploadingRef.current = true;
     setUploadingPhoto(true);
     try {
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
-      await sendMessage(file.type.startsWith("video/")
+      if (!file_url) throw new Error('Fichier non confirmé');
+      const media = { ...(file.type.startsWith("video/")
         ? { message_type: "video", video_url: file_url, content: "" }
-        : { message_type: "photo", photo_url: file_url, content: "" });
+        : { message_type: "photo", photo_url: file_url, content: "" }),
+        client_message_id: buildClientMessageId(scopeId, senderType, senderId) };
+      setPendingMedia(media);
+      if (await sendMessage(media)) setPendingMedia(null);
     } catch (err) {
       console.error("Erreur envoi photo:", err);
+      toast.error("Impossible de joindre le fichier. Veuillez le sélectionner à nouveau.");
     }
+    uploadingRef.current = false;
     setUploadingPhoto(false);
     e.target.value = "";
   };
@@ -281,7 +297,9 @@ function CourseChatWindow({ courseId, conversationId, senderType, senderId, send
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-3 bg-[#16191d]">
+      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-3 bg-[#16191d]"
+        onScroll={event => { const node = event.currentTarget;
+          followLatestRef.current = node.scrollHeight - node.clientHeight - node.scrollTop < 80; }}>
         {hasOlder && <button type="button" onClick={loadOlder} disabled={loadingOlder}
           className="block mx-auto text-sm text-white/80 py-3 disabled:opacity-50">
           {loadingOlder ? "Chargement..." : "Messages plus anciens"}
@@ -304,14 +322,19 @@ function CourseChatWindow({ courseId, conversationId, senderType, senderId, send
       </div>
 
       {/* Barre de saisie — bouton Envoyer toujours visible */}
+      {pendingMedia && !sending && <button type="button" disabled={sending || uploadingPhoto}
+        onClick={async () => { if (await sendMessage(pendingMedia)) setPendingMedia(null); }}
+        className="flex items-center justify-center gap-2 p-2 text-sm text-white bg-[#1f2429]">
+        <RotateCcw className="w-4 h-4" /> Réessayer l'envoi du fichier
+      </button>}
       <div className="p-2.5 bg-[#1f2429] border-t border-white/8 flex items-end gap-1.5 safe-area-bottom">
         <AudioRecorder
           onSend={handleAudioSend}
-          disabled={sending}
+          disabled={sending || uploadingPhoto}
           senderName={senderName}
         />
         <label className="cursor-pointer flex-shrink-0">
-          <input type="file" accept="image/*,video/*" onChange={handlePhotoSend} className="hidden" disabled={sending || uploadingPhoto} />
+          <input type="file" accept="image/*,video/*" onChange={handlePhotoSend} className="hidden" disabled={sending || uploadingPhoto || !!pendingMedia} />
           <div className="h-10 w-10 rounded-full flex items-center justify-center text-white/50 hover:text-[#00a86b] hover:bg-white/10 transition-colors">
             {uploadingPhoto ? <Loader2 className="w-5 h-5 animate-spin" /> : <ImagePlus className="w-5 h-5" />}
           </div>

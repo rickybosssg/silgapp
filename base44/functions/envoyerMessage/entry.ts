@@ -229,7 +229,7 @@ Deno.serve(async (req) => {
     const msgPreview =
       message_type === 'text' ? (content || '').slice(0, 100) :
       message_type === 'audio' ? '🎤 Message vocal' :
-      message_type === 'photo' ? '📷 Photo' : 'Nouveau message';
+      message_type === 'photo' ? '📷 Photo' : message_type === 'video' ? 'Vidéo' : 'Nouveau message';
 
     const pushTitle = `💬 Nouveau message de ${realName}`;
     const recipients = new Set(); // emails des destinataires (déduit pour éviter les doublons)

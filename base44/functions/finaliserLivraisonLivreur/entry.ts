@@ -51,6 +51,13 @@ export default async function(req: Request): Promise<Response> {
     const course = await base44.asServiceRole.entities.CourseExterne.get(course_id);
     if (!course) return Response.json({ error: 'Course introuvable' }, { status: 404 });
 
+    if (course.eco_mission_id && course.statut !== 'livree') {
+      const mission = await base44.asServiceRole.entities.EcoMission.get(course.eco_mission_id).catch(() => null);
+      if (!mission || !['accepted', 'in_progress'].includes(mission.status)) {
+        return Response.json({ error: 'Attribution de la mission en cours de vérification. Actualisez avant de livrer.' }, { status: 409 });
+      }
+    }
+
     const isAdminCourse = course.pricing_mode === 'admin_manuel' || course.source === 'admin';
 
     // Idempotence: si déjà livrée, ne pas écraser le prix existant

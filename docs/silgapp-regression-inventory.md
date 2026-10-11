@@ -167,3 +167,14 @@ when their assertions still match current product decisions.
    validated Codex behavior.
 5. Run typecheck, lint, active tests, and restored regression tests.
 6. Do not build Android or push `origin/ios` until explicitly authorized.
+## 1.0.124 Corrections And Validation Boundaries
+
+- Driver Messages must own a bounded dynamic viewport, independent of the dashboard's content height. Preserve the shared MessagesPage/ChatWindow and its back action. Guard: `tests/driver-chat-viewport-regression.mjs` (source contract only; Android rendering still required).
+- Eco route-progress recursion has an explicit result type; this addresses the newly introduced recursive return-inference diagnostic, not all existing Deno diagnostics.
+- Android handles system bars/cutouts natively, forwards zeroed handled insets and keeps IME notifications. Chat uses visual viewport height without clearing focus. Never add a second fixed bottom margin.
+- Unread watermarks are account- and course/conversation-scoped, monotonic and persisted on the device. This does not provide cross-device read-receipt synchronization. Latest-message badge queries are bounded to authorized threads and RLS, with no service-role frontend reads.
+- Failed text, photo/video and audio retries preserve their idempotency key. Media retries must not upload again after a successful upload with an uncertain send result. Preserve older-message scroll position during refresh.
+- Eco acceptance keeps a durable `accepting` owner through partial failures, confirms both single-row claims before publishing `accepted`, and retries from the existing conversion workflow. Pre-pickup cancellation compensation is fenced and resumable; collected parcels and foreign owners require administrative repair, never automatic reassignment. This is a recovery protocol, not a proven Base44 multi-entity transaction.
+- Pickup/finalization must reject missions whose acceptance is not complete. Preserve independent per-course finance and completed steps.
+- Notification storage maps `nouveau_message` to the supported `message_client` enum, while FCM retains the original deep-link type.
+- New guards: `eco-acceptance-recovery-regression`, `chat-read-state-regression`, `message-notification-type-regression`, and the expanded chat/transition adapter tests. Simulation PASS does not establish Android or production concurrency PASS.

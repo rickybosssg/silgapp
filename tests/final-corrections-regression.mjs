@@ -18,7 +18,7 @@ assert.deepEqual(await captureDeliveryGps({ getCurrentPosition: ok => ok({ coord
 let handlerCode = read('base44/functions/transitionStatutLivreur/entry.ts')
   .replace(/^import .*;\r?\n/gm, '').replace('export default async function', 'async function handler');
 handlerCode = ts.transpile(handlerCode, { target: ts.ScriptTarget.ES2022 });
-async function transition({ actor = 'test', current = 'livreur_en_route', race = false } = {}) {
+async function transition({ actor = 'test', current = 'livreur_en_route', race = false, missionStatus = 'accepted' } = {}) {
   let row = { id: 'a', statut: current, livreur_id: 'driver', source: 'client', eco_mission_id: 'm', prix_final: 1250, commission_silga: 250 };
   let progresses = 0;
   const api = { auth: { me: async () => ({ email: actor }) }, asServiceRole: { entities: {
@@ -31,6 +31,7 @@ async function transition({ actor = 'test', current = 'livreur_en_route', race =
       },
     },
     Livreur: { get: async () => ({ user_email: 'test', email: 'test' }) },
+    EcoMission: { get: async () => ({ id: 'm', status: missionStatus }) },
   } } };
   const handler = new Function('createClientFromRequest', 'validatedDeliveryGps', 'updateEcoMissionRouteProgress',
     `${handlerCode};return handler;`)(() => api, validateGps, async () => { progresses++; return { updated: true }; });
@@ -48,6 +49,10 @@ assert.equal(pickup.progresses, 1);
 assert.equal((await transition({ actor: 'other' })).status, 403);
 assert.equal((await transition({ current: 'colis_recupere', actor: 'other' })).status, 403);
 assert.equal((await transition({ current: 'colis_recupere' })).progresses, 1);
+const partial = await transition({ missionStatus: 'accepting' });
+assert.equal(partial.status, 409);
+assert.equal(partial.row.statut, 'livreur_en_route');
+assert.equal(partial.progresses, 0);
 const cancelled = await transition({ race: true });
 assert.equal(cancelled.status, 409);
 assert.equal(cancelled.row.statut, 'annulee');

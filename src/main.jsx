@@ -1,4 +1,5 @@
 import React from 'react'
+import { Capacitor } from '@capacitor/core'
 import ReactDOM from 'react-dom/client'
 import App from '@/App.jsx'
 import { installNativeGeolocationShim } from '@/lib/nativeAndroid'
@@ -12,6 +13,7 @@ init500Diagnostic();
 initCartoTiles();
 
 installNativeGeolocationShim()
+if (Capacitor.getPlatform() === 'android') document.documentElement.classList.add('android-insets-native')
 
 // Note: la capture du access_token depuis l'URL est faite dans index.html
 // (script inline synchrone, exécuté avant tout module ES)
