@@ -151,8 +151,13 @@ function NavButtons({ step, totalSteps, onBack, onNext, onAnnuler, onSubmit, isL
 
       {!isLastStep ? (
         <button
+          key="next-step"
           type="button"
-          onClick={onNext}
+          onClick={(event) => {
+            // Cancel the native action before this render can become a submit button.
+            event.preventDefault();
+            onNext();
+          }}
           disabled={isContinueDisabled}
           className="flex-1 h-14 rounded-xl text-white font-bold text-base shadow-md transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           style={{ background: COLORS.primary }}
@@ -162,7 +167,9 @@ function NavButtons({ step, totalSteps, onBack, onNext, onAnnuler, onSubmit, isL
         </button>
       ) : (
         <button
+          key="confirm-step"
           type="submit"
+          data-course-confirm="true"
           disabled={isLoading}
           className="flex-1 h-14 rounded-xl text-white font-black text-base shadow-md transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
           style={{ background: COLORS.primary }}

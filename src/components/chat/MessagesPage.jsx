@@ -1,23 +1,13 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Send, Loader2, MessageCircle, User, Truck, Shield, UserPlus, Users, ImagePlus, Store } from "lucide-react";
+import { ArrowLeft, Loader2, MessageCircle, User, Truck, Shield, UserPlus, Users, Store } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import ChatBubble from "@/components/chat/ChatBubble";
-import AudioRecorder from "@/components/chat/AudioRecorder";
 import NewConversationDialog from "@/components/chat/NewConversationDialog";
 import CourseChatPanel from "@/components/chat/CourseChatPanel";
-import { playNotificationSound } from "@/hooks/useSonEtVibration";
-import {
-  buildClientMessageId,
-  buildSenderProfiles,
-  dedupeAndSortMessages,
-  enrichMessagesWithProfiles,
-  getMessageKey,
-  mergeMessageList,
-} from "@/lib/chatUtils";
+import ChatWindow from "@/components/chat/ChatWindow";
 
 const PARTNER_TYPES = ["partner", "partenaire", "boutique", "restaurant", "pharmacie"];
 const normalizeParticipantType = (type) => PARTNER_TYPES.includes(type) ? "partenaire" : type;
@@ -156,168 +146,15 @@ function ConversationItem({ conv, myType, myId, active, onClick }) {
 }
 
 function GeneralChatWindow({ conversationId, myType, myId, myName, onBack }) {
-  const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState("");
-  const [sending, setSending] = useState(false);
-  const [uploadingPhoto, setUploadingPhoto] = useState(false);
-  const bottomRef = useRef(null);
-  const sendingRef = useRef(false);
-  const knownIdsRef = useRef(new Set());
-
-  useEffect(() => {
-    if (!conversationId) return;
-    base44.entities.Message.filter({ conversation_id: conversationId }, "created_date", 100)
-      .then(async (msgs) => {
-        const list = dedupeAndSortMessages(msgs || []);
-        const profiles = await buildSenderProfiles(base44, list);
-        const enriched = enrichMessagesWithProfiles(list, profiles);
-        knownIdsRef.current = new Set(enriched.map(getMessageKey));
-        setMessages(enriched);
-      })
-      .catch(() => setMessages([]));
-  }, [conversationId]);
-
-  useEffect(() => {
-    if (!conversationId) return;
-    const unsub = base44.entities.Message.subscribe((event) => {
-      if (event.type === "create" && event.data?.conversation_id === conversationId) {
-        // Anti-doublon : vérifier le ref
-        const eventKey = getMessageKey(event.data);
-        if (knownIdsRef.current.has(eventKey)) return;
-        knownIdsRef.current.add(eventKey);
-
-        const isFromMe = event.data.sender_type === myType && event.data.sender_id === myId;
-        if (!isFromMe) {
-          playNotificationSound();
-          navigator.vibrate?.([200, 100, 200]);
-        }
-        setMessages(prev => mergeMessageList(prev, event.data));
-      }
-    });
-    return () => unsub?.();
-  }, [conversationId, myType, myId]);
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
-  // Envoi sécurisé via la fonction backend envoyerMessage
-  const sendMessage = async (msgData) => {
-    if (sendingRef.current || !conversationId) return;
-    sendingRef.current = true;
-    setSending(true);
-    try {
-      const clientMessageId = msgData.client_message_id || buildClientMessageId(conversationId, myType, myId);
-      const res = await base44.functions.invoke("envoyerMessage", {
-        conversation_id: conversationId,
-        sender_type: myType,
-        sender_id: myId,
-        client_message_id: clientMessageId,
-        ...msgData,
-      });
-      const newMsg = res?.message || res?.data?.message;
-      if (newMsg) {
-        const key = getMessageKey(newMsg);
-        if (!knownIdsRef.current.has(key)) {
-          knownIdsRef.current.add(key);
-          setMessages(prev => mergeMessageList(prev, newMsg));
-        }
-      }
-    } catch (err) {
-      console.error("Erreur envoi message:", err);
-    }
-    sendingRef.current = false;
-    setSending(false);
-  };
-
-  const handleSend = async () => {
-    if (!input.trim() || sendingRef.current) return;
-    setInput("");
-    await sendMessage({ content: input.trim(), message_type: "text" });
-  };
-
-  const handlePhotoSend = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file || sendingRef.current) return;
-    setUploadingPhoto(true);
-    try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
-      await sendMessage({ message_type: "photo", photo_url: file_url, content: "" });
-    } catch (err) {
-      console.error("Erreur envoi photo:", err);
-    }
-    setUploadingPhoto(false);
-    e.target.value = "";
-  };
-
-  const handleKeyDown = (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  };
-
   return (
-    <div className="flex flex-col h-full bg-[#16191d]">
-      {/* Header */}
-      <div className="flex items-center gap-2 p-3 bg-[#0f1216] text-white">
-        <button onClick={onBack} className="text-white/80 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors">
+    <div className="flex flex-col h-full min-h-0 bg-[#16191d]">
+      <div className="safe-area-top p-3 bg-[#0f1216] text-white">
+        <button onClick={onBack} aria-label="Retour aux messages" className="p-2">
           <ArrowLeft className="w-5 h-5" />
         </button>
-        <MessageCircle className="w-4 h-4" />
-        <span className="text-sm font-bold truncate">Messagerie</span>
       </div>
-
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-3 bg-[#16191d]">
-        {messages.length === 0 && (
-          <div className="flex items-center justify-center h-full">
-            <p className="text-xs text-gray-400 text-center">
-              Aucun message. Dites bonjour !
-            </p>
-          </div>
-        )}
-        {messages.map((msg) => (
-          <ChatBubble
-            key={msg.id}
-            message={msg}
-            isMine={msg.sender_type === myType && msg.sender_id === myId}
-          />
-        ))}
-        <div ref={bottomRef} />
-      </div>
-
-      {/* Barre de saisie — bouton Envoyer toujours visible */}
-      <div className="p-2.5 bg-[#1f2429] border-t border-white/10 flex items-end gap-1.5 safe-area-bottom shadow-[0_-8px_24px_rgba(0,0,0,0.2)]">
-        <AudioRecorder
-          onSend={(data) => sendMessage(data)}
-          disabled={sending}
-          senderName={myName}
-        />
-        <label className="cursor-pointer flex-shrink-0">
-          <input type="file" accept="image/*" onChange={handlePhotoSend} className="hidden" disabled={sending || uploadingPhoto} />
-          <div className="h-10 w-10 rounded-full flex items-center justify-center text-white/50 hover:text-[#00a86b] hover:bg-white/10 transition-colors">
-            {uploadingPhoto ? <Loader2 className="w-5 h-5 animate-spin" /> : <ImagePlus className="w-5 h-5" />}
-          </div>
-        </label>
-        <textarea
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Votre message..."
-          disabled={sending}
-          rows={2}
-          className="flex-1 min-h-14 max-h-32 min-w-0 resize-none rounded-2xl border border-white/10 bg-[#16191d] px-4 py-3 text-[15px] font-medium leading-5 text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-[#00a86b]/40 focus:border-[#00a86b]/40"
-        />
-        <Button
-          onClick={handleSend}
-          disabled={sending || !input.trim()}
-          className="h-11 w-11 sm:w-auto sm:min-w-[92px] rounded-full sm:rounded-xl bg-primary hover:bg-primary/90 shadow-md flex-shrink-0 disabled:opacity-60 gap-2 px-0 sm:px-4 font-black text-white"
-        >
-          {sending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
-          <span className="hidden sm:inline">Envoyer</span>
-        </Button>
-      </div>
+      <ChatWindow conversationId={conversationId} senderType={myType} senderId={myId}
+        senderName={myName} fullHeight />
     </div>
   );
 }
@@ -328,6 +165,27 @@ export default function MessagesPage({ myType, myId, myName, onBack, initialConv
   const [activeCourseId, setActiveCourseId] = useState(initialCourseId || null);
   const [loading, setLoading] = useState(true);
   const [showNewConv, setShowNewConv] = useState(false);
+  const [courseThreads, setCourseThreads] = useState([]);
+
+  useEffect(() => {
+    setActiveCourseId(initialCourseId || null);
+    setActiveConvId(initialCourseId ? null : initialConversationId || null);
+  }, [initialCourseId, initialConversationId]);
+
+  useEffect(() => {
+    let active = true;
+    setCourseThreads([]);
+    if (!myId || !["client", "livreur"].includes(myType)) return;
+    const filters = myType === "livreur" ? [{ livreur_id: myId }]
+      : [{ expediteur_client_id: myId }, { destinataire_client_id: myId }];
+    Promise.all(filters.map(filter => base44.entities.CourseExterne.filter(filter, "-updated_date", 50)))
+      .then(groups => {
+        if (!active) return;
+        const unique = new Map(groups.flat().filter(Boolean).map(c => [c.id, c]));
+        setCourseThreads([...unique.values()]);
+      }).catch(() => {});
+    return () => { active = false; };
+  }, [myId, myType]);
 
   useEffect(() => {
     if (!myId) return;
@@ -457,7 +315,7 @@ export default function MessagesPage({ myType, myId, myName, onBack, initialConv
             <p className="text-xs text-gray-400 font-medium">Chargement des conversations...</p>
           </div>
         )}
-        {!loading && conversations.length === 0 && (
+        {!loading && conversations.length === 0 && courseThreads.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16 text-center px-8">
             <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-gray-100 to-gray-50 flex items-center justify-center mb-4 shadow-sm">
               <MessageCircle className="w-8 h-8 text-gray-300" />
@@ -476,6 +334,13 @@ export default function MessagesPage({ myType, myId, myName, onBack, initialConv
             </Button>
           </div>
         )}
+        {courseThreads.map(course => (
+          <button key={course.id} onClick={() => setActiveCourseId(course.id)}
+            className="w-full text-left p-3 rounded-lg border border-gray-200 bg-white">
+            <p className="text-sm font-semibold text-gray-900">Course #{course.id.slice(-6)}</p>
+            <p className="text-xs text-gray-600 truncate">{course.adresse_depart} → {course.adresse_arrivee}</p>
+          </button>
+        ))}
         {conversations.map(conv => (
           <ConversationItem
             key={conv.id}

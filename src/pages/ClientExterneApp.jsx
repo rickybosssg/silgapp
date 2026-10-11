@@ -38,9 +38,9 @@ import { MOMENTS as PUB_MOMENTS } from "@/lib/publiciteUtils";
 import MultiColisProgressBadge from "@/components/multi-colis/MultiColisProgressBadge";
 import FraisAnnulationBannerClient from "@/components/client/FraisAnnulationBannerClient";
 import SuiviBarreFlottante from "@/components/client/SuiviBarreFlottante";
-import RechercheLivreurScreen from "@/components/client/RechercheLivreurScreen";
 import SuiviCourseFullscreen from "@/components/client/SuiviCourseFullscreen";
 import EcranFinCourse from "@/components/client/EcranFinCourse";
+import AnnulerCourseDialog from "@/components/client/AnnulerCourseDialog";
 import MultiCourseSelector from "@/components/client/MultiCourseSelector";
 import QuickOrderPanel from "@/components/client/QuickOrderPanel";
 import QuickOrderProPanel from "@/components/client/QuickOrderProPanel";
@@ -97,6 +97,8 @@ export default function ClientExterneApp() {
   const [courseAnnuleeRelance, setCourseAnnuleeRelance] = useState(null); // course annulée auto → proposer relance
   const [courseDecisionClient, setCourseDecisionClient] = useState(null); // course en attente de décision client (livreur a annulé)
   const [showMessages, setShowMessages] = useState(false);
+  const [messageCourseId, setMessageCourseId] = useState(null);
+  const [courseToCancel, setCourseToCancel] = useState(null);
   const [pendingConversationId, setPendingConversationId] = useState(null);
   const [showNotificationsPanel, setShowNotificationsPanel] = useState(false);
   const [notificationPanelItems, setNotificationPanelItems] = useState([]);
@@ -236,14 +238,15 @@ export default function ClientExterneApp() {
     for (const id of prevActiveIds.current) {
       if (!currentIds.has(id)) {
         const lastStatus = prevStatuses.current[id];
-        // Si la dernière statut connu n'était pas "annulee", on considère que c'est une livraison
+        // A missing active course can be cancelled or temporarily absent. Read its real status.
         if (lastStatus && lastStatus !== "annulee") {
-          setCourseLivreId(id);
-          setCourseLivreData(prevCoursesRef.current[id] || { id, statut: "livree", type_course: "expedier" });
-          // Vibration de livraison
-          if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 400]);
-          // Auto-clear après 30 secondes
-          setTimeout(() => setCourseLivreId(prev => prev === id ? null : prev), 30000);
+          base44.entities.CourseExterne.get(id).then(saved => {
+            if (saved?.id !== id || saved.statut !== "livree") return;
+            setCourseLivreId(id);
+            setCourseLivreData(saved);
+            if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 400]);
+            setTimeout(() => setCourseLivreId(prev => prev === id ? null : prev), 30000);
+          }).catch(() => {});
         }
       }
     }
@@ -430,6 +433,7 @@ export default function ClientExterneApp() {
       // ── Message : ouvrir la conversation ──
       if (data.type === "nouveau_message") {
         const convId = String(data.conversation_id || "").trim();
+        setMessageCourseId(String(data.course_id || "").trim() || null);
         setPendingConversationId(convId || null);
         setShowMessages(true);
       }
@@ -1068,7 +1072,7 @@ export default function ClientExterneApp() {
 
       {/* ── COURSE ACTIVE UNIQUE — bannière flottante ─────── */}
       {coursesActives.length === 1 && (
-        <div className="fixed top-3 left-3 right-3 z-50">
+        <div className="fixed top-[calc(max(env(safe-area-inset-top),28px)+0.75rem)] left-3 right-3 z-50">
           <div
             className="bg-[#1f2429]/95 backdrop-blur-md rounded-2xl shadow-xl border border-[#00a86b]/20 overflow-hidden cursor-pointer active:scale-[0.98] transition-transform"
             onClick={() => navigate("/client/suivi", { state: { course_id: coursesActives[0].id } })}
@@ -1109,7 +1113,7 @@ export default function ClientExterneApp() {
 
       {/* ── MULTI-COURSES — bannière compacte + sélecteur ─────── */}
       {coursesActives.length > 1 && (
-        <div className="fixed top-3 left-3 right-3 z-50">
+        <div className="fixed top-[calc(max(env(safe-area-inset-top),28px)+0.75rem)] left-3 right-3 z-50">
           <div
             className="bg-[#1f2429]/95 backdrop-blur-md rounded-2xl shadow-xl border border-[#00a86b]/20 overflow-hidden cursor-pointer active:scale-[0.98] transition-transform"
             onClick={() => setShowMultiCourseSelector(true)}
@@ -1145,7 +1149,7 @@ export default function ClientExterneApp() {
         </div>
       )}
 
-      <div className="px-4 pb-[calc(5rem+env(safe-area-inset-bottom))]" style={coursesActives.length > 0 ? { paddingTop: `${coursesActives.length * 76 + 16}px` } : { paddingTop: "16px" }}>
+      <div className="px-4 pb-[calc(5rem+env(safe-area-inset-bottom))]" style={{ paddingTop: `calc(max(env(safe-area-inset-top), 28px) + ${coursesActives.length > 0 ? 104 : 16}px)` }}>
         <div className="max-w-lg mx-auto space-y-4">
 
           {/* ── ONGLETS PROMO ─────────────────────── */}
@@ -1378,7 +1382,7 @@ export default function ClientExterneApp() {
                 <div className="grid grid-cols-4 gap-2">
                   {[
                     { icon: <Package className="w-5 h-5" />, label: "Courses",   color: "text-blue-600",   bg: "bg-blue-50",   action: () => navigate("/client/suivi") },
-                    { icon: <Clock className="w-5 h-5" />,   label: "Historique",color: "text-purple-600", bg: "bg-purple-50", action: () => navigate("/client/suivi") },
+                    { icon: <Clock className="w-5 h-5" />,   label: "Historique",color: "text-purple-600", bg: "bg-purple-50", action: () => navigate("/client/suivi", { state: { view: "historique" } }) },
                     { icon: <Bell className="w-5 h-5" />, label: "Notifications", color: "text-red-600", bg: "bg-red-50", badge: notifications.length, action: openNotificationsPanel },
                     { icon: <Package className="w-5 h-5" />, label: "Commandes", color: "text-indigo-600", bg: "bg-indigo-50", badge: commandesActivesCount, action: () => navigate("/client/mes-commandes") },
                     { icon: <Clock className="w-5 h-5" />, label: "Programmees", color: "text-amber-600", bg: "bg-amber-50", action: () => navigate("/client/livraisons-programmees") },
@@ -1559,12 +1563,12 @@ export default function ClientExterneApp() {
       />
 
       {/* ── ÉCRAN RECHERCHE LIVREUR — carte vivante + vagues de dispatch ── */}
-      {showRecherche && courseEnRecherche && (
-        <RechercheLivreurScreen
+      {showRecherche && !showSuiviFullscreen && courseEnRecherche && (
+        <SuiviCourseFullscreen
           course={courseEnRecherche}
           position={position}
-          countryCode={clientProfil?.country_code}
           onClose={() => setShowRecherche(false)}
+          onCancel={() => setCourseToCancel(courseEnRecherche)}
         />
       )}
 
@@ -1624,23 +1628,11 @@ export default function ClientExterneApp() {
             }
           }}
           onMessage={() => {
+            setMessageCourseId(coursePrincipale.id);
             setShowSuiviFullscreen(false);
             setShowMessages(true);
           }}
-          onCancel={async () => {
-            try {
-              await base44.functions.invoke("annulerCourseExterne", {
-                course_id: coursePrincipale.id,
-                motif: "Annulé par le client",
-                source: "client",
-              });
-              toast.success("Course annulée");
-              setShowSuiviFullscreen(false);
-              checkStatus(position, clientProfil);
-            } catch (e) {
-              toast.error("Erreur lors de l'annulation");
-            }
-          }}
+          onCancel={() => setCourseToCancel(coursePrincipale)}
         />
       )}
 
@@ -1718,6 +1710,15 @@ export default function ClientExterneApp() {
         </div>
       )}
 
+      {courseToCancel && (
+        <AnnulerCourseDialog course={courseToCancel} open clientId={clientProfil?.id}
+          onClose={() => setCourseToCancel(null)}
+          onSuccess={() => {
+            setCourseToCancel(null);
+            setShowSuiviFullscreen(false);
+            checkStatus(position, clientProfil);
+          }} />
+      )}
       {showMessages && (
         <div className="fixed inset-0 z-50 bg-white flex flex-col">
           <MessagesPage
@@ -1725,7 +1726,8 @@ export default function ClientExterneApp() {
             myId={clientProfil?.id}
             myName={prenom}
             initialConversationId={pendingConversationId}
-            onBack={() => { setPendingConversationId(null); setShowMessages(false); }}
+            initialCourseId={messageCourseId}
+            onBack={() => { setMessageCourseId(null); setPendingConversationId(null); setShowMessages(false); }}
           />
         </div>
       )}

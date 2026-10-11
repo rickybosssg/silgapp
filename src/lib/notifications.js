@@ -1028,7 +1028,7 @@ export function subscribeToNotifications(onNotification, userEmail, options = {}
     if (notification.type === "nouveau_message" || notification.type === "message_client") {
       try {
         window.dispatchEvent(new CustomEvent("silgapp:chat_refetch", {
-          detail: { type: notification.type, course_id: notification.course_id || "" }
+          detail: { type: notification.type, course_id: notification.course_id || "", conversation_id: notification.conversation_id || "" }
         }));
       } catch (_) {}
     }

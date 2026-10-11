@@ -87,7 +87,7 @@ export default function ProfilModal({ clientProfil, onClose, onSave }) {
 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-3xl max-w-sm w-full p-6 space-y-5 shadow-2xl" onClick={e => e.stopPropagation()}>
+      <div className="bg-white rounded-3xl max-w-sm w-full min-w-0 max-h-[calc(100dvh-2rem)] overflow-y-auto p-6 space-y-5 shadow-2xl" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -145,7 +145,7 @@ export default function ProfilModal({ clientProfil, onClose, onSave }) {
                 onChange={handleTelChange}
                 placeholder={"0".repeat(countryInfo.len).replace(/(.{2})/g, "$1 ").trim()}
                 inputMode="numeric"
-                className="flex-1 h-12 rounded-xl border border-gray-200 px-4 text-sm font-mono tracking-widest focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                className="flex-1 min-w-0 w-0 h-12 rounded-xl border border-gray-200 px-4 text-sm font-mono tracking-widest focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
               />
             </div>
             {telAffiche.length > 0 && (

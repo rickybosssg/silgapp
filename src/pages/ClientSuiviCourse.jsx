@@ -6,11 +6,11 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, Package, CheckCircle2, Clock, Star, XCircle, ArrowLeft, Share2, Ruler, Banknote } from "lucide-react";
+import { MapPin, Package, CheckCircle2, Clock, Star, ArrowLeft, Share2, Ruler, Banknote } from "lucide-react";
 import { getPrixAffichable } from "@/utils/getPrixAffichable";
-import { getCourseStatusLabel, getCourseStatusColor } from "@/lib/courseStatuses";
+import { getCourseStatusLabel } from "@/lib/courseStatuses";
 import { haversineKm } from "@/lib/priceEstimate";
-import LivreurAssigneCard from "@/components/client/LivreurAssigneCard";
+
 
 // Ouvre WhatsApp via wa.me (fonctionne sur Android/iOS, ouvre l'app si installée)
 function openWhatsApp(phone, message = "") {
@@ -26,10 +26,12 @@ import LivreurRatingDialog from "@/components/client/LivreurRatingDialog";
 import DestinataireReactionButton from "@/components/client/DestinataireReactionButton";
 import AnnulerCourseDialog from "@/components/client/AnnulerCourseDialog";
 import LivreurAnnulationDialog from "@/components/client/LivreurAnnulationDialog";
-import ChatWindow from "@/components/chat/ChatWindow";
+
 import CoursePriceEditor from "@/components/courses/CoursePriceEditor";
-import CarteLivreurClient from "@/components/chat/CarteLivreurClient";
-import ETADisplay from "@/components/client/ETADisplay";
+
+
+import SuiviCourseFullscreen from "@/components/client/SuiviCourseFullscreen";
+import CourseChatPanel from "@/components/chat/CourseChatPanel";
 import ResumeETACell from "@/components/client/ResumeETACell";
 import HistoriqueCoursesClient from "@/components/client/HistoriqueCoursesClient";
 import FraisAnnulationBannerClient from "@/components/client/FraisAnnulationBannerClient";
@@ -73,12 +75,25 @@ export default function ClientSuiviCourse() {
   const [motifAnnulation, setMotifAnnulation] = useState(null);
   const prevLivreurIdRef = useRef(null);
   const [ratingShownForCourse, setRatingShownForCourse] = useState(null);
-  const [onglet, setOnglet] = useState("actives"); // "actives" | "historique"
+  const [onglet, setOnglet] = useState(location.state?.view === "historique" ? "historique" : "actives");
   // Pré-sélectionner la course depuis la navigation (bouton "Voir la course")
   const [selectedCourseId, setSelectedCourseId] = useState(
     location.state?.course_id || null
   );
   const [userEmail, setUserEmail] = useState(null);
+  const [messageCourseId, setMessageCourseId] = useState(null);
+  useEffect(() => {
+    const id = location.state?.course_id || new URLSearchParams(location.search).get("course_id");
+    if (id) {
+      setSelectedCourseId(id);
+      setOnglet("actives");
+      setMessageCourseId(location.state?.openChat ? id : null);
+    } else if (location.state?.view === "historique") {
+      setSelectedCourseId(null);
+      setOnglet("historique");
+      setMessageCourseId(null);
+    }
+  }, [location.key, location.search, location.state]);
 
   const queryClient = useQueryClient();
 
@@ -195,12 +210,30 @@ export default function ClientSuiviCourse() {
     staleTime: 5000,
   });
 
+  // A deep link can target a course outside the latest 50 entries. Never fall back to another course.
+  const { data: selectedCourse } = useQuery({
+    queryKey: ["mes-courses-externes", userId, clientProfilId, selectedCourseId],
+    enabled: !!userId && !!clientProfilId && !!selectedCourseId && !courses.some(c => c.id === selectedCourseId),
+    queryFn: async () => {
+      const c = await base44.entities.CourseExterne.get(selectedCourseId);
+      if (!c || !(c.created_by_id === userId || c.expediteur_client_id === clientProfilId ||
+        c.destinataire_client_id === clientProfilId || c.client_user_email === userEmail)) return null;
+      if (c.livreur_id && !["livree", "annulee"].includes(c.statut)) {
+        const gps = await base44.functions.invoke("getLivreurGPSForCourse", { courseId: c.id }).catch(() => null);
+        return { ...c, _livreur: gps?.data || gps || undefined };
+      }
+      return c;
+    },
+    staleTime: 5000,
+    refetchInterval: 10000,
+  });
+
   // Toutes les courses actives / terminées
   const coursesActives = courses.filter(c => !["livree", "annulee"].includes(c.statut));
   const coursesHistorique = courses.filter(c => ["livree", "annulee"].includes(c.statut));
   // Course sélectionnée : celle choisie ou la première active ou la dernière
-  const maCourse = (selectedCourseId ? courses.find(c => c.id === selectedCourseId) : null)
-    || coursesActives[0] || courses[0] || null;
+  const maCourse = selectedCourseId ? courses.find(c => c.id === selectedCourseId) || selectedCourse || null
+    : coursesActives[0] || courses[0] || null;
 
   // Déclencheur direct sur changement de statut critique (fallback si notification ratée)
   const [prevStatut, setPrevStatut] = useState(null);
@@ -404,6 +437,16 @@ export default function ClientSuiviCourse() {
         {/* ── ONGLET ACTIVES ── */}
         {onglet === "actives" && maCourse && (
           <>
+          <SuiviCourseFullscreen key={maCourse.id}
+            course={{ ...maCourse, gps_arrivee_lat: destGpsLat ?? maCourse.gps_arrivee_lat, gps_arrivee_lng: destGpsLng ?? maCourse.gps_arrivee_lng }}
+            onClose={() => navigate("/client")}
+            onCall={() => { if (maCourse.livreur_telephone) window.location.href = `tel:${maCourse.livreur_telephone}`; }}
+            onMessage={clientProfilId ? () => setMessageCourseId(maCourse.id) : undefined}
+            onCancel={() => setShowAnnulerDialog(true)}>
+          <details className="mt-4">
+            <summary className="font-semibold text-sm cursor-pointer py-2">Informations et actions de la course</summary>
+            <div className="space-y-4 pt-3">
+
 
         {/* Sélecteur de course si plusieurs actives */}
         {coursesActives.length > 1 && (
@@ -438,143 +481,9 @@ export default function ClientSuiviCourse() {
           </Card>
         )}
 
-        {/* Statut course */}
-        <Card className="p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h1 className="text-lg font-bold text-foreground">Suivi de course</h1>
-            <Badge className={getCourseStatusColor(maCourse.statut)}>
-              {getStatutLabel(maCourse)}
-            </Badge>
-          </div>
-
-          {/* Progress bar */}
-          <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
-            <span>Créée</span>
-            <span>Récupération</span>
-            <span>Livraison</span>
-          </div>
-          <div className="relative h-2 bg-gray-200 rounded-full overflow-hidden">
-            <div
-              className={`absolute h-full transition-all duration-500 ${
-                maCourse.statut === "livree" ? "bg-green-500 w-full" :
-                maCourse.statut === "en_livraison" ? "bg-primary w-full" :
-                maCourse.statut === "livreur_en_route" || maCourse.statut === "colis_recupere" ? "bg-primary w-2/3" :
-                maCourse.statut === "annulee" ? "bg-red-400 w-0" :
-                "bg-primary w-1/3"
-              }`}
-            />
-          </div>
-
-          {/* Bouton Annuler */}
-          {!["livree", "annulee"].includes(maCourse.statut) && (
-            <Button
-              variant="outline"
-              className="w-full mt-4 border-red-300 text-red-600 hover:bg-red-50"
-              onClick={() => setShowAnnulerDialog(true)}
-            >
-              <XCircle className="w-4 h-4 mr-2" />
-              Annuler la course
-            </Button>
-          )}
-        </Card>
-
-        {/* Prix modifiable par le client — uniquement avant acceptation par un livreur */}
+        {/* Existing price, sharing, history and rating actions remain in this same tracking panel. */}
         {!maCourse.livreur_id && !["livree", "annulee"].includes(maCourse.statut) && (
           <CoursePriceEditor course={maCourse} context="client" />
-        )}
-
-        {/* Infos livreur — Card style Uber uniquement si livreur a accepté */}
-        {maCourse.livreur_id && maCourse.heure_acceptation && (
-          <LivreurAssigneCard course={maCourse} />
-        )}
-
-        {/* 💬 Messagerie client-livreur-admin */}
-        {maCourse.livreur_id && !["livree", "annulee"].includes(maCourse.statut) && clientProfilId && (
-          <div id="chat-livreur" className="scroll-mt-20">
-            <ChatWindow
-            courseId={maCourse.id}
-            senderType="client"
-            senderId={clientProfilId}
-            senderName={maCourse.expediteur_nom || maCourse.client_nom || "Client"}
-            clientName={maCourse.expediteur_nom || maCourse.client_nom}
-            livreurName={maCourse.livreur_nom}
-          />
-          </div>
-        )}
-
-        {/* 🗺️ Carte live du livreur */}
-        {["livreur_en_route", "en_route_expediteur", "colis_recupere", "en_livraison"].includes(maCourse.statut) && (() => {
-          const l = maCourse._livreur;
-          const isVersRecup = maCourse.statut === "livreur_en_route";
-          return (
-            <CarteLivreurClient
-              livreurLat={l?.latitude}
-              livreurLng={l?.longitude}
-              livreurNom={maCourse.livreur_nom}
-              departLat={maCourse.gps_depart_lat}
-              departLng={maCourse.gps_depart_lng}
-              arriveeLat={maCourse.gps_arrivee_lat}
-              arriveeLng={maCourse.gps_arrivee_lng}
-              statut={maCourse.statut}
-            />
-          );
-        })()}
-
-        {/* ETA temps réel — expéditeur : vers récupération puis vers livraison */}
-        {/* CORRECTION CRITIQUE : ETA TOUJOURS affiché, même <100m */}
-        {["livreur_en_route", "colis_recupere", "en_livraison"].includes(maCourse.statut) && maCourse.livreur_id && isClientPrincipalForETA(maCourse, userId, clientProfilId) && (
-          (() => {
-            const livreurLat = maCourse._livreur?.latitude;
-            const livreurLng = maCourse._livreur?.longitude;
-            const isVersRecup = maCourse.statut === "livreur_en_route";
-            // GPS live destinataire prioritaire pour la phase livraison, fallback gps_arrivee
-            const targetLat = isVersRecup ? maCourse.gps_depart_lat : (destGpsLat || maCourse.gps_arrivee_lat);
-            const targetLng = isVersRecup ? maCourse.gps_depart_lng : (destGpsLng || maCourse.gps_arrivee_lng);
-            // CORRECTION : Afficher ETA même si GPS manquant (affichera "en route")
-            return (
-              <ETADisplay
-                livreurLat={livreurLat || null}
-                livreurLng={livreurLng || null}
-                targetLat={targetLat || null}
-                targetLng={targetLng || null}
-                livreurNom={maCourse.livreur_nom}
-                phase={isVersRecup ? "vers_recuperation" : "vers_livraison"}
-                statut={maCourse.statut}
-                gpsLastUpdate={maCourse._livreur?.derniere_position_date || maCourse._livreur?.last_seen_at}
-                courseId={maCourse.id}
-                countryCode={maCourse.country_code}
-                livreurId={maCourse.livreur_id}
-              />
-            );
-          })()
-        )}
-
-        {/* ETA temps réel — destinataire : vers livraison uniquement (après récupération) */}
-        {/* CORRECTION CRITIQUE : ETA TOUJOURS affiché, même <100m */}
-        {["colis_recupere", "en_livraison"].includes(maCourse.statut) && maCourse.livreur_id && (
-          (() => {
-            const livreurLat = maCourse._livreur?.latitude;
-            const livreurLng = maCourse._livreur?.longitude;
-            const isDestinataire = maCourse.type_course === "expedier" && maCourse.destinataire_client_id === clientProfilId;
-            const shouldShow = isDestinataire || !isClientPrincipalForETA(maCourse, userId, clientProfilId);
-            if (!shouldShow) return null;
-            // CORRECTION : Afficher ETA même si GPS manquant
-            return (
-              <ETADisplay
-                livreurLat={livreurLat || null}
-                livreurLng={livreurLng || null}
-                targetLat={destGpsLat || maCourse.gps_arrivee_lat || null}
-                targetLng={destGpsLng || maCourse.gps_arrivee_lng || null}
-                livreurNom={maCourse.livreur_nom}
-                phase="vers_livraison"
-                statut={maCourse.statut}
-                gpsLastUpdate={maCourse._livreur?.derniere_position_date || maCourse._livreur?.last_seen_at || destGpsLastUpdate}
-                courseId={maCourse.id}
-                countryCode={maCourse.country_code}
-                livreurId={maCourse.livreur_id}
-              />
-            );
-          })()
         )}
 
         {/* Trajet + Estimation — affiché dès que la course existe */}
@@ -628,7 +537,7 @@ export default function ClientSuiviCourse() {
               && maCourse.manual_price_status === "accepted" 
               && maCourse.manual_price > 0;
             const prixRaw = getPrixAffichable(maCourse);
-            const prix = prixRaw ? Math.max(prixRaw, PRIX_MIN) : 0;
+            const prix = prixRaw || 0;
 
             return (
               <div className={`grid grid-cols-3 gap-3 pt-3 mt-1 border-t ${isFinal ? "border-green-200" : "border-gray-200"}`}>
@@ -805,7 +714,6 @@ export default function ClientSuiviCourse() {
                   {(() => {
                     const countryDataFinal = countries.find(c => c.code === maCourse.country_code);
                     const tarifKmFinal = countryDataFinal?.prix_par_km || 100;
-                    const prixMinFinal = countryDataFinal?.prix_minimum || 1000;
                     // Guard : éviter NaN si coordonnées GPS nulles (ex: destination_inconnue)
                     const haversineOrNull = (a, b, c, d) =>
                       (a != null && b != null && c != null && d != null && !isNaN(a) && !isNaN(b) && !isNaN(c) && !isNaN(d))
@@ -814,7 +722,7 @@ export default function ClientSuiviCourse() {
                       ? maCourse.distance_reelle_km
                       : haversineOrNull(maCourse.latitude_recuperation, maCourse.longitude_recuperation, maCourse.latitude_livraison, maCourse.longitude_livraison);
                     const prixBrutFinal = maCourse.prix_final > 0 ? maCourse.prix_final : (distFinal != null && distFinal > 0 ? Math.round(distFinal * tarifKmFinal) : null);
-                    const prixFinal = prixBrutFinal > 0 ? Math.max(prixBrutFinal, prixMinFinal) : null;
+                      const prixFinal = prixBrutFinal > 0 ? prixBrutFinal : null;
                     const dureeMs = maCourse.heure_livraison && maCourse.heure_recuperation
                       ? new Date(maCourse.heure_livraison) - new Date(maCourse.heure_recuperation)
                       : maCourse.heure_livraison && maCourse.heure_acceptation
@@ -903,6 +811,16 @@ export default function ClientSuiviCourse() {
             </>
           );
         })()}
+
+            </div>
+          </details>
+          </SuiviCourseFullscreen>
+          {messageCourseId && (
+            <div className="fixed inset-0 z-[80] flex flex-col bg-white">
+              <CourseChatPanel courseId={messageCourseId} myType="client" myId={clientProfilId}
+                myName={maCourse.client_nom || "Client"} onBack={() => setMessageCourseId(null)} />
+            </div>
+          )}
 
         {/* Prix manuel géré inline dans la carte statut ci-dessus — pas de modale flottante */}
 

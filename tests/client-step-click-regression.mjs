@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+const src=readFileSync(new URL('../src/components/client/CourseStepForm.jsx',import.meta.url),'utf8');
+const next=src.match(/key="next-step"[\s\S]*?onClick=\{\(event\) => \{([\s\S]*?)\}\}/);
+assert.ok(next,'next-step must be a separate keyed button');
+assert.match(src,/key="next-step"\s+type="button"/);
+assert.match(src,/key="confirm-step"\s+type="submit"/);
+const events=[];
+new Function('event','onNext',next[1])({preventDefault(){events.push('preventDefault');}},()=>events.push('next'));
+assert.deepEqual(events,['preventDefault','next']);
+console.log('CLIENT_STEP_CLICK=PASS (extracted handler; Android revalidation required)');

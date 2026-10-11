@@ -33,6 +33,7 @@ Deno.serve(async (req) => {
       content,
       audio_url,
       photo_url,
+      video_url,
     } = payload;
     let final_sender_id = raw_sender_id;
 
@@ -40,16 +41,8 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'sender_type et sender_id sont requis' }, { status: 400 });
     }
 
-    // ── 0. Idempotence : si client_message_id déjà présent, retourner le message existant ──
-    if (client_message_id) {
-      try {
-        const existing = await base44.asServiceRole.entities.Message.filter({ client_message_id });
-        if (existing && existing.length > 0) {
-          return Response.json({ success: true, message: existing[0], idempotent: true });
-        }
-      } catch (e: any) {
-        console.warn('[envoyerMessage] Idempotency check failed:', e?.message);
-      }
+    if (!!course_id === !!conversation_id) {
+      return Response.json({ error: 'Une course ou une conversation unique est requise' }, { status: 400 });
     }
 
     // ── 1. Résoudre le VRAI nom et la photo depuis le profil ──
@@ -148,6 +141,21 @@ Deno.serve(async (req) => {
       }
     }
 
+    // ── 0. Idempotence : si client_message_id déjà présent, retourner le message existant ──
+    if (client_message_id) {
+      try {
+        const existing = await base44.asServiceRole.entities.Message.filter({
+          client_message_id, sender_type, sender_id: final_sender_id,
+          ...(course_id ? { course_id } : { conversation_id }),
+        });
+        if (existing && existing.length > 0) {
+          return Response.json({ success: true, message: existing[0], idempotent: true });
+        }
+      } catch (e: any) {
+        console.warn('[envoyerMessage] Idempotency check failed:', e?.message);
+      }
+    }
+
     // ── 3. Résoudre les User.id des participants pour la RLS Message ──
     let messageParticipantUserIds: string[] = [];
     try {
@@ -198,6 +206,7 @@ Deno.serve(async (req) => {
       content: content || '',
       audio_url: audio_url || null,
       photo_url: photo_url || null,
+      video_url: video_url || null,
       participant_user_ids: messageParticipantUserIds,
       security_status: messageParticipantUserIds.length > 0 ? 'secured' : 'pending',
     });

@@ -42,6 +42,22 @@ Follow the latest session authorization; never treat an older mission's limits
 as a permanent ban. Production deployment and data changes require their own
 authorization.
 
+## Client tracking and messaging invariants
+
+- `SuiviCourseFullscreen` is the existing Codex tracking presentation for
+  Standard, Eco and authorized public tracking. Do not introduce a competing
+  tracking screen. Public token views must not gain private entity queries.
+- Open tracking only after explicit confirmation and successful creation,
+  with the returned course id. Closing tracking must not cancel the course.
+- `ChatWindow` owns the shared message history and composer. CourseChatPanel
+  and MessagesPage are entry-point wrappers, not independent composers.
+- Eco conversations are scoped to each course, never shared by mission.
+  Validate participation before returning idempotent message responses.
+- Preserve media, unread behavior, history and reconnect behavior; test these
+  separately. Source presence does not establish device or backend validation.
+- Keep a failed audio/text draft and avoid a fresh idempotency key when retrying
+  the same uncertain send. Never alter production accounting to fix test data.
+
 ## Android release and GitHub ios sync
 
 For every SILGAPP Android delivery that produces a new signed APK and AAB:

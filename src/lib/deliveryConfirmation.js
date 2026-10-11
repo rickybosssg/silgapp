@@ -1,3 +1,5 @@
+import { captureDeliveryGps } from './deliveryGps.js';
+
 export function functionBody(response) {
   let body = response;
   for (let depth = 0; depth < 2 && body?.data && body.success === undefined; depth++) {
@@ -12,8 +14,10 @@ export async function confirmDelivery(api, courseId) {
   let result;
   let failure;
   try {
+    const gps = await captureDeliveryGps();
     result = functionBody(await api.functions.invoke("finaliserLivraisonLivreur", {
       course_id: courseId,
+      ...gps,
     }));
     if (result?.success === true) return result;
   } catch (error) {

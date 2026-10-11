@@ -4,7 +4,6 @@ import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { getPrixAffichable } from "@/utils/getPrixAffichable";
 import { getCourseStatusLabel, getCourseStatusColor } from "@/lib/courseStatuses";
 import { haversineKm } from "@/lib/priceEstimate";
@@ -13,9 +12,6 @@ import {
   Package,
   CheckCircle2,
   Clock,
-  User,
-  Phone,
-  Navigation,
   Download,
   Star,
   Truck,
@@ -24,7 +20,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { CARTO_TILE_URL, CARTO_TILE_CONFIG } from "@/lib/cartTiles";
+import SuiviCourseFullscreen from "@/components/client/SuiviCourseFullscreen";
 
 const APK_DOWNLOAD_URL = "/telecharger-app";
 const LOADING_TIMEOUT_MS = 8000; // 8 secondes max avant d'afficher une erreur
@@ -35,7 +31,7 @@ export default function PublicSuiviCourse() {
   const [course, setCourse] = useState(null);
   const [error, setError] = useState(null);       // "not_found" | "timeout" | "server_error"
   const [loading, setLoading] = useState(true);
-  const [mapLoaded, setMapLoaded] = useState(false);
+
   const [livreurPos, setLivreurPos] = useState(null);
 
   // Récupérer la course avec timeout
@@ -121,96 +117,6 @@ export default function PublicSuiviCourse() {
   }, [freshData]);
 
   // La position live du livreur est maintenant récupérée via getSuiviCourse (refetchInterval 10s)
-
-  // Charger Leaflet pour la carte
-  useEffect(() => {
-    if (!course?.livreur_id || !livreurPos) return;
-
-    const loadLeaflet = async () => {
-      // Injecter CSS
-      if (!document.querySelector('link[href*="leaflet.css"]')) {
-        const link = document.createElement("link");
-        link.rel = "stylesheet";
-        link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
-        document.head.appendChild(link);
-      }
-
-      // Injecter JS
-      if (!window.L) {
-        const script = document.createElement("script");
-        script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
-        script.onload = () => setMapLoaded(true);
-        document.head.appendChild(script);
-      } else {
-        setMapLoaded(true);
-      }
-    };
-
-    loadLeaflet();
-  }, [course]);
-
-  // Initialiser la carte avec position live du livreur
-  useEffect(() => {
-    if (!mapLoaded || !livreurPos) return;
-
-    const container = document.getElementById("public-map");
-    if (!container) {
-      console.warn("[PublicSuivi] Container #public-map non trouvé dans le DOM");
-      return;
-    }
-
-    const map = window.L.map(container, { zoomControl: false }).setView([livreurPos.lat, livreurPos.lng], 14);
-    window.L.control.zoom({ position: 'topleft' }).addTo(map);
-
-    window.L.tileLayer(CARTO_TILE_URL, CARTO_TILE_CONFIG).addTo(map);
-
-    // Marqueur livreur — bonhomme sur scooter (SVG vectoriel)
-    const livreurIcon = window.L.divIcon({
-      html: '<div style="position:relative;width:44px;height:44px;">' +
-        '<div style="position:absolute;inset:0;border-radius:50%;background:rgba(220,38,38,0.2);animation:pulsePub 2s infinite;"></div>' +
-        '<div style="position:absolute;top:4px;left:4px;width:36px;height:36px;border-radius:50%;background:#dc2626;border:3px solid white;box-shadow:0 3px 10px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;">' +
-        '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-        '<circle cx="5.5" cy="17.5" r="3.5" fill="white" stroke="white"/>' +
-        '<circle cx="18.5" cy="17.5" r="3.5" fill="white" stroke="white"/>' +
-        '<path d="M5.5 17.5 L9 17.5 L10 14 L15 14 L18.5 17.5" stroke="white" stroke-width="2" fill="none"/>' +
-        '<path d="M10 14 L11 10 L14 10 L15 14" stroke="white" stroke-width="2" fill="none"/>' +
-        '<circle cx="12.5" cy="7" r="2.5" fill="white" stroke="white"/>' +
-        '</svg>' +
-        '</div>' +
-        '</div>' +
-        '<style>@keyframes pulsePub{0%{transform:scale(0.8);opacity:0.7}70%{transform:scale(1.3);opacity:0}100%{transform:scale(0.8);opacity:0}}</style>',
-      iconSize: [44, 44],
-      iconAnchor: [22, 22],
-      className: 'livreur-marker-anim',
-    });
-    window.L.marker([livreurPos.lat, livreurPos.lng], { icon: livreurIcon })
-      .addTo(map)
-      .bindPopup(`<b>${course?.livreur_nom || livreurPos.nom || 'Livreur'}</b><br>Position en temps réel`)
-      .openPopup();
-
-    // Départ — point bleu
-    if (course?.gps_depart_lat && course?.gps_depart_lng) {
-      const departIcon = window.L.divIcon({
-        html: '<div style="width:20px;height:20px;border-radius:50%;background:#3b82f6;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);"></div>',
-        iconSize: [20, 20],
-        iconAnchor: [10, 10],
-      });
-      window.L.marker([course.gps_depart_lat, course.gps_depart_lng], { icon: departIcon })
-        .addTo(map).bindPopup('<b>Point de récupération</b>');
-    }
-    // Arrivée — point rouge
-    if (course?.gps_arrivee_lat && course?.gps_arrivee_lng) {
-      const arriveeIcon = window.L.divIcon({
-        html: '<div style="width:20px;height:20px;border-radius:50%;background:#ef4444;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);"></div>',
-        iconSize: [20, 20],
-        iconAnchor: [10, 10],
-      });
-      window.L.marker([course.gps_arrivee_lat, course.gps_arrivee_lng], { icon: arriveeIcon })
-        .addTo(map).bindPopup('<b>Point de livraison</b>');
-    }
-
-    return () => { map.remove(); };
-  }, [mapLoaded, livreurPos]);
 
   // ── ÉCRAN : Erreur serveur ──
   if (error === "server_error") {
@@ -336,67 +242,17 @@ export default function PublicSuiviCourse() {
   const dureeMin = dureeMs ? Math.round(dureeMs / 60000) : etaMin;
   const distCourse = haversineKm(course.gps_depart_lat, course.gps_depart_lng, course.gps_arrivee_lat, course.gps_arrivee_lng);
   const prixAfficheRaw = getPrixAffichable(course);
-  const prixAffiche = prixAfficheRaw ? Math.max(prixAfficheRaw, PRIX_MIN) : 0;
+  const prixAffiche = prixAfficheRaw || 0;
   const showEtaCards = ["livreur_en_route", "en_route_expediteur", "colis_recupere", "en_livraison", "livree"].includes(course.statut);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white py-8 px-4">
-      <div className="max-w-2xl mx-auto space-y-6">
-        {/* Header */}
-        <Card className="p-6 bg-gradient-to-r from-primary to-primary/80 text-white border-0">
-          <div className="flex items-center gap-3 mb-4">
-            <Truck className="w-8 h-8" />
-            <div>
-              <h1 className="text-2xl font-bold">Suivi SILGAPP</h1>
-              <p className="text-sm text-white/80">
-                {course.type_course === "expedier" ? "Expédition de colis" : "Réception de colis"}
-              </p>
-            </div>
-          </div>
-
-          <Badge className={`${statusColor} border-0`}>
-                    {statusLabel}
-          </Badge>
-        </Card>
-
-        {/* Progression */}
-        <Card className="p-6">
-          <h2 className="font-bold text-lg mb-4 flex items-center gap-2">
-            <Navigation className="w-5 h-5 text-primary" />
-            Progression
-          </h2>
-
-          <div className="space-y-4">
-            {[
-              { key: "recherche_livreur", label: "Livreur recherché", icon: Package },
-              { key: "livreur_en_route", label: "Livreur assigné", icon: User },
-              { key: "colis_recupere", label: "Colis récupéré", icon: CheckCircle2 },
-              { key: "en_livraison", label: "En route vers le destinataire", icon: Truck },
-              { key: "livree", label: "Colis livré", icon: CheckCircle2 }
-            ].map((step, idx) => {
-              const steps = ["nouvelle", "recherche_livreur", "livreur_en_route", "colis_recupere", "en_livraison", "livree"];
-              const progressionStatut = ["client_contacte", "en_route_expediteur"].includes(course.statut) ? "livreur_en_route" : course.statut;
-              const currentIndex = steps.indexOf(progressionStatut);
-              const stepIndex = steps.indexOf(step.key);
-              const isCompleted = stepIndex <= currentIndex && course.statut !== "annulee";
-              const StepIcon = step.icon;
-
-              return (
-                <div key={step.key} className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                    isCompleted ? "bg-green-500 text-white" : "bg-gray-200 text-gray-400"
-                  }`}>
-                    <StepIcon className="w-5 h-5" />
-                  </div>
-                  <p className={`font-medium ${isCompleted ? "text-green-700" : "text-gray-500"}`}>
-                    {step.label}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-        </Card>
-
+    <SuiviCourseFullscreen publicView
+      course={{ ...course, _livreur: livreurPos ? { latitude: livreurPos.lat, longitude: livreurPos.lng } : null }}
+      onClose={() => { window.location.href = "/"; }}
+      onCall={course.livreur_telephone ? () => { window.location.href = `tel:${course.livreur_telephone}`; } : undefined}>
+      <details className="mt-4">
+        <summary className="py-2 text-sm font-semibold cursor-pointer">Informations de la course</summary>
+        <div className="space-y-4 pt-3">
         {/* Cartes ETA dynamiques */}
         {showEtaCards && (
           <Card className="p-4">
@@ -424,62 +280,6 @@ export default function PublicSuiviCourse() {
             </div>
           </Card>
         )}
-
-        {/* Info livreur */}
-        {course.livreur_nom && (
-          <Card className="p-6">
-            <h2 className="font-bold text-lg mb-4 flex items-center gap-2">
-              <User className="w-5 h-5 text-primary" />
-              Votre livreur
-            </h2>
-
-            <div className="flex items-center gap-4 mb-4">
-              {course.livreur_photo_url ? (
-                <img
-                  src={course.livreur_photo_url}
-                  alt={course.livreur_nom}
-                  className="w-16 h-16 rounded-full object-cover border-4 border-primary/20"
-                />
-              ) : (
-                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-                  <User className="w-8 h-8 text-primary" />
-                </div>
-              )}
-
-              <div className="flex-1">
-                <p className="font-bold text-lg">{course.livreur_nom}</p>
-                {course.livreur_vehicule && (
-                  <p className="text-sm text-muted-foreground capitalize">
-                    {course.livreur_vehicule.replace("_", " ")}
-                  </p>
-                )}
-                <p className="text-sm text-muted-foreground">
-                   {course.livreur_telephone}
-                </p>
-              </div>
-
-              <a href={`tel:${course.livreur_telephone}`}>
-                <Button size="icon" className="rounded-full bg-green-500 hover:bg-green-600">
-                  <Phone className="w-5 h-5" />
-                </Button>
-              </a>
-            </div>
-          </Card>
-        )}
-
-        {/* Carte — position live du livreur */}
-        {course.livreur_id && livreurPos && (
-          <Card className="p-4">
-            <h2 className="font-bold text-lg mb-4 flex items-center gap-2">
-              <MapPin className="w-5 h-5 text-primary" />
-              Position du livreur
-            </h2>
-            <div id="public-map" className="h-64 rounded-xl overflow-hidden" />
-          </Card>
-        )}
-
-        {/* QR Code de livraison - visible automatiquement pour le destinataire */}
-        {/* [CORRECTION PIN/QR] QR Codes supprimés — parcours bouton sans PIN/QR */}
 
         {/* Détails course */}
         <Card className="p-6">
@@ -583,7 +383,8 @@ export default function PublicSuiviCourse() {
             </div>
           </Card>
         )}
-      </div>
-    </div>
+        </div>
+      </details>
+    </SuiviCourseFullscreen>
   );
 }

@@ -1642,7 +1642,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       )}
 
       {/* ── Navigation sticky en haut ──────────────── */}
-      <div className="sticky top-0 z-30 bg-background/90 backdrop-blur-xl px-3 pt-3 pb-2 border-b border-border">
+      <div className="sticky top-0 z-30 bg-background/90 backdrop-blur-xl px-3 safe-area-top pb-2 border-b border-border">
         <div className="max-w-lg mx-auto flex w-full gap-0.5 bg-card/90 rounded-2xl p-1 shadow-[0_8px_30px_rgba(15,23,42,0.06)] border border-border">
           {TABS.map(tab => (
             <button

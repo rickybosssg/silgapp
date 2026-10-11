@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { Phone, MessageCircle, Star, Bike, TrendingUp, Calendar, Package, Award } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 
-export default function LivreurCardModerne({ course, onCall, onMessage, onTrack }) {
+export default function LivreurCardModerne({ course, onCall, onMessage, onTrack, publicView = false }) {
   const [livreur, setLivreur] = useState(null);
   const [stats, setStats] = useState(null);
 
@@ -15,7 +15,7 @@ export default function LivreurCardModerne({ course, onCall, onMessage, onTrack 
 
   // Fetch full livreur entity + stats
   useEffect(() => {
-    if (!course.livreur_id) return;
+    if (publicView || !course.livreur_id) return;
     let active = true;
     const fetchData = async () => {
       try {
@@ -45,7 +45,7 @@ export default function LivreurCardModerne({ course, onCall, onMessage, onTrack 
     };
     fetchData();
     return () => { active = false; };
-  }, [course.livreur_id]);
+  }, [course.livreur_id, publicView]);
 
   // Ancienneté
   const anciennete = livreur?.created_date
@@ -134,18 +134,19 @@ export default function LivreurCardModerne({ course, onCall, onMessage, onTrack 
       <div className="flex gap-2 mt-3">
         <button
           onClick={onCall}
+          disabled={!onCall}
           className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-emerald-50 active:scale-95 transition-transform"
         >
           <Phone className="w-4 h-4 text-emerald-600" />
           <span className="text-sm font-bold text-emerald-700">Appeler</span>
         </button>
-        <button
+        {onMessage && <button
           onClick={onMessage}
           className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-blue-50 active:scale-95 transition-transform"
         >
           <MessageCircle className="w-4 h-4 text-blue-600" />
           <span className="text-sm font-bold text-blue-700">Discuter</span>
-        </button>
+        </button>}
       </div>
     </motion.div>
   );

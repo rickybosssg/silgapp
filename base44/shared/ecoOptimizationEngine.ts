@@ -386,6 +386,56 @@ function routePlanForEcoMission(courses: any[]) {
   return chainKm != null && pickupKm != null && chainKm < pickupKm ? pickupFirstThenDeliverFirst : directAllPickups;
 }
 
+// Fence publication before releasing claims. locked_at records unfinished recovery.
+export async function releaseEcoCandidate(base44: any, mission: any) {
+  const entities = base44.asServiceRole.entities;
+  let fresh = await entities.EcoMission.get(mission.id);
+  if (fresh?.status === 'candidate') {
+    // Fence publication before releasing claims, including a concurrent publisher.
+    await entities.EcoMission.updateMany({ id: mission.id, status: 'candidate' },
+      { $set: { status: 'invalidated', locked_at: new Date().toISOString() } });
+    fresh = await entities.EcoMission.get(mission.id);
+  }
+  if (fresh?.status !== 'invalidated' || fresh.livreur_id) return false;
+  mission = fresh;
+  for (const id of mission.course_ids || []) {
+    const current = await entities.CourseExterne.get(id);
+    if (current?.eco_mission_id !== mission.id) continue;
+    if (current.livreur_id || current.accepted_by_livreur_id ||
+        !['nouvelle', 'recherche_livreur', 'en_attente', 'annulee'].includes(current.statut)) {
+      return false;
+    }
+    await entities.CourseExterne.updateMany({
+      id, eco_mission_id: mission.id,
+      livreur_id: { $in: [null, ''] }, accepted_by_livreur_id: { $in: [null, ''] },
+      statut: current.statut,
+    }, { $set: { eco_mission_id: null, eco_status: 'isolated', eco_candidate_score: null } });
+  }
+  const remaining = await Promise.all((mission.course_ids || []).map((id: string) => entities.CourseExterne.get(id)));
+  if (remaining.some((c: any) => c?.eco_mission_id === mission.id)) return false;
+  const closed = await entities.EcoMission.updateMany(
+    { id: mission.id, status: 'invalidated' }, { $set: { locked_at: null } }
+  );
+  return closed?.updated === 1;
+}
+
+export async function recoverEcoCandidates(base44: any, countryCode?: string, limit = 50) {
+  const cutoff = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+  const filter: any = { enterprise_id: null, $or: [
+    { status: 'candidate', created_date: { $lte: cutoff } },
+    { status: 'invalidated', locked_at: { $ne: null } },
+  ] };
+  if (countryCode) filter.country_code = String(countryCode).toUpperCase();
+  const missions = await base44.asServiceRole.entities.EcoMission.filter(filter, 'created_date', limit);
+  const results = [];
+  for (const mission of missions || []) {
+    if (mission.livreur_id || mission.enterprise_id) continue;
+    try { results.push({ id: mission.id, recovered: await releaseEcoCandidate(base44, mission) }); }
+    catch { results.push({ id: mission.id, recovered: false }); }
+  }
+  return results;
+}
+
 export async function processEcoCourseCreated(base44: any, courseId: string) {
   const course = await base44.asServiceRole.entities.CourseExterne.get(courseId).catch(() => null);
   if (!course || !(await shouldHoldEcoCourseOnCreate(base44, course))) {
@@ -422,13 +472,14 @@ export async function processEcoCourseCreated(base44: any, courseId: string) {
     return { success: true, handled: true, grouped: false, reason: 'no_compatible_candidate' };
   }
 
-  const courses = [course, best].slice(0, config.maxCoursesPerMission);
+  const courses = [course, best].slice(0, Math.min(2, config.maxCoursesPerMission));
+  if (courses.length !== 2) return { success: true, grouped: false, reason: 'grouping_limit' };
   const now = new Date().toISOString();
   const mission = await base44.asServiceRole.entities.EcoMission.create({
     country_code: course.country_code,
     enterprise_id: null,
     course_ids: courses.map((c) => c.id),
-    status: 'available',
+    status: 'candidate',
     route_plan_json: JSON.stringify(routePlanForEcoMission(courses)),
     active_step_index: 0,
     total_price: courses.reduce((sum, c) => sum + prixCourse(c), 0),
@@ -437,6 +488,7 @@ export async function processEcoCourseCreated(base44: any, courseId: string) {
     locked_at: now,
   });
 
+  try {
   const claim = await base44.asServiceRole.entities.CourseExterne.updateMany(
     {
       id: { $in: courses.map((c) => c.id) },
@@ -444,6 +496,11 @@ export async function processEcoCourseCreated(base44: any, courseId: string) {
       eco_status: 'isolated',
       eco_mission_id: null,
       dispatch_status: 'en_attente',
+      country_code: course.country_code,
+      enterprise_id: null,
+      statut: { $in: ['nouvelle', 'recherche_livreur', 'en_attente'] },
+      livreur_id: { $in: [null, ''] },
+      accepted_by_livreur_id: { $in: [null, ''] },
     },
     {
       $set: {
@@ -455,11 +512,28 @@ export async function processEcoCourseCreated(base44: any, courseId: string) {
   );
 
   if (!claim || claim.updated !== courses.length) {
-    await base44.asServiceRole.entities.EcoMission.update(mission.id, { status: 'invalidated' }).catch(() => null);
-    return { success: false, handled: true, grouped: false, reason: 'atomic_grouping_lost' };
+    throw new Error('atomic_grouping_lost');
   }
-
+  const saved = await Promise.all(courses.map(c => base44.asServiceRole.entities.CourseExterne.get(c.id)));
+  if (saved.some(c => c.eco_mission_id !== mission.id || c.eco_status !== 'grouped' ||
+      c.livreur_id || c.accepted_by_livreur_id || TERMINAL_STATUSES.includes(c.statut))) {
+    throw new Error('grouping_revalidation_failed');
+  }
+  const published = await base44.asServiceRole.entities.EcoMission.updateMany(
+    { id: mission.id, status: 'candidate' }, { $set: { status: 'available' } }
+  );
+  if (published?.updated !== 1) throw new Error('mission_publication_failed');
   return { success: true, handled: true, grouped: true, mission_id: mission.id, course_ids: courses.map((c) => c.id) };
+  } catch (error) {
+    // Read back an ambiguous publication before compensating a possibly live mission.
+    const state = await base44.asServiceRole.entities.EcoMission.get(mission.id).catch(() => null);
+    if (state?.status === 'available') {
+      return { success: true, handled: true, grouped: true, mission_id: mission.id, course_ids: courses.map(c => c.id) };
+    }
+    const released = ['candidate', 'invalidated'].includes(state?.status) && await releaseEcoCandidate(base44, state).catch(() => false);
+    return { success: false, handled: true, grouped: false,
+      reason: released ? 'atomic_grouping_lost' : 'grouping_recovery_required', mission_id: mission.id };
+  }
 }
 
 async function notifyConversion(base44: any, course: any) {
@@ -494,6 +568,7 @@ async function notifyConversion(base44: any, course: any) {
 }
 
 export async function convertDueEcoCourses(base44: any, countryCode?: string, limit = 50) {
+  await recoverEcoCandidates(base44, countryCode, limit);
   const now = new Date().toISOString();
   const filter: any = {
     delivery_mode: 'eco',
@@ -879,7 +954,7 @@ export async function completeEcoMissionIfNeeded(base44: any, courseId: string) 
 // Met à jour les steps du route_plan_json et active_step_index quand une course
 // passe en statut terminal (livree ou annulee). Les étapes terminées restent terminées.
 // Gère les annulations partielles sans corrompre la mission.
-export async function updateEcoMissionRouteProgress(base44: any, courseId: string) {
+export async function updateEcoMissionRouteProgress(base44: any, courseId: string, attempt = 0) {
   const course = await base44.asServiceRole.entities.CourseExterne.get(courseId).catch(() => null);
   if (!course?.eco_mission_id) return { updated: false, reason: 'no_mission' };
 
@@ -895,6 +970,7 @@ export async function updateEcoMissionRouteProgress(base44: any, courseId: strin
   const courses = await Promise.all(
     courseIds.map((id: string) => base44.asServiceRole.entities.CourseExterne.get(id).catch(() => null))
   );
+  if (courses.some((c: any) => !c)) return { updated: false, reason: 'courses_read_failed' };
 
   // Construire un map de statut par course_id
   const courseStatusMap = new Map<string, string>();
@@ -907,36 +983,43 @@ export async function updateEcoMissionRouteProgress(base44: any, courseId: strin
   try {
     routePlan = mission.route_plan_json ? JSON.parse(mission.route_plan_json) : [];
   } catch {
-    routePlan = [];
+    return { updated: false, reason: 'invalid_route_plan' };
   }
+  if (!Array.isArray(routePlan) || !routePlan.length) return { updated: false, reason: 'invalid_route_plan' };
 
   let updated = false;
-  let maxCompletedOrder = 0;
 
   for (const step of routePlan) {
     if (!step?.course_id) continue;
     const statut = courseStatusMap.get(step.course_id);
     if (!statut) continue;
 
-    const isTerminal = statut === 'livree' || statut === 'annulee';
-    if (isTerminal && step.status !== 'completed') {
+    const stepDone = statut === 'livree' || statut === 'annulee' ||
+      (step.type === 'pickup' && ['colis_recupere', 'en_livraison', 'arrivee', 'pris_en_charge'].includes(statut));
+    if (stepDone && step.status !== 'completed') {
       step.status = 'completed';
       updated = true;
-    }
-    if (isTerminal && step.order > maxCompletedOrder) {
-      maxCompletedOrder = step.order;
     }
   }
 
   // Calculer active_step_index = premier step non-complété
-  const firstPendingStep = routePlan.find((s: any) => s?.status !== 'completed');
-  const newActiveStepIndex = firstPendingStep ? Math.max(0, (Number(firstPendingStep.order) || 1) - 1) : routePlan.length;
+  const pendingIndex = routePlan.findIndex((s: any) => s?.status !== 'completed');
+  const newActiveStepIndex = pendingIndex < 0 ? routePlan.length : pendingIndex;
+  const started = mission.status === 'accepted' && courses.some((c: any) =>
+    c && ['colis_recupere', 'en_livraison', 'arrivee', 'pris_en_charge', 'livree'].includes(c.statut));
 
-  if (updated || mission.active_step_index !== newActiveStepIndex) {
-    await base44.asServiceRole.entities.EcoMission.update(mission.id, {
+  if (updated || mission.active_step_index !== newActiveStepIndex || started) {
+    const write = await base44.asServiceRole.entities.EcoMission.updateMany({
+      id: mission.id, status: mission.status, route_plan_json: mission.route_plan_json,
+    }, { $set: {
       route_plan_json: JSON.stringify(routePlan),
       active_step_index: newActiveStepIndex,
-    }).catch(() => null);
+      ...(started ? { status: 'in_progress' } : {}),
+    } });
+    if (write?.updated !== 1) {
+      return attempt < 2 ? updateEcoMissionRouteProgress(base44, courseId, attempt + 1)
+        : { updated: false, reason: 'progress_changed_retry' };
+    }
     return { updated: true, mission_id: mission.id, active_step_index: newActiveStepIndex };
   }
 
@@ -948,7 +1031,7 @@ export async function updateEcoMissionRouteProgress(base44: any, courseId: strin
 // sont toutes terminales. Si oui, met à jour le statut de la mission.
 // Cette fonction est idempotente et peut être appelée par un workflow périodique.
 export async function cleanupStuckEcoMissions(base44: any, countryCode?: string, limit = 50) {
-  const filter: any = { status: { $in: ['accepted', 'available', 'accepting'] } };
+  const filter: any = { status: { $in: ['accepted', 'available', 'accepting', 'in_progress'] } };
   if (countryCode) filter.country_code = String(countryCode).toUpperCase();
   const missions = await base44.asServiceRole.entities.EcoMission.filter(filter, '-created_date', limit).catch(() => []);
   const results = [];
@@ -978,7 +1061,7 @@ export async function cleanupStuckEcoMissions(base44: any, countryCode?: string,
     }
 
     // Libérer le livreur si la mission était acceptée
-    if (mission.livreur_id && mission.status === 'accepted') {
+    if (mission.livreur_id && ['accepted', 'in_progress'].includes(mission.status)) {
       const livreur = await base44.asServiceRole.entities.Livreur.get(mission.livreur_id).catch(() => null);
       if (livreur && livreur.statut === 'en_course') {
         const STATUTS_ACTIFS = ['livreur_en_route', 'client_contacte', 'en_route_expediteur', 'arrive_prise_en_charge', 'colis_recupere', 'passager_embarque', 'pris_en_charge', 'en_livraison', 'arrivee'];

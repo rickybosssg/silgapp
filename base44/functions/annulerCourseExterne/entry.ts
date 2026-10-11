@@ -350,15 +350,7 @@ Deno.serve(async (req) => {
       }
 
       if (clientEmail) {
-        await asService.entities.Notification.create({
-          titre: "🚫 Votre livreur a annulé",
-          message: `Motif: ${motifLabel}. Ouvrez SILGAPP pour choisir la suite.`,
-          type: "course_annulee_livreur",
-          course_id,
-          destinataire_email: clientEmail,
-          lue: false,
-        }).catch(() => null);
-
+        // envoiNotificationPush persists the inbox notification, even without an FCM token.
         await base44.asServiceRole.functions.invoke('envoiNotificationPush', {
           titre: "SILGAPP — Votre livreur a annulé",
           message: `Motif: ${motifLabel}. Ouvrez SILGAPP pour choisir la suite.`,

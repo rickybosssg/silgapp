@@ -3,6 +3,7 @@ import { chargerConfigPays, normalizeCommissionPct } from '../../shared/dispatch
 import { comptabiliserCommissionEnterprise, normalizeEnterpriseId } from '../../shared/enterpriseFinance.ts';
 import { tauxCommissionEffectif, zeroCommissionFields } from '../../shared/commissionLock.ts';
 import { completeEcoMissionIfNeeded, updateEcoMissionRouteProgress } from '../../shared/ecoOptimizationEngine.ts';
+import { validatedDeliveryGps } from '../../shared/deliveryGps.ts';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // FINALISER LIVRAISON LIVREUR — Source de vérité pour la livraison
@@ -118,6 +119,8 @@ export default async function(req: Request): Promise<Response> {
     }
 
     const now = new Date().toISOString();
+    const gps = validatedDeliveryGps(body.latitude, body.longitude);
+    const deliveryGps = gps ? { latitude_livraison: gps.latitude, longitude_livraison: gps.longitude } : {};
 
     // ── CAS 1: Course admin — le livreur saisit le prix (montant brut) ──
     // Le backend calcule commission_silga et montant_livreur côté backend uniquement.
@@ -163,6 +166,7 @@ export default async function(req: Request): Promise<Response> {
 
       const updateData = {
         statut: 'livree',
+        ...deliveryGps,
         heure_livraison: now,
         colis_livre_at: now,
         delivery_confirmed_by: 'bouton',
@@ -235,6 +239,7 @@ export default async function(req: Request): Promise<Response> {
     if (course.prix_a_confirmer) {
       const updateData = {
         statut: 'livree',
+        ...deliveryGps,
         heure_livraison: now,
         colis_livre_at: now,
         delivery_confirmed_by: 'bouton',
@@ -296,11 +301,13 @@ export default async function(req: Request): Promise<Response> {
           await base44.asServiceRole.entities.CourseExterne.update(course_id, {
             livreur_financier_id: course.livreur_id,
             delivery_confirmed_by: 'bouton',
+            ...deliveryGps,
             delivery_confirmed_at: now,
           }).catch(() => {});
         } else {
           await base44.asServiceRole.entities.CourseExterne.update(course_id, {
             delivery_confirmed_by: 'bouton',
+            ...deliveryGps,
             delivery_confirmed_at: now,
           }).catch(() => {});
         }
@@ -344,6 +351,7 @@ export default async function(req: Request): Promise<Response> {
         // Le livreur peut quand même terminer la livraison.
         const updateData = {
           statut: 'livree',
+          ...deliveryGps,
           heure_livraison: now,
           colis_livre_at: now,
           delivery_confirmed_by: 'bouton',

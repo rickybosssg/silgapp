@@ -69,7 +69,6 @@ export default function CourseExterneFormSync() {
   const [confirming, setConfirming] = useState(false); // mutation en cours après confirmation
   const confirmationInFlight = useRef(false);
   const [gpsLoading, setGpsLoading] = useState({ depart: false, arrivee: false });
-  const [deliveryMode, setDeliveryMode] = useState("standard");
   const { forteDemande } = useForteDemande(clientProfil?.country_code);
   const { country: countryConfig } = useCountryPricing(clientProfil?.country_code);
   // Source tarifaire unique : Country.prix_minimum (jamais codé en dur)
@@ -157,6 +156,8 @@ export default function CourseExterneFormSync() {
       });
 
   const [formData, setFormData] = useState(initialData);
+  const deliveryMode = formData.type_course !== "deplacement" && formData.delivery_mode === "eco" ? "eco" : "standard";
+  const setDeliveryMode = (mode) => setFormData(prev => ({ ...prev, delivery_mode: mode }));
 
   // ── État multi-colis ─────────────────────────────────────────────────────
   const [colis, setColis] = useState(() => createColisDefaults(1));
@@ -462,7 +463,7 @@ export default function CourseExterneFormSync() {
 
       if (formData.date_souhaitee || response?.statut === "programmee") {
         toast.success("Course programmee creee");
-        navigate("/client", { replace: true });
+        navigate("/client/suivi", { replace: true, state: { course_id: response.id } });
         return;
       }
 
@@ -498,6 +499,7 @@ export default function CourseExterneFormSync() {
       } else {
         setCourseCreated(true);
       }
+      navigate("/client/suivi", { replace: true, state: { course_id: response.id } });
     },
     onError: (err) => {
       console.error("[CREATE_CLIENT_ERROR]", {
@@ -814,6 +816,7 @@ export default function CourseExterneFormSync() {
     });
 
     const _submissionSignature = JSON.stringify({
+      dm: deliveryMode,
       tc: formData.type_course,
       ad: formData.adresse_depart,
       aa: adresseArriveeFinale,
@@ -929,7 +932,25 @@ export default function CourseExterneFormSync() {
   };
 
   if (courseCreated && createdCourse) {
-    return <LivreurRechercheAnimation course={createdCourse} />;
+    return <LivreurRechercheAnimation course={createdCourse} onAddAnother={() => {
+      setFormData({
+        type_course: typeCourse, client_nom: clientProfil?.nom || "",
+        client_telephone: clientProfil?.telephone || "", type_colis: "petit_colis",
+        delivery_mode: "standard", prix_propose: 0, mode_immediat: true,
+        adresse_depart: "", adresse_arrivee: "", notes: "", nb_colis: 1,
+      });
+      setColis(createColisDefaults(1));
+      setCurrentStep(0);
+      setPendingRecap(null);
+      setInvitationModal(null);
+      setCreatedCourse(null);
+      setCourseCreated(false);
+      setConfirming(false);
+      setIsSubmitting(false);
+      confirmationInFlight.current = false;
+      submitRequestIdRef.current = null;
+      submitSignatureRef.current = null;
+    }} />;
   }
 
   // ── Correction 1: invitation WhatsApp non bloquante ──
@@ -1071,7 +1092,7 @@ export default function CourseExterneFormSync() {
             // La touche Entrée dans un input déclenche le submit du formulaire.
             // Sans cette garde, la confirmation s'ouvre prématurément avant
             // que le client ait choisi son type de colis et son prix.
-            if (currentStep < totalSteps - 1) return;
+            if (currentStep !== totalSteps - 1 || e.nativeEvent?.submitter?.dataset?.courseConfirm !== "true") return;
             handleSubmit(e).catch((err) => {
               console.error("[CREATE_CLIENT_UNCAUGHT_ERROR]", {
                 error: err?.message,

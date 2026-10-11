@@ -16,6 +16,7 @@ export function getMessageKey(message) {
     message?.content || "",
     message?.audio_url || "",
     message?.photo_url || "",
+    message?.video_url || "",
     message?.created_date || "",
   ].join("|");
 }
@@ -78,7 +79,7 @@ export async function buildSenderProfiles(base44, messages = []) {
   };
 
   if (idsByType.client.size > 0) {
-    const clients = await safeList(() => base44.entities.ClientExterne.list());
+    const clients = await safeList(() => base44.entities.ClientExterne.filter({ id: { $in: [...idsByType.client] } }));
     for (const client of clients || []) {
       if (!idsByType.client.has(client.id)) continue;
       profileMap.set(roleProfileKey("client", client.id), {
@@ -90,7 +91,7 @@ export async function buildSenderProfiles(base44, messages = []) {
   }
 
   if (idsByType.livreur.size > 0) {
-    const livreurs = await safeList(() => base44.entities.Livreur.list());
+    const livreurs = await safeList(() => base44.entities.Livreur.filter({ id: { $in: [...idsByType.livreur] } }));
     for (const livreur of livreurs || []) {
       if (!idsByType.livreur.has(livreur.id)) continue;
       profileMap.set(roleProfileKey("livreur", livreur.id), {
@@ -103,8 +104,8 @@ export async function buildSenderProfiles(base44, messages = []) {
 
   if (idsByType.partenaire.size > 0) {
     const [boutiques, restaurants] = await Promise.all([
-      safeList(() => base44.entities.Boutique.list()),
-      safeList(() => base44.entities.Restaurant.list()),
+      safeList(() => base44.entities.Boutique.filter({ id: { $in: [...idsByType.partenaire] } })),
+      safeList(() => base44.entities.Restaurant.filter({ id: { $in: [...idsByType.partenaire] } })),
     ]);
     for (const boutique of boutiques || []) {
       if (!idsByType.partenaire.has(boutique.id)) continue;

@@ -10,6 +10,7 @@ import RestaurantParallelTracking from "./RestaurantParallelTracking";
 import { base44 } from "@/api/base44Client";
 import { useETACourse } from "@/hooks/useETACourse";
 import { CARTO_TILE_URL, CARTO_TILE_CONFIG } from "@/lib/cartTiles";
+import { getCourseStatusLabel } from "@/lib/courseStatuses";
 
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -85,7 +86,7 @@ const REASSURANCE_LIVRAISON = [
   "Livraison en cours, restez informé.",
 ];
 
-export default function SuiviCourseFullscreen({ course, position, onClose, onCall, onMessage, onCancel }) {
+export default function SuiviCourseFullscreen({ course, position, onClose, onCall, onMessage, onCancel, children, publicView = false }) {
   const [showTimeline, setShowTimeline] = useState(false);
   const [livreurPos, setLivreurPos] = useState(null);
   const [reassuranceIdx, setReassuranceIdx] = useState(0);
@@ -106,7 +107,7 @@ export default function SuiviCourseFullscreen({ course, position, onClose, onCal
   const [commandeRestaurant, setCommandeRestaurant] = useState(null);
 
   useEffect(() => {
-    if (!course.commande_restaurant_id) {
+    if (publicView || !course.commande_restaurant_id) {
       setCommandeRestaurant(null);
       return;
     }
@@ -123,11 +124,16 @@ export default function SuiviCourseFullscreen({ course, position, onClose, onCal
         .catch(() => {});
     }, 15000);
     return () => { cancelled = true; clearInterval(interval); };
-  }, [course.commande_restaurant_id]);
+  }, [course.commande_restaurant_id, publicView]);
 
   // Phase: "approche" (livreur va vers départ) ou "livraison" (livreur va vers arrivée)
   const isLivraison = ["en_livraison", "arrivee"].includes(course.statut);
   const isColisRecupere = ["colis_recupere", "passager_embarque", "pris_en_charge"].includes(course.statut);
+  const terminal = ["livree", "annulee"].includes(course.statut);
+  const ecoWaiting = !terminal && course.delivery_mode === "eco" && !course.livreur_id;
+  const statusLabel = ecoWaiting
+    ? (course.eco_mission_id ? "Mission Éco constituée — recherche de livreur" : "Course Éco — En attente de regroupement")
+    : getCourseStatusLabel(course.statut);
 
   // ── Position livreur depuis course._livreur (enrichi par ClientExterneApp.checkStatus) ──
   // Polling Livreur.get() redondant supprimé — la position vient du polling de courses.
@@ -136,9 +142,8 @@ export default function SuiviCourseFullscreen({ course, position, onClose, onCal
     if (l?.latitude && l?.longitude) {
       setLivreurPos({ lat: l.latitude, lng: l.longitude });
     } else {
-      const fallbackLat = course.latitude_prise_en_charge || course.latitude_recuperation;
-      const fallbackLng = course.longitude_prise_en_charge || course.longitude_recuperation;
-      if (fallbackLat) setLivreurPos({ lat: fallbackLat, lng: fallbackLng });
+      // A pickup coordinate is not a live driver position.
+      setLivreurPos(null);
     }
   }, [course._livreur, course.latitude_prise_en_charge, course.longitude_prise_en_charge, course.latitude_recuperation, course.longitude_recuperation]);
 
@@ -155,9 +160,9 @@ export default function SuiviCourseFullscreen({ course, position, onClose, onCal
   const activeTarget = (isLivraison || isColisRecupere) ? arrivee : depart;
   const etaHook = useETACourse({
     courseId: course.id,
-    phase: isLivraison ? "livraison" : "recuperation",
-    fromLat: livreurPos?.lat || null,
-    fromLng: livreurPos?.lng || null,
+    phase: (isLivraison || isColisRecupere) ? "livraison" : "recuperation",
+    fromLat: terminal || publicView ? null : livreurPos?.lat ?? null,
+    fromLng: terminal || publicView ? null : livreurPos?.lng ?? null,
     toLat: activeTarget?.lat || null,
     toLng: activeTarget?.lng || null,
     countryCode: course.country_code,
@@ -233,7 +238,7 @@ export default function SuiviCourseFullscreen({ course, position, onClose, onCal
       className="fixed inset-0 z-50 bg-white flex flex-col"
     >
       {/* Header */}
-      <div className="absolute top-0 left-0 right-0 z-[1000] flex items-center justify-between p-4 pt-[max(1rem,env(safe-area-inset-top))] bg-gradient-to-b from-black/40 to-transparent">
+      <div className="absolute top-0 left-0 right-0 z-[1000] flex items-center justify-between gap-2 p-4 pt-[max(28px,env(safe-area-inset-top))] bg-gradient-to-b from-black/40 to-transparent">
         <button onClick={onClose} className="w-10 h-10 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center shadow-lg">
           <ArrowLeft className="w-5 h-5 text-gray-900" />
         </button>
@@ -262,16 +267,16 @@ export default function SuiviCourseFullscreen({ course, position, onClose, onCal
             )}
           </motion.div>
         )}
-        {onCancel && !isLivraison && !isColisRecupere && (
-          <button onClick={onCancel} className="w-10 h-10 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center shadow-lg">
+        {onClose && (
+          <button onClick={onClose} aria-label="Fermer le suivi" className="w-10 h-10 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center shadow-lg">
             <X className="w-5 h-5 text-red-500" />
           </button>
         )}
-        {(!onCancel || isLivraison || isColisRecupere) && <div className="w-10" />}
+        {!onClose && <div className="w-10" />}
       </div>
 
       {/* Carte */}
-      <div className="flex-1 relative">
+      <div className="flex-1 min-h-[30dvh] relative">
         <MapContainer
           center={fitPositions[0] || [12.3714, -1.5197]}
           zoom={14}
@@ -338,6 +343,8 @@ export default function SuiviCourseFullscreen({ course, position, onClose, onCal
         <div className="p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
           {/* Poignée */}
           <div className="w-10 h-1.5 bg-gray-200 rounded-full mx-auto mb-3" />
+          <p className="text-sm font-bold text-gray-900 mb-3" role="status">{statusLabel}</p>
+          {course.eco_status === "converted" && <p className="text-xs text-gray-600 mb-3">Course convertie en Standard — prix conservé.</p>}
 
           {/* ── SUIVI PARALLÈLE RESTAURANT (style Glovo) ── */}
           {isRestaurantCourse && (
@@ -420,19 +427,20 @@ export default function SuiviCourseFullscreen({ course, position, onClose, onCal
               onCall={onCall}
               onMessage={onMessage}
               onTrack={null}
+              publicView={publicView}
             />
           )}
 
           {/* Pas de livreur encore */}
-          {!hasLivreur && (
+          {!hasLivreur && !terminal && (
             <div className="bg-amber-50 rounded-2xl p-4 flex items-center gap-3">
               <div className="w-3 h-3 bg-amber-500 rounded-full animate-pulse" />
-              <p className="text-sm font-semibold text-amber-800">Recherche d'un livreur en cours...</p>
+              <p className="text-sm font-semibold text-amber-800">{statusLabel}</p>
             </div>
           )}
 
           {/* Bouton annuler */}
-          {hasLivreur && onCancel && !isLivraison && !isColisRecupere && (
+          {onCancel && !terminal && !isLivraison && !isColisRecupere && (
             <button
               onClick={onCancel}
               className="w-full mt-3 py-2.5 rounded-xl border border-red-200 text-red-600 text-sm font-bold active:scale-[0.98] transition-transform"
@@ -440,6 +448,7 @@ export default function SuiviCourseFullscreen({ course, position, onClose, onCal
               Annuler la course
             </button>
           )}
+          {children}
         </div>
       </motion.div>
     </motion.div>

@@ -1,4 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
+import { updateEcoMissionRouteProgress } from '../../shared/ecoOptimizationEngine.ts';
+import { validatedDeliveryGps } from '../../shared/deliveryGps.ts';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TRANSITION STATUT LIVREUR — Toutes les transitions de statut sans prix
@@ -80,14 +82,9 @@ export default async function(req: Request): Promise<Response> {
       return Response.json({ error: 'Course terminée ou annulée' }, { status: 400 });
     }
 
-    // Idempotence : si déjà au statut cible, retourner success
-    if (course.statut === statut_cible) {
-      return Response.json({ success: true, skipped: 'already_at_target', course_id, statut: statut_cible });
-    }
-
     // Valider la transition
     const statutsSources = TRANSITIONS_VALIDES[statut_cible];
-    if (!statutsSources.includes(course.statut)) {
+    if (course.statut !== statut_cible && !statutsSources.includes(course.statut)) {
       return Response.json({
         error: `Transition invalide: ${course.statut} → ${statut_cible}`,
         statut_actuel: course.statut,
@@ -120,6 +117,11 @@ export default async function(req: Request): Promise<Response> {
       }
     }
 
+    if (course.statut === statut_cible) {
+      if (course.eco_mission_id) await updateEcoMissionRouteProgress(base44, course_id).catch(() => null);
+      return Response.json({ success: true, skipped: 'already_at_target', course_id, statut: statut_cible });
+    }
+
     // Validation spécifique: client_contacte réservé aux courses admin
     if (statut_cible === 'client_contacte' && course.source !== 'admin' && course.pricing_mode !== 'admin_manuel') {
       return Response.json({ error: 'L\'étape "Client contacté" est réservée aux courses administratives' }, { status: 400 });
@@ -143,7 +145,7 @@ export default async function(req: Request): Promise<Response> {
 
     // Champs GPS (uniquement si fournis et valides)
     const gpsFields = GPS_FIELDS_PAR_STATUT[statut_cible];
-    if (gpsFields && latitude != null && longitude != null && Number.isFinite(latitude) && Number.isFinite(longitude)) {
+    if (gpsFields && validatedDeliveryGps(latitude, longitude)) {
       updateData[gpsFields[0]] = latitude;
       updateData[gpsFields[1]] = longitude;
     }
@@ -158,8 +160,17 @@ export default async function(req: Request): Promise<Response> {
       delete updateData[f];
     }
 
-    const updated = await base44.asServiceRole.entities.CourseExterne.update(course_id, updateData);
-    return Response.json({ success: true, course: updated, statut: statut_cible });
+    await base44.asServiceRole.entities.CourseExterne.updateMany({
+      id: course_id, livreur_id: course.livreur_id, statut: course.statut,
+    }, { $set: updateData });
+    const updated = await base44.asServiceRole.entities.CourseExterne.get(course_id);
+    if (updated?.livreur_id !== course.livreur_id || updated?.statut !== statut_cible) {
+      return Response.json({ error: 'La course a changé. Actualisez avant de continuer.', statut_actuel: updated?.statut }, { status: 409 });
+    }
+    const ecoProgress = course.eco_mission_id
+      ? await updateEcoMissionRouteProgress(base44, course_id).catch(() => ({ updated: false, reason: 'progress_sync_failed' }))
+      : undefined;
+    return Response.json({ success: true, course: updated, statut: statut_cible, eco_progress: ecoProgress });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
   }

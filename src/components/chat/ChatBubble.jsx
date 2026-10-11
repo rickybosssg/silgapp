@@ -130,6 +130,9 @@ export default function ChatBubble({ message, isMine }) {
         {/* Contenu du message */}
         {message.message_type === "audio" && message.audio_url ? (
           <AudioBubble audioUrl={message.audio_url} isMine={isMine} />
+        ) : message.message_type === "video" && message.video_url ? (
+          <video src={message.video_url} controls playsInline preload="metadata"
+            className="w-full max-w-[240px] rounded-xl" aria-label="Vidéo du message" />
         ) : message.message_type === "photo" && message.photo_url ? (
           <div className={cn(
             "rounded-2xl overflow-hidden max-w-[240px] shadow-sm",

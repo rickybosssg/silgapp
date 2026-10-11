@@ -5,7 +5,7 @@ import confetti from "canvas-confetti";
 /**
  * LivreurVictoryOverlay — Animation plein écran de célébration livreur.
  *
- * Déclenchée UNIQUEMENT après confirmation backend du succès du PIN/QR de LIVRAISON.
+ * Déclenchée UNIQUEMENT après confirmation backend de la LIVRAISON.
  * Jamais sur la récupération, jamais sur erreur, jamais sur ouverture/rafraîchissement.
  *
  * Durée : 9 secondes exactement.
@@ -35,6 +35,10 @@ const DURATION_MS = 9000;
 export default function LivreurVictoryOverlay({ courseId, onClose }) {
   const [visible, setVisible] = useState(false);
   const lastCourseIdRef = useRef(null);
+  const deadlineRef = useRef(0);
+  const closedRef = useRef(false);
+  const onCloseRef = useRef(onClose);
+  useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
 
   // Mot aléatoire — choisi une seule fois par courseId (pas de re-tirage au rerender)
   const word = useMemo(
@@ -50,9 +54,16 @@ export default function LivreurVictoryOverlay({ courseId, onClose }) {
     }
 
     // ── Anti-doublon : même courseId = pas de replay ──
-    if (lastCourseIdRef.current === courseId) return;
-    lastCourseIdRef.current = courseId;
+    const firstRun = lastCourseIdRef.current !== courseId;
+    if (firstRun) {
+      lastCourseIdRef.current = courseId;
+      deadlineRef.current = Date.now() + DURATION_MS;
+      closedRef.current = false;
+    }
+    if (closedRef.current) return;
     setVisible(true);
+    let cancelled = false;
+    let frameId;
 
     const prefersReducedMotion =
       typeof window !== "undefined" &&
@@ -83,18 +94,24 @@ export default function LivreurVictoryOverlay({ courseId, onClose }) {
           disableForReducedMotion: true,
           scalar: 0.8,
         });
-        if (Date.now() < end) requestAnimationFrame(frame);
+        if (!cancelled && Date.now() < end) frameId = requestAnimationFrame(frame);
       })();
     }
 
-    // ── Fermeture automatique à 6 secondes ──
+    // Le rafraichissement du parent ne doit pas annuler ce minuteur.
     const timer = setTimeout(() => {
+      if (closedRef.current) return;
+      closedRef.current = true;
       setVisible(false);
-      onClose?.();
-    }, DURATION_MS);
+      onCloseRef.current?.();
+    }, Math.max(0, deadlineRef.current - Date.now()));
 
-    return () => clearTimeout(timer);
-  }, [courseId, onClose]);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      if (frameId) cancelAnimationFrame(frameId);
+    };
+  }, [courseId]);
 
   if (!visible || !courseId) return null;
 

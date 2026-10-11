@@ -14,6 +14,7 @@ import {
 import { getCourseContactForPhase, normalizePhoneForWhatsapp } from "@/lib/courseContact";
 import { getPrixAffichable, getDeviseAffichable } from "@/utils/getPrixAffichable";
 import { confirmDelivery, functionBody } from "@/lib/deliveryConfirmation";
+import { captureDeliveryGps } from "@/lib/deliveryGps";
 
 const ACTIVE_STATUSES = new Set([
   "livreur_en_route", "client_contacte", "en_route_expediteur",
@@ -95,13 +96,16 @@ export default function EcoMissionDashboard({ mission, livreurProfil, onAllDeliv
     if (actionPending) return;
     setActionPending(true);
     try {
+      const gps = ["colis_recupere", "pris_en_charge", "arrivee"].includes(statutCible)
+        ? await captureDeliveryGps() : {};
       const response = await base44.functions.invoke("transitionStatutLivreur", {
         course_id: courseId,
         statut_cible: statutCible,
         ...extraData,
+        ...gps,
       });
       const result = functionBody(response);
-      if (result?.success === false) throw new Error(result.error || "Mise à jour refusée");
+      if (result?.success !== true) throw new Error(result?.error || "Mise à jour non confirmée");
       queryClient.invalidateQueries({ queryKey: ["eco-mission-active-courses", mission.id] });
       queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
     } catch (err) {

@@ -26,7 +26,7 @@ const messages = [
   "En attente de confirmation...",
 ];
 
-export default function LivreurRechercheAnimation({ course, onRelancer }) {
+export default function LivreurRechercheAnimation({ course, onRelancer, onAddAnother }) {
   const navigate = useNavigate();
   const [showAnnulerDialog, setShowAnnulerDialog] = useState(false);
   const [currentMessage, setCurrentMessage] = useState(0);
@@ -44,6 +44,10 @@ export default function LivreurRechercheAnimation({ course, onRelancer }) {
       localStorage.removeItem("silgapp_course_draft");
       localStorage.removeItem("silgapp_course_step");
     } catch {}
+    if (onAddAnother) {
+      onAddAnother();
+      return;
+    }
     const route = `/client/course/${course?.type_course || "expedier"}`;
     navigate(route, { replace: true });
   };

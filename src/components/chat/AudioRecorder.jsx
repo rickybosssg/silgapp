@@ -140,15 +140,17 @@ export default function AudioRecorder({ onSend, disabled }) {
       const ext = audioBlob.type.includes("mp4") ? "m4a" : audioBlob.type.includes("mpeg") ? "mp3" : "webm";
       const file = new File([audioBlob], `audio_${Date.now()}.${ext}`, { type: audioBlob.type });
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
-      await onSend({ message_type: "audio", audio_url: file_url, content: "" });
+      const sent = await onSend({ message_type: "audio", audio_url: file_url, content: "" });
+      if (sent === false) return;
       setAudioBlob(null);
       setAudioUrl(null);
       setDuration(0);
     } catch (err) {
       console.error("Upload audio error:", err);
       alert("Erreur lors de l'envoi de l'audio");
+    } finally {
+      setUploading(false);
     }
-    setUploading(false);
   };
 
   const cancelRecording = () => {

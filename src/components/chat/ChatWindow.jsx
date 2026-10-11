@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Send, Loader2, MessageCircle, ImagePlus, X } from "lucide-react";
 import ChatBubble from "@/components/chat/ChatBubble";
 import AudioRecorder from "@/components/chat/AudioRecorder";
+import { toast } from "sonner";
 import { playNotificationSound } from "@/hooks/useSonEtVibration";
 import {
   buildClientMessageId,
@@ -14,7 +15,13 @@ import {
   mergeMessageList,
 } from "@/lib/chatUtils";
 
-export default function ChatWindow({ courseId, senderType, senderId, senderName, compact = false, contextInfo = null }) {
+export default function ChatWindow(props) {
+  return <CourseChatWindow key={`${props.courseId ? "course" : "conversation"}:${props.courseId || props.conversationId}:${props.senderType}:${props.senderId}`} {...props} />;
+}
+
+function CourseChatWindow({ courseId, conversationId, senderType, senderId, senderName, compact = false, contextInfo = null, fullHeight = false }) {
+  const scopeId = courseId || conversationId;
+  const scopeField = courseId ? "course_id" : "conversation_id";
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -22,34 +29,61 @@ export default function ChatWindow({ courseId, senderType, senderId, senderName,
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const bottomRef = useRef(null);
   const sendingRef = useRef(false);
+  const pendingSendRef = useRef(null);
   const knownIdsRef = useRef(new Set());
+  const [hasOlder, setHasOlder] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const olderScrollRef = useRef(null);
+  const initializedRef = useRef(false);
 
   // ── Refetch réutilisable : charge les messages depuis la DB et fusionne avec l'état courant ──
   // Utilisé par : chargement initial, polling 5s, refetch foreground, refetch sur push.
   // La déduplication via getMessageKey garantit zéro doublon ni scintillement.
   const refetchMessages = useCallback(async () => {
-    if (!courseId) return;
+    if (!scopeId) return;
     try {
-      const msgs = await base44.entities.Message.filter({ course_id: courseId }, "created_date", 100);
+      const msgs = await base44.entities.Message.filter({ [scopeField]: scopeId }, "-created_date", 100);
+      if (!initializedRef.current) {
+        setHasOlder(msgs.length === 100);
+        initializedRef.current = true;
+      }
       const list = dedupeAndSortMessages(msgs || []);
       const profiles = await buildSenderProfiles(base44, list);
       const enriched = enrichMessagesWithProfiles(list, profiles);
       enriched.forEach(m => knownIdsRef.current.add(getMessageKey(m)));
       setMessages(prev => dedupeAndSortMessages([...prev, ...enriched]));
     } catch (_) {}
-  }, [courseId]);
+  }, [scopeId, scopeField]);
+
+  const loadOlder = async () => {
+    if (loadingOlder || !scopeId) return;
+    setLoadingOlder(true);
+    try {
+      const rows = await base44.entities.Message.filter({ [scopeField]: scopeId }, "-created_date", 100, messages.length);
+      const profiles = await buildSenderProfiles(base44, rows);
+      const container = bottomRef.current?.parentElement;
+      if (container) olderScrollRef.current = { height: container.scrollHeight, top: container.scrollTop };
+      rows.forEach(m => knownIdsRef.current.add(getMessageKey(m)));
+      setMessages(previous => dedupeAndSortMessages([...previous, ...enrichMessagesWithProfiles(rows, profiles)]));
+      setHasOlder(rows.length === 100);
+    } catch {
+      toast.error("Impossible de charger les anciens messages");
+    } finally {
+      setLoadingOlder(false);
+    }
+  };
 
   // Charger les messages existants
   useEffect(() => {
-    if (!courseId || !open) return;
+    if (!scopeId || !open) return;
     refetchMessages();
-  }, [courseId, open, refetchMessages]);
+  }, [scopeId, open, refetchMessages]);
 
   // Subscription temps réel + son notification (WebSocket = instantané)
   useEffect(() => {
-    if (!courseId || !open) return;
+    if (!scopeId || !open) return;
     const unsub = base44.entities.Message.subscribe((event) => {
-      if (event.type === "create" && event.data?.course_id === courseId) {
+      if (event.type === "create" && event.data?.[scopeField] === scopeId) {
         // Anti-doublon : vérifier le ref
         const eventKey = getMessageKey(event.data);
         if (knownIdsRef.current.has(eventKey)) return;
@@ -64,14 +98,14 @@ export default function ChatWindow({ courseId, senderType, senderId, senderName,
       }
     });
     return () => unsub?.();
-  }, [courseId, open, senderType, senderId]);
+  }, [scopeId, scopeField, open, senderType, senderId]);
 
   // ── Polling de sécurité 5s + refetch foreground + refetch sur push ──
   // Architecture : WebSocket (instantané) + polling 5s (filet) + foreground (resync) + push (rattrapage)
   // Le polling ne tourne QUE quand le chat est ouvert ET l'app au premier plan.
   // Aucun timer orphelin : nettoyé au démontage, au changement de course, et en arrière-plan.
   useEffect(() => {
-    if (!courseId || !open) return;
+    if (!scopeId || !open) return;
 
     let intervalId = null;
 
@@ -109,7 +143,7 @@ export default function ChatWindow({ courseId, senderType, senderId, senderName,
     // Le push peut être dispatché par le hook de notifications ou la couche native.
     const handlePushRefetch = (event) => {
       const detail = event?.detail || {};
-      if (detail.course_id === courseId || detail.type === "nouveau_message") {
+      if (detail[scopeField] === scopeId || (!detail.course_id && !detail.conversation_id && detail.type === "nouveau_message")) {
         refetchMessages();
       }
     };
@@ -122,7 +156,7 @@ export default function ChatWindow({ courseId, senderType, senderId, senderName,
       window.removeEventListener("silgapp:chat_refetch", handlePushRefetch);
       stopPolling();
     };
-  }, [courseId, open, refetchMessages]);
+  }, [scopeId, scopeField, open, refetchMessages]);
 
   // ── Correction scroll : scrollTop sur le conteneur du chat uniquement,
   //    JAMAIS scrollIntoView (qui fait défiler toute la page).
@@ -130,24 +164,33 @@ export default function ChatWindow({ courseId, senderType, senderId, senderName,
   //    de scroll choisie par l'utilisateur sur la page principale. ──
   useEffect(() => {
     const container = bottomRef.current?.parentElement;
-    if (container) container.scrollTop = container.scrollHeight;
+    if (container && olderScrollRef.current) {
+      const saved = olderScrollRef.current;
+      container.scrollTop = saved.top + container.scrollHeight - saved.height;
+      olderScrollRef.current = null;
+    } else if (container) container.scrollTop = container.scrollHeight;
   }, [messages]);
 
   // Envoi sécurisé via la fonction backend envoyerMessage
   const sendMessage = async (msgData) => {
-    if (sendingRef.current || !courseId) return;
+    if (sendingRef.current || !scopeId) return false;
     sendingRef.current = true;
     setSending(true);
     try {
-      const clientMessageId = msgData.client_message_id || buildClientMessageId(courseId, senderType, senderId);
+      const signature = JSON.stringify(msgData);
+      if (pendingSendRef.current?.signature !== signature) {
+        pendingSendRef.current = { signature, id: msgData.client_message_id || buildClientMessageId(scopeId, senderType, senderId) };
+      }
+      const clientMessageId = pendingSendRef.current.id;
       const res = await base44.functions.invoke("envoyerMessage", {
-        course_id: courseId,
+        [scopeField]: scopeId,
         sender_type: senderType,
         sender_id: senderId,
         client_message_id: clientMessageId,
         ...msgData,
       });
       const newMsg = res?.message || res?.data?.message;
+      if (!newMsg?.id) throw new Error(res?.data?.error || res?.error || "Envoi non confirmé");
       if (newMsg) {
         // Anti-doublon : ne pas ajouter si déjà présent
         const key = getMessageKey(newMsg);
@@ -156,22 +199,28 @@ export default function ChatWindow({ courseId, senderType, senderId, senderName,
           setMessages(prev => mergeMessageList(prev, newMsg));
         }
       }
+      pendingSendRef.current = null;
+      return true;
     } catch (err) {
       console.error("Erreur envoi message:", err);
+      toast.error(err?.response?.data?.error || err?.message || "Message non envoyé");
+      return false;
+    } finally {
+      sendingRef.current = false;
+      setSending(false);
     }
-    sendingRef.current = false;
-    setSending(false);
   };
 
   const handleSend = async () => {
-    if (!input.trim() || sendingRef.current || !courseId) return;
+    if (!input.trim() || sendingRef.current || !scopeId) return;
     const content = input.trim();
-    setInput("");
-    await sendMessage({ content, message_type: "text" });
+    if (await sendMessage({ content, message_type: "text" })) {
+      setInput(previous => previous.trim() === content ? "" : previous);
+    }
   };
 
   const handleAudioSend = async (audioData) => {
-    await sendMessage(audioData);
+    return sendMessage(audioData);
   };
 
   const handlePhotoSend = async (e) => {
@@ -180,7 +229,9 @@ export default function ChatWindow({ courseId, senderType, senderId, senderName,
     setUploadingPhoto(true);
     try {
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
-      await sendMessage({ message_type: "photo", photo_url: file_url, content: "" });
+      await sendMessage(file.type.startsWith("video/")
+        ? { message_type: "video", video_url: file_url, content: "" }
+        : { message_type: "photo", photo_url: file_url, content: "" });
     } catch (err) {
       console.error("Erreur envoi photo:", err);
     }
@@ -207,7 +258,7 @@ export default function ChatWindow({ courseId, senderType, senderId, senderName,
   }
 
   return (
-    <div className="flex flex-col h-[460px] bg-[#16191d] rounded-2xl overflow-hidden border border-white/8 shadow-sm">
+    <div className={`flex flex-col min-h-0 ${fullHeight ? "flex-1" : "h-[460px] rounded-2xl"} bg-[#16191d] overflow-hidden border border-white/8 shadow-sm`}>
       {/* Header */}
       <div className="p-3 bg-[#0f1216] text-white flex items-center justify-between">
         <div className="min-w-0">
@@ -231,6 +282,10 @@ export default function ChatWindow({ courseId, senderType, senderId, senderName,
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-3 bg-[#16191d]">
+        {hasOlder && <button type="button" onClick={loadOlder} disabled={loadingOlder}
+          className="block mx-auto text-sm text-white/80 py-3 disabled:opacity-50">
+          {loadingOlder ? "Chargement..." : "Messages plus anciens"}
+        </button>}
         {messages.length === 0 && (
           <div className="flex items-center justify-center h-full">
             <p className="text-xs text-white/50 text-center">
@@ -256,7 +311,7 @@ export default function ChatWindow({ courseId, senderType, senderId, senderName,
           senderName={senderName}
         />
         <label className="cursor-pointer flex-shrink-0">
-          <input type="file" accept="image/*" onChange={handlePhotoSend} className="hidden" disabled={sending || uploadingPhoto} />
+          <input type="file" accept="image/*,video/*" onChange={handlePhotoSend} className="hidden" disabled={sending || uploadingPhoto} />
           <div className="h-10 w-10 rounded-full flex items-center justify-center text-white/50 hover:text-[#00a86b] hover:bg-white/10 transition-colors">
             {uploadingPhoto ? <Loader2 className="w-5 h-5 animate-spin" /> : <ImagePlus className="w-5 h-5" />}
           </div>
