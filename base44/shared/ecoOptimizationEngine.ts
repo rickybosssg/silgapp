@@ -883,6 +883,90 @@ export async function cleanupStuckEcoMissions(base44: any, countryCode?: string,
   return { success: true, checked: (missions || []).length, results };
 }
 
+// ════════════════════════════════════════════════════════════════════════
+// DÉCLENCHEMENT AUTOMATIQUE DES PROPOSITIONS SUR TRAJET
+// ════════════════════════════════════════════════════════════════════════
+// Appelé par courseEventOrchestrator quand une nouvelle course est créée.
+// Trouve les livreurs en cours de livraison compatibles et crée des propositions.
+//
+// CONTRAINTES :
+// - Déclenchement événementiel (appelé par l'orchestrateur, pas de polling)
+// - Respecte ON_ROUTE_ENABLED (désactivé si false)
+// - Aucune proposition si la course est groupée (mission Éco)
+// - Isolation pays + entreprise/public
+// - Préfiltrage économique avant calcul d'itinéraire
+// - Proposition explicite au livreur, jamais d'attribution automatique
+// - Protection contre les doublons (createOnRouteProposal est idempotent)
+// - Compatible courses Standard et Éco
+export async function triggerOnRouteProposalsForNewCourse(base44: any, courseId: string) {
+  const course = await base44.asServiceRole.entities.CourseExterne.get(courseId).catch(() => null);
+  if (!course) return { success: false, reason: 'course_not_found' };
+
+  // Course déjà assignée ou terminée → pas de proposition
+  if (TERMINAL_STATUSES.includes(course.statut) || course.livreur_id || course.accepted_by_livreur_id) {
+    return { success: true, proposals_created: 0, reason: 'course_unavailable' };
+  }
+
+  // Course Éco groupée → fait partie d'une mission, pas de proposition individuelle
+  if (course.eco_status === 'grouped' && course.eco_mission_id) {
+    return { success: true, proposals_created: 0, reason: 'course_grouped' };
+  }
+
+  // Course sans GPS utilisable → pas de calcul de compatibilité possible
+  if (!hasUsableRoutePoints(course)) {
+    return { success: true, proposals_created: 0, reason: 'no_gps_points' };
+  }
+
+  const config = await loadEcoConfig(base44, course.country_code);
+  if (!config.enabled || !config.onRouteEnabled) {
+    return { success: true, proposals_created: 0, reason: 'on_route_disabled' };
+  }
+
+  // ── Trouver les livreurs avec des courses actives dans le même scope ──
+  const courseEnterpriseId = normalizeEnterpriseId(course.enterprise_id);
+  const activeCourses = await base44.asServiceRole.entities.CourseExterne.filter({
+    country_code: course.country_code,
+    statut: { $in: ACTIVE_STATUSES },
+    livreur_id: { $exists: true },
+  }, '-updated_date', 50).catch(() => []);
+
+  // Grouper par livreur_id (un livreur peut avoir plusieurs courses actives)
+  const driverIds = new Set<string>();
+  for (const ac of activeCourses || []) {
+    if (!ac?.livreur_id) continue;
+    // Isolation entreprise/public
+    if (normalizeEnterpriseId(ac.enterprise_id) !== courseEnterpriseId) continue;
+    driverIds.add(ac.livreur_id);
+  }
+
+  if (driverIds.size === 0) {
+    return { success: true, proposals_created: 0, reason: 'no_active_drivers' };
+  }
+
+  // ── Pour chaque livreur, créer une proposition si compatible ──
+  // createOnRouteProposal fait le préfiltrage de compatibilité (détour, gain, etc.)
+  // et est idempotent (pas de doublon si une proposition pending existe déjà)
+  let proposalsCreated = 0;
+  const errors: any[] = [];
+  for (const livreurId of driverIds) {
+    try {
+      const result = await createOnRouteProposal(base44, courseId, livreurId);
+      if (result?.success && !result?.idempotent) {
+        proposalsCreated++;
+      }
+    } catch (e: any) {
+      errors.push({ livreur_id: livreurId, error: e?.message || String(e) });
+    }
+  }
+
+  return {
+    success: true,
+    proposals_created: proposalsCreated,
+    drivers_checked: driverIds.size,
+    errors: errors.length > 0 ? errors : undefined,
+  };
+}
+
 export async function acceptEcoMission(base44: any, missionId: string, livreurId: string) {
   const mission = await base44.asServiceRole.entities.EcoMission.get(missionId).catch(() => null);
   if (!mission || mission.status !== 'available') return { success: false, reason: 'mission_unavailable' };

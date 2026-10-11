@@ -8,6 +8,7 @@ import {
   invalidatePendingProposals,
   processEcoCourseCreated,
   respondToOnRouteProposal,
+  triggerOnRouteProposalsForNewCourse,
   updateEcoMissionRouteProgress,
 } from '../../shared/ecoOptimizationEngine.ts';
 
@@ -44,8 +45,11 @@ Deno.serve(async (req) => {
     if (action === 'update_route_progress') {
       return Response.json(await updateEcoMissionRouteProgress(base44, body.course_id));
     }
+    if (action === 'trigger_on_route_proposals') {
+      return Response.json(await triggerOnRouteProposalsForNewCourse(base44, body.course_id));
+    }
 
-    return Response.json({ success: true, service: 'ecoOptimizationOrchestrator', actions: ['course_created', 'convert_due', 'expire_proposals', 'invalidate_pending', 'create_on_route_proposal', 'respond_proposal', 'accept_eco_mission', 'cleanup_stuck_missions', 'update_route_progress'] });
+    return Response.json({ success: true, service: 'ecoOptimizationOrchestrator', actions: ['course_created', 'convert_due', 'expire_proposals', 'invalidate_pending', 'create_on_route_proposal', 'respond_proposal', 'accept_eco_mission', 'cleanup_stuck_missions', 'update_route_progress', 'trigger_on_route_proposals'] });
   } catch (error) {
     console.error('[EcoOrchestrator] Fatal:', error?.message || String(error));
     return Response.json({ success: false, error: error?.message || String(error) }, { status: 500 });

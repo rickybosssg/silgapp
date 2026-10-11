@@ -3,6 +3,7 @@ import { isV2Enabled, DISPATCH_V2_BUNDLE_VERSION } from '../../shared/dispatchV2
 import {
   processEcoCourseCreated,
   shouldHoldEcoCourseOnCreate,
+  triggerOnRouteProposalsForNewCourse,
 } from '../../shared/ecoOptimizationEngine.ts';
 import {
   emitCourseCreated,
@@ -94,12 +95,24 @@ Deno.serve(async (req) => {
 
         await emitCourseCreated(base44, course).catch(() => {});
 
+        // ── Propositions sur trajet (déclenchement automatique) ──
+        // Si la course Éco n'a pas été groupée, proposer aux livreurs en route.
+        // Si elle a été groupée, triggerOnRouteProposalsForNewCourse ignore (course_grouped).
+        const onRouteResult = await triggerOnRouteProposalsForNewCourse(base44, courseId).catch((error) => {
+          const msg = error?.message || String(error);
+          console.error('[COURSE_ORCHESTRATOR] ❌ onRouteProposals:', msg);
+          errors.push({ module: 'onRouteProposals', error: msg });
+          return { success: false, error: msg };
+        });
+        called.push('onRouteProposals');
+
         return Response.json({
           success: true,
           event: 'create',
           course_id: courseId,
           eco_hold: true,
           eco_result: ecoResult,
+          on_route_result: onRouteResult,
           called,
           errors,
         });
@@ -134,10 +147,21 @@ Deno.serve(async (req) => {
       // 3. VENUS Admin Event (non-bloquant)
       await emitCourseCreated(base44, course).catch(() => {});
 
+      // ── Propositions sur trajet (déclenchement automatique) ──
+      // Pour les courses Standard (non-Éco), proposer aux livreurs en route.
+      const onRouteResult = await triggerOnRouteProposalsForNewCourse(base44, courseId).catch((error) => {
+        const msg = error?.message || String(error);
+        console.error('[COURSE_ORCHESTRATOR] ❌ onRouteProposals:', msg);
+        errors.push({ module: 'onRouteProposals', error: msg });
+        return { success: false, error: msg };
+      });
+      called.push('onRouteProposals');
+
       return Response.json({
         success: true,
         event: 'create',
         course_id: courseId,
+        on_route_result: onRouteResult,
         called,
         errors,
       });
