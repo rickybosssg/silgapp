@@ -37,6 +37,18 @@ Deno.serve(async (req) => {
       return Response.json({ success: false, error: 'Livreur introuvable' }, { status: 404 });
     }
 
+    // ── LAZY CLEANUP : Libérer les réservations sur trajet expirées ──
+    // Quand un livreur interroge ses propositions, on en profite pour libérer
+    // les réservations expirées de son pays. Cela garantit qu'une course
+    // dont la fenêtre de 15s est expirée est libérée dès qu'un livreur
+    // consulte l'app, sans attendre le workflow de 1 minute.
+    try {
+      const { releaseExpiredReservationsLazy } = await import('../../shared/onRoutePriorityReservation.ts');
+      await releaseExpiredReservationsLazy(base44, livreur.country_code, 5);
+    } catch (e: any) {
+      console.error('[getOnRouteProposals] lazy cleanup:', e?.message || String(e));
+    }
+
     // ── Récupérer les propositions pending non expirées ──
     const now = new Date().toISOString();
     const proposals = await base44.asServiceRole.entities.EcoProposal.filter({

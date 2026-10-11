@@ -316,8 +316,119 @@ export async function createExclusiveReservation(
 }
 
 /**
+ * Libère une réservation expirée individuelle et reprend le dispatch normal.
+ * Factorisée pour éviter la duplication entre le workflow et le lazy cleanup.
+ *
+ * Étapes :
+ * 1. Marque la proposition comme 'expired' (atomique, anti-double-libération)
+ * 2. Vérifie que la course n'a pas été acceptée entre-temps
+ * 3. Si la course est toujours disponible → la libère au dispatch normal
+ *    - Course Standard → dispatch_status = 'disponible_push', trigger dispatchExterneAuto
+ *    - Course Éco isolée → reste en attente Éco (pas de conversion forcée)
+ *
+ * Retourne true si la course a été libérée au dispatch.
+ */
+async function releaseSingleExpiredReservation(base44: any, proposal: any, now: string): Promise<{ released: boolean; courseReleased: boolean; error?: string }> {
+  try {
+    // ── Marquer la proposition comme expirée (atomique) ──
+    const claim = await base44.asServiceRole.entities.EcoProposal.updateMany(
+      { id: proposal.id, status: 'pending' },
+      { $set: { status: 'expired', responded_at: now } },
+    );
+    if (!claim || claim.updated !== 1) return { released: false, courseReleased: false };
+
+    // ── Vérifier que la course n'a pas été acceptée entre-temps ──
+    const course = await base44.asServiceRole.entities.CourseExterne.get(proposal.course_id).catch(() => null);
+    if (!course) return { released: true, courseReleased: false };
+    if (TERMINAL_STATUSES.includes(course.statut) || course.livreur_id || course.accepted_by_livreur_id) {
+      return { released: true, courseReleased: false };
+    }
+
+    // ── Course Éco isolée → reste en attente Éco (pas de conversion forcée) ──
+    if (course.delivery_mode === 'eco' && course.eco_status === 'isolated') {
+      return { released: true, courseReleased: false };
+    }
+
+    // ── Libérer la course au dispatch normal ──
+    const releaseClaim = await base44.asServiceRole.entities.CourseExterne.updateMany(
+      {
+        id: course.id,
+        dispatch_status: { $in: ['en_attente', 'propose'] },
+        livreur_id: null,
+        accepted_by_livreur_id: null,
+      },
+      {
+        $set: {
+          dispatch_status: 'disponible_push',
+          statut: 'recherche_livreur',
+          heure_sollicitation: now,
+        },
+      },
+    );
+
+    if (releaseClaim?.updated === 1) {
+      // ── Déclencher le dispatch normal ──
+      await base44.asServiceRole.functions.invoke('dispatchExterneAuto', {
+        action: 'lancer_recherche_auto',
+        course_id: course.id,
+      }).catch(() => null);
+      return { released: true, courseReleased: true };
+    }
+
+    return { released: true, courseReleased: false };
+  } catch (e: any) {
+    return { released: false, courseReleased: false, error: e?.message || String(e) };
+  }
+}
+
+/**
+ * LAZY CLEANUP — Libération paresseuse des réservations expirées.
+ *
+ * Appelée par les événements normaux du système (création de course,
+ * mise à jour de course, polling du livreur) — PAS par un polling global.
+ *
+ * Avantages :
+ * - Libération quasi-instantanée quand le système est actif
+ * - Aucun coût de polling quand le système est au repos
+ * - Limité à `limit` réservations par appel (défaut 10) pour rester léger
+ * - Filtrable par pays pour réduire la portée
+ *
+ * Le workflow périodique (1 minute) reste le filet de sécurité pour les
+ * périodes calmes où aucun événement ne déclencherait le lazy cleanup.
+ */
+export async function releaseExpiredReservationsLazy(
+  base44: any,
+  countryCode?: string,
+  limit = 10,
+): Promise<{ success: boolean; released: number; coursesReleased: number; errors?: any[] }> {
+  const now = new Date().toISOString();
+  const filter: any = {
+    status: 'pending',
+    is_exclusive: true,
+    reservation_expires_at: { $lte: now },
+  };
+  if (countryCode) filter.country_code = String(countryCode).toUpperCase();
+
+  const expiredProposals = await base44.asServiceRole.entities.EcoProposal.filter(filter, 'reservation_expires_at', limit).catch(() => []);
+  if (!expiredProposals?.length) return { success: true, released: 0, coursesReleased: 0 };
+
+  let released = 0;
+  let coursesReleased = 0;
+  const errors: any[] = [];
+
+  for (const proposal of expiredProposals) {
+    const result = await releaseSingleExpiredReservation(base44, proposal, now);
+    if (result.released) released++;
+    if (result.courseReleased) coursesReleased++;
+    if (result.error) errors.push({ proposal_id: proposal.id, error: result.error });
+  }
+
+  return { success: true, released, coursesReleased, errors: errors.length > 0 ? errors : undefined };
+}
+
+/**
  * Libère les réservations exclusives expirées et reprend le dispatch normal.
- * Appelée par un workflow périodique (toutes les 5-10 secondes).
+ * Appelée par le workflow périodique (toutes les 1 minute) — filet de sécurité.
  *
  * Pour chaque réservation expirée :
  * 1. Marque la proposition comme 'expired'
@@ -334,68 +445,20 @@ export async function releaseExpiredOnRouteReservations(base44: any, limit = 50)
     reservation_expires_at: { $lte: now },
   };
   const expiredProposals = await base44.asServiceRole.entities.EcoProposal.filter(filter, 'reservation_expires_at', limit).catch(() => []);
-  if (!expiredProposals?.length) return { success: true, released: 0 };
+  if (!expiredProposals?.length) return { success: true, released: 0, coursesReleased: 0 };
 
   let released = 0;
+  let coursesReleased = 0;
   const errors: any[] = [];
 
   for (const proposal of expiredProposals) {
-    try {
-      // ── Marquer la proposition comme expirée (atomique) ──
-      const claim = await base44.asServiceRole.entities.EcoProposal.updateMany(
-        { id: proposal.id, status: 'pending' },
-        { $set: { status: 'expired', responded_at: now } },
-      );
-      if (!claim || claim.updated !== 1) continue;
-
-      // ── Vérifier que la course n'a pas été acceptée entre-temps ──
-      const course = await base44.asServiceRole.entities.CourseExterne.get(proposal.course_id).catch(() => null);
-      if (!course) continue;
-      if (TERMINAL_STATUSES.includes(course.statut) || course.livreur_id || course.accepted_by_livreur_id) {
-        continue;
-      }
-
-      // ── Libérer la course au dispatch normal ──
-      // Course Éco isolée → reste en attente Éco (pas de conversion forcée)
-      if (course.delivery_mode === 'eco' && course.eco_status === 'isolated') {
-        // La course reste en attente Éco — le moteur de conversion différée s'en charge
-        continue;
-      }
-
-      // Course Standard ou Éco groupée → dispatch normal
-      const releaseClaim = await base44.asServiceRole.entities.CourseExterne.updateMany(
-        {
-          id: course.id,
-          dispatch_status: { $in: ['en_attente', 'propose'] },
-          livreur_id: null,
-          accepted_by_livreur_id: null,
-        },
-        {
-          $set: {
-            dispatch_status: 'disponible_push',
-            statut: 'recherche_livreur',
-            heure_sollicitation: now,
-          },
-        },
-      );
-
-      if (releaseClaim?.updated === 1) {
-        // ── Déclencher le dispatch normal ──
-        await base44.asServiceRole.functions.invoke('dispatchExterneAuto', {
-          action: 'lancer_recherche_auto',
-          course_id: course.id,
-        }).catch((e: any) => {
-          errors.push({ course_id: course.id, error: e?.message || String(e) });
-        });
-      }
-
-      released++;
-    } catch (e: any) {
-      errors.push({ proposal_id: proposal.id, error: e?.message || String(e) });
-    }
+    const result = await releaseSingleExpiredReservation(base44, proposal, now);
+    if (result.released) released++;
+    if (result.courseReleased) coursesReleased++;
+    if (result.error) errors.push({ proposal_id: proposal.id, error: result.error });
   }
 
-  return { success: true, released, errors: errors.length > 0 ? errors : undefined };
+  return { success: true, released, coursesReleased, errors: errors.length > 0 ? errors : undefined };
 }
 
 /**

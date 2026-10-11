@@ -22,6 +22,11 @@
  * 14. Absence de régression Dispatch V2
  * 15. Aucun livreur compatible → dispatch normal sans attente
  * 16. Course Éco isolée → pas de conversion forcée en Standard
+ * 17. Lazy cleanup libère les réservations expirées
+ * 18. Lazy cleanup ne libère pas les réservations non expirées
+ * 19. Lazy cleanup préserve les courses Éco isolées
+ * 20. Lazy cleanup est idempotent (double appel ne double-libère pas)
+ * 21. Lazy cleanup filtré par pays ne libère que les réservations du pays
  */
 
 const assert = {
@@ -47,8 +52,7 @@ const assert = {
   truthy: (value, msg) => assert.ok(!!value, msg),
   notEqual: (actual, expected, msg) => {
     if (actual === expected) {
-      console.error(`❌ ${msg} — actual should NOT equal expected`);
-      process.exitCode = 1;
+      throw new Error(`${msg} — actual should NOT equal expected, but got: ${JSON.stringify(actual)}`);
     } else {
       console.log(`  ✅ ${msg}`);
     }
@@ -92,8 +96,12 @@ function makeMockBase44(opts = {}) {
             for (const [id, c] of courses.entries()) {
               let matches = true;
               if (query.id?.$in) matches = matches && query.id.$in.includes(id);
+              else if (query.id) matches = matches && id === query.id;
               if (query.dispatch_status?.$in) matches = matches && query.dispatch_status.$in.includes(c.dispatch_status);
               if (query.livreur_id === null) matches = matches && !c.livreur_id;
+              if (query.delivery_mode) matches = matches && c.delivery_mode === query.delivery_mode;
+              if (query.eco_status) matches = matches && c.eco_status === query.eco_status;
+              if (query.eco_mission_id === null) matches = matches && !c.eco_mission_id;
               if (matches) {
                 if (update.$set) Object.assign(c, update.$set);
                 count++;
@@ -112,10 +120,18 @@ function makeMockBase44(opts = {}) {
           get: async (id) => proposals.get(id) || null,
           filter: async (query, sort, limit) => {
             let results = [...proposals.values()];
+            if (query?.course_code) results = results.filter(p => p.country_code === query.country_code);
             if (query?.course_id) results = results.filter(p => p.course_id === query.course_id);
             if (query?.livreur_id) results = results.filter(p => p.livreur_id === query.livreur_id);
             if (query?.status) results = results.filter(p => p.status === query.status);
             if (query?.is_exclusive) results = results.filter(p => p.is_exclusive === query.is_exclusive);
+            if (query?.expires_at?.$gte) {
+              const now = new Date(query.expires_at.$gte).getTime();
+              results = results.filter(p => {
+                if (!p.expires_at) return false;
+                return new Date(p.expires_at).getTime() >= now;
+              });
+            }
             if (query?.reservation_expires_at?.$lte) {
               const now = new Date(query.reservation_expires_at.$lte).getTime();
               results = results.filter(p => {
@@ -135,6 +151,7 @@ function makeMockBase44(opts = {}) {
             for (const [id, p] of proposals.entries()) {
               let matches = true;
               if (query.id?.$in) matches = matches && query.id.$in.includes(id);
+              else if (query.id) matches = matches && id === query.id;
               if (query.status) matches = matches && p.status === query.status;
               if (matches) {
                 if (update.$set) Object.assign(p, update.$set);
@@ -242,7 +259,7 @@ function makeLivreur(id, extra = {}) {
 
 let testsPassed = 0;
 let testsFailed = 0;
-const totalTests = 16;
+const totalTests = 21;
 
 async function runTest(name, fn) {
   try {
@@ -912,6 +929,332 @@ await runTest('8 — releaseReservationAfterRefusal libère immédiatement', asy
 
   const updatedCourse = courses.get('new-8');
   assert.equal(updatedCourse.dispatch_status, 'disponible_push', 'Course disponible_push');
+});
+
+// ════════════════════════════════════════════════════════════════════════
+// TESTS LAZY CLEANUP — Libération paresseuse déclenchée par les événements
+// ════════════════════════════════════════════════════════════════════════
+
+// ── Test 17 : Lazy cleanup libère les réservations expirées ──
+await runTest('17 — Lazy cleanup libère les réservations expirées', async () => {
+  const { base44, courses, livreurs, proposals, invokedFunctions } = makeMockBase44({
+    invokeResponses: {
+      envoiNotificationPush: { success: true },
+    },
+  });
+
+  // Course active du livreur
+  const activeCourse = makeCourse('active-17', 'en_livraison', {
+    livreur_id: 'livreur-17',
+    dispatch_status: 'accepte',
+    gps_depart_lat: 12.3714,
+    gps_arrivee_lat: 12.3750,
+  });
+  courses.set('active-17', activeCourse);
+
+  // Course réservée (expirée)
+  const reservedCourse = makeCourse('reserved-17', 'recherche_livreur', {
+    dispatch_status: 'en_attente',
+    gps_depart_lat: 12.3720,
+    gps_arrivee_lat: 12.3760,
+  });
+  courses.set('reserved-17', reservedCourse);
+
+  livreurs.set('livreur-17', makeLivreur('livreur-17'));
+
+  const { createExclusiveReservation, releaseExpiredReservationsLazy } = await import('../base44/shared/onRoutePriorityReservation.ts');
+
+  const config = {
+    onRoutePriorityEnabled: true,
+    onRoutePrioritySec: 15,
+    maxDetourKm: 6,
+    minDriverGain: 0,
+    enabled: true,
+    onRouteEnabled: true,
+  };
+
+  // Créer une réservation
+  const result = await createExclusiveReservation(base44, reservedCourse, config);
+  assert.ok(result.created, 'Réservation créée');
+
+  // Simuler l'expiration (reculer reservation_expires_at dans le passé)
+  const proposalEntry = [...proposals.values()].find(p => p.course_id === 'reserved-17');
+  assert.ok(proposalEntry, 'Proposition trouvée');
+  proposalEntry.reservation_expires_at = new Date(Date.now() - 10000).toISOString(); // Expirée il y a 10s
+  proposalEntry.expires_at = proposalEntry.reservation_expires_at;
+
+  // Le lazy cleanup doit libérer la réservation
+  const releaseResult = await releaseExpiredReservationsLazy(base44, 'BF', 10);
+  assert.ok(releaseResult.success, 'Lazy cleanup réussi');
+  assert.ok(releaseResult.released > 0, 'Au moins une réservation libérée');
+  assert.ok(releaseResult.coursesReleased > 0, 'Course libérée au dispatch');
+
+  // La course doit être passée en disponible_push
+  const updatedCourse = courses.get('reserved-17');
+  assert.equal(updatedCourse.dispatch_status, 'disponible_push', 'Course disponible_push');
+  assert.equal(updatedCourse.statut, 'recherche_livreur', 'Statut recherche_livreur');
+
+  // Le dispatch normal doit avoir été relancé
+  assert.ok(invokedFunctions.some(f => f.name === 'dispatchExterneAuto'), 'Dispatch relancé');
+
+  // La proposition doit être marquée expired
+  const expiredProposal = [...proposals.values()].find(p => p.course_id === 'reserved-17');
+  assert.equal(expiredProposal.status, 'expired', 'Proposition marquée expired');
+});
+
+// ── Test 18 : Lazy cleanup ne libère pas les réservations non expirées ──
+await runTest('18 — Lazy cleanup ne libère pas les réservations non expirées', async () => {
+  const { base44, courses, livreurs, proposals, invokedFunctions } = makeMockBase44({
+    invokeResponses: {
+      envoiNotificationPush: { success: true },
+    },
+  });
+
+  const activeCourse = makeCourse('active-18', 'en_livraison', {
+    livreur_id: 'livreur-18',
+    dispatch_status: 'accepte',
+    gps_depart_lat: 12.3714,
+    gps_arrivee_lat: 12.3750,
+  });
+  courses.set('active-18', activeCourse);
+
+  const reservedCourse = makeCourse('reserved-18', 'recherche_livreur', {
+    dispatch_status: 'en_attente',
+    gps_depart_lat: 12.3720,
+    gps_arrivee_lat: 12.3760,
+  });
+  courses.set('reserved-18', reservedCourse);
+
+  livreurs.set('livreur-18', makeLivreur('livreur-18'));
+
+  const { createExclusiveReservation, releaseExpiredReservationsLazy } = await import('../base44/shared/onRoutePriorityReservation.ts');
+
+  const config = {
+    onRoutePriorityEnabled: true,
+    onRoutePrioritySec: 15,
+    maxDetourKm: 6,
+    minDriverGain: 0,
+    enabled: true,
+    onRouteEnabled: true,
+  };
+
+  // Créer une réservation (non expirée — dans le futur)
+  const result = await createExclusiveReservation(base44, reservedCourse, config);
+  assert.ok(result.created, 'Réservation créée');
+
+  // Le lazy cleanup ne doit rien libérer (la réservation est encore valide)
+  const releaseResult = await releaseExpiredReservationsLazy(base44, 'BF', 10);
+  assert.ok(releaseResult.success, 'Lazy cleanup réussi');
+  assert.equal(releaseResult.released, 0, 'Aucune réservation libérée');
+  assert.equal(releaseResult.coursesReleased, 0, 'Aucune course libérée');
+
+  // La course ne doit pas avoir changé
+  const updatedCourse = courses.get('reserved-18');
+  assert.equal(updatedCourse.dispatch_status, 'en_attente', 'Course reste en_attente');
+
+  // Le dispatch ne doit pas avoir été relancé pour cette course
+  const dispatchCalls = invokedFunctions.filter(f =>
+    f.name === 'dispatchExterneAuto' && f.args?.course_id === 'reserved-18'
+  );
+  assert.equal(dispatchCalls.length, 0, 'Dispatch non relancé pour course réservée');
+});
+
+// ── Test 19 : Lazy cleanup préserve les courses Éco isolées ──
+await runTest('19 — Lazy cleanup préserve les courses Éco isolées', async () => {
+  const { base44, courses, livreurs, proposals } = makeMockBase44({
+    invokeResponses: {
+      envoiNotificationPush: { success: true },
+    },
+  });
+
+  const activeCourse = makeCourse('active-19', 'en_livraison', {
+    livreur_id: 'livreur-19',
+    dispatch_status: 'accepte',
+    gps_depart_lat: 12.3714,
+    gps_arrivee_lat: 12.3750,
+  });
+  courses.set('active-19', activeCourse);
+
+  // Course Éco isolée réservée
+  const ecoCourse = makeCourse('eco-19', 'recherche_livreur', {
+    delivery_mode: 'eco',
+    eco_status: 'isolated',
+    dispatch_status: 'en_attente',
+    gps_depart_lat: 12.3720,
+    gps_arrivee_lat: 12.3760,
+  });
+  courses.set('eco-19', ecoCourse);
+
+  livreurs.set('livreur-19', makeLivreur('livreur-19'));
+
+  const { createExclusiveReservation, releaseExpiredReservationsLazy } = await import('../base44/shared/onRoutePriorityReservation.ts');
+
+  const config = {
+    onRoutePriorityEnabled: true,
+    onRoutePrioritySec: 15,
+    maxDetourKm: 6,
+    minDriverGain: 0,
+    enabled: true,
+    onRouteEnabled: true,
+  };
+
+  const result = await createExclusiveReservation(base44, ecoCourse, config);
+  assert.ok(result.created, 'Réservation créée pour course Éco');
+
+  // Simuler l'expiration
+  const proposalEntry = [...proposals.values()].find(p => p.course_id === 'eco-19');
+  proposalEntry.reservation_expires_at = new Date(Date.now() - 10000).toISOString();
+  proposalEntry.expires_at = proposalEntry.reservation_expires_at;
+
+  // Le lazy cleanup doit marquer la proposition expirée mais NE PAS convertir la course
+  const releaseResult = await releaseExpiredReservationsLazy(base44, 'BF', 10);
+  assert.ok(releaseResult.success, 'Lazy cleanup réussi');
+  assert.ok(releaseResult.released > 0, 'Proposition marquée expirée');
+  assert.equal(releaseResult.coursesReleased, 0, 'Course Éco NON libérée au dispatch');
+
+  // La course doit rester Éco isolée
+  const updatedCourse = courses.get('eco-19');
+  assert.equal(updatedCourse.delivery_mode, 'eco', 'Course reste Éco');
+  assert.equal(updatedCourse.eco_status, 'isolated', 'Course reste isolée');
+  assert.notEqual(updatedCourse.dispatch_status, 'disponible_push', 'Course pas en disponible_push');
+});
+
+// ── Test 20 : Lazy cleanup est idempotent (double appel ne double-libère pas) ──
+await runTest('20 — Lazy cleanup est idempotent', async () => {
+  const { base44, courses, livreurs, proposals, invokedFunctions } = makeMockBase44({
+    invokeResponses: {
+      envoiNotificationPush: { success: true },
+    },
+  });
+
+  const activeCourse = makeCourse('active-20', 'en_livraison', {
+    livreur_id: 'livreur-20',
+    dispatch_status: 'accepte',
+    gps_depart_lat: 12.3714,
+    gps_arrivee_lat: 12.3750,
+  });
+  courses.set('active-20', activeCourse);
+
+  const reservedCourse = makeCourse('reserved-20', 'recherche_livreur', {
+    dispatch_status: 'en_attente',
+    gps_depart_lat: 12.3720,
+    gps_arrivee_lat: 12.3760,
+  });
+  courses.set('reserved-20', reservedCourse);
+
+  livreurs.set('livreur-20', makeLivreur('livreur-20'));
+
+  const { createExclusiveReservation, releaseExpiredReservationsLazy } = await import('../base44/shared/onRoutePriorityReservation.ts');
+
+  const config = {
+    onRoutePriorityEnabled: true,
+    onRoutePrioritySec: 15,
+    maxDetourKm: 6,
+    minDriverGain: 0,
+    enabled: true,
+    onRouteEnabled: true,
+  };
+
+  const result = await createExclusiveReservation(base44, reservedCourse, config);
+  assert.ok(result.created, 'Réservation créée');
+
+  // Simuler l'expiration
+  const proposalEntry = [...proposals.values()].find(p => p.course_id === 'reserved-20');
+  proposalEntry.reservation_expires_at = new Date(Date.now() - 10000).toISOString();
+  proposalEntry.expires_at = proposalEntry.reservation_expires_at;
+
+  // Premier appel → libère
+  const release1 = await releaseExpiredReservationsLazy(base44, 'BF', 10);
+  assert.ok(release1.released > 0, 'Premier appel libère');
+
+  // Deuxième appel → ne trouve plus rien (la proposition est déjà expired)
+  const release2 = await releaseExpiredReservationsLazy(base44, 'BF', 10);
+  assert.equal(release2.released, 0, 'Deuxième appel ne libère rien');
+  assert.equal(release2.coursesReleased, 0, 'Pas de double-libération');
+});
+
+// ── Test 21 : Lazy cleanup filtré par pays ne libère que les réservations du pays ──
+await runTest('21 — Lazy cleanup filtré par pays', async () => {
+  const { base44, courses, livreurs, proposals } = makeMockBase44({
+    invokeResponses: {
+      envoiNotificationPush: { success: true },
+    },
+  });
+
+  // Course active au BF
+  const activeBF = makeCourse('active-bf', 'en_livraison', {
+    country_code: 'BF',
+    livreur_id: 'livreur-bf',
+    dispatch_status: 'accepte',
+    gps_depart_lat: 12.3714,
+    gps_arrivee_lat: 12.3750,
+  });
+  courses.set('active-bf', activeBF);
+
+  // Course active au CI
+  const activeCI = makeCourse('active-ci', 'en_livraison', {
+    country_code: 'CI',
+    livreur_id: 'livreur-ci',
+    dispatch_status: 'accepte',
+    gps_depart_lat: 5.3600,
+    gps_arrivee_lat: 5.3700,
+  });
+  courses.set('active-ci', activeCI);
+
+  // Course réservée au BF (expirée)
+  const reservedBF = makeCourse('reserved-bf', 'recherche_livreur', {
+    country_code: 'BF',
+    dispatch_status: 'en_attente',
+    gps_depart_lat: 12.3720,
+    gps_arrivee_lat: 12.3760,
+  });
+  courses.set('reserved-bf', reservedBF);
+
+  // Course réservée au CI (expirée)
+  const reservedCI = makeCourse('reserved-ci', 'recherche_livreur', {
+    country_code: 'CI',
+    dispatch_status: 'en_attente',
+    gps_depart_lat: 5.3610,
+    gps_arrivee_lat: 5.3710,
+  });
+  courses.set('reserved-ci', reservedCI);
+
+  livreurs.set('livreur-bf', makeLivreur('livreur-bf', { country_code: 'BF' }));
+  livreurs.set('livreur-ci', makeLivreur('livreur-ci', { country_code: 'CI' }));
+
+  const { createExclusiveReservation, releaseExpiredReservationsLazy } = await import('../base44/shared/onRoutePriorityReservation.ts');
+
+  const config = {
+    onRoutePriorityEnabled: true,
+    onRoutePrioritySec: 15,
+    maxDetourKm: 6,
+    minDriverGain: 0,
+    enabled: true,
+    onRouteEnabled: true,
+  };
+
+  // Créer les réservations
+  await createExclusiveReservation(base44, reservedBF, config);
+  await createExclusiveReservation(base44, reservedCI, config);
+
+  // Simuler l'expiration
+  for (const p of proposals.values()) {
+    p.reservation_expires_at = new Date(Date.now() - 10000).toISOString();
+    p.expires_at = p.reservation_expires_at;
+  }
+
+  // Lazy cleanup filtré sur BF → ne libère que les réservations BF
+  const releaseBF = await releaseExpiredReservationsLazy(base44, 'BF', 10);
+  assert.ok(releaseBF.success, 'Lazy cleanup BF réussi');
+  assert.ok(releaseBF.released > 0, 'Réservations BF libérées');
+
+  // La course BF doit être libérée
+  const updatedBF = courses.get('reserved-bf');
+  assert.equal(updatedBF.dispatch_status, 'disponible_push', 'Course BF libérée');
+
+  // La course CI ne doit PAS être libérée
+  const updatedCI = courses.get('reserved-ci');
+  assert.notEqual(updatedCI.dispatch_status, 'disponible_push', 'Course CI non libérée par filtre BF');
 });
 
 // ════════════════════════════════════════════════════════════════════════

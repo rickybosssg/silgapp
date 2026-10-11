@@ -1231,6 +1231,18 @@ export async function triggerOnRouteProposalsForNewCourse(base44: any, courseId:
     return { success: true, proposals_created: 0, reason: 'on_route_disabled' };
   }
 
+  // ── LAZY CLEANUP : Libérer les réservations expirées avant d'en créer de nouvelles ──
+  // Cela garantit qu'aucune course ne reste bloquée plus de quelques secondes
+  // après l'expiration de sa fenêtre de priorité, dès qu'un événement système
+  // se produit (création d'une nouvelle course ici).
+  // Le workflow périodique (1 min) reste le filet de sécurité pour les périodes calmes.
+  try {
+    const { releaseExpiredReservationsLazy } = await import('./onRoutePriorityReservation.ts');
+    await releaseExpiredReservationsLazy(base44, course.country_code, 10);
+  } catch (e: any) {
+    console.error('[triggerOnRouteProposals] lazy cleanup failed:', e?.message || String(e));
+  }
+
   // ════════════════════════════════════════════════════════════════════════
   // CORRECTION 20 : PRIORITÉ EXCLUSIVE SUR TRAJET (15 secondes)
   // ════════════════════════════════════════════════════════════════════════

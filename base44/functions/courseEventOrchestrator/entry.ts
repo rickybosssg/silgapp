@@ -200,6 +200,18 @@ Deno.serve(async (req) => {
       return Response.json({ success: true, skip: true, reason: 'no_relevant_change' });
     }
 
+    // ── LAZY CLEANUP : Libérer les réservations sur trajet expirées ──
+    // Déclenché par toute mise à jour de course (changement de statut).
+    // Cela garantit qu'aucune course ne reste bloquée plus de quelques secondes
+    // après l'expiration de sa fenêtre de priorité (15s), dès qu'une activité
+    // système se produit. Le workflow périodique (1 min) reste le filet de sécurité.
+    try {
+      const { releaseExpiredReservationsLazy } = await import('../../shared/onRoutePriorityReservation.ts');
+      await releaseExpiredReservationsLazy(base44, course.country_code, 10);
+    } catch (e: any) {
+      console.error('[COURSE_ORCHESTRATOR] lazy reservation cleanup:', e?.message || String(e));
+    }
+
     const newStatut = course.statut;
     const oldStatut = oldCourse.statut;
 

@@ -17,7 +17,7 @@
       "ends_after_count": null
     }
   },
-  "description": "Lib\u00e8re automatiquement les r\u00e9servations exclusives sur trajet expir\u00e9es (15s) et retourne la course au dispatch normal. Appel\u00e9 toutes les 5 minutes en secours \u2014 la lib\u00e9ration principale se fait au refus ou \u00e0 l'acceptation tardive.",
+  "description": "Filet de s\u00e9curit\u00e9 (5 min, minimum plateforme) : lib\u00e8re les r\u00e9servations exclusives sur trajet expir\u00e9es (15s). La lib\u00e9ration PRINCIPALE se fait en temps r\u00e9el via le lazy cleanup d\u00e9clench\u00e9 par les \u00e9v\u00e9nements syst\u00e8me (cr\u00e9ation de course, mise \u00e0 jour de course, polling livreur via getOnRouteProposalsForLivreur). Ce workflow ne sert qu'en cas de p\u00e9riode calme prolong\u00e9e o\u00f9 aucun \u00e9v\u00e9nement ne d\u00e9clencherait le lazy cleanup.",
   "definition": {
     "document": {
       "dsl": "1.0.0",
