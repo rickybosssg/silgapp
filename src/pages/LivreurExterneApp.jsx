@@ -59,6 +59,8 @@ import HappyHourBadge from "@/components/livreur/HappyHourBadge";
 import PassZeroCommissionSection from "@/components/livreur/PassZeroCommissionSection";
 import LivreurVictoryOverlay from "@/components/livreur/LivreurVictoryOverlay";
 import EcoMissionDashboard from "@/components/livreur/EcoMissionDashboard";
+import OnRouteProposalCard from "@/components/livreur/OnRouteProposalCard";
+import { useOnRouteProposals } from "@/hooks/useOnRouteProposals";
 
 // haversineKm importé depuis priceEstimate (source canonique)
 
@@ -936,6 +938,14 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     return new Set(activeEcoMission.course_ids);
   }, [activeEcoMission]);
 
+  // ─── Propositions "sur trajet" (livraisons supplémentaires compatibles) ──
+  // Affichées uniquement quand le livreur a au moins une course active.
+  // Le hook interroge le backend toutes les 15s ; le backend filtre par livreur_id,
+  // vérifie la disponibilité des courses et l'isolation pays/entreprise.
+  const { proposals: onRouteProposals } = useOnRouteProposals(
+    coursesActives.length > 0 ? livreurProfil : null
+  );
+
   // Courses non-Éco — affichées par CourseActiveCard individuellement
   const nonEcoCoursesActives = useMemo(
     () => coursesActives.filter(c => !activeEcoCourseIds.has(c.id)),
@@ -1782,6 +1792,19 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
                 <ChevronRight className={`w-4 h-4 ${montantDuSilga !== 0 ? "text-slate-400" : "text-slate-300"}`} />
               </div>
             </Link>
+            )}
+
+            {/* ── Propositions "sur trajet" — livraisons supplémentaires facultatives ── */}
+            {onRouteProposals && onRouteProposals.length > 0 && (
+              <div className="space-y-3">
+                {onRouteProposals.map((proposal) => (
+                  <OnRouteProposalCard
+                    key={proposal.proposal_id}
+                    proposal={proposal}
+                    livreurProfil={livreurProfil}
+                  />
+                ))}
+              </div>
             )}
 
             {activeEcoMission && (

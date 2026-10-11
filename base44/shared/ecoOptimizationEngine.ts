@@ -624,6 +624,29 @@ export async function createOnRouteProposal(base44: any, courseId: string, livre
       note: 'ORS reserved for top candidates only',
     }),
   });
+
+  // ── Envoyer une notification push FCM au livreur ──
+  // Uniquement pour les nouvelles propositions (pas les idempotent).
+  // Utilise le système FCM existant (envoiNotificationPush).
+  // La notification inclut proposal_id dans les data pour ouvrir la bonne proposition au clic.
+  if (livreur.user_email) {
+    try {
+      await base44.asServiceRole.functions.invoke('envoiNotificationPush', {
+        titre: 'SILGAPP — Livraison sur votre trajet !',
+        message: 'Une nouvelle livraison compatible avec votre trajet est disponible. Ouvrez SILGAPP pour consulter votre gain supplémentaire.',
+        type: 'on_route_proposal',
+        destinataire_email: livreur.user_email,
+        livreur_id: livreurId,
+        course_id: courseId,
+        category: 'on_route_proposal',
+        alert_duration_seconds: config.proposalExpirationSec,
+      });
+    } catch (pushError: any) {
+      // Non-bloquant : la proposition est créée même si le push échoue.
+      console.error('[createOnRouteProposal] Push notification failed:', pushError?.message || String(pushError));
+    }
+  }
+
   return { success: true, proposal };
 }
 
