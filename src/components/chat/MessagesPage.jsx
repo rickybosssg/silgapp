@@ -173,6 +173,8 @@ export default function MessagesPage({ myType, myId, myName, onBack, initialConv
   const [latestMessages, setLatestMessages] = useState({});
   const [, refreshReadState] = useState(0);
 
+  useEffect(() => { setLatestMessages({}); }, [myId, myType]);
+
   useEffect(() => {
     const refresh = () => refreshReadState(value => value + 1);
     window.addEventListener('silgapp:chat-read', refresh);
@@ -189,15 +191,21 @@ export default function MessagesPage({ myType, myId, myName, onBack, initialConv
     if (courseThreads.length) filters.push({ course_id: { $in: courseThreads.map(c => c.id) } });
     if (conversations.length) filters.push({ conversation_id: { $in: conversations.map(c => c.id) } });
     if (!myId || !filters.length) { setLatestMessages({}); return; }
-    const load = async () => {
+    const load = async (scope) => {
       try {
-        const rows = await base44.entities.Message.filter({ $or: filters }, '-created_date', 200);
+        const rows = await base44.entities.Message.filter(scope || { $or: filters }, '-created_date', scope ? 1 : 200);
         const latest = {};
         for (const message of rows) {
           const scope = message.course_id ? `course_id:${message.course_id}` : `conversation_id:${message.conversation_id}`;
           if (!latest[scope]) latest[scope] = message;
         }
-        if (active) setLatestMessages(latest);
+        if (active) setLatestMessages(previous => {
+          const merged = { ...previous };
+          for (const [key, message] of Object.entries(latest)) {
+            if (!merged[key] || Date.parse(message.created_date) >= Date.parse(merged[key].created_date)) merged[key] = message;
+          }
+          return merged;
+        });
       } catch { /* RLS remains authoritative; never query with service privileges here. */ }
     };
     load();
@@ -210,9 +218,19 @@ export default function MessagesPage({ myType, myId, myName, onBack, initialConv
       timer = setTimeout(load, 250);
     });
     const resume = () => { if (document.visibilityState === 'visible') load(); };
+    const push = (event) => {
+      const detail = event.detail || {};
+      const scope = courseThreads.some(c => c.id === detail.course_id) ? { course_id: detail.course_id }
+        : conversations.some(c => c.id === detail.conversation_id) ? { conversation_id: detail.conversation_id } : null;
+      if (!scope) return;
+      clearTimeout(timer);
+      timer = setTimeout(() => load(scope), 250);
+    };
     document.addEventListener('visibilitychange', resume);
-    return () => { active = false; clearTimeout(timer); unsubscribe?.(); document.removeEventListener('visibilitychange', resume); };
-  }, [myId, courseThreads, conversations]);
+    window.addEventListener('silgapp:chat_refetch', push);
+    window.addEventListener('focus', resume);
+    return () => { active = false; clearTimeout(timer); unsubscribe?.(); document.removeEventListener('visibilitychange', resume); window.removeEventListener('silgapp:chat_refetch', push); window.removeEventListener('focus', resume); };
+  }, [myId, courseThreads, conversations, activeCourseId, activeConvId]);
 
   useEffect(() => {
     setActiveCourseId(initialCourseId || null);
@@ -337,7 +355,7 @@ export default function MessagesPage({ myType, myId, myName, onBack, initialConv
             <div>
               <h2 className="text-base font-black text-gray-900 leading-tight tracking-tight">Messages</h2>
               <p className="text-[10px] text-gray-400 font-medium leading-tight">
-                {conversations.length} conversation{conversations.length > 1 ? "s" : ""}
+                {conversations.length + courseThreads.length} conversation{conversations.length + courseThreads.length > 1 ? "s" : ""}
               </p>
             </div>
           </div>

@@ -274,7 +274,7 @@ function CourseChatWindow({ courseId, conversationId, senderType, senderId, send
   }
 
   return (
-    <div className={`flex flex-col min-h-0 ${fullHeight ? "flex-1" : "h-[460px] rounded-2xl"} bg-[#16191d] overflow-hidden border border-white/8 shadow-sm`}>
+    <div data-silgapp-chat-active="true" className={`flex flex-col min-h-0 ${fullHeight ? "flex-1" : "h-[460px] rounded-2xl"} bg-[#16191d] overflow-hidden border border-white/8 shadow-sm`}>
       {/* Header */}
       <div className="p-3 bg-[#0f1216] text-white flex items-center justify-between">
         <div className="min-w-0">

@@ -24,7 +24,8 @@ const {chromium} = createRequire(path.join(process.env.SILGAPP_PLAYWRIGHT_ROOT |
  const browser=await chromium.launch({channel:'chrome',headless:true});
  try{
  const page=await browser.newPage();
- await page.setContent('<div id="root"></div>');
+ await page.setContent('<button data-venus-floating="true">Assistant</button><div id="root"></div>');
+ await page.addStyleTag({content:require('node:fs').readFileSync(path.join(root,'src/index.css'),'utf8')});
  await page.evaluate(()=>{
   window.sent=[];window.reads=[];
   window.testApi={entities:{Message:{filter:async(filter,sort,limit,skip=0)=>{
@@ -32,6 +33,10 @@ const {chromium} = createRequire(path.join(process.env.SILGAPP_PLAYWRIGHT_ROOT |
  });
  await page.addScriptTag({content:built.outputFiles[0].text});
  await page.waitForSelector('[data-message="a-99"]');
+ assert.equal(await page.locator('[data-venus-floating]').evaluate(el=>getComputedStyle(el).visibility),'hidden');
+ await page.locator('[data-silgapp-chat-active]').evaluate(el=>el.removeAttribute('data-silgapp-chat-active'));
+ assert.equal(await page.locator('[data-venus-floating]').evaluate(el=>getComputedStyle(el).visibility),'visible');
+ await page.locator('textarea').evaluate(el=>el.closest('.flex').parentElement.setAttribute('data-silgapp-chat-active','true'));
  assert.equal(await page.locator('[data-message]').count(),100);
  await page.getByRole('button',{name:'Messages plus anciens'}).click();
  await page.waitForSelector('[data-message="a-199"]');

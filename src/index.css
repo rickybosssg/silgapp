@@ -1,6 +1,12 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
 @tailwind base;
+
+/* A chat may live inside a lower stacking context than the floating assistant. */
+body:has([data-silgapp-chat-active="true"]) [data-venus-floating="true"] {
+  visibility: hidden;
+  pointer-events: none;
+}
 @tailwind components;
 @tailwind utilities;
 

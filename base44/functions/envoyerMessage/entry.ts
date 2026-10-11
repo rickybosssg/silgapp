@@ -37,6 +37,10 @@ Deno.serve(async (req) => {
     } = payload;
     let final_sender_id = raw_sender_id;
 
+    if (message_type === 'video' && (typeof video_url !== 'string' || !/^https:\/\//i.test(video_url))) {
+      return Response.json({ error: 'Le fichier vidéo est requis' }, { status: 400 });
+    }
+
     if (!sender_type || !final_sender_id) {
       return Response.json({ error: 'sender_type et sender_id sont requis' }, { status: 400 });
     }
@@ -203,7 +207,9 @@ Deno.serve(async (req) => {
       sender_photo_url: photoUrl,
       client_message_id: client_message_id || null,
       message_type: message_type || 'text',
-      content: content || '',
+      // Some deployed Message schemas omit video_url at runtime despite exporting it.
+      // Keep the media URL in an existing field as well, scoped by message_type.
+      content: content || (message_type === 'video' ? video_url : '') || '',
       audio_url: audio_url || null,
       photo_url: photo_url || null,
       video_url: video_url || null,

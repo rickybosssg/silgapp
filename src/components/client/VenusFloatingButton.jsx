@@ -142,6 +142,7 @@ export default function VenusFloatingButton({ forcedCountryCode = null }) {
     <>
       {/* Bouton flottant VENUS déplaçable */}
       <motion.button
+        data-venus-floating="true"
         ref={buttonRef}
         drag
         dragMomentum={false}

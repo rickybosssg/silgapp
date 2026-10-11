@@ -130,9 +130,13 @@ export default function ChatBubble({ message, isMine }) {
         {/* Contenu du message */}
         {message.message_type === "audio" && message.audio_url ? (
           <AudioBubble audioUrl={message.audio_url} isMine={isMine} />
-        ) : message.message_type === "video" && message.video_url ? (
-          <video src={message.video_url} controls playsInline preload="metadata"
+        ) : message.message_type === "video" && (message.video_url || /^https:\/\/\S+$/i.test(message.content || "")) ? (
+          <video src={message.video_url || message.content} controls playsInline preload="metadata"
             className="w-full max-w-[240px] rounded-xl" aria-label="Vidéo du message" />
+        ) : message.message_type === "video" ? (
+          <p role="status" className="rounded-xl px-4 py-3 text-sm text-white">
+            Vidéo indisponible. Le fichier n'a pas été enregistré correctement.
+          </p>
         ) : message.message_type === "photo" && message.photo_url ? (
           <div className={cn(
             "rounded-2xl overflow-hidden max-w-[240px] shadow-sm",
