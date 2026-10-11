@@ -751,6 +751,78 @@ export async function respondToOnRouteProposal(base44: any, proposalId: string, 
     await figerCommissionAcceptation(base44, course.id, livreurId, fresh.country_code, now).catch(() => null);
   }
   await marquerAccepte(base44, course.id, livreurId).catch(() => null);
+
+  // ── Multi-delivery mission creation ──
+  // When a driver accepts an on-route proposal, link the new course with the
+  // driver's currently active course(s) in an EcoMission. This enables the
+  // multi-delivery dashboard (EcoMissionDashboard) for Standard courses too.
+  // A Standard course stays Standard — only the mission grouping changes.
+  // The route plan is computed via Haversine (ORS reserved for top candidates only).
+  try {
+    const activeCoursesForMission = await base44.asServiceRole.entities.CourseExterne.filter({
+      livreur_id: livreurId,
+      country_code: fresh.country_code,
+      statut: { $in: ACTIVE_STATUSES },
+    }, '-updated_date', 10).catch(() => []);
+
+    const otherActiveCourses = (activeCoursesForMission || []).filter(
+      (c: any) => c.id !== fresh.id && !TERMINAL_STATUSES.includes(c.statut)
+    );
+
+    if (otherActiveCourses.length > 0) {
+      const config = await loadEcoConfig(base44, fresh.country_code);
+      const courseWithMission = otherActiveCourses.find((c: any) => c.eco_mission_id);
+
+      if (courseWithMission?.eco_mission_id) {
+        // ── Add the new course to the existing mission ──
+        const existingMission = await base44.asServiceRole.entities.EcoMission.get(courseWithMission.eco_mission_id).catch(() => null);
+        if (existingMission && !['completed', 'cancelled', 'invalidated'].includes(existingMission.status)) {
+          const currentCourseIds = Array.isArray(existingMission.course_ids) ? existingMission.course_ids : [];
+          if (currentCourseIds.length < config.maxCoursesPerMission) {
+            const updatedCourseIds = [...new Set([...currentCourseIds, fresh.id])];
+            const allCoursesForMission = [...otherActiveCourses, fresh].filter(c => updatedCourseIds.includes(c.id));
+            await base44.asServiceRole.entities.EcoMission.update(existingMission.id, {
+              course_ids: updatedCourseIds,
+              route_plan_json: JSON.stringify(routePlanForEcoMission(allCoursesForMission)),
+              total_price: allCoursesForMission.reduce((sum, c) => sum + prixCourse(c), 0),
+              total_driver_amount: allCoursesForMission.reduce((sum, c) => sum + Math.max(0, prixCourse(c) - (Number(c.commission_silga) || 0)), 0),
+            }).catch(() => null);
+            await base44.asServiceRole.entities.CourseExterne.update(fresh.id, {
+              eco_mission_id: existingMission.id,
+            }).catch(() => null);
+          }
+        }
+      } else {
+        // ── Create a new mission with the active course + new course ──
+        const allCoursesForMission = [...otherActiveCourses.slice(0, config.maxCoursesPerMission - 1), fresh];
+        const nowIso = new Date().toISOString();
+        const newMission = await base44.asServiceRole.entities.EcoMission.create({
+          country_code: fresh.country_code,
+          enterprise_id: null,
+          course_ids: allCoursesForMission.map(c => c.id),
+          status: 'accepted',
+          livreur_id: livreurId,
+          livreur_user_email: livreur.user_email || null,
+          route_plan_json: JSON.stringify(routePlanForEcoMission(allCoursesForMission)),
+          active_step_index: 0,
+          total_price: allCoursesForMission.reduce((sum, c) => sum + prixCourse(c), 0),
+          total_driver_amount: allCoursesForMission.reduce((sum, c) => sum + Math.max(0, prixCourse(c) - (Number(c.commission_silga) || 0)), 0),
+          accepted_at: nowIso,
+        }).catch(() => null);
+
+        if (newMission) {
+          await base44.asServiceRole.entities.CourseExterne.updateMany(
+            { id: { $in: allCoursesForMission.map(c => c.id) } },
+            { $set: { eco_mission_id: newMission.id } }
+          ).catch(() => null);
+        }
+      }
+    }
+  } catch (missionError: any) {
+    console.error('[respondToOnRouteProposal] Mission creation failed:', missionError?.message || String(missionError));
+    // Non-blocking: the course is already claimed, the driver can proceed.
+  }
+
   return { success: true, accepted: true, course_id: course.id, proposal_id: proposal.id };
 }
 

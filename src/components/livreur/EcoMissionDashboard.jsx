@@ -76,6 +76,11 @@ export default function EcoMissionDashboard({ mission, livreurProfil, onAllDeliv
   const total = Number(mission?.total_price) || totalPriceEco(courses);
   const totalDist = useMemo(() => totalDistanceKm(courses, routePlan), [courses, routePlan]);
   const devise = courses[0]?.devise || "FCFA";
+  // ── Label dynamique : "Mission Éco" si toutes les courses sont Éco, sinon "Mission en cours" ──
+  const missionLabel = useMemo(() => {
+    if (courses.length > 0 && courses.every(c => c.delivery_mode === "eco")) return "Mission Éco";
+    return "Mission en cours";
+  }, [courses]);
 
   // ── Détection de fin de mission ──
   const allDone = courses.length > 0 && courses.every(c =>
@@ -172,7 +177,7 @@ export default function EcoMissionDashboard({ mission, livreurProfil, onAllDeliv
           <div className="flex items-center gap-2">
             <Leaf className="w-5 h-5 text-white" />
             <div>
-              <p className="text-[11px] font-bold uppercase text-green-100">Mission Éco</p>
+              <p className="text-[11px] font-bold uppercase text-green-100">{missionLabel}</p>
               <p className="text-sm font-bold text-white">{courses.length} livraisons</p>
             </div>
           </div>

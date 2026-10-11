@@ -141,6 +141,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   // ── Animation de victoire livreur (livraison validée par PIN/QR) ──
   const [victoryCourseId, setVictoryCourseId] = useState(null);
   const celebratedCourseIdsRef = useRef(new Set());
+  // ── Propositions sur trajet dismissées (modal fermée manuellement) ──
+  const [dismissedProposalIds, setDismissedProposalIds] = useState(() => new Set());
 
   const [sessionId, setSessionId] = useState(() => {
     try { return localStorage.getItem("silgapp_livreur_session_id") || null; } catch { return null; }
@@ -916,8 +918,11 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   // Garantit que les DEUX courses de la mission restent visibles dans l'onglet
   // « Courses » via le EcoMissionDashboard, même après la 1re livraison.
   const activeEcoMissionId = useMemo(() => {
-    const ecoCourse = coursesActives.find(c => c.eco_mission_id && c.delivery_mode === "eco");
-    return ecoCourse?.eco_mission_id || null;
+    // ── Détecte toute mission active, pas seulement les missions Éco ──
+    // Les courses Standard acceptées via proposition sur trajet ont aussi un
+    // eco_mission_id et doivent déclencher le dashboard multi-livraisons.
+    const courseWithMission = coursesActives.find(c => c.eco_mission_id);
+    return courseWithMission?.eco_mission_id || null;
   }, [coursesActives]);
 
   const { data: activeEcoMission = null } = useQuery({
@@ -1594,6 +1599,21 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         userType="livreur"
       />
 
+      {/* ── Modale : Proposition de livraison sur trajet ── */}
+      {onRouteProposals && onRouteProposals.length > 0 && (() => {
+        const topProposal = onRouteProposals.find(p => !dismissedProposalIds.has(p.proposal_id));
+        if (!topProposal) return null;
+        return (
+          <OnRouteProposalCard
+            proposal={topProposal}
+            livreurProfil={livreurProfil}
+            onDismiss={() =>
+              setDismissedProposalIds(prev => new Set([...prev, topProposal.proposal_id]))
+            }
+          />
+        );
+      })()}
+
       {/* Modal plein écran si course en attente */}
       {courseEnAttente && (
         <CourseEnAttenteModalExterne
@@ -1794,18 +1814,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
             </Link>
             )}
 
-            {/* ── Propositions "sur trajet" — livraisons supplémentaires facultatives ── */}
-            {onRouteProposals && onRouteProposals.length > 0 && (
-              <div className="space-y-3">
-                {onRouteProposals.map((proposal) => (
-                  <OnRouteProposalCard
-                    key={proposal.proposal_id}
-                    proposal={proposal}
-                    livreurProfil={livreurProfil}
-                  />
-                ))}
-              </div>
-            )}
+            {/* ── Propositions "sur trajet" — affichées en modale (voir plus bas) ── */}
 
             {activeEcoMission && (
               <EcoMissionDashboard
