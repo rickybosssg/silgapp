@@ -237,27 +237,30 @@ export default function EcoMissionDashboard({ mission, livreurProfil, onAllDeliv
           const prix = prixCourseEco(course);
           const isLivre = course.statut === "livree";
           const isAnnule = course.statut === "annulee";
+          const isSuspendue = course.statut === "en_attente" || course.client_decision_attendue === true;
           const isRecupere = ["colis_recupere", "en_livraison", "arrivee", "livree"].includes(course.statut);
 
           return (
             <div key={course.id} className={cn(
               "rounded-xl border p-3 space-y-1.5",
-              isLivre ? "bg-green-50 border-green-200" :
-              isAnnule ? "bg-red-50 border-red-200" :
-              isRecupere ? "bg-blue-50 border-blue-200" :
-              "bg-amber-50 border-amber-200"
-            )}>
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-slate-700">Colis {idx + 1}</span>
-                <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full",
-                  isLivre ? "bg-green-100 text-green-700" :
-                  isAnnule ? "bg-red-100 text-red-700" :
-                  isRecupere ? "bg-blue-100 text-blue-700" :
-                  "bg-amber-100 text-amber-700"
-                )}>
-                  {isLivre ? "✓ Livré" : isAnnule ? "Annulé" : isRecupere ? "Récupéré" : "À récupérer"}
-                </span>
-              </div>
+               isLivre ? "bg-green-50 border-green-200" :
+               isAnnule ? "bg-red-50 border-red-200" :
+               isSuspendue ? "bg-orange-50 border-orange-200" :
+               isRecupere ? "bg-blue-50 border-blue-200" :
+               "bg-amber-50 border-amber-200"
+              )}>
+               <div className="flex items-center justify-between">
+                 <span className="text-[11px] font-bold text-slate-700">Colis {idx + 1}</span>
+                 <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full",
+                   isLivre ? "bg-green-100 text-green-700" :
+                   isAnnule ? "bg-red-100 text-red-700" :
+                   isSuspendue ? "bg-orange-100 text-orange-700" :
+                   isRecupere ? "bg-blue-100 text-blue-700" :
+                   "bg-amber-100 text-amber-700"
+                 )}>
+                   {isLivre ? "✓ Livré" : isAnnule ? "Annulé" : isSuspendue ? "Suspendue" : isRecupere ? "Récupéré" : "À récupérer"}
+                 </span>
+               </div>
               <div className="space-y-1">
                 <div className="flex items-center gap-2 text-[11px]">
                   <MapPin className="w-3 h-3 text-green-600 flex-shrink-0" />
