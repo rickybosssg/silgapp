@@ -60,7 +60,24 @@ export default function EcoMissionCard({ mission, livreurProfil, onAcceptSuccess
         queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
         onAcceptSuccess?.();
       } else {
-        toast.error(data?.error || data?.reason || "Erreur lors de l'acceptation");
+        // ── Traduire les codes d'erreur en messages compréhensibles ──
+        const reasonMessages = {
+          mission_unavailable: "Cette mission n'est plus disponible.",
+          mission_race_lost: "Cette mission vient d'être acceptée par un autre livreur.",
+          course_race_lost: "Une course de la mission vient d'être prise par un autre livreur.",
+          identity_mismatch: "Vérification d'identité échouée. Reconnectez-vous.",
+          enterprise_mismatch: "Cette mission appartient à un autre périmètre.",
+          livreur_indisponible: "Vous n'êtes pas disponible pour accepter cette mission.",
+          missing_course: "Une course de la mission est introuvable.",
+          course_not_claimable: "Une course de la mission n'est plus disponible.",
+          mission_incomplete: "La mission est incomplète.",
+        };
+        const errorMsg = data?.error
+          || reasonMessages[data?.reason]
+          || (data?.reason ? `Erreur: ${data.reason}` : null)
+          || "Erreur lors de l'acceptation";
+        toast.error(errorMsg);
+        queryClient.invalidateQueries({ queryKey: ["eco-missions-available"] });
       }
     } catch (err) {
       toast.error("Erreur réseau lors de l'acceptation");

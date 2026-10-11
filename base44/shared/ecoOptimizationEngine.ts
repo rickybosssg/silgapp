@@ -519,7 +519,9 @@ export async function convertDueEcoCourses(base44: any, countryCode?: string, li
           eco_status: 'converted',
           eco_converted_at: now,
           eco_conversion_reason: 'no_grouping_after_delay',
-          statut: 'nouvelle',
+          statut: 'recherche_livreur',
+          dispatch_status: 'disponible_push',
+          heure_sollicitation: now,
         },
       }
     );

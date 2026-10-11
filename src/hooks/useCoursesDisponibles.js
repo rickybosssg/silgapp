@@ -131,6 +131,26 @@ export function useCoursesDisponibles(livreurProfil) {
     refetchOnWindowFocus: true,
   });
 
+  // ── Courses Éco isolées (en attente de regroupement) ──
+  // Visibles dans le fil avec un badge « En attente de regroupement » mais NON acceptables.
+  // Elles restent dispatch_status: 'en_attente' — le livreur ne peut pas les accepter.
+  const { data: ecoIsolatedCourses = [] } = useQuery({
+    queryKey: ["eco-isolated-courses", livreurId, countryCode],
+    queryFn: async () => {
+      if (!countryCode) return [];
+      const courses = await base44.entities.CourseExterne.filter({
+        country_code: countryCode,
+        enterprise_id: null,
+        delivery_mode: 'eco',
+        eco_status: 'isolated',
+      }, '-created_date', 20);
+      return (courses || []).filter(c => !c.livreur_id && !FINAL_COURSE_STATUSES.has(c.statut));
+    },
+    enabled: !!livreurId && !!countryCode && livreurPeutVoirFil,
+    refetchInterval: 15000,
+    staleTime: 5000,
+  });
+
   // ── Courses dismissées localement (localStorage, TTL 30 min) ──
   const [refusedIds, setRefusedIds] = useState(() => {
     try {
@@ -177,5 +197,6 @@ export function useCoursesDisponibles(livreurProfil) {
     refusedCourseIds,
     setRefusedIds,
     ecoMissions,
+    ecoIsolatedCourses,
   };
 }

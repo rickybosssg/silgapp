@@ -1408,6 +1408,11 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       if (!course.eco_mission_id) {
         await remettreDisponibleSiAutorise();
       }
+      // ── Animation Victory après confirmation backend ──
+      if (!celebratedCourseIdsRef.current.has(course.id)) {
+        celebratedCourseIdsRef.current.add(course.id);
+        setVictoryCourseId(course.id);
+      }
       toast.success(`Livraison terminée ! ${montantSaisi.toLocaleString()} F`);
       return;
     }
@@ -1422,6 +1427,11 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       // — d'autres courses de la mission sont peut-être encore actives.
       if (!course.eco_mission_id) {
         await remettreDisponibleSiAutorise();
+      }
+      // ── Animation Victory après confirmation backend ──
+      if (!celebratedCourseIdsRef.current.has(course.id)) {
+        celebratedCourseIdsRef.current.add(course.id);
+        setVictoryCourseId(course.id);
       }
       toast.success("Livraison terminée ! ");
       return;
@@ -1458,6 +1468,11 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     // [ECO] Ne pas remettre disponible si la course fait partie d'une mission Eco
     if (!course.eco_mission_id) {
       await remettreDisponibleSiAutorise();
+    }
+    // ── Animation Victory après confirmation backend (parcours interne) ──
+    if (!celebratedCourseIdsRef.current.has(course.id)) {
+      celebratedCourseIdsRef.current.add(course.id);
+      setVictoryCourseId(course.id);
     }
     toast.success("Livraison terminée ! ");
   };

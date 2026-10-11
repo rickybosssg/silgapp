@@ -57,7 +57,7 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
   const livreurLng = livreurProfil?.longitude;
 
   // ── Source unique de vérité : hook partagé avec ActiviteTempsReel ──
-  const { eligibleCourses, courses, isLoading, isV2Enabled, livreurDisponible, livreurPeutVoirFil, raisonBlocage, refusedCourseIds, setRefusedIds, ecoMissions } = useCoursesDisponibles(livreurProfil);
+  const { eligibleCourses, courses, isLoading, isV2Enabled, livreurDisponible, livreurPeutVoirFil, raisonBlocage, refusedCourseIds, setRefusedIds, ecoMissions, ecoIsolatedCourses } = useCoursesDisponibles(livreurProfil);
 
   // ── Tracking vue_at — DÉDUPLICATION LOCALE (Option C) ──
   // Un seul appel marquer_vue_course par course et par session composant.
@@ -273,6 +273,66 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
           livreurProfil={livreurProfil}
           onAcceptSuccess={onAcceptSuccess}
         />
+      ))}
+
+      {/* ── Courses Éco isolées (en attente de regroupement — non acceptables) ── */}
+      {ecoIsolatedCourses && ecoIsolatedCourses.length > 0 && ecoIsolatedCourses.map(course => (
+        <div
+          key={course.id}
+          className="overflow-hidden rounded-lg border border-green-200 bg-green-50/50 shadow-[0_4px_12px_rgba(15,23,42,0.04)]"
+        >
+          <div className="p-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[11px] font-bold uppercase text-green-700">Éco — En attente de regroupement</span>
+                </div>
+                <p className="mt-1 flex items-center gap-1.5 text-xs font-medium text-slate-500">
+                  <Clock className="h-3.5 w-3.5" />
+                  {new Date(course.created_date).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2digit" })}
+                </p>
+              </div>
+              {(() => {
+                const prix = getPrixAffichable(course);
+                const devise = course.devise || "FCFA";
+                return prix > 0 ? (
+                  <div className="shrink-0 text-right">
+                    <p className="text-[10px] font-semibold uppercase text-slate-400">Prix</p>
+                    <p className="text-lg font-bold text-green-700">{prix.toLocaleString()}</p>
+                    <p className="text-[10px] font-bold text-green-700">{devise}</p>
+                  </div>
+                ) : null;
+              })()}
+            </div>
+            <div className="mt-3 grid grid-cols-[22px_1fr] gap-x-2.5">
+              <div className="flex flex-col items-center pt-1">
+                <span className="h-3 w-3 rounded-full border-[3px] border-success bg-white" />
+                <span className="my-1 min-h-8 w-px flex-1 bg-slate-200" />
+                <span className="h-3 w-3 rounded-[3px] bg-primary" />
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <p className="text-[10px] font-bold uppercase text-slate-400">Récupération</p>
+                  <p className="mt-0.5 text-sm font-semibold leading-snug text-foreground">
+                    {course.quartier_depart || course.adresse_depart || "Adresse à confirmer"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase text-slate-400">Livraison</p>
+                  <p className="mt-0.5 text-sm font-semibold leading-snug text-foreground">
+                    {course.quartier_arrivee || course.adresse_arrivee || "Adresse à confirmer"}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="border-t border-green-100 bg-green-50 p-3">
+            <div className="h-12 rounded-lg bg-green-100 text-xs font-medium text-green-700 flex items-center justify-center gap-1.5 px-2 text-center">
+              <Clock className="h-3.5 w-3.5 shrink-0" />
+              <span className="leading-tight">En attente de regroupement Éco — non acceptable individuellement</span>
+            </div>
+          </div>
+        </div>
       ))}
 
       {coursesWithDistance.map(course => (
