@@ -118,35 +118,7 @@ Deno.serve(async (req) => {
         });
       }
 
-      // ── Correction 20 : Propositions sur trajet AVANT dispatch ──
-      // Si un livreur compatible est trouvé et que la priorité exclusive est
-      // activée, créer une réservation exclusive (15s) et NE PAS dispatcher
-      // immédiatement. La course reste en 'en_attente' (invisible des autres).
-      // Après refus ou expiration, le dispatch normal reprend.
-      const onRouteResult = await triggerOnRouteProposalsForNewCourse(base44, courseId).catch((error) => {
-        const msg = error?.message || String(error);
-        console.error('[COURSE_ORCHESTRATOR] ❌ onRouteProposals:', msg);
-        errors.push({ module: 'onRouteProposals', error: msg });
-        return { success: false, error: msg };
-      });
-      called.push('onRouteProposals');
-
-      // Si une réservation exclusive a été créée, ne pas dispatcher
-      if (onRouteResult?.exclusive_reservation_created) {
-        await fireInvoke('notifyClientSync', { event, data });
-        await emitCourseCreated(base44, course).catch(() => {});
-        return Response.json({
-          success: true,
-          event: 'create',
-          course_id: courseId,
-          on_route_result: onRouteResult,
-          exclusive_reservation: true,
-          called,
-          errors,
-        });
-      }
-
-      // 1. Dispatch : V2 (fil) ou V1 (vagues) selon feature flag
+      // 1. Preserve normal dispatch before non-blocking on-route proposals.
       const v2Enabled = await isV2Enabled(base44);
       if (v2Enabled) {
         // V2 : dispatchExterneAuto publie et notifie de façon idempotente.
@@ -165,6 +137,14 @@ Deno.serve(async (req) => {
           data,
         });
       }
+
+      // Ordinary proposals never delay or reserve the Standard dispatch.
+      const onRouteResult = await triggerOnRouteProposalsForNewCourse(base44, courseId).catch((error) => {
+        const msg = error?.message || String(error);
+        errors.push({ module: 'onRouteProposals', error: msg });
+        return { success: false, error: msg };
+      });
+      called.push('onRouteProposals');
 
       // 2. Notifier les clients (expéditeur/destinataire)
       await fireInvoke('notifyClientSync', {
@@ -200,17 +180,7 @@ Deno.serve(async (req) => {
       return Response.json({ success: true, skip: true, reason: 'no_relevant_change' });
     }
 
-    // ── LAZY CLEANUP : Libérer les réservations sur trajet expirées ──
-    // Déclenché par toute mise à jour de course (changement de statut).
-    // Cela garantit qu'aucune course ne reste bloquée plus de quelques secondes
-    // après l'expiration de sa fenêtre de priorité (15s), dès qu'une activité
-    // système se produit. Le workflow périodique (1 min) reste le filet de sécurité.
-    try {
-      const { releaseExpiredReservationsLazy } = await import('../../shared/onRoutePriorityReservation.ts');
-      await releaseExpiredReservationsLazy(base44, course.country_code, 10);
-    } catch (e: any) {
-      console.error('[COURSE_ORCHESTRATOR] lazy reservation cleanup:', e?.message || String(e));
-    }
+    // Exclusive priority is disabled; updates must not mutate unrelated reservations.
 
     const newStatut = course.statut;
     const oldStatut = oldCourse.statut;

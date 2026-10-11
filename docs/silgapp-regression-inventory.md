@@ -222,6 +222,23 @@ when their assertions still match current product decisions.
 - Guards: chat-scope-regression (runtime schema omission simulation, access and retry idempotency), chat-media-render-regression (actual render), message-badge-ui-regression (actual component, mocked API), chat-ui-regression (pagination/retries/VENUS).
 - Source comparison and targeted re-read are mandatory for backend deployments. This release changes only envoyerMessage; finance, Dispatch V2 and configuration remain unchanged.
 
+## Exclusive On-route Priority Safety Gate
+
+- Correction 20 from origin/main d1fed9db is integrated but NOT release-ready.
+- Exclusive priority stays disabled even when a stored enable flag is true until
+  a durable 15-second dispatch handoff, recovery outbox and all acceptance-path
+  reservation guards are implemented and verified. Never claim updateMany is a
+  multi-entity transaction.
+- A five-minute workflow plus activity-driven cleanup cannot guarantee release
+  after 15 seconds. Marking a proposal expired before a recoverable dispatch
+  handoff can strand a course after an interruption.
+- Ordinary on-route proposals remain non-blocking; Standard dispatch starts
+  before those proposals. No Dispatch V2 implementation changes are authorized.
+- Guard: tests/on-route-priority-disabled-regression.mjs executes the real
+  reservation function with adapters that throw on any backend access.
+- Keep the original priority regression suite: its enabled-feature failures
+  must remain visible, not be removed to approve a release.
+
 ## 1.0.125 Dispatch Follow-up
 
 - dispatchExterneAuto must fail closed with dispatch_v2_disabled/503 when V2 is off, never call the retired V1 engine. V2 publication and tenant checks remain unchanged. Targeted deployment re-read matched staging; configuration and workflows were not changed.

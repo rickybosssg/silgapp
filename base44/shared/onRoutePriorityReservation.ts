@@ -32,6 +32,9 @@
 
 import { normalizeEnterpriseId } from './enterpriseFinance.ts';
 
+// Requires a durable 15-second dispatch handoff and guards on every acceptance path.
+export const ON_ROUTE_PRIORITY_RUNTIME_READY = false;
+
 const ACTIVE_STATUSES = [
   'livreur_en_route',
   'client_contacte',
@@ -219,7 +222,7 @@ export async function createExclusiveReservation(
   course: any,
   config: any,
 ): Promise<{ created: boolean; livreurId?: string; proposalId?: string; reason?: string }> {
-  if (!config.onRoutePriorityEnabled) {
+  if (!ON_ROUTE_PRIORITY_RUNTIME_READY || !config.onRoutePriorityEnabled) {
     return { created: false, reason: 'priority_disabled' };
   }
 
