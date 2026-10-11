@@ -1,6 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
 import { normalizeEnterpriseId } from '../../shared/enterpriseFinance.ts';
-import { completeEcoMissionIfNeeded } from '../../shared/ecoOptimizationEngine.ts';
+import { recalculateEcoMissionAfterCancellation } from '../../shared/ecoOptimizationEngine.ts';
 
 const MOTIFS_VALIDES = [
   "client_injoignable",
@@ -238,8 +238,8 @@ Deno.serve(async (req) => {
       // ici — sauf si toutes les autres sont déjà annulées ET que la course courante
       // est en "en_attente" (non terminal). Dans ce cas, la mission reste inchangée.
       if (course.eco_mission_id) {
-        await completeEcoMissionIfNeeded(base44, course_id).catch((err: any) =>
-          console.error('[ANNULATION] completeEcoMissionIfNeeded error (livreur):', err?.message)
+        await recalculateEcoMissionAfterCancellation(base44, course_id).catch((err: any) =>
+          console.error('[ANNULATION] recalculateEcoMissionAfterCancellation error (livreur):', err?.message)
         );
       }
 
@@ -414,8 +414,8 @@ Deno.serve(async (req) => {
       // on vérifie si toutes les courses sont désormais annulées → mission "cancelled".
       // Si une seule course est annulée, l'autre reste accessible et la mission reste inchangée.
       if (course.eco_mission_id) {
-        await completeEcoMissionIfNeeded(base44, course_id).catch((err: any) =>
-          console.error('[ANNULATION] completeEcoMissionIfNeeded error (client/admin):', err?.message)
+        await recalculateEcoMissionAfterCancellation(base44, course_id).catch((err: any) =>
+          console.error('[ANNULATION] recalculateEcoMissionAfterCancellation error (client/admin):', err?.message)
         );
       }
 

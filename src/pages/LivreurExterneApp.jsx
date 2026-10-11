@@ -454,6 +454,11 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     const unsub = subscribeToNotifications(
       (n) => {
         toast.info(n.titre, { description: n.message });
+        if (n.type === "on_route_proposal") {
+          // ── Refetch immédiat des propositions sur trajet à la réception du push ──
+          queryClient.invalidateQueries({ queryKey: ["on-route-proposals"] });
+          return;
+        }
         if ((n.type === "nouvelle_course" || n.type === "course_assignee") && n.course_id) {
           setNotificationCourseId(n.course_id);
           setActiveTab("courses");
@@ -491,6 +496,11 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         const convId = String(data.conversation_id || "").trim();
         setPendingConversationId(convId || null);
         setActiveTab("messages");
+        return;
+      }
+      // ── Proposition sur trajet : refetch immédiat des propositions ──
+      if (data.type === "on_route_proposal") {
+        queryClient.invalidateQueries({ queryKey: ["on-route-proposals"] });
         return;
       }
       if (data.type !== "nouvelle_course" && data.type !== "course_assignee") return;
@@ -618,6 +628,23 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       }
     });
     return unsubscribe;
+  }, [livreurId, queryClient]);
+
+  // ── Realtime EcoProposal → refetch immédiat des propositions sur trajet ──
+  // Quand une nouvelle proposition est créée (create) ou mise à jour (update),
+  // on invalide le cache pour déclencher un refetch immédiat, sans attendre
+  // le prochain cycle de polling de 15s.
+  useEffect(() => {
+    if (!livreurId) return;
+    const unsubscribe = base44.entities.EcoProposal?.subscribe?.((event) => {
+      if (event?.type === "create" || event?.type === "update" || event?.type === "delete") {
+        const p = event?.data || {};
+        if (String(p.livreur_id || "") === String(livreurId)) {
+          queryClient.invalidateQueries({ queryKey: ["on-route-proposals"] });
+        }
+      }
+    });
+    return () => { if (typeof unsubscribe === "function") unsubscribe(); };
   }, [livreurId, queryClient]);
 
   useEffect(() => {
@@ -848,12 +875,32 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     [mesCourses, notificationCourseCandidate, courseProposeeDirecte]
   );
 
+  // ── Propositions "sur trajet" (livraisons supplémentaires compatibles) ──
+  // Le hook est appelé ici (avant courseEnAttente) pour permettre l'exclusion
+  // des courses ayant une proposition sur trajet active de la modale V1.
+  // Le backend filtre déjà par livreur_id et vérifie les courses actives.
+  const { proposals: onRouteProposals } = useOnRouteProposals(livreurProfil);
+
+  // ── IDs des courses ayant une proposition sur trajet active ──
+  // Ces courses doivent être EXCLUES de courseEnAttente (modale V1) pour
+  // éviter un double parcours d'acceptation (respond_proposal vs dispatchExterneAuto).
+  // Le bouton V1 appelle dispatchExterneAuto qui rejette avec "deja_en_course"
+  // car le livreur est déjà en course → faux message d'erreur.
+  const onRouteProposalCourseIds = useMemo(
+    () => new Set((onRouteProposals || []).map(p => p.course_id).filter(Boolean)),
+    [onRouteProposals]
+  );
+
   const courseEnAttente = useMemo(() => {
     const waiting = courseCandidates.find((course) => {
       if (isCourseDismissed(course)) return false; // déjà écartée, sauf nouvelle sollicitation
       // Dispatch V2 shows disponible_push courses exclusively in the
       // "Disponibles" feed. The legacy V1 modal must not open for them.
       if (isV2Enabled && course.dispatch_status === "disponible_push") return false;
+      // ── Exclure les courses avec une proposition sur trajet active ──
+      // Ces courses sont gérées par OnRouteProposalCard (respondToOnRouteProposal).
+      // Les laisser ici déclencherait un double parcours d'acceptation.
+      if (onRouteProposalCourseIds.has(course.id)) return false;
       return isCourseWaitingForLivreur(course, livreurId);
     }) || null;
     if (waiting) {
@@ -879,7 +926,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       });
     }
     return waiting;
-  }, [courseCandidates, livreurId, isV2Enabled]);
+  }, [courseCandidates, livreurId, isV2Enabled, onRouteProposalCourseIds]);
 
   // ─── Course en attente de validation prix par le client ───────────────────
   const courseEnAttenteValidationPrix = useMemo(() => {
@@ -943,13 +990,9 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     return new Set(activeEcoMission.course_ids);
   }, [activeEcoMission]);
 
-  // ─── Propositions "sur trajet" (livraisons supplémentaires compatibles) ──
-  // Affichées uniquement quand le livreur a au moins une course active.
-  // Le hook interroge le backend toutes les 15s ; le backend filtre par livreur_id,
-  // vérifie la disponibilité des courses et l'isolation pays/entreprise.
-  const { proposals: onRouteProposals } = useOnRouteProposals(
-    coursesActives.length > 0 ? livreurProfil : null
-  );
+  // ─── Propositions "sur trajet" : hook déplacé plus haut (avant courseEnAttente) ──
+  // onRouteProposals est défini à la ligne ~870, avant courseEnAttente, pour
+  // permettre l'exclusion des courses avec proposition active de la modale V1.
 
   // Courses non-Éco — affichées par CourseActiveCard individuellement
   const nonEcoCoursesActives = useMemo(

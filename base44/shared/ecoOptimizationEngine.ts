@@ -1029,6 +1029,187 @@ export async function updateEcoMissionRouteProgress(base44: any, courseId: strin
   return { updated: false, reason: 'no_changes' };
 }
 
+// ════════════════════════════════════════════════════════════════════════
+// CORRECTION 19 : RECALCUL DE MISSION APRÈS ANNULATION D'UNE COURSE
+// ════════════════════════════════════════════════════════════════════════
+// Gère tous les cas d'annulation d'une course faisant partie d'une mission :
+//
+// 1. Annulation AVANT récupération (statut < colis_recupere) :
+//    → Retirer la course de course_ids
+//    → Effacer eco_mission_id sur la course
+//    → Retirer ses étapes du route_plan_json
+//
+// 2. Annulation APRÈS récupération (statut >= colis_recupere) :
+//    → Garder la course dans course_ids (audit)
+//    → Marquer ses étapes comme "cancelled" dans le route_plan
+//    → Les règles d'incident (FraisAnnulation) s'appliquent via annulerCourseExterne
+//
+// 3. Si une seule course active reste → mission "invalidated"
+//    → Le frontend affiche la course restante via CourseActiveCard (vue individuelle)
+//
+// 4. Si toutes les courses sont annulées → mission "cancelled"
+//
+// 5. Si toutes les courses sont livrées → mission "completed"
+//
+// 6. Préserve les prix, commissions, historiques et la comptabilité.
+// 7. Évite les doubles finalisations et les missions fantômes.
+// 8. Synchronise les statuts backend, l'interface livreur, le suivi client et la vue Admin.
+//
+// Appelée par annulerCourseExterne à la place de completeEcoMissionIfNeeded.
+// completeEcoMissionIfNeeded reste utilisée par finaliserLivraisonLivreur (cas nominal).
+export async function recalculateEcoMissionAfterCancellation(base44: any, courseId: string) {
+  const course = await base44.asServiceRole.entities.CourseExterne.get(courseId).catch(() => null);
+  if (!course?.eco_mission_id) return { recalculated: false, reason: 'no_mission' };
+
+  const mission = await base44.asServiceRole.entities.EcoMission.get(course.eco_mission_id).catch(() => null);
+  if (!mission || ['completed', 'cancelled', 'invalidated'].includes(mission.status)) {
+    return { recalculated: false, reason: 'mission_terminal' };
+  }
+
+  const courseIds = Array.isArray(mission.course_ids) ? mission.course_ids : [];
+  if (courseIds.length === 0) return { recalculated: false, reason: 'no_courses' };
+
+  const courses = await Promise.all(
+    courseIds.map((id: string) => base44.asServiceRole.entities.CourseExterne.get(id).catch(() => null))
+  );
+
+  // ── Déterminer si la course annulée a été récupérée avant l'annulation ──
+  // On ne peut PAS utiliser le statut (déjà changé en 'annulee' ou 'en_attente'
+  // par annulerCourseExterne avant l'appel de cette fonction).
+  // On utilise heure_recuperation : si elle est définie, le colis a été récupéré.
+  const cancelledCourse = courses.find((c: any) => c && c.id === courseId);
+  const wasPickedUp = !!(cancelledCourse?.heure_recuperation);
+
+  // ── Classifier les courses ──
+  // active : course en cours de livraison par ce livreur
+  // terminal : livree ou annulee
+  // suspended : en_attente (livreur a annulé, course retournée au dispatch)
+  const activeCourses = courses.filter((c: any) =>
+    c &&
+    c.statut !== 'annulee' &&
+    c.statut !== 'livree' &&
+    c.statut !== 'en_attente' &&
+    !c.client_decision_attendue
+  );
+
+  // ── Mettre à jour le route plan ──
+  let routePlan: any[] = [];
+  try {
+    routePlan = mission.route_plan_json ? JSON.parse(mission.route_plan_json) : [];
+  } catch {
+    routePlan = [];
+  }
+
+  let routeUpdated = false;
+
+  // Marquer les étapes des courses terminales/suspendues
+  for (const step of routePlan) {
+    if (!step?.course_id) continue;
+    const c = courses.find((co: any) => co && co.id === step.course_id);
+    if (!c) continue;
+
+    const isTerminal = c.statut === 'livree' || c.statut === 'annulee';
+    const isSuspended = c.statut === 'en_attente' || c.client_decision_attendue === true;
+
+    if (isTerminal && step.status !== 'completed') {
+      step.status = 'completed';
+      routeUpdated = true;
+    }
+    if (isSuspended && step.status !== 'cancelled') {
+      step.status = 'cancelled';
+      routeUpdated = true;
+    }
+  }
+
+  // ── Si la course annulée était AVANT récupération → la retirer de la mission ──
+  let updatedCourseIds = courseIds;
+  let courseRemoved = false;
+  if (!wasPickedUp && cancelledCourse) {
+    updatedCourseIds = courseIds.filter((id: string) => id !== courseId);
+    await base44.asServiceRole.entities.CourseExterne.update(courseId, {
+      eco_mission_id: null,
+    }).catch(() => null);
+    // Retirer ses étapes du route plan
+    const beforeLen = routePlan.length;
+    routePlan = routePlan.filter((step: any) => step?.course_id !== courseId);
+    if (routePlan.length !== beforeLen) routeUpdated = true;
+    courseRemoved = true;
+  }
+
+  // ── Recalculer active_step_index ──
+  const firstPendingStep = routePlan.find((s: any) =>
+    s && s.status !== 'completed' && s.status !== 'cancelled'
+  );
+  const newActiveStepIndex = firstPendingStep
+    ? Math.max(0, (Number(firstPendingStep.order) || 1) - 1)
+    : routePlan.length;
+
+  // ── Déterminer le statut de la mission ──
+  let newStatus = mission.status;
+  let livreurLibere = false;
+
+  if (activeCourses.length === 0) {
+    // Aucune course active → toutes terminales ou suspendues
+    const allTerminal = courses.every((c: any) => c && (c.statut === 'livree' || c.statut === 'annulee'));
+    if (allTerminal) {
+      const allDelivered = courses.every((c: any) => c && c.statut === 'livree');
+      newStatus = allDelivered ? 'completed' : 'cancelled';
+    } else {
+      // Des courses sont suspendues (en_attente) → annuler la mission
+      newStatus = 'cancelled';
+    }
+    livreurLibere = true;
+  } else if (activeCourses.length === 1) {
+    // Une seule course active → invalider la mission
+    // Le frontend affichera la course restante via CourseActiveCard (vue individuelle)
+    // Que la course annulée ait été retirée (avant récupération) ou conservée
+    // (après récupération, pour audit), la mission est invalidée.
+    newStatus = 'invalidated';
+  }
+
+  // ── Mettre à jour la mission ──
+  const updateData: any = {};
+  if (routeUpdated) updateData.route_plan_json = JSON.stringify(routePlan);
+  if (mission.active_step_index !== newActiveStepIndex) updateData.active_step_index = newActiveStepIndex;
+  if (updatedCourseIds.length !== courseIds.length) updateData.course_ids = updatedCourseIds;
+  if (newStatus !== mission.status) updateData.status = newStatus;
+
+  if (Object.keys(updateData).length > 0) {
+    await base44.asServiceRole.entities.EcoMission.update(mission.id, updateData).catch(() => null);
+  }
+
+  // ── Si la mission devient terminale → libérer le livreur si pas d'autre course active ──
+  if (livreurLibere && mission.livreur_id) {
+    const STATUTS_ACTIFS = ['livreur_en_route', 'client_contacte', 'en_route_expediteur',
+      'arrive_prise_en_charge', 'colis_recupere', 'passager_embarque',
+      'pris_en_charge', 'en_livraison', 'arrivee'];
+    const autresCourses = await base44.asServiceRole.entities.CourseExterne.filter(
+      { livreur_id: mission.livreur_id }, '-created_date', 10
+    ).catch(() => []);
+    const aAutreCourseActive = (autresCourses || []).some((c: any) =>
+      c.id !== courseId && STATUTS_ACTIFS.includes(c.statut)
+    );
+    if (!aAutreCourseActive) {
+      const livreur = await base44.asServiceRole.entities.Livreur.get(mission.livreur_id).catch(() => null);
+      if (livreur && livreur.statut === 'en_course') {
+        await base44.asServiceRole.entities.Livreur.update(mission.livreur_id, {
+          statut: livreur.manual_hors_ligne === true ? 'hors_ligne' : 'disponible',
+        }).catch(() => null);
+      }
+    }
+  }
+
+  return {
+    recalculated: true,
+    mission_id: mission.id,
+    active_courses: activeCourses.length,
+    new_status: newStatus,
+    route_updated: routeUpdated,
+    course_removed: courseRemoved ? courseId : null,
+    livreur_libere: livreurLibere,
+  };
+}
+
 // ── Correction 5 : Nettoyer les missions Éco bloquées ──
 // Scanne toutes les missions non-terminales et vérifie si leurs courses
 // sont toutes terminales. Si oui, met à jour le statut de la mission.
