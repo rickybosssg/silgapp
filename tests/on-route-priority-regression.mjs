@@ -120,7 +120,7 @@ function makeMockBase44(opts = {}) {
           get: async (id) => proposals.get(id) || null,
           filter: async (query, sort, limit) => {
             let results = [...proposals.values()];
-            if (query?.course_code) results = results.filter(p => p.country_code === query.country_code);
+            if (query?.country_code) results = results.filter(p => p.country_code === query.country_code);
             if (query?.course_id) results = results.filter(p => p.course_id === query.course_id);
             if (query?.livreur_id) results = results.filter(p => p.livreur_id === query.livreur_id);
             if (query?.status) results = results.filter(p => p.status === query.status);
