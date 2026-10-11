@@ -189,3 +189,8 @@ when their assertions still match current product decisions.
 - MessagesPage listens to the existing scoped chat_refetch notification event, reads only the authorized matching thread, refreshes on focus/return from chat, and merges by timestamp to avoid stale responses replacing newer badges. Account changes reset its cache. No new polling or service-role frontend queries.
 - Guards: chat-scope-regression (runtime schema omission simulation, access and retry idempotency), chat-media-render-regression (actual render), message-badge-ui-regression (actual component, mocked API), chat-ui-regression (pagination/retries/VENUS).
 - Source comparison and targeted re-read are mandatory for backend deployments. This release changes only envoyerMessage; finance, Dispatch V2 and configuration remain unchanged.
+
+## 1.0.125 Dispatch Follow-up
+
+- dispatchExterneAuto must fail closed with dispatch_v2_disabled/503 when V2 is off, never call the retired V1 engine. V2 publication and tenant checks remain unchanged. Targeted deployment re-read matched staging; configuration and workflows were not changed.
+- Guard: dispatch-v2-enterprise-reconstruction.mjs scans executable AST imports/calls and executes the real publication branch with isolated adapters for both flag values and Public/Enterprise inputs. It preserves current backend/frontend tenant and suspension guards; it does not prove live acceptance atomicity.

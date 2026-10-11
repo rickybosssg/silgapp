@@ -3,8 +3,6 @@ import { notifierRedispatchClient } from '../../shared/venusRedispatchNotifier.t
 import { STATUTS_ACTIFS_COURSE, STATUTS_ACTIFS_VERIF, normalizeCommissionPct, chargerConfigPays } from '../../shared/dispatchConstants.ts';
 import { verifierPaysCourseLivreur, reponseDejaPrise, generateToken, generatePIN, supprimerNotificationsCourse, journaliserDispatch } from '../../shared/dispatchUtils.ts';
 import { chargerConfigDispatch, chargerConfigVaguesGPS, CYCLE_EPUISE_TIMEOUT_MS } from '../../shared/dispatchConfig.ts';
-// V1 (lancerDispatchMulti) désactivé en runtime — V2 est l'unique moteur de dispatch.
-// import { lancerDispatchMulti } from '../../shared/dispatchEngine.ts';
 import { runWatchdog } from '../../shared/dispatchWatchdog.ts';
 import { marquerRefuse, marquerAccepte, getLivreursNotifies, getLivreursRefuses, resetNotifications as resetNotifsEntity } from '../../shared/dispatchNotifications.ts';
 import { accepterCourseV2, publierCourseDansFil, isV2Enabled, secoursDispatchV2, isPilotLivreur, DISPATCH_V2_BUNDLE_VERSION } from '../../shared/dispatchV2.ts';
@@ -242,12 +240,9 @@ export default async function(req) {
         return Response.json({ success: true, blocked: true, reason: 'client_decision_attendue' });
       }
 
-      // [ECO] Une course Éco isolée reste en attente de regroupement.
-      // Ce garde protège tous les chemins de lancement (V2, fallback V1, automation,
-      // retry manuel) afin qu'elle ne devienne jamais une course Standard acceptable
-      // avant regroupement ou conversion différée explicite.
+      // Isolated Eco courses stay visible as waiting, never Standard-dispatched.
+      // Grouping is triggered by courseEventOrchestrator, not by dispatch retries.
       if (course.delivery_mode === 'eco' && course.eco_status === 'isolated') {
-        // Grouping is triggered by courseEventOrchestrator, not by dispatch retries.
         return Response.json({
           success: true,
           blocked: true,
@@ -269,22 +264,13 @@ export default async function(req) {
         return Response.json({ success: true, v2: true, published: true, ...result });
       }
 
-      // ── V1 : dispatch par vagues (notifications ciblées) ──
-      const result = await lancerDispatchMulti(base44, course_id, []);
-      if (result.erreur) return Response.json({ error: result.erreur }, { status: 404 });
-      if (result.ignore) return Response.json({ success: true, message: `Dispatch ignoré: ${result.statut}` });
-      if (result.locked) return Response.json({ success: true, locked: true, message: 'Course verrouillée par un autre tick' });
-      if (result.noLivreur) return Response.json({ success: false, noLivreur: true });
-      if (result.en_attente) return Response.json({ success: true, en_attente: true });
-      if (result.cycleEpuise) return Response.json({ success: true, cycle_epuise: true });
-
+      // Fail closed: disabling V2 must never reactivate the retired engine.
       return Response.json({
-        success: true,
-        nb_notifies: result.nb_notifies,
-        total_notifies: result.total_notifies,
-        livreurs: result.livreurs,
-        timeout_sec: result.timeout_sec,
-      });
+        success: false,
+        blocked: true,
+        reason: 'dispatch_v2_disabled',
+        error: 'Le dispatch est temporairement indisponible.',
+      }, { status: 503 });
     }
 
     // ─── 2. Vérifier si un livreur est dans la liste notifiée ─────────────

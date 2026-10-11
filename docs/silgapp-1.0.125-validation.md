@@ -69,6 +69,14 @@ AAB: 8420167 bytes; SHA256
 Both signatures were verified against the previous release certificate:
 9dcb9cd32c6ca78b6868f446c883aa0694a1cc93622d8765522804b6708a9699.
 Application id, SDK configuration and native iOS configuration were preserved.
-GitHub ios push is suspended under AGENTS.md's failed-test rule pending explicit
-acceptance of the documented pre-existing Dispatch historical test failure.
-The complete delivery must not be claimed finished while that gate remains.
+Follow-up validation removed the real conditional V1 call in dispatchExterneAuto:
+V2 enabled keeps the unchanged publication path; V2 disabled returns HTTP 503
+without calling another engine. The old import was commented, so that branch
+previously risked a ReferenceError rather than providing a valid fallback.
+The targeted function was deployed and its re-read SHA256 matched staging.
+The restored historical regression uses AST checks, isolated execution of both
+flag branches and current tenant isolation guards. Obsolete 978abc53 release
+diff allowlists were not restored; approved UI/native changes are not errors.
+Targeted Dispatch/Eco/idempotency/zero-commission tests, typecheck and lint pass.
+This is not a live dispatch or concurrency proof. No Android rebuild is needed
+for this backend/test/documentation-only follow-up.
