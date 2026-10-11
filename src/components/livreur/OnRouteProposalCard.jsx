@@ -72,12 +72,13 @@ export default function OnRouteProposalCard({ proposal, livreurProfil, onDismiss
     if (responding || isExpired) return;
     setResponding(true);
     try {
-      const res = await base44.functions.invoke("ecoOptimizationOrchestrator", {
+      const rawRes = await base44.functions.invoke("ecoOptimizationOrchestrator", {
         action: "respond_proposal",
         proposal_id: proposal.proposal_id,
         livreur_id: livreurProfil.id,
         response: "accept",
       });
+      const res = rawRes?.data ?? rawRes;
       if (res?.success && res?.accepted) {
         toast.success("Livraison supplémentaire acceptée !");
         queryClient.invalidateQueries({ queryKey: ["on-route-proposals"] });
@@ -112,12 +113,13 @@ export default function OnRouteProposalCard({ proposal, livreurProfil, onDismiss
     if (responding) return;
     setResponding(true);
     try {
-      const res = await base44.functions.invoke("ecoOptimizationOrchestrator", {
+      const rawRes = await base44.functions.invoke("ecoOptimizationOrchestrator", {
         action: "respond_proposal",
         proposal_id: proposal.proposal_id,
         livreur_id: livreurProfil.id,
         response: "refuse",
       });
+      const res = rawRes?.data ?? rawRes;
       if (res?.success) {
         toast.info("Proposition refusée");
         queryClient.invalidateQueries({ queryKey: ["on-route-proposals"] });

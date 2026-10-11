@@ -18,9 +18,10 @@ export function useOnRouteProposals(livreurProfil) {
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["on-route-proposals", livreurId],
     queryFn: async () => {
-      const res = await base44.functions.invoke("getOnRouteProposalsForLivreur", {
+      const rawRes = await base44.functions.invoke("getOnRouteProposalsForLivreur", {
         livreur_id: livreurId,
       });
+      const res = rawRes?.data ?? rawRes;
       return res?.proposals || [];
     },
     enabled: !!livreurId,
