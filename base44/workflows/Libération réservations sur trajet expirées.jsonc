@@ -1,0 +1,48 @@
+{
+  "name": "Lib\u00e9ration r\u00e9servations sur trajet expir\u00e9es",
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "recurring",
+      "cron_expression": "*/5 * * * *",
+      "one_time_date": null,
+      "timezone": "Africa/Ouagadougou",
+      "interval_value": null,
+      "interval_unit": null,
+      "interval_anchor": null,
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  },
+  "description": "Lib\u00e8re automatiquement les r\u00e9servations exclusives sur trajet expir\u00e9es (15s) et retourne la course au dispatch normal. Appel\u00e9 toutes les 5 minutes en secours \u2014 la lib\u00e9ration principale se fait au refus ou \u00e0 l'acceptation tardive.",
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "release_expired_on_route_reservations",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "release_reservations": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "ecoOptimizationOrchestrator",
+            "args": {
+              "action": "release_expired_reservations",
+              "limit": 50
+            }
+          },
+          "then": "end",
+          "x-base44": {
+            "title": "Lib\u00e9rer r\u00e9servations expir\u00e9es",
+            "description": "Lib\u00e8re les r\u00e9servations sur trajet expir\u00e9es et reprend le dispatch"
+          }
+        }
+      }
+    ]
+  }
+}

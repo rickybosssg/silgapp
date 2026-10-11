@@ -29,6 +29,7 @@ const DEFAULT_MAX_COURSES = 2;
 const DEFAULT_PROPOSAL_EXPIRATION_SEC = 300;
 const DEFAULT_MAX_DETOUR_KM = 6;
 const DEFAULT_MIN_GAIN = 0;
+const DEFAULT_ON_ROUTE_PRIORITY_SEC = 15;
 const ECO_PREFIX = 'ECO';
 
 // ── Seuils configurables pour la chaîne de destination ──
@@ -180,6 +181,8 @@ export async function loadEcoConfig(base44: any, countryCode: string) {
       key(code, 'CHAIN_COST_PER_KM'),
       key(code, 'CHAIN_MAX_TIME_DIFF_HOURS'),
       key(code, 'EMERGENCY_STOP'),
+      key(code, 'ON_ROUTE_PRIORITY_ENABLED'),
+      key(code, 'ON_ROUTE_PRIORITY_SEC'),
     ] },
   }, undefined, 25).catch(() => []);
   const map = new Map((configs || []).map((c: any) => [c.cle, c.valeur]));
@@ -217,6 +220,11 @@ export async function loadEcoConfig(base44: any, countryCode: string) {
     // ── Taux de commission du pays (pour calcul du gain NET livreur) ──
     commissionPct,
     emergencyStop,
+    // ── Priorité exclusive sur trajet (Correction 20) ──
+    // Pendant prioritySec secondes, la course est réservée au meilleur livreur
+    // compatible. Les autres livreurs ne la voient pas dans "Disponibles".
+    onRoutePriorityEnabled: !emergencyStop && parseBool(map.get(key(code, 'ON_ROUTE_PRIORITY_ENABLED')), false),
+    onRoutePrioritySec: parseNumber(map.get(key(code, 'ON_ROUTE_PRIORITY_SEC')), DEFAULT_ON_ROUTE_PRIORITY_SEC, 5),
   };
 }
 
@@ -684,6 +692,16 @@ export async function respondToOnRouteProposal(base44: any, proposalId: string, 
   }
   if (response === 'refuse') {
     await base44.asServiceRole.entities.EcoProposal.update(proposal.id, { status: 'refused', responded_at: new Date().toISOString() });
+    // ── Correction 20 : Libérer immédiatement la réservation exclusive ──
+    // Après refus, la course retourne au dispatch normal sans attendre l'expiration.
+    if (proposal.is_exclusive) {
+      try {
+        const { releaseReservationAfterRefusal } = await import('./onRoutePriorityReservation.ts');
+        await releaseReservationAfterRefusal(base44, proposal.course_id);
+      } catch (e: any) {
+        console.error('[respondToOnRouteProposal] release after refusal failed:', e?.message || String(e));
+      }
+    }
     return { success: true, accepted: false };
   }
 
@@ -1213,7 +1231,32 @@ export async function triggerOnRouteProposalsForNewCourse(base44: any, courseId:
     return { success: true, proposals_created: 0, reason: 'on_route_disabled' };
   }
 
-  // ── Trouver les livreurs avec des courses actives dans le même scope ──
+  // ════════════════════════════════════════════════════════════════════════
+  // CORRECTION 20 : PRIORITÉ EXCLUSIVE SUR TRAJET (15 secondes)
+  // ════════════════════════════════════════════════════════════════════════
+  // Si la priorité exclusive est activée, sélectionner le MEILLEUR livreur
+  // compatible et créer une réservation exclusive. La course reste en
+  // dispatch_status='en_attente' (invisible des autres livreurs dans
+  // "Disponibles"). Après refus ou expiration (15s), la course retourne
+  // au dispatch normal.
+  if (config.onRoutePriorityEnabled) {
+    const { createExclusiveReservation } = await import('./onRoutePriorityReservation.ts');
+    const reservation = await createExclusiveReservation(base44, course, config);
+    if (reservation.created) {
+      return {
+        success: true,
+        proposals_created: 1,
+        exclusive_reservation_created: true,
+        livreur_id: reservation.livreurId,
+        proposal_id: reservation.proposalId,
+        reason: 'exclusive_priority_reservation',
+      };
+    }
+    // Aucun livreur compatible → le dispatch normal démarre sans attente
+  }
+
+  // ── Comportement historique (priorité désactivée ou pas de candidat) ──
+  // Créer des propositions pour tous les livreurs compatibles
   const courseEnterpriseId = normalizeEnterpriseId(course.enterprise_id);
   const activeCourses = await base44.asServiceRole.entities.CourseExterne.filter({
     country_code: course.country_code,
@@ -1221,11 +1264,9 @@ export async function triggerOnRouteProposalsForNewCourse(base44: any, courseId:
     livreur_id: { $exists: true },
   }, '-updated_date', 50).catch(() => []);
 
-  // Grouper par livreur_id (un livreur peut avoir plusieurs courses actives)
   const driverIds = new Set<string>();
   for (const ac of activeCourses || []) {
     if (!ac?.livreur_id) continue;
-    // Isolation entreprise/public
     if (normalizeEnterpriseId(ac.enterprise_id) !== courseEnterpriseId) continue;
     driverIds.add(ac.livreur_id);
   }
@@ -1234,9 +1275,6 @@ export async function triggerOnRouteProposalsForNewCourse(base44: any, courseId:
     return { success: true, proposals_created: 0, reason: 'no_active_drivers' };
   }
 
-  // ── Pour chaque livreur, créer une proposition si compatible ──
-  // createOnRouteProposal fait le préfiltrage de compatibilité (détour, gain, etc.)
-  // et est idempotent (pas de doublon si une proposition pending existe déjà)
   let proposalsCreated = 0;
   const errors: any[] = [];
   for (const livreurId of driverIds) {

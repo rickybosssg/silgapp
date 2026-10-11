@@ -118,6 +118,34 @@ Deno.serve(async (req) => {
         });
       }
 
+      // ── Correction 20 : Propositions sur trajet AVANT dispatch ──
+      // Si un livreur compatible est trouvé et que la priorité exclusive est
+      // activée, créer une réservation exclusive (15s) et NE PAS dispatcher
+      // immédiatement. La course reste en 'en_attente' (invisible des autres).
+      // Après refus ou expiration, le dispatch normal reprend.
+      const onRouteResult = await triggerOnRouteProposalsForNewCourse(base44, courseId).catch((error) => {
+        const msg = error?.message || String(error);
+        console.error('[COURSE_ORCHESTRATOR] ❌ onRouteProposals:', msg);
+        errors.push({ module: 'onRouteProposals', error: msg });
+        return { success: false, error: msg };
+      });
+      called.push('onRouteProposals');
+
+      // Si une réservation exclusive a été créée, ne pas dispatcher
+      if (onRouteResult?.exclusive_reservation_created) {
+        await fireInvoke('notifyClientSync', { event, data });
+        await emitCourseCreated(base44, course).catch(() => {});
+        return Response.json({
+          success: true,
+          event: 'create',
+          course_id: courseId,
+          on_route_result: onRouteResult,
+          exclusive_reservation: true,
+          called,
+          errors,
+        });
+      }
+
       // 1. Dispatch : V2 (fil) ou V1 (vagues) selon feature flag
       const v2Enabled = await isV2Enabled(base44);
       if (v2Enabled) {
@@ -146,16 +174,6 @@ Deno.serve(async (req) => {
 
       // 3. VENUS Admin Event (non-bloquant)
       await emitCourseCreated(base44, course).catch(() => {});
-
-      // ── Propositions sur trajet (déclenchement automatique) ──
-      // Pour les courses Standard (non-Éco), proposer aux livreurs en route.
-      const onRouteResult = await triggerOnRouteProposalsForNewCourse(base44, courseId).catch((error) => {
-        const msg = error?.message || String(error);
-        console.error('[COURSE_ORCHESTRATOR] ❌ onRouteProposals:', msg);
-        errors.push({ module: 'onRouteProposals', error: msg });
-        return { success: false, error: msg };
-      });
-      called.push('onRouteProposals');
 
       return Response.json({
         success: true,

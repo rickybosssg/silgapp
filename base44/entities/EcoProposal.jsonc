@@ -54,6 +54,16 @@
       "type": "string",
       "format": "date-time"
     },
+    "is_exclusive": {
+      "type": "boolean",
+      "default": false,
+      "description": "True si cette proposition beneficie d'une priorite exclusive temporaire (15s par defaut). Pendant cette fenetre, la course est reservee a ce livreur et n'est pas visible dans 'Disponibles' pour les autres livreurs. Apres expiration ou refus, la course retourne au dispatch normal."
+    },
+    "reservation_expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date/heure d'expiration de la reservation exclusive (now + priority_sec). Si defini et depasse, la reservation est liberee automatiquement et la course retourne au dispatch normal. Le compte a rebours commence cote backend (pas frontend) pour garantir la coherence."
+    },
     "gain_amount": {
       "type": "number",
       "description": "Gain supplementaire affiche au livreur."
