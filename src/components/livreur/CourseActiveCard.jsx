@@ -271,7 +271,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
     (isDeplacement && ["passager_embarque", "pris_en_charge"].includes(effectiveStatut));
   const colisLivre = course.statut === "livree";
 
-  const handleConfirmerLivraison = () => {
+  const handleConfirmerLivraison = async () => {
     // DÉPLACEMENT : prix saisi → recap local → attendre TERMINER
     // IMPORTANT : garder statut "arrivee" (pas "livree") pour que syncStatutLivreurOnCourse
     // ne libère PAS le livreur automatiquement. Le livreur doit rester "en_course" jusqu'à TERMINER.
@@ -327,9 +327,17 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
         commission_pct: split.commission_pct,
         heure_livraison: pendingDeliveryData?.heure_livraison || new Date().toISOString(),
       };
-      updateOptimisticStatut("livree", mergedData);
-      onColisLivre({ ...course, ...mergedData }, montant);
-      navigateToRecap(mergedData);
+      if (deliveryBoutonPending) return;
+      setDeliveryBoutonPending(true);
+      try {
+        await onColisLivre({ ...course, ...mergedData }, montant);
+        onDeliveryVictory?.(course.id);
+      } catch (error) {
+        toast.error(error?.message || "Livraison non confirmée. Réessayez.");
+        return;
+      } finally {
+        setDeliveryBoutonPending(false);
+      }
       setPendingDeliveryData(null);
     } else if (isExterne) {
       onColisLivre(course);

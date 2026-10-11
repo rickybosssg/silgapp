@@ -1,5 +1,47 @@
 # SILGAPP Release Rules
 
+## Permanent non-regression policy
+
+ON AVANCE. ON NE RECULE PAS. Every correction must preserve previously validated
+features unless the user explicitly authorizes their removal or replacement.
+This policy applies to Base44 synchronization, GitHub integration, Android and
+iOS changes, and release builds.
+
+Before changing functional code:
+
+1. Inspect Git status and identify the last validated local commit.
+2. Preserve uncommitted and untracked work; create an identifiable local restore
+   point when needed. Never commit signing secrets or keystores.
+3. Read `docs/silgapp-regression-inventory.md` and compare incoming Base44,
+   current Codex, and last validated implementations.
+4. Identify protected behavior and regression risks before resolving conflicts.
+
+Never replace a corrected file wholesale with an older implementation to fix
+one issue. Merge compatible improvements and preserve the most recently
+validated product rules. If incompatible rules remain ambiguous, pause that
+part of the integration and request a user decision.
+
+After functional changes, run historical and relevant current regression tests,
+add meaningful protection for new fixes, and run typecheck, lint and web build.
+Inspect the final diff for unintended deletions. Never remove a regression test
+merely to make checks pass. Update the inventory with rules, affected files,
+tests and remaining validation gaps.
+
+Before an authorized Android build, report preserved and new corrections,
+passed and failed tests, untested features and residual risks. Distinguish
+static checks, simulations, backend integration tests and physical-device
+tests. A successful merge or build alone does not prove functional correctness.
+
+Do not test using real production deliveries, payments or balances. Do not
+trigger production dispatch or notifications without explicit authorization.
+Do not undertake a general refactor or reintroduce explicitly abandoned
+features such as Force Update or PushTelemetry.
+
+Compilation and remote synchronization require explicit user authorization.
+Follow the latest session authorization; never treat an older mission's limits
+as a permanent ban. Production deployment and data changes require their own
+authorization.
+
 ## Android release and GitHub ios sync
 
 For every SILGAPP Android delivery that produces a new signed APK and AAB:

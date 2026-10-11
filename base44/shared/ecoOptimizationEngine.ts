@@ -10,6 +10,7 @@ import {
 } from './commissionLock.ts';
 import { marquerAccepte } from './dispatchNotifications.ts';
 import { claimCourseForLivreur } from './courseAcceptanceLock.ts';
+import { bestTwoCourseOrder } from './ecoRouteOrder.ts';
 
 const ACTIVE_STATUSES = [
   'livreur_en_route',
@@ -236,11 +237,7 @@ export async function prepareEcoCreationFields(base44: any, rawCourseData: any) 
   const price = Number(rawCourseData?.prix_propose_client || rawCourseData?.prix_propose_admin || rawCourseData?.prix_estimate || 0) || 0;
 
   if (!config.enabled || !publicOnly) {
-    return {
-      delivery_mode: 'standard',
-      eco_status: config.enabled && publicOnly ? 'disabled' : 'none',
-      eco_mission_id: null,
-    };
+    throw new Error(!publicOnly ? 'SILGAPP Eco est reserve aux courses publiques.' : 'SILGAPP Eco non active. Choisissez Standard ou reessayez plus tard.');
   }
 
   const now = new Date();
@@ -257,8 +254,9 @@ export async function shouldHoldEcoCourseOnCreate(base44: any, course: any) {
   if (normalizeDeliveryMode(course?.delivery_mode) !== 'eco') return false;
   if (course?.eco_status !== 'isolated') return false;
   if (!isPublicCourse(course)) return false;
-  const config = await loadEcoConfig(base44, course.country_code);
-  return config.enabled && config.groupingEnabled;
+  // Feature flags stop new grouping; they must never turn a waiting Eco course
+  // into a Standard dispatch implicitly.
+  return true;
 }
 
 function compatibilityScore(a: any, b: any, config?: any) {
@@ -287,11 +285,11 @@ function compatibilityScore(a: any, b: any, config?: any) {
   //
   // ⚠️ TOUS les seuils sont configurables par pays via AppConfig.
   //    Aucune valeur n'est codée en dur — les défauts sont des fallbacks.
-  const chainMaxPickupKm = Number(config?.chainMaxPickupKm) || DEFAULT_CHAIN_MAX_PICKUP_KM;
-  const chainMaxDropKm = Number(config?.chainMaxDropKm) || DEFAULT_CHAIN_MAX_DROP_KM;
-  const chainMinGainFcfa = Number(config?.chainMinGainFcfa) || DEFAULT_CHAIN_MIN_GAIN_FCFA;
-  const chainCostPerKm = Number(config?.chainCostPerKm) || DEFAULT_CHAIN_COST_PER_KM;
-  const chainMaxTimeDiffHours = Number(config?.chainMaxTimeDiffHours) || DEFAULT_CHAIN_MAX_TIME_DIFF_HOURS;
+  const chainMaxPickupKm = config?.chainMaxPickupKm ?? DEFAULT_CHAIN_MAX_PICKUP_KM;
+  const chainMaxDropKm = config?.chainMaxDropKm ?? DEFAULT_CHAIN_MAX_DROP_KM;
+  const chainMinGainFcfa = config?.chainMinGainFcfa ?? DEFAULT_CHAIN_MIN_GAIN_FCFA;
+  const chainCostPerKm = config?.chainCostPerKm ?? DEFAULT_CHAIN_COST_PER_KM;
+  const chainMaxTimeDiffHours = config?.chainMaxTimeDiffHours ?? DEFAULT_CHAIN_MAX_TIME_DIFF_HOURS;
 
   if (Number(dropKm) <= chainMaxDropKm && Number(pickupKm) > 3 && Number(pickupKm) <= chainMaxPickupKm) {
     // ── Calcul du gain NET livreur (après commission) ──
@@ -363,6 +361,8 @@ function buildRoutePlan(courses: any[]) {
 }
 
 function routePlanForEcoMission(courses: any[]) {
+  const optimized = bestTwoCourseOrder(courses, calculerDistance);
+  if (optimized) return optimized;
   const first = courses[0];
   const second = courses[1];
   if (!first || !second) return buildRoutePlan(courses);
@@ -393,6 +393,9 @@ export async function processEcoCourseCreated(base44: any, courseId: string) {
   }
 
   const config = await loadEcoConfig(base44, course.country_code);
+  if (!config.enabled || !config.groupingEnabled) {
+    return { success: true, handled: true, grouped: false, reason: 'grouping_disabled' };
+  }
   const candidates = await base44.asServiceRole.entities.CourseExterne.filter({
     country_code: course.country_code,
     enterprise_id: null,
@@ -968,7 +971,11 @@ export async function cleanupStuckEcoMissions(base44: any, countryCode?: string,
     const allCancelled = courses.every((c: any) => c && c.statut === 'annulee');
     const finalStatus = allDelivered ? 'completed' : 'cancelled';
 
-    await base44.asServiceRole.entities.EcoMission.update(mission.id, { status: finalStatus }).catch(() => null);
+    const closedMission = await base44.asServiceRole.entities.EcoMission.update(mission.id, { status: finalStatus }).catch(() => null);
+    if (!closedMission) {
+      results.push({ mission_id: mission.id, action: 'skipped', reason: 'mission_update_failed' });
+      continue;
+    }
 
     // Libérer le livreur si la mission était acceptée
     if (mission.livreur_id && mission.status === 'accepted') {
@@ -976,13 +983,17 @@ export async function cleanupStuckEcoMissions(base44: any, countryCode?: string,
       if (livreur && livreur.statut === 'en_course') {
         const STATUTS_ACTIFS = ['livreur_en_route', 'client_contacte', 'en_route_expediteur', 'arrive_prise_en_charge', 'colis_recupere', 'passager_embarque', 'pris_en_charge', 'en_livraison', 'arrivee'];
         const autresCourses = await base44.asServiceRole.entities.CourseExterne.filter(
-          { livreur_id: mission.livreur_id }, '-created_date', 10
-        ).catch(() => []);
+          { livreur_id: mission.livreur_id, statut: { $in: STATUTS_ACTIFS } }, '-created_date', 1
+        ).catch(() => null);
+        if (!Array.isArray(autresCourses)) {
+          results.push({ mission_id: mission.id, action: 'skipped', reason: 'active_courses_read_failed' });
+          continue;
+        }
         const aAutreCourseActive = (autresCourses || []).some((c: any) =>
           c.id !== courseIds[0] && STATUTS_ACTIFS.includes(c.statut)
         );
         await base44.asServiceRole.entities.Livreur.update(mission.livreur_id, {
-          statut: aAutreCourseActive ? 'en_course' : (livreur.manual_hors_ligne === true ? 'hors_ligne' : 'disponible'),
+          statut: aAutreCourseActive ? 'en_course' : (livreur.manual_hors_ligne === true || livreur.admin_hors_ligne === true || livreur.actif === false ? 'hors_ligne' : 'disponible'),
         }).catch(() => null);
       }
     }
@@ -1080,6 +1091,9 @@ export async function triggerOnRouteProposalsForNewCourse(base44: any, courseId:
 export async function acceptEcoMission(base44: any, missionId: string, livreurId: string) {
   const mission = await base44.asServiceRole.entities.EcoMission.get(missionId).catch(() => null);
   if (!mission || mission.status !== 'available') return { success: false, reason: 'mission_unavailable' };
+  if (!isPublicCourse(mission)) return { success: false, reason: 'enterprise_mismatch' };
+  const config = await loadEcoConfig(base44, mission.country_code);
+  if (!config.enabled || !config.groupingEnabled) return { success: false, reason: 'engine_disabled' };
 
   // ── [SÉCURITÉ] Vérification d'identité obligatoire avant toute logique d'acceptation ──
   const { verifyLivreurIdentity } = await import('./livreurIdentityGuard.ts');
@@ -1088,6 +1102,7 @@ export async function acceptEcoMission(base44: any, missionId: string, livreurId
     return { success: false, reason: 'identity_mismatch', error: identityCheck.error || 'Vérification d\'identité échouée' };
   }
   const livreur = identityCheck.livreur;
+  if (livreur.country_code !== mission.country_code) return { success: false, reason: 'country_mismatch' };
   if (normalizeEnterpriseId(mission.enterprise_id) !== normalizeEnterpriseId(livreur.enterprise_id)) {
     return { success: false, reason: 'enterprise_mismatch' };
   }

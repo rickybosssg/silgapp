@@ -59,6 +59,7 @@ export function computeActiveStepIndex(routePlan = [], courses = []) {
     const step = routePlan[i];
     const course = courseMap.get(step.course_id);
     if (!course) continue;
+    if (course.statut === "annulee") continue;
 
     if (step.type === "pickup") {
       // Pickup non fait si la course n'est pas encore à colis_recupere ou au-delà

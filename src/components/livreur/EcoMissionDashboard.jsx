@@ -83,7 +83,7 @@ export default function EcoMissionDashboard({ mission, livreurProfil, onAllDeliv
   }, [courses]);
 
   // ── Détection de fin de mission ──
-  const allDone = courses.length > 0 && courses.every(c =>
+  const allDone = courses.length === mission?.course_ids?.length && courses.length > 0 && courses.every(c =>
     c.statut === "livree" || c.statut === "annulee"
   );
   useEffect(() => {
@@ -393,7 +393,7 @@ function CurrentStepCard({ course, step, stepIndex, totalSteps, courses, actionP
         ) : (
           <button
             onClick={() => onFinalize(course.id)}
-            disabled={actionPending}
+            disabled={actionPending || !isColisRecupere}
             className="w-full h-14 rounded-2xl bg-primary text-white font-black text-base shadow-lg shadow-primary/20 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-3"
           >
             {actionPending ? (

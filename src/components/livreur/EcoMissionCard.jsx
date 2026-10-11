@@ -21,7 +21,7 @@ import { parseRoutePlan, prixCourseEco, totalPriceEco, totalDistanceKm } from "@
  *
  * L'acceptation est atomique : le backend verrouille la mission et les deux courses.
  */
-export default function EcoMissionCard({ mission, livreurProfil, onAcceptSuccess }) {
+export default function EcoMissionCard({ mission, livreurProfil, onAcceptSuccess, canAccept = false, blockedReason }) {
   const queryClient = useQueryClient();
   const [accepting, setAccepting] = useState(false);
 
@@ -44,6 +44,10 @@ export default function EcoMissionCard({ mission, livreurProfil, onAcceptSuccess
   const totalDist = useMemo(() => totalDistanceKm(courses, routePlan), [courses, routePlan]);
 
   const handleAccept = async () => {
+    if (!canAccept) {
+      toast.error(blockedReason || "Votre compte ne peut pas accepter cette mission.");
+      return;
+    }
     if (!mission?.id || !livreurProfil?.id || accepting) return;
     setAccepting(true);
     try {
@@ -56,7 +60,8 @@ export default function EcoMissionCard({ mission, livreurProfil, onAcceptSuccess
       const data = res?.data ?? res;
       if (data?.success && data?.accepted) {
         toast.success("Mission Éco acceptée !");
-        queryClient.invalidateQueries({ queryKey: ["eco-missions-available"] });
+        queryClient.invalidateQueries({ queryKey: ["eco-missions-disponibles"] });
+        queryClient.invalidateQueries({ queryKey: ["eco-mission-active"] });
         queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
         onAcceptSuccess?.();
       } else {
@@ -71,13 +76,15 @@ export default function EcoMissionCard({ mission, livreurProfil, onAcceptSuccess
           missing_course: "Une course de la mission est introuvable.",
           course_not_claimable: "Une course de la mission n'est plus disponible.",
           mission_incomplete: "La mission est incomplète.",
+          engine_disabled: "Les nouvelles acceptations Éco sont suspendues.",
+          country_mismatch: "Cette mission appartient à un autre pays.",
         };
         const errorMsg = data?.error
           || reasonMessages[data?.reason]
           || (data?.reason ? `Erreur: ${data.reason}` : null)
           || "Erreur lors de l'acceptation";
         toast.error(errorMsg);
-        queryClient.invalidateQueries({ queryKey: ["eco-missions-available"] });
+        queryClient.invalidateQueries({ queryKey: ["eco-missions-disponibles"] });
       }
     } catch (err) {
       toast.error("Erreur réseau lors de l'acceptation");
@@ -200,7 +207,8 @@ export default function EcoMissionCard({ mission, livreurProfil, onAcceptSuccess
         <button
           type="button"
           onClick={handleAccept}
-          disabled={accepting}
+          disabled={accepting || !canAccept}
+          title={!canAccept ? blockedReason : undefined}
           className="w-full h-12 rounded-lg bg-gradient-to-r from-green-600 to-emerald-600 text-sm font-bold text-white shadow-lg shadow-green-200 transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
         >
           {accepting ? (

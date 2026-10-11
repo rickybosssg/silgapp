@@ -67,6 +67,7 @@ export default function CourseExterneFormSync() {
   const [invitationModal, setInvitationModal] = useState(null); // { telephone, nom } ou null
   const [pendingRecap, setPendingRecap] = useState(null); // récapitulatif avant confirmation
   const [confirming, setConfirming] = useState(false); // mutation en cours après confirmation
+  const confirmationInFlight = useRef(false);
   const [gpsLoading, setGpsLoading] = useState({ depart: false, arrivee: false });
   const [deliveryMode, setDeliveryMode] = useState("standard");
   const { forteDemande } = useForteDemande(clientProfil?.country_code);
@@ -451,6 +452,7 @@ export default function CourseExterneFormSync() {
       );
       setPendingRecap(null);
       setConfirming(false);
+      confirmationInFlight.current = false;
       setIsSubmitting(false);
       submitRequestIdRef.current = null;
       submitSignatureRef.current = null;
@@ -507,6 +509,7 @@ export default function CourseExterneFormSync() {
       queryClient.setQueryData(['courses-externes-client'], (old) => (old || []).filter(c => !c.id?.startsWith('temp_')));
       toast.error("Erreur : " + err.message);
       setConfirming(false);
+      confirmationInFlight.current = false;
       setIsSubmitting(false);
     },
   });
@@ -903,12 +906,14 @@ export default function CourseExterneFormSync() {
 
   // ── Création réelle après confirmation explicite du client ──
   const handleConfirmCreation = () => {
-    if (!pendingRecap?._mutationPayload || confirming) return;
+    if (!pendingRecap?._mutationPayload || confirmationInFlight.current || confirming || createMutation.isPending) return;
+    confirmationInFlight.current = true;
     setConfirming(true);
     createMutation.mutate(pendingRecap._mutationPayload);
   };
 
   const handleCloseConfirmation = () => {
+    if (confirmationInFlight.current) return;
     setPendingRecap(null);
     setConfirming(false);
   };
@@ -1077,7 +1082,7 @@ export default function CourseExterneFormSync() {
               setIsSubmitting(false);
             });
           }} onKeyDown={(e) => {
-            if (e.key === "Enter" && currentStep < totalSteps - 1) {
+            if (e.key === "Enter" && e.target.tagName !== "TEXTAREA" && e.target.tagName !== "BUTTON") {
               e.preventDefault();
             }
           }}>

@@ -272,6 +272,8 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
           mission={mission}
           livreurProfil={livreurProfil}
           onAcceptSuccess={onAcceptSuccess}
+          canAccept={livreurDisponible}
+          blockedReason={raisonBlocage}
         />
       ))}
 
