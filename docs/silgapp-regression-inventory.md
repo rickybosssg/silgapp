@@ -224,6 +224,15 @@ when their assertions still match current product decisions.
 
 ## Exclusive On-route Priority Safety Gate
 
+- Owner decision for 1.0.128: correction 20 is officially deferred, not a
+  blocker for releasing the validated non-exclusive production paths. Preserve
+  and report its experimental suite separately (last run 9/20 passed, 11 failed).
+  Do not remove or weaken those tests. Release checks must exercise the disabled
+  feature, including stale true configuration, read endpoints and cleanup actions.
+- Existing exclusive proposals are not accepted or displayed; experimental
+  cleanup performs no backend access. Inspect any legacy reservations read-only
+  before a separately authorized repair. Never silently redispatch real courses.
+
 - Correction 20 from origin/main d1fed9db is integrated but NOT release-ready.
 - Exclusive priority stays disabled even when a stored enable flag is true until
   a durable 15-second dispatch handoff, recovery outbox and all acceptance-path

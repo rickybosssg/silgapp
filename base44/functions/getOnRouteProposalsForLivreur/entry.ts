@@ -42,18 +42,14 @@ Deno.serve(async (req) => {
     // les réservations expirées de son pays. Cela garantit qu'une course
     // dont la fenêtre de 15s est expirée est libérée dès qu'un livreur
     // consulte l'app, sans attendre le workflow de 1 minute.
-    try {
-      const { releaseExpiredReservationsLazy } = await import('../../shared/onRoutePriorityReservation.ts');
-      await releaseExpiredReservationsLazy(base44, livreur.country_code, 5);
-    } catch (e: any) {
-      console.error('[getOnRouteProposals] lazy cleanup:', e?.message || String(e));
-    }
+    // Exclusive priority is deferred: this read must not release production courses.
 
     // ── Récupérer les propositions pending non expirées ──
     const now = new Date().toISOString();
     const proposals = await base44.asServiceRole.entities.EcoProposal.filter({
       livreur_id: livreurId,
       status: 'pending',
+      is_exclusive: { $ne: true },
       expires_at: { $gte: now },
     }, '-created_date', 10).catch(() => []);
 

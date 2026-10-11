@@ -88,6 +88,13 @@ Do not use `eject` for a read-only snapshot: the observed CLI flow creates a new
 
 Do not publish automatically to Google Play or the App Store.
 
+Correction 20 (exclusive on-route priority) is officially deferred for 1.0.128.
+Keep its experimental tests intact and report them separately; they do not block
+the owner-authorized release of validated non-exclusive paths. Production must
+fail closed even with a stale true flag. Gate reservation creation and cleanup,
+exclude exclusive proposals from driver responses, and never repair legacy
+reservations by mutating real courses without a separate controlled decision.
+
 ## Base44 to Codex integration guard
 
 SILGAPP must evolve without losing validated functionality. Before integrating

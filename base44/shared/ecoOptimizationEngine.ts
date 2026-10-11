@@ -756,6 +756,7 @@ export async function createOnRouteProposal(base44: any, courseId: string, livre
 export async function respondToOnRouteProposal(base44: any, proposalId: string, livreurId: string, response: 'accept' | 'refuse') {
   const proposal = await base44.asServiceRole.entities.EcoProposal.get(proposalId).catch(() => null);
   if (!proposal || proposal.status !== 'pending') return { success: false, reason: 'proposal_unavailable' };
+  if (proposal.is_exclusive === true) return { success: false, reason: 'exclusive_priority_disabled' };
   if (String(proposal.livreur_id) !== String(livreurId)) return { success: false, reason: 'proposal_owner_mismatch' };
 
   // ── [SÉCURITÉ] Vérification d'identité obligatoire avant acceptation de proposal ──

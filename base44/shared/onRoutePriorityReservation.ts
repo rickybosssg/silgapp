@@ -404,6 +404,7 @@ export async function releaseExpiredReservationsLazy(
   countryCode?: string,
   limit = 10,
 ): Promise<{ success: boolean; released: number; coursesReleased: number; errors?: any[] }> {
+  if (!ON_ROUTE_PRIORITY_RUNTIME_READY) return { success: true, released: 0, coursesReleased: 0 };
   const now = new Date().toISOString();
   const filter: any = {
     status: 'pending',
@@ -441,6 +442,7 @@ export async function releaseExpiredReservationsLazy(
  *    - Course Éco → reste soumise aux règles Éco (pas de conversion forcée)
  */
 export async function releaseExpiredOnRouteReservations(base44: any, limit = 50) {
+  if (!ON_ROUTE_PRIORITY_RUNTIME_READY) return { success: true, released: 0, coursesReleased: 0, reason: 'priority_disabled' };
   const now = new Date().toISOString();
   const filter: any = {
     status: 'pending',
@@ -469,6 +471,7 @@ export async function releaseExpiredOnRouteReservations(base44: any, limit = 50)
  * Reprend le dispatch normal sans attendre l'expiration.
  */
 export async function releaseReservationAfterRefusal(base44: any, courseId: string) {
+  if (!ON_ROUTE_PRIORITY_RUNTIME_READY) return { released: false, reason: 'priority_disabled' };
   const course = await base44.asServiceRole.entities.CourseExterne.get(courseId).catch(() => null);
   if (!course) return { released: false, reason: 'course_not_found' };
   if (TERMINAL_STATUSES.includes(course.statut) || course.livreur_id || course.accepted_by_livreur_id) {

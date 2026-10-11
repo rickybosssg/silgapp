@@ -21,3 +21,15 @@ assert.match(engine,/onRoutePriorityEnabled:\s*false/);
 const orchestrator=fs.readFileSync('base44/functions/courseEventOrchestrator/entry.ts','utf8');
 assert.doesNotMatch(orchestrator,/exclusive_reservation_created/);
 console.log('PASS: disabled exclusive priority performs no backend access and cannot suppress dispatch (isolated real function).');
+for (const name of ['releaseExpiredReservationsLazy','releaseExpiredOnRouteReservations','releaseReservationAfterRefusal']) {
+  const node=tree.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text===name);
+  const js=ts.transpileModule(node.getText(tree).replace('export ',''),{compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText;
+  vm.runInContext(js,context);
+  const result=await context[name](backend,'BF');
+  assert.equal(result.released===false||result.released===0,true);
+}
+assert.match(engine,/proposal\.is_exclusive === true.*exclusive_priority_disabled/);
+const reader=fs.readFileSync('base44/functions/getOnRouteProposalsForLivreur/entry.ts','utf8');
+assert.match(reader,/is_exclusive:\s*\{ \$ne: true \}/);
+assert.doesNotMatch(reader,/await releaseExpiredReservationsLazy/);
+console.log('PASS: deferred cleanup performs no writes; exclusive proposals cannot be shown or accepted.');
