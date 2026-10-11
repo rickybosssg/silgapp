@@ -625,15 +625,30 @@ export async function createOnRouteProposal(base44: any, courseId: string, livre
     }),
   });
 
-  // ── Envoyer une notification push FCM au livreur ──
+  // ── Notification au livreur (bannière in-app + push FCM) ──
   // Uniquement pour les nouvelles propositions (pas les idempotent).
-  // Utilise le système FCM existant (envoiNotificationPush).
-  // La notification inclut proposal_id dans les data pour ouvrir la bonne proposition au clic.
+  // 1. Crée un enregistrement Notification (pour la bannière in-app au retour)
+  // 2. Tente l'envoi FCM via envoiNotificationPush (non-bloquant)
   if (livreur.user_email) {
+    const notifTitle = 'SILGAPP — Livraison sur votre trajet !';
+    const notifMessage = 'Une nouvelle livraison compatible avec votre trajet est disponible. Ouvrez SILGAPP pour consulter votre gain supplémentaire.';
+    try {
+      await base44.asServiceRole.entities.Notification.create({
+        titre: notifTitle,
+        message: notifMessage,
+        type: 'on_route_proposal',
+        destinataire_email: livreur.user_email,
+        course_id: courseId,
+        lue: false,
+        deduplication_key: `ON_ROUTE_PROPOSAL_${proposal.id}`,
+      });
+    } catch (notifError: any) {
+      console.error('[createOnRouteProposal] Notification record failed:', notifError?.message || String(notifError));
+    }
     try {
       await base44.asServiceRole.functions.invoke('envoiNotificationPush', {
-        titre: 'SILGAPP — Livraison sur votre trajet !',
-        message: 'Une nouvelle livraison compatible avec votre trajet est disponible. Ouvrez SILGAPP pour consulter votre gain supplémentaire.',
+        titre: notifTitle,
+        message: notifMessage,
         type: 'on_route_proposal',
         destinataire_email: livreur.user_email,
         livreur_id: livreurId,
@@ -642,8 +657,8 @@ export async function createOnRouteProposal(base44: any, courseId: string, livre
         alert_duration_seconds: config.proposalExpirationSec,
       });
     } catch (pushError: any) {
-      // Non-bloquant : la proposition est créée même si le push échoue.
-      console.error('[createOnRouteProposal] Push notification failed:', pushError?.message || String(pushError));
+      // Non-bloquant : la notification in-app est déjà créée.
+      console.error('[createOnRouteProposal] FCM push failed:', pushError?.message || String(pushError));
     }
   }
 

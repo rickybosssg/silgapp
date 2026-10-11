@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.53';
+// Redéploiement 2026-10-11 — notification push pour propositions sur trajet
 import {
   acceptEcoMission,
   cleanupStuckEcoMissions,
