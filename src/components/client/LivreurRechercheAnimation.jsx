@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
@@ -32,6 +32,12 @@ export default function LivreurRechercheAnimation({ course, onRelancer }) {
   const [currentMessage, setCurrentMessage] = useState(0);
   const [aucunLivreur, setAucunLivreur] = useState(false);
 
+  const openCourseTracking = useCallback((targetCourse = course) => {
+    navigate("/client/suivi", {
+      state: { course_id: targetCourse?.id || course?.id },
+    });
+  }, [navigate, course]);
+
   const handleAjouterAutre = () => {
     // Réinitialiser le brouillon pour une nouvelle course fraîche
     try {
@@ -63,13 +69,13 @@ export default function LivreurRechercheAnimation({ course, onRelancer }) {
     if (!courseData) return;
     // Rediriger si un livreur a accepté
     if (courseData.statut === "livreur_en_route" || courseData.dispatch_status === "accepte") {
-      navigate("/client/suivi");
+      openCourseTracking(courseData);
     }
     // Fermée automatiquement après 4 min sans livreur → afficher l'écran "Aucun livreur"
     if (courseData.statut === "annulee" && courseData.dispatch_status === "expire") {
       setAucunLivreur(true);
     }
-  }, [courseData, navigate]);
+  }, [courseData, openCourseTracking]);
 
   const liveCourse = courseData || course;
   const hasPrixManuel =
@@ -137,7 +143,7 @@ export default function LivreurRechercheAnimation({ course, onRelancer }) {
           <PrixManuelInlineCard
             course={liveCourse}
             devise={liveCourse.devise || "FCFA"}
-            onAccepted={() => navigate("/client/suivi")}
+            onAccepted={() => openCourseTracking(liveCourse)}
             onRefused={() => { /* le polling reprendra automatiquement */ }}
             onAnnuler={() => setShowAnnulerDialog(true)}
           />
@@ -193,7 +199,9 @@ export default function LivreurRechercheAnimation({ course, onRelancer }) {
               </div>
               <div className="flex-1">
                 <p className="text-xs text-muted-foreground uppercase font-semibold">Tarif</p>
-                <p className="font-bold text-primary text-sm">Calculé à la livraison selon le tarif local</p>
+                <p className="font-bold text-primary text-sm">
+                  Prix proposé par le client, conservé à la livraison
+                </p>
               </div>
             </div>
           </div>
@@ -219,7 +227,7 @@ export default function LivreurRechercheAnimation({ course, onRelancer }) {
           <div className="space-y-2">
             <Button
               className="w-full bg-primary text-white hover:bg-primary/90"
-              onClick={() => navigate("/client/suivi")}
+              onClick={() => openCourseTracking(liveCourse)}
             >
               <Eye className="w-4 h-4 mr-2" />
               Suivre ma course

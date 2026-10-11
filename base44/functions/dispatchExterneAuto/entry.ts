@@ -242,6 +242,26 @@ export default async function(req) {
         return Response.json({ success: true, blocked: true, reason: 'client_decision_attendue' });
       }
 
+      // [ECO] Une course Éco isolée reste en attente de regroupement.
+      // Ce garde protège tous les chemins de lancement (V2, fallback V1, automation,
+      // retry manuel) afin qu'elle ne devienne jamais une course Standard acceptable
+      // avant regroupement ou conversion différée explicite.
+      if (course.delivery_mode === 'eco' && course.eco_status === 'isolated') {
+        await base44.asServiceRole.functions.invoke('ecoOptimizationOrchestrator', {
+          action: 'process_course_created',
+          course_id,
+        }).catch((error: any) => {
+          console.warn('[DISPATCH] ⚠️ Eco optimisation trigger failed:', error?.message || String(error));
+          return null;
+        });
+        return Response.json({
+          success: true,
+          blocked: true,
+          eco_isolated: true,
+          reason: 'eco_isolated_pending_grouping',
+        });
+      }
+
       // ── V2 : publier dans le fil de courses disponibles ──
       // RÈGLE MÉTIER (2026-08-14) :
       //   T=0  : course visible dans le fil par tous les livreurs éligibles

@@ -5,6 +5,7 @@ import { Save, Loader2, Users, Clock, Info, Flame, ChevronRight, MapPin } from "
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import DispatchWaveConfigPanel from "@/components/admin/DispatchWaveConfigPanel";
+import { useAdminContext } from "@/hooks/useAdminContext";
 
 const NB_OPTIONS = [
   { value: "1", label: "1 livreur", desc: "Attribution séquentielle classique" },
@@ -21,12 +22,28 @@ const TIMEOUT_OPTIONS = [
 ];
 
 export default function DispatchConfigPanel() {
+  const { selectedCountry } = useAdminContext();
   const [nbLivreurs, setNbLivreurs] = useState("3");
   const [timeoutSec, setTimeoutSec] = useState("60");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [v2Enabled, setV2Enabled] = useState(true);
   const [v2Saving, setV2Saving] = useState(false);
+  const [ecoSettings, setEcoSettings] = useState({
+    enabled: false,
+    groupingEnabled: false,
+    onRouteEnabled: false,
+    emergencyStop: false,
+    convertDelayMin: 45,
+    maxCoursesPerMission: 2,
+    proposalExpirationSec: 300,
+    maxDetourKm: 6,
+    minDriverGain: 0,
+  });
+  const [ecoSaving, setEcoSaving] = useState(false);
+
+  const activeCountry = String(selectedCountry || "BF").toUpperCase();
+  const ecoKey = (name) => `ECO:${activeCountry}:${name}`;
 
   useEffect(() => {
     const load = async () => {
@@ -47,6 +64,78 @@ export default function DispatchConfigPanel() {
     };
     load();
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadEco = async () => {
+      const keys = [
+        "ENABLED",
+        "GROUPING_ENABLED",
+        "ON_ROUTE_ENABLED",
+        "EMERGENCY_STOP",
+        "CONVERT_DELAY_MIN",
+        "MAX_COURSES_PER_MISSION",
+        "PROPOSAL_EXPIRATION_SEC",
+        "MAX_DETOUR_KM",
+        "MIN_DRIVER_GAIN",
+      ].map(ecoKey);
+      try {
+        const rows = await base44.entities.AppConfig.filter({ cle: { $in: keys } }, undefined, 20);
+        if (cancelled) return;
+        const map = new Map((rows || []).map((row) => [row.cle, row.valeur]));
+        setEcoSettings({
+          enabled: String(map.get(ecoKey("ENABLED")) || "false") === "true",
+          groupingEnabled: String(map.get(ecoKey("GROUPING_ENABLED")) || "false") === "true",
+          onRouteEnabled: String(map.get(ecoKey("ON_ROUTE_ENABLED")) || "false") === "true",
+          emergencyStop: String(map.get(ecoKey("EMERGENCY_STOP")) || "false") === "true",
+          convertDelayMin: Number(map.get(ecoKey("CONVERT_DELAY_MIN"))) || 45,
+          maxCoursesPerMission: Number(map.get(ecoKey("MAX_COURSES_PER_MISSION"))) || 2,
+          proposalExpirationSec: Number(map.get(ecoKey("PROPOSAL_EXPIRATION_SEC"))) || 300,
+          maxDetourKm: Number(map.get(ecoKey("MAX_DETOUR_KM"))) || 6,
+          minDriverGain: Number(map.get(ecoKey("MIN_DRIVER_GAIN"))) || 0,
+        });
+      } catch (error) {
+        console.error("Erreur chargement config Eco:", error);
+      }
+    };
+    loadEco();
+    return () => { cancelled = true; };
+  }, [activeCountry]);
+
+  const saveEcoConfig = async () => {
+    setEcoSaving(true);
+    try {
+      const values = {
+        ENABLED: ecoSettings.enabled ? "true" : "false",
+        GROUPING_ENABLED: ecoSettings.groupingEnabled ? "true" : "false",
+        ON_ROUTE_ENABLED: ecoSettings.onRouteEnabled ? "true" : "false",
+        EMERGENCY_STOP: ecoSettings.emergencyStop ? "true" : "false",
+        CONVERT_DELAY_MIN: String(Math.max(1, Number(ecoSettings.convertDelayMin) || 45)),
+        MAX_COURSES_PER_MISSION: String(Math.max(2, Number(ecoSettings.maxCoursesPerMission) || 2)),
+        PROPOSAL_EXPIRATION_SEC: String(Math.max(60, Number(ecoSettings.proposalExpirationSec) || 300)),
+        MAX_DETOUR_KM: String(Math.max(0, Number(ecoSettings.maxDetourKm) || 6)),
+        MIN_DRIVER_GAIN: String(Math.max(0, Number(ecoSettings.minDriverGain) || 0)),
+      };
+      for (const [name, value] of Object.entries(values)) {
+        const cle = ecoKey(name);
+        const existing = await base44.entities.AppConfig.filter({ cle }, undefined, 1);
+        if (existing?.[0]?.id) {
+          await base44.entities.AppConfig.update(existing[0].id, { valeur: value });
+        } else {
+          await base44.entities.AppConfig.create({
+            cle,
+            valeur: value,
+            description: `SILGAPP Eco V1 ${name} (${activeCountry})`,
+          });
+        }
+      }
+      toast.success(`Configuration SILGAPP Eco sauvegardée pour ${activeCountry}`);
+    } catch (error) {
+      toast.error("Erreur sauvegarde Eco: " + (error?.message || "inconnue"));
+    } finally {
+      setEcoSaving(false);
+    }
+  };
 
   const handleToggleV2 = async (enabled) => {
     setV2Saving(true);
@@ -276,6 +365,101 @@ export default function DispatchConfigPanel() {
         {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
         {saving ? "Sauvegarde..." : "Sauvegarder la configuration"}
       </Button>
+
+      <div className="border-t border-gray-200 pt-5 mt-5 space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="font-black text-sm text-emerald-700">SILGAPP Eco V1</p>
+            <p className="text-[11px] text-muted-foreground">
+              Pays {activeCountry}. Interrupteurs OFF par défaut, sans impact sur les courses Standard.
+            </p>
+          </div>
+          {ecoSaving && <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />}
+        </div>
+
+        {[
+          ["enabled", "Activer SILGAPP Eco", "Permet aux formulaires de proposer Standard/Eco."],
+          ["groupingEnabled", "Regroupement automatique", "Retient les courses Eco isolées pour chercher une mission de 2 courses."],
+          ["onRouteEnabled", "Optimisation sur trajet", "Autorise les propositions sur itinéraire et proches de la destination."],
+          ["emergencyStop", "Arrêt d'urgence", "Désactive immédiatement le moteur Eco et invalide les nouvelles propositions."],
+        ].map(([field, label, desc]) => (
+          <button
+            key={field}
+            type="button"
+            onClick={() => setEcoSettings((prev) => ({ ...prev, [field]: !prev[field] }))}
+            className={`w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-all ${
+              ecoSettings[field] ? "border-emerald-400 bg-emerald-50" : "border-gray-200 bg-white"
+            }`}
+          >
+            <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+              ecoSettings[field] ? "border-emerald-500" : "border-gray-300"
+            }`}>
+              {ecoSettings[field] && <div className="w-2 h-2 rounded-full bg-emerald-500" />}
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-bold">{label}</p>
+              <p className="text-xs text-muted-foreground">{desc}</p>
+            </div>
+          </button>
+        ))}
+
+        <div className="grid grid-cols-2 gap-3">
+          <label className="space-y-1">
+            <span className="text-xs font-bold text-gray-600">Conversion Eco → Standard</span>
+            <input
+              type="number"
+              min="1"
+              value={ecoSettings.convertDelayMin}
+              onChange={(e) => setEcoSettings((prev) => ({ ...prev, convertDelayMin: e.target.value }))}
+              className="w-full h-10 rounded-lg border border-gray-200 px-3 text-sm font-bold"
+            />
+            <span className="block text-[10px] text-gray-500">minutes, défaut 45</span>
+          </label>
+          <label className="space-y-1">
+            <span className="text-xs font-bold text-gray-600">Max courses/mission</span>
+            <input
+              type="number"
+              min="2"
+              value={ecoSettings.maxCoursesPerMission}
+              onChange={(e) => setEcoSettings((prev) => ({ ...prev, maxCoursesPerMission: e.target.value }))}
+              className="w-full h-10 rounded-lg border border-gray-200 px-3 text-sm font-bold"
+            />
+            <span className="block text-[10px] text-gray-500">V1: 2 par défaut</span>
+          </label>
+          <label className="space-y-1">
+            <span className="text-xs font-bold text-gray-600">Expiration proposition</span>
+            <input
+              type="number"
+              min="15"
+              value={ecoSettings.proposalExpirationSec}
+              onChange={(e) => setEcoSettings((prev) => ({ ...prev, proposalExpirationSec: e.target.value }))}
+              className="w-full h-10 rounded-lg border border-gray-200 px-3 text-sm font-bold"
+            />
+            <span className="block text-[10px] text-gray-500">secondes, défaut 300 (5 min)</span>
+          </label>
+          <label className="space-y-1">
+            <span className="text-xs font-bold text-gray-600">Détour max</span>
+            <input
+              type="number"
+              min="0"
+              value={ecoSettings.maxDetourKm}
+              onChange={(e) => setEcoSettings((prev) => ({ ...prev, maxDetourKm: e.target.value }))}
+              className="w-full h-10 rounded-lg border border-gray-200 px-3 text-sm font-bold"
+            />
+            <span className="block text-[10px] text-gray-500">km, préfiltrage avant ORS</span>
+          </label>
+        </div>
+
+        <Button
+          onClick={saveEcoConfig}
+          disabled={ecoSaving}
+          variant="outline"
+          className="w-full h-11 rounded-xl gap-2 font-bold border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+        >
+          {ecoSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+          Sauvegarder SILGAPP Eco
+        </Button>
+      </div>
 
       {/* Séparateur vagues GPS */}
       <div className="border-t border-gray-200 pt-5 mt-5">

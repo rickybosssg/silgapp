@@ -1777,6 +1777,11 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
                   queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
                   queryClient.invalidateQueries({ queryKey: ["eco-mission-active"] });
                 }}
+                onDeliveryConfirmed={(courseId) => {
+                  if (celebratedCourseIdsRef.current.has(courseId)) return;
+                  celebratedCourseIdsRef.current.add(courseId);
+                  setVictoryCourseId(courseId);
+                }}
               />
             )}
 
@@ -1916,7 +1921,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       </div>
     </div>
 
-      {/* ── Animation de victoire livreur — 3 secondes, purement visuelle ── */}
+      {/* ── Animation de victoire livreur — ~9 secondes, purement visuelle ── */}
       <LivreurVictoryOverlay
         courseId={victoryCourseId}
         onClose={() => {
