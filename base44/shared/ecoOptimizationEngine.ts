@@ -1058,10 +1058,16 @@ export async function updateEcoMissionRouteProgress(base44: any, courseId: strin
 // Appelée par annulerCourseExterne à la place de completeEcoMissionIfNeeded.
 // completeEcoMissionIfNeeded reste utilisée par finaliserLivraisonLivreur (cas nominal).
 export async function recalculateEcoMissionAfterCancellation(base44: any, courseId: string) {
-  const course = await base44.asServiceRole.entities.CourseExterne.get(courseId).catch(() => null);
+  const course = await base44.asServiceRole.entities.CourseExterne.get(courseId);
   if (!course?.eco_mission_id) return { recalculated: false, reason: 'no_mission' };
 
-  const mission = await base44.asServiceRole.entities.EcoMission.get(course.eco_mission_id).catch(() => null);
+  const mission = await base44.asServiceRole.entities.EcoMission.get(course.eco_mission_id);
+  if (mission && ['cancelled', 'invalidated'].includes(mission.status) &&
+      !mission.course_ids?.includes(courseId) && !course.heure_recuperation &&
+      (course.statut === 'annulee' || course.client_decision_attendue === true)) {
+    await base44.asServiceRole.entities.CourseExterne.update(courseId, { eco_mission_id: null });
+    return { recalculated: true, reason: 'detach_recovered', mission_id: mission.id };
+  }
   if (!mission || ['completed', 'cancelled', 'invalidated'].includes(mission.status)) {
     return { recalculated: false, reason: 'mission_terminal' };
   }
@@ -1070,14 +1076,19 @@ export async function recalculateEcoMissionAfterCancellation(base44: any, course
   if (courseIds.length === 0) return { recalculated: false, reason: 'no_courses' };
 
   const courses = await Promise.all(
-    courseIds.map((id: string) => base44.asServiceRole.entities.CourseExterne.get(id).catch(() => null))
+    courseIds.map((id: string) => base44.asServiceRole.entities.CourseExterne.get(id))
   );
+  if (courses.some((c: any) => !c)) throw new Error('eco_cancellation_courses_read_failed');
 
   // ── Déterminer si la course annulée a été récupérée avant l'annulation ──
   // On ne peut PAS utiliser le statut (déjà changé en 'annulee' ou 'en_attente'
   // par annulerCourseExterne avant l'appel de cette fonction).
   // On utilise heure_recuperation : si elle est définie, le colis a été récupéré.
   const cancelledCourse = courses.find((c: any) => c && c.id === courseId);
+  if (!cancelledCourse || (cancelledCourse.statut !== 'annulee' &&
+      cancelledCourse.statut !== 'en_attente' && !cancelledCourse.client_decision_attendue)) {
+    return { recalculated: false, reason: 'course_not_cancelled' };
+  }
   const wasPickedUp = !!(cancelledCourse?.heure_recuperation);
 
   // ── Classifier les courses ──
@@ -1097,8 +1108,9 @@ export async function recalculateEcoMissionAfterCancellation(base44: any, course
   try {
     routePlan = mission.route_plan_json ? JSON.parse(mission.route_plan_json) : [];
   } catch {
-    routePlan = [];
+    throw new Error('eco_cancellation_invalid_route_plan');
   }
+  if (!Array.isArray(routePlan)) throw new Error('eco_cancellation_invalid_route_plan');
 
   let routeUpdated = false;
 
@@ -1108,14 +1120,14 @@ export async function recalculateEcoMissionAfterCancellation(base44: any, course
     const c = courses.find((co: any) => co && co.id === step.course_id);
     if (!c) continue;
 
-    const isTerminal = c.statut === 'livree' || c.statut === 'annulee';
-    const isSuspended = c.statut === 'en_attente' || c.client_decision_attendue === true;
+    const isTerminal = c.statut === 'livree';
+    const isSuspended = c.statut === 'annulee' || c.statut === 'en_attente' || c.client_decision_attendue === true;
 
     if (isTerminal && step.status !== 'completed') {
       step.status = 'completed';
       routeUpdated = true;
     }
-    if (isSuspended && step.status !== 'cancelled') {
+    if (isSuspended && step.status !== 'cancelled' && step.status !== 'completed') {
       step.status = 'cancelled';
       routeUpdated = true;
     }
@@ -1126,9 +1138,6 @@ export async function recalculateEcoMissionAfterCancellation(base44: any, course
   let courseRemoved = false;
   if (!wasPickedUp && cancelledCourse) {
     updatedCourseIds = courseIds.filter((id: string) => id !== courseId);
-    await base44.asServiceRole.entities.CourseExterne.update(courseId, {
-      eco_mission_id: null,
-    }).catch(() => null);
     // Retirer ses étapes du route plan
     const beforeLen = routePlan.length;
     routePlan = routePlan.filter((step: any) => step?.course_id !== courseId);
@@ -1137,12 +1146,10 @@ export async function recalculateEcoMissionAfterCancellation(base44: any, course
   }
 
   // ── Recalculer active_step_index ──
-  const firstPendingStep = routePlan.find((s: any) =>
+  const pendingIndex = routePlan.findIndex((s: any) =>
     s && s.status !== 'completed' && s.status !== 'cancelled'
   );
-  const newActiveStepIndex = firstPendingStep
-    ? Math.max(0, (Number(firstPendingStep.order) || 1) - 1)
-    : routePlan.length;
+  const newActiveStepIndex = pendingIndex < 0 ? routePlan.length : pendingIndex;
 
   // ── Déterminer le statut de la mission ──
   let newStatus = mission.status;
@@ -1158,7 +1165,7 @@ export async function recalculateEcoMissionAfterCancellation(base44: any, course
       // Des courses sont suspendues (en_attente) → annuler la mission
       newStatus = 'cancelled';
     }
-    livreurLibere = true;
+    livreurLibere = !courses.some((c: any) => c.heure_recuperation && c.statut !== 'livree');
   } else if (activeCourses.length === 1) {
     // Une seule course active → invalider la mission
     // Le frontend affichera la course restante via CourseActiveCard (vue individuelle)
@@ -1173,9 +1180,22 @@ export async function recalculateEcoMissionAfterCancellation(base44: any, course
   if (mission.active_step_index !== newActiveStepIndex) updateData.active_step_index = newActiveStepIndex;
   if (updatedCourseIds.length !== courseIds.length) updateData.course_ids = updatedCourseIds;
   if (newStatus !== mission.status) updateData.status = newStatus;
+  if (!mission.livreur_id && newStatus === 'invalidated') updateData.locked_at = new Date().toISOString();
 
   if (Object.keys(updateData).length > 0) {
-    await base44.asServiceRole.entities.EcoMission.update(mission.id, updateData).catch(() => null);
+    const write = await base44.asServiceRole.entities.EcoMission.updateMany({
+      id: mission.id, status: mission.status, route_plan_json: mission.route_plan_json,
+      course_ids: mission.course_ids,
+    }, { $set: updateData });
+    if (write?.updated !== 1) throw new Error('eco_cancellation_mission_changed_retry');
+  }
+  // Publish the coherent mission state before detaching. A failed detach is retryable.
+  if (courseRemoved) {
+    await base44.asServiceRole.entities.CourseExterne.update(courseId, { eco_mission_id: null });
+  }
+  // A pre-acceptance cancellation must not strand the unassigned survivor as grouped.
+  if (!mission.livreur_id && newStatus === 'invalidated') {
+    if (!await releaseEcoCandidate(base44, mission)) throw new Error('eco_cancellation_survivor_changed_retry');
   }
 
   // ── Si la mission devient terminale → libérer le livreur si pas d'autre course active ──
@@ -1184,8 +1204,8 @@ export async function recalculateEcoMissionAfterCancellation(base44: any, course
       'arrive_prise_en_charge', 'colis_recupere', 'passager_embarque',
       'pris_en_charge', 'en_livraison', 'arrivee'];
     const autresCourses = await base44.asServiceRole.entities.CourseExterne.filter(
-      { livreur_id: mission.livreur_id }, '-created_date', 10
-    ).catch(() => []);
+      { livreur_id: mission.livreur_id, statut: { $in: STATUTS_ACTIFS } }, '-created_date', 1
+    );
     const aAutreCourseActive = (autresCourses || []).some((c: any) =>
       c.id !== courseId && STATUTS_ACTIFS.includes(c.statut)
     );

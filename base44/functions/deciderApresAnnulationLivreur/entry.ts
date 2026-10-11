@@ -84,6 +84,9 @@ Deno.serve(async (req) => {
 
     // ── Action 1 : Chercher un autre livreur (redispatch) ──
     if (action === "chercher_autre_livreur") {
+      if (course.eco_mission_id && course.heure_recuperation) {
+        return Response.json({ success: false, error: "Colis deja recupere : intervention administrateur requise" }, { status: 409 });
+      }
       const updateData = {
         client_decision_attendue: false,
         client_decision_at: now,

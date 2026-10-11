@@ -1,5 +1,27 @@
 # SILGAPP Regression Inventory
 
+## Corrections 18 And 19
+
+Base44 origin/main f481f1ec integrated without replacing Codex changes. Active
+on-route proposals exclude their courses from the ordinary waiting modal.
+Push and EcoProposal realtime invalidate the query; 15-second polling remains
+fallback. SDK data extraction from correction 17 stays in place.
+
+Cancellation recalculates mission membership and remaining steps. Preserve
+pickup timestamps, completed steps, prices, commissions and independent history.
+Never redispatch a collected Eco parcel: require administrator intervention.
+Do not release the driver while another parcel remains active. Mission realtime
+invalidates the active mission query to restore CourseActiveCard after reduction
+to one active course. A pre-acceptance survivor returns to isolated via the
+existing candidate compensation path. Conditional single-mission writes and
+retryable detachment are not a multi-entity transaction guarantee.
+
+Protection: 27 incoming simulated assertions (on-route-proposals-regression and
+eco-mission-cancellation-regression), plus eco-cancellation-runtime-regression
+executing the real recalculation with fault-injected adapters. Live cancellation,
+concurrency and FCM still require controlled test data; do not claim them PASS
+from source re-reading or mock execution alone.
+
 ## Correction 17 - SDK Proposal Responses
 
 Integrated origin/main 9135d80b: unwrap SDK data in useOnRouteProposals and

@@ -91,16 +91,19 @@ Deno.serve(async (req) => {
     if (livreurId) {
       const livreur = await asService.entities.Livreur.get(livreurId).catch(() => null);
       if (livreur) {
-        await asService.entities.Livreur.update(livreurId, {
-          statut: livreur.manual_hors_ligne === true ? "hors_ligne" : "disponible",
-        });
-        livreurLibere = true;
+        // Eco recalculation releases the driver only after checking the other parcels.
+        if (!course.eco_mission_id) {
+          await asService.entities.Livreur.update(livreurId, {
+            statut: livreur.manual_hors_ligne === true ? "hors_ligne" : "disponible",
+          });
+          livreurLibere = true;
+        }
 
         // Notification au livreur
         if (livreur.user_email) {
           await asService.entities.Notification.create({
             titre: "ℹ Course annulée",
-            message: `La course #${course_id.slice(-8)} a été annulée. ${source === "livreur" ? "Vous êtes maintenant disponible." : ""}`,
+            message: `La course #${course_id.slice(-8)} a été annulée. ${source === "livreur" && livreurLibere ? "Vous êtes maintenant disponible." : ""}`,
             type: "course_annulee",
             course_id,
             destinataire_email: livreur.user_email,
@@ -208,12 +211,12 @@ Deno.serve(async (req) => {
         dispatch_notified_ids: "[]",
         dispatch_refused_ids: JSON.stringify(refusedIds),
         heure_acceptation: null,
-        heure_recuperation: null,
+        heure_recuperation: course.eco_mission_id ? course.heure_recuperation : null,
         heure_livraison: null,
         timeout_expires_at: null,
         heure_sollicitation: null,
-        pickup_confirmed_by: null,
-        pickup_confirmed_at: null,
+        pickup_confirmed_by: course.eco_mission_id ? course.pickup_confirmed_by : null,
+        pickup_confirmed_at: course.eco_mission_id ? course.pickup_confirmed_at : null,
         delivery_confirmed_by: null,
         delivery_confirmed_at: null,
         accepted_by_livreur_id: null,

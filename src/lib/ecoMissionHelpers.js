@@ -59,12 +59,11 @@ export function computeActiveStepIndex(routePlan = [], courses = []) {
     const step = routePlan[i];
     const course = courseMap.get(step.course_id);
     if (!course) continue;
-    if (course.statut === "annulee") continue;
 
     // ── Correction 19 : Ignorer les courses annulées ou suspendues (en_attente) ──
     // Une course annulée ou retournée au dispatch ne doit plus bloquer l'index actif.
     // Ses étapes sont sautées entièrement (pickup ET delivery).
-    if (course.statut === "annulee" || course.statut === "en_attente") continue;
+    if (course.statut === "annulee" || course.statut === "en_attente" || course.client_decision_attendue) continue;
 
     if (step.type === "pickup") {
       // Pickup non fait si la course n'est pas encore à colis_recupere ou au-delà

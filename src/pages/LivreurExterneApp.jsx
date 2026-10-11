@@ -990,6 +990,16 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     return new Set(activeEcoMission.course_ids);
   }, [activeEcoMission]);
 
+  useEffect(() => {
+    if (!activeEcoMissionId) return;
+    const unsubscribe = base44.entities.EcoMission?.subscribe?.((event) => {
+      if (event?.data?.id !== activeEcoMissionId) return;
+      queryClient.invalidateQueries({ queryKey: ["eco-mission-active", activeEcoMissionId] });
+      queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+    });
+    return () => { if (typeof unsubscribe === "function") unsubscribe(); };
+  }, [activeEcoMissionId, queryClient]);
+
   // ─── Propositions "sur trajet" : hook déplacé plus haut (avant courseEnAttente) ──
   // onRouteProposals est défini à la ligne ~870, avant courseEnAttente, pour
   // permettre l'exclusion des courses avec proposition active de la modale V1.
