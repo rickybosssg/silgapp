@@ -12,6 +12,7 @@ import {
   triggerOnRouteProposalsForNewCourse,
   updateEcoMissionRouteProgress,
 } from '../../shared/ecoOptimizationEngine.ts';
+import { releaseExpiredOnRouteReservations, releaseExpiredReservationsLazy } from '../../shared/onRoutePriorityReservation.ts';
 
 Deno.serve(async (req) => {
   try {
@@ -49,8 +50,14 @@ Deno.serve(async (req) => {
     if (action === 'trigger_on_route_proposals') {
       return Response.json(await triggerOnRouteProposalsForNewCourse(base44, body.course_id));
     }
+    if (action === 'release_expired_reservations') {
+      return Response.json(await releaseExpiredOnRouteReservations(base44, body.limit || 50));
+    }
+    if (action === 'release_expired_reservations_lazy') {
+      return Response.json(await releaseExpiredReservationsLazy(base44, body.country_code, body.limit || 10));
+    }
 
-    return Response.json({ success: true, service: 'ecoOptimizationOrchestrator', actions: ['course_created', 'convert_due', 'expire_proposals', 'invalidate_pending', 'create_on_route_proposal', 'respond_proposal', 'accept_eco_mission', 'cleanup_stuck_missions', 'update_route_progress', 'trigger_on_route_proposals'] });
+    return Response.json({ success: true, service: 'ecoOptimizationOrchestrator', actions: ['course_created', 'convert_due', 'expire_proposals', 'invalidate_pending', 'create_on_route_proposal', 'respond_proposal', 'accept_eco_mission', 'cleanup_stuck_missions', 'update_route_progress', 'trigger_on_route_proposals', 'release_expired_reservations', 'release_expired_reservations_lazy'] });
   } catch (error) {
     console.error('[EcoOrchestrator] Fatal:', error?.message || String(error));
     return Response.json({ success: false, error: error?.message || String(error) }, { status: 500 });
