@@ -245,7 +245,7 @@ test('14 — buildLivreurCityFilter : flag ON → filtre ville', async () => {
   const course = { country_code: 'BF', ville_depart: 'Ouagadougou', gps_depart_lat: 12.37, gps_depart_lng: -1.52 };
   const filter = await buildLivreurCityFilter(base44, course);
   assert.ok(filter.ville, 'Doit avoir un filtre ville');
-  assert.ok(filter.ville.$regex, 'Le filtre doit être un $regex');
+  assert.ok(filter.ville.$in || filter.ville.$regex, 'Filtre ville présent ($in ou $regex)');
   invalidateCityFlagCache('BF');
 });
 

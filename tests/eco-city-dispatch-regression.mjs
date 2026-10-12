@@ -309,8 +309,9 @@ test('8. Basculement OFF → restrictions cessent immédiatement (cache 30s)', a
   assert.strictEqual(beforeToggle, true, 'Flag ON avant bascule');
   // Invalider le cache (simule la désactivation)
   invalidateCityFlagCache('BF');
-  // Maintenant le mock ne renvoie plus la config → flag OFF
-  mockSdk.asServiceRole.entities.AppConfig.filter = async () => [];
+  try { const { invalidateOperationalCityCache } = await import('../base44/shared/operationalZones.ts'); invalidateOperationalCityCache('BF'); } catch {}
+  // Maintenant le mock ne renvoie plus de villes activées → flag OFF
+  mockSdk.asServiceRole.entities.OperationalCity.filter = async () => [];
   const afterToggle = await isCityDispatchEnabled(mockSdk, 'BF');
   assert.strictEqual(afterToggle, false, 'Flag OFF après bascule (cache invalidé)');
 });
@@ -502,8 +503,9 @@ test('24. invalidateCityFlagCache → cache vidé immédiatement', async () => {
   assert.strictEqual(before, true, 'Cache chargé');
   // Invalider
   invalidateCityFlagCache('BF');
-  // Le mock ne renvoie plus la config → flag OFF
-  mockSdk.asServiceRole.entities.AppConfig.filter = async () => [];
+  try { const { invalidateOperationalCityCache } = await import('../base44/shared/operationalZones.ts'); invalidateOperationalCityCache('BF'); } catch {}
+  // Le mock ne renvoie plus de villes activées → flag OFF
+  mockSdk.asServiceRole.entities.OperationalCity.filter = async () => [];
   const after = await isCityDispatchEnabled(mockSdk, 'BF');
   assert.strictEqual(after, false, 'Cache vidé → flag OFF lu depuis DB');
 });
