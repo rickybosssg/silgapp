@@ -689,6 +689,17 @@ export async function respondToOnRouteProposal(base44: any, proposalId: string, 
     if (!identityCheck.verified) {
       return { success: false, reason: 'identity_mismatch', error: identityCheck.error || 'Vérification d\'identité échouée' };
     }
+    // ── [CITY DISPATCH] Vérification de compatibilité ville avant acceptation ──
+    // Une proposition sur trajet d'une autre ville ne peut pas être acceptée
+    // lorsque le filtrage par ville est activé. Défense en profondeur backend.
+    const proposalCourse = await base44.asServiceRole.entities.CourseExterne.get(proposal.course_id).catch(() => null);
+    if (proposalCourse) {
+      const { verifyCityCompatibility } = await import('./cityDispatchFilter.ts');
+      const cityCheck = await verifyCityCompatibility(base44, proposalCourse, identityCheck.livreur);
+      if (!cityCheck.compatible) {
+        return { success: false, reason: 'city_mismatch', courseCity: cityCheck.courseCity, livreurCity: cityCheck.livreurCity };
+      }
+    }
   }
   if (proposal.expires_at && new Date(proposal.expires_at) < new Date()) {
     await base44.asServiceRole.entities.EcoProposal.update(proposal.id, { status: 'expired', responded_at: new Date().toISOString() }).catch(() => null);
@@ -1334,6 +1345,20 @@ export async function acceptEcoMission(base44: any, missionId: string, livreurId
       livreur.statut !== 'disponible' || livreur.manual_hors_ligne === true ||
       livreur.admin_hors_ligne === true || livreur.bloque_encours === true) {
     return { success: false, reason: 'livreur_indisponible' };
+  }
+
+  // ── [CITY DISPATCH] Vérification de compatibilité ville avant acceptation ──
+  // Une mission Éco de Ouagadougou ne peut pas être acceptée par un livreur de Bobo-Dioulasso
+  // lorsque le filtrage par ville est activé. Défense en profondeur backend.
+  const { verifyCityCompatibility } = await import('./cityDispatchFilter.ts');
+  const firstCourse = await base44.asServiceRole.entities.CourseExterne.get(
+    (Array.isArray(mission.course_ids) ? mission.course_ids : [])[0]
+  ).catch(() => null);
+  if (firstCourse) {
+    const cityCheck = await verifyCityCompatibility(base44, firstCourse, livreur);
+    if (!cityCheck.compatible) {
+      return { success: false, reason: 'city_mismatch', courseCity: cityCheck.courseCity, livreurCity: cityCheck.livreurCity };
+    }
   }
 
   const courseIds = Array.isArray(mission.course_ids) ? mission.course_ids : [];

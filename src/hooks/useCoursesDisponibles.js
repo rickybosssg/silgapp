@@ -141,8 +141,11 @@ export function useCoursesDisponibles(livreurProfil) {
   });
 
   // ── Missions Eco disponibles ──
+  // [CITY_DISPATCH] Si le filtrage par ville est ON, les missions Éco sont filtrées
+  // par ville_depart de leurs courses. Une mission de Ouaga n'est pas visible
+  // par un livreur de Bobo. Si OFF → toutes les missions du pays sont visibles.
   const { data: ecoMissions = [] } = useQuery({
-    queryKey: ["eco-missions-available", livreurId, countryCode],
+    queryKey: ["eco-missions-available", livreurId, countryCode, livreurVille, cityDispatchEnabled],
     queryFn: async () => {
       if (!countryCode) return [];
       const missions = await base44.entities.EcoMission.filter({
@@ -150,7 +153,31 @@ export function useCoursesDisponibles(livreurProfil) {
         enterprise_id: null,
         status: 'available',
       }, '-created_date', 20);
-      return missions || [];
+      if (!missions || missions.length === 0) return [];
+
+      // [CITY_DISPATCH] Filtrage par ville si le flag est ON
+      if (cityDispatchEnabled && livreurVille) {
+        const allCourseIds = missions.flatMap(m => m.course_ids || []);
+        if (allCourseIds.length === 0) return missions;
+        const courses = await base44.entities.CourseExterne.filter({
+          id: { $in: allCourseIds },
+          country_code: countryCode,
+        }, undefined, allCourseIds.length);
+        const courseMap = new Map();
+        for (const c of courses || []) courseMap.set(c.id, c);
+        const livreurVilleNorm = livreurVille.toLowerCase().trim();
+        return missions.filter(mission => {
+          const courseIds = mission.course_ids || [];
+          return courseIds.some(cid => {
+            const course = courseMap.get(cid);
+            if (!course) return false;
+            const courseCity = (course.ville_depart || '').toLowerCase().trim();
+            return courseCity && courseCity.includes(livreurVilleNorm);
+          });
+        });
+      }
+
+      return missions;
     },
     enabled: !!livreurId && !!countryCode && livreurPeutVoirFil,
     refetchInterval: 10000,

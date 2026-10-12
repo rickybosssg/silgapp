@@ -14,7 +14,7 @@
 import { haversineKm } from './geoUtils.ts';
 
 const CITY_FLAG_PREFIX = 'CITY_DISPATCH_ENABLED';
-const CITY_FLAG_CACHE_TTL_MS = 2 * 60 * 1000; // 2 min
+const CITY_FLAG_CACHE_TTL_MS = 30 * 1000; // 30 sec — délai court pour désactivation immédiate
 const QUARTIER_CACHE_TTL_MS = 10 * 60 * 1000; // 10 min
 
 // ── Seuils de sécurité pour la détection automatique de ville ──
