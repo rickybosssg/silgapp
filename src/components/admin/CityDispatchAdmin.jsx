@@ -4,9 +4,10 @@ import { useQuery } from '@tanstack/react-query';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { MapPin, Users, Package, Bike, TrendingUp, Activity, Clock, AlertCircle, Globe } from 'lucide-react';
+import { MapPin, Users, Package, Bike, TrendingUp, Activity, Clock, AlertCircle, Globe, Building2 } from 'lucide-react';
 import CityDispatchToggle from './CityDispatchToggle';
 import CityDispatchMap from './CityDispatchMap';
+import OperationalCityManager from './OperationalCityManager';
 
 const ACTIVE_COURSE_STATUSES = ['recherche_livreur', 'livreur_en_route', 'en_route_expediteur', 'arrive_prise_en_charge', 'colis_recupere', 'en_livraison', 'arrivee'];
 
@@ -158,14 +159,27 @@ export default function CityDispatchAdmin() {
         )}
       </div>
 
-      {/* Section 1 : Interrupteurs par pays */}
+      {/* Section 1 : Villes opérationnelles (activation individuelle) */}
+      <Card className="p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <Building2 className="w-4 h-4 text-primary" />
+          <h3 className="text-sm font-semibold text-foreground">Villes opérationnelles</h3>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Activez les villes une par une. Une zone activée réserve ses courses aux livreurs de cette zone.
+          Saaba est rattachée à Ouagadougou. OFF par défaut.
+        </p>
+        <OperationalCityManager countries={countries} />
+      </Card>
+
+      {/* Section 1b : Interrupteurs par pays (secours global) */}
       <Card className="p-4 space-y-3">
         <div className="flex items-center gap-2">
           <Globe className="w-4 h-4 text-primary" />
-          <h3 className="text-sm font-semibold text-foreground">Configuration par pays</h3>
+          <h3 className="text-sm font-semibold text-foreground">Secours global par pays</h3>
         </div>
         <p className="text-xs text-muted-foreground">
-          Activez ou désactivez le filtrage par ville pour chaque pays. OFF par défaut — aucune modification sans validation.
+          Désactivez d'urgence le filtrage par ville pour un pays entier. Les activations individuelles priment.
         </p>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
           {countries.map(c => (

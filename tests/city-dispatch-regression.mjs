@@ -30,6 +30,13 @@ function createMockBase44(courseCity = 'ouagadougou', livreurCity = 'ouagadougou
     configs.set('CITY_DISPATCH_ENABLED:BF', { cle: 'CITY_DISPATCH_ENABLED:BF', valeur: 'true' });
   }
 
+  // OperationalCity (nouveau système de zones opérationnelles)
+  const opCities = new Map();
+  if (flagEnabled) {
+    const opCityName = courseCity === 'ouagadougou' ? 'ouagadougou' : courseCity === 'bobo' ? 'bobo-dioulasso' : courseCity;
+    opCities.set(opCityName, { id: 'oc1', country_code: 'BF', nom: opCityName, nom_affichage: opCityName, actif: true });
+  }
+
   // Course de test
   courses.set('course-1', {
     id: 'course-1',
@@ -97,6 +104,14 @@ function createMockBase44(courseCity = 'ouagadougou', livreurCity = 'ouagadougou
                 results = results.filter(c => c.cle === query.cle);
               }
             }
+            return results;
+          },
+        },
+        OperationalCity: {
+          filter: async (query) => {
+            let results = [...opCities.values()];
+            if (query?.country_code) results = results.filter(c => c.country_code === query.country_code);
+            if (query?.actif !== undefined) results = results.filter(c => c.actif === query.actif);
             return results;
           },
         },
@@ -468,6 +483,16 @@ async function runTests() {
   let failed = 0;
 
   for (const { name, fn } of tests) {
+    // ── Nettoyer tous les caches avant chaque test ──
+    try {
+      const { invalidateCityFlagCache, invalidateQuartierCache } = await import('../base44/shared/cityResolution.ts');
+      invalidateCityFlagCache();
+      invalidateQuartierCache();
+    } catch {}
+    try {
+      const { invalidateOperationalCityCache } = await import('../base44/shared/operationalZones.ts');
+      invalidateOperationalCityCache();
+    } catch {}
     try {
       await fn();
       console.log(`  ✅ ${name}`);

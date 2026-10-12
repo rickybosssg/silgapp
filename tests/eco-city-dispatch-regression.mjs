@@ -44,6 +44,13 @@ function createEcoMockBase44(opts = {}) {
     configs.set(`CITY_DISPATCH_ENABLED:${countryCode}`, { cle: `CITY_DISPATCH_ENABLED:${countryCode}`, valeur: 'true' });
   }
 
+  // OperationalCity (nouveau système de zones opérationnelles)
+  const opCities = new Map();
+  if (flagEnabled) {
+    const opCityName = courseCity === 'ouagadougou' ? 'ouagadougou' : courseCity === 'bobo' ? 'bobo-dioulasso' : courseCity === 'abidjan' ? 'abidjan' : courseCity;
+    opCities.set(opCityName, { id: 'oc1', country_code: countryCode, nom: opCityName, nom_affichage: opCityName, actif: true });
+  }
+
   // Course
   const courseVille = courseCity === 'ouagadougou' ? 'Ouagadougou' : courseCity === 'bobo' ? 'Bobo-Dioulasso' : courseCity === 'abidjan' ? 'Abidjan' : null;
   const courseLat = courseCity === 'ouagadougou' ? 12.37 : courseCity === 'bobo' ? 11.17 : courseCity === 'abidjan' ? 5.35 : 0;
@@ -172,6 +179,14 @@ function createEcoMockBase44(opts = {}) {
               if (query.cle.$in) results = results.filter(c => query.cle.$in.includes(c.cle));
               else results = results.filter(c => c.cle === query.cle);
             }
+            return results;
+          },
+        },
+        OperationalCity: {
+          filter: async (query) => {
+            let results = [...opCities.values()];
+            if (query?.country_code) results = results.filter(c => c.country_code === query.country_code);
+            if (query?.actif !== undefined) results = results.filter(c => c.actif === query.actif);
             return results;
           },
         },
@@ -508,6 +523,10 @@ async function runTests() {
       const { invalidateCityFlagCache, invalidateQuartierCache } = await import('../base44/shared/cityResolution.ts');
       invalidateCityFlagCache();
       invalidateQuartierCache();
+    } catch {}
+    try {
+      const { invalidateOperationalCityCache } = await import('../base44/shared/operationalZones.ts');
+      invalidateOperationalCityCache();
     } catch {}
     try {
       await fn();
