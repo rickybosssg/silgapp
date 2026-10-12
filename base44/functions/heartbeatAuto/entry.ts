@@ -128,29 +128,30 @@ Deno.serve(async (req) => {
           }
 
           // [CITY_DISPATCH] Détection automatique de la ville opérationnelle du livreur.
-          // Si le feature flag est activé pour ce pays et que le GPS est fiable,
-          // résoudre la ville depuis les quartiers en base et la mettre à jour
-          // si elle a changé. Évite les basculements intempestifs en ne mettant
-          // à jour que si la ville résolue est différente de la ville actuelle.
+          // Utilise shouldUpdateDriverCity qui encapsule toutes les règles de sécurité :
+          // - Pas de changement pendant une mission (statut = en_course)
+          // - GPS avec précision > 100m ignoré
+          // - Hystérésis anti-flicker (5km) aux limites de villes
+          // - Ne jamais effacer une ville existante par une position incertaine
           // Aucune API externe — utilise le cache des quartiers (TTL 10 min).
           try {
-            const { isCityDispatchEnabled, resolveCityFromGPS, normalizeCityName } = await import('../../shared/cityResolution.ts');
+            const { isCityDispatchEnabled, shouldUpdateDriverCity } = await import('../../shared/cityResolution.ts');
             const cityEnabled = await isCityDispatchEnabled(base44, livreur.country_code);
             if (cityEnabled) {
-              const resolvedCity = await resolveCityFromGPS(base44, latNum, lngNum, livreur.country_code);
-              const currentCity = normalizeCityName(livreur.ville);
-              // Ne mettre à jour que si la ville résolue est différente et non nulle
-              if (resolvedCity && resolvedCity !== currentCity) {
-                updateData.ville = resolvedCity;
+              const accuracyVal = accuracy !== undefined && accuracy !== null ? Number(accuracy) : undefined;
+              const cityUpdate = await shouldUpdateDriverCity(base44, livreur, latNum, lngNum, accuracyVal);
+              if (cityUpdate.shouldUpdate && cityUpdate.newCity) {
+                updateData.ville = cityUpdate.newCity;
                 console.log('[heartbeatAuto] 🏙️ Ville livreur mise à jour', {
                   livreur_id: livreur.id,
                   ancienne_ville: livreur.ville || '(vide)',
-                  nouvelle_ville: resolvedCity,
+                  nouvelle_ville: cityUpdate.newCity,
+                  raison: cityUpdate.reason,
                 });
               }
             }
           } catch (cityError: any) {
-            // Non-bloquant : la détection de ville est un optimisation, pas une obligation.
+            // Non-bloquant : la détection de ville est une optimisation, pas une obligation.
             console.error('[heartbeatAuto] ⚠️ City resolution failed:', cityError?.message || String(cityError));
           }
         }

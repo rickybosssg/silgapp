@@ -282,6 +282,182 @@ test('18 — verifyCityCompatibility : flag OFF → toujours compatible', async 
   invalidateCityFlagCache('BF');
 });
 
+// ════════════════════════════════════════════════════════════════════════
+// TESTS AMÉLIORATION 2 : FILTRAGE FRONTEND ON/OFF
+// ════════════════════════════════════════════════════════════════════════
+
+tests.push({
+  name: '19. Frontend OFF → pas de filtre ville (comportement historique)',
+  fn: async () => {
+    const cityDispatchEnabled = false;
+    const livreurVille = 'Ouagadougou';
+    const filter = { dispatch_status: { $in: ['disponible_push', 'propose'] }, country_code: 'BF' };
+    if (cityDispatchEnabled && livreurVille) {
+      filter.ville_depart = { $regex: livreurVille, $options: 'i' };
+    }
+    assert.strictEqual(filter.ville_depart, undefined, 'Flag OFF → pas de filtre ville_depart');
+  },
+});
+
+tests.push({
+  name: '20. Frontend ON → filtre ville appliqué',
+  fn: async () => {
+    const cityDispatchEnabled = true;
+    const livreurVille = 'Ouagadougou';
+    const filter = { dispatch_status: { $in: ['disponible_push', 'propose'] }, country_code: 'BF' };
+    if (cityDispatchEnabled && livreurVille) {
+      filter.ville_depart = { $regex: livreurVille, $options: 'i' };
+    }
+    assert.ok(filter.ville_depart, 'Flag ON → filtre ville_depart présent');
+    assert.strictEqual(filter.ville_depart.$regex, 'Ouagadougou', 'Regex correcte');
+  },
+});
+
+tests.push({
+  name: '21. Frontend ON mais ville vide → pas de filtre (graceful)',
+  fn: async () => {
+    const cityDispatchEnabled = true;
+    const livreurVille = '';
+    const filter = { dispatch_status: { $in: ['disponible_push', 'propose'] }, country_code: 'BF' };
+    if (cityDispatchEnabled && livreurVille) {
+      filter.ville_depart = { $regex: livreurVille, $options: 'i' };
+    }
+    assert.strictEqual(filter.ville_depart, undefined, 'Ville vide → pas de filtre');
+  },
+});
+
+tests.push({
+  name: '22. Frontend ON → missions Éco préservées (pas filtrées par ville)',
+  fn: async () => {
+    const ecoFilter = { country_code: 'BF', enterprise_id: null, status: 'available' };
+    assert.ok(!ecoFilter.ville_depart, 'Missions Éco non filtrées par ville');
+  },
+});
+
+// ════════════════════════════════════════════════════════════════════════
+// TESTS AMÉLIORATION 3 : DÉTECTION AUTOMATIQUE SÉCURISÉE
+// ════════════════════════════════════════════════════════════════════════
+
+const OUAGA_LAT = 12.37, OUAGA_LNG = -1.52;
+const BOBO_LAT = 11.17, BOBO_LNG = -4.30;
+
+tests.push({
+  name: '23. GPS imprécis (accuracy > 100m) → pas de mise à jour ville',
+  fn: async () => {
+    const mockSdk = createMockBase44('ouagadougou', 'ouagadougou', true);
+    const { shouldUpdateDriverCity } = await import('../base44/shared/cityResolution.ts');
+    const livreur = {
+      id: 'livreur-1', country_code: 'BF', ville: 'Ouagadougou', statut: 'disponible',
+      latitude: OUAGA_LAT, longitude: OUAGA_LNG,
+    };
+    const result = await shouldUpdateDriverCity(mockSdk, livreur, OUAGA_LAT, OUAGA_LNG, 150);
+    assert.strictEqual(result.shouldUpdate, false, 'Accuracy 150m → pas de mise à jour');
+    assert.strictEqual(result.reason, 'gps_accuracy_too_low', 'Raison correcte');
+  },
+});
+
+tests.push({
+  name: '24. GPS précis (accuracy < 100m) → mise à jour autorisée',
+  fn: async () => {
+    const mockSdk = createMockBase44('ouagadougou', '', true);
+    const { shouldUpdateDriverCity } = await import('../base44/shared/cityResolution.ts');
+    const livreur = {
+      id: 'livreur-1', country_code: 'BF', ville: '', statut: 'disponible',
+      latitude: OUAGA_LAT, longitude: OUAGA_LNG,
+    };
+    const result = await shouldUpdateDriverCity(mockSdk, livreur, OUAGA_LAT, OUAGA_LNG, 50);
+    assert.strictEqual(result.shouldUpdate, true, 'Accuracy 50m → mise à jour autorisée');
+  },
+});
+
+tests.push({
+  name: '25. Livreur en mission → pas de changement de ville',
+  fn: async () => {
+    const mockSdk = createMockBase44('ouagadougou', 'ouagadougou', true);
+    const { shouldUpdateDriverCity } = await import('../base44/shared/cityResolution.ts');
+    const livreur = {
+      id: 'livreur-1', country_code: 'BF', ville: 'Ouagadougou', statut: 'en_course',
+      latitude: OUAGA_LAT, longitude: OUAGA_LNG,
+    };
+    const result = await shouldUpdateDriverCity(mockSdk, livreur, BOBO_LAT, BOBO_LNG, 30);
+    assert.strictEqual(result.shouldUpdate, false, 'En mission → pas de changement');
+    assert.strictEqual(result.reason, 'driver_in_mission', 'Raison correcte');
+  },
+});
+
+tests.push({
+  name: '26. Hystérésis : livreur proche de sa ville actuelle → pas de changement',
+  fn: async () => {
+    const mockSdk = createMockBase44('ouagadougou', 'ouagadougou', true);
+    const { shouldUpdateDriverCity } = await import('../base44/shared/cityResolution.ts');
+    const livreur = {
+      id: 'livreur-1', country_code: 'BF', ville: 'Ouagadougou', statut: 'disponible',
+      latitude: OUAGA_LAT, longitude: OUAGA_LNG,
+    };
+    // Position très proche du quartier Ouaga (à quelques mètres)
+    const result = await shouldUpdateDriverCity(mockSdk, livreur, OUAGA_LAT + 0.001, OUAGA_LNG + 0.001, 20);
+    // Le livreur est à moins de 5km d'un quartier Ouaga → pas de changement
+    assert.strictEqual(result.shouldUpdate, false, 'Hystérésis → pas de flicker');
+  },
+});
+
+tests.push({
+  name: '27. Déplacement interurbain confirmé → ville mise à jour',
+  fn: async () => {
+    const mockSdk = createMockBase44('ouagadougou', 'ouagadougou', true);
+    const { shouldUpdateDriverCity } = await import('../base44/shared/cityResolution.ts');
+    const livreur = {
+      id: 'livreur-1', country_code: 'BF', ville: 'Ouagadougou', statut: 'disponible',
+      latitude: OUAGA_LAT, longitude: OUAGA_LNG,
+    };
+    const result = await shouldUpdateDriverCity(mockSdk, livreur, BOBO_LAT, BOBO_LNG, 30);
+    assert.strictEqual(result.shouldUpdate, true, 'Déplacement confirmé → mise à jour');
+    assert.strictEqual(result.newCity, 'bobo-dioulasso', 'Nouvelle ville correcte');
+  },
+});
+
+tests.push({
+  name: '28. Ville inconnue (aucun quartier proche) → pas de mise à jour',
+  fn: async () => {
+    const mockSdk = createMockBase44('ouagadougou', 'ouagadougou', true);
+    const { shouldUpdateDriverCity } = await import('../base44/shared/cityResolution.ts');
+    const livreur = {
+      id: 'livreur-1', country_code: 'BF', ville: 'Ouagadougou', statut: 'disponible',
+      latitude: OUAGA_LAT, longitude: OUAGA_LNG,
+    };
+    const result = await shouldUpdateDriverCity(mockSdk, livreur, 99.0, 99.0, 20);
+    assert.strictEqual(result.shouldUpdate, false, 'Ville inconnue → pas de mise à jour');
+    assert.strictEqual(result.reason, 'too_far_from_any_quartier', 'Raison correcte');
+  },
+});
+
+tests.push({
+  name: '29. Même ville résolue → pas de mise à jour (idempotent)',
+  fn: async () => {
+    const mockSdk = createMockBase44('ouagadougou', 'ouagadougou', true);
+    const { shouldUpdateDriverCity } = await import('../base44/shared/cityResolution.ts');
+    const livreur = {
+      id: 'livreur-1', country_code: 'BF', ville: 'Ouagadougou', statut: 'disponible',
+      latitude: OUAGA_LAT, longitude: OUAGA_LNG,
+    };
+    const result = await shouldUpdateDriverCity(mockSdk, livreur, OUAGA_LAT, OUAGA_LNG, 20);
+    assert.strictEqual(result.shouldUpdate, false, 'Même ville → pas de mise à jour');
+    assert.strictEqual(result.reason, 'same_city', 'Raison correcte');
+  },
+});
+
+tests.push({
+  name: '30. Activation d\'un pays n\'impacte pas les autres pays',
+  fn: async () => {
+    const mockSdk = createMockBase44('ouagadougou', 'ouagadougou', true);
+    const { isCityDispatchEnabled } = await import('../base44/shared/cityResolution.ts');
+    const bfEnabled = await isCityDispatchEnabled(mockSdk, 'BF');
+    const ciEnabled = await isCityDispatchEnabled(mockSdk, 'CI');
+    assert.strictEqual(bfEnabled, true, 'BF activé');
+    assert.strictEqual(ciEnabled, false, 'CI reste OFF');
+  },
+});
+
 // ── Runner ──
 async function runTests() {
   console.log('\n═══════════════════════════════════════════════════════');

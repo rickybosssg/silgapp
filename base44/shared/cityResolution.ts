@@ -17,6 +17,14 @@ const CITY_FLAG_PREFIX = 'CITY_DISPATCH_ENABLED';
 const CITY_FLAG_CACHE_TTL_MS = 2 * 60 * 1000; // 2 min
 const QUARTIER_CACHE_TTL_MS = 10 * 60 * 1000; // 10 min
 
+// ── Seuils de sécurité pour la détection automatique de ville ──
+// GPS avec précision > ce seuil → ignoré (position trop imprécise pour identifier une ville)
+const GPS_ACCURACY_THRESHOLD_M = 100;
+// Hystérésis anti-flicker : si le livreur est à moins de cette distance d'un quartier
+// de sa ville actuelle, ne pas changer de ville (évite les basculements intempestifs
+// aux limites de villes et lors d'erreurs GPS ponctuelles)
+const CITY_CHANGE_HYSTERESIS_KM = 5;
+
 // ── Cache feature flag par pays ──
 const CITY_FLAG_CACHE = new Map<string, { enabled: boolean; expires: number }>();
 
@@ -187,6 +195,97 @@ export async function getCourseDepartureCity(base44: any, course: any): Promise<
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
 
   return await resolveCityFromGPS(base44, lat, lng, course.country_code);
+}
+
+/**
+ * Devrait-on mettre à jour la ville opérationnelle du livreur ?
+ *
+ * Règles anti-flicker et de sécurité :
+ * 1. Ne jamais changer pendant une mission (statut = en_course) — le livreur
+ *    est en transit, son GPS peut être sur une route interurbaine.
+ * 2. Ignorer les GPS avec précision > GPS_ACCURACY_THRESHOLD_M (100m) — trop imprécis.
+ * 3. Si la ville résolue == ville actuelle → pas de changement.
+ * 4. Si la ville actuelle est déjà définie → hystérésis : ne changer que si le
+ *    livreur est clairement dans la nouvelle ville (à plus de
+ *    CITY_CHANGE_HYSTERESIS_KM de tout quartier de sa ville actuelle).
+ * 5. Si la ville résolue est null → ne pas effacer la ville existante.
+ *
+ * @returns { shouldUpdate, newCity?, reason? }
+ */
+export async function shouldUpdateDriverCity(
+  base44: any,
+  livreur: any,
+  lat: number,
+  lng: number,
+  accuracyM?: number,
+): Promise<{ shouldUpdate: boolean; newCity?: string; reason?: string }> {
+  // 1. Ne jamais changer pendant une mission
+  if (livreur?.statut === 'en_course') {
+    return { shouldUpdate: false, reason: 'driver_in_mission' };
+  }
+
+  // 2. Ignorer les GPS trop imprécis
+  if (accuracyM != null && Number.isFinite(Number(accuracyM)) && Number(accuracyM) > GPS_ACCURACY_THRESHOLD_M) {
+    return { shouldUpdate: false, reason: 'gps_accuracy_too_low' };
+  }
+
+  if (!Number.isFinite(Number(lat)) || !Number.isFinite(Number(lng))) {
+    return { shouldUpdate: false, reason: 'invalid_gps_coordinates' };
+  }
+
+  // 3. Charger les quartiers du pays
+  const quartiers = await loadQuartiersForCountry(base44, livreur?.country_code);
+  if (!quartiers || quartiers.length === 0) {
+    return { shouldUpdate: false, reason: 'no_quartiers_available' };
+  }
+
+  // 4. Trouver le quartier le plus proche
+  let nearest: any = null;
+  let nearestDist = Infinity;
+  for (const q of quartiers) {
+    const dist = haversineKm(lat, lng, q.latitude, q.longitude);
+    if (dist === null) continue;
+    if (dist < nearestDist) {
+      nearestDist = dist;
+      nearest = q;
+    }
+  }
+
+  if (!nearest || nearestDist > 30) {
+    return { shouldUpdate: false, reason: 'too_far_from_any_quartier' };
+  }
+
+  const resolvedCity = normalizeCityName(nearest.ville) || normalizeCityName(nearest.nom);
+  if (!resolvedCity) {
+    return { shouldUpdate: false, reason: 'city_name_unresolved' };
+  }
+
+  // 5. Comparer avec la ville actuelle
+  const currentCity = normalizeCityName(livreur?.ville);
+  if (resolvedCity === currentCity) {
+    return { shouldUpdate: false, reason: 'same_city' };
+  }
+
+  // 6. Anti-flicker : si la ville actuelle est définie, vérifier l'hystérésis
+  if (currentCity) {
+    let currentCityMinDist = Infinity;
+    for (const q of quartiers) {
+      const qCity = normalizeCityName(q.ville) || normalizeCityName(q.nom);
+      if (qCity === currentCity) {
+        const dist = haversineKm(lat, lng, q.latitude, q.longitude);
+        if (dist !== null && dist < currentCityMinDist) {
+          currentCityMinDist = dist;
+        }
+      }
+    }
+    // Si le livreur est encore proche d'un quartier de sa ville actuelle,
+    // ne pas changer (évite le flicker aux limites de villes)
+    if (currentCityMinDist < CITY_CHANGE_HYSTERESIS_KM) {
+      return { shouldUpdate: false, reason: 'within_hysteresis_zone_of_current_city' };
+    }
+  }
+
+  return { shouldUpdate: true, newCity: resolvedCity, reason: 'city_changed' };
 }
 
 /**

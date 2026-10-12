@@ -1,10 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { MapPin, Users, Package, Bike, TrendingUp, Activity, Clock, AlertCircle } from 'lucide-react';
+import { MapPin, Users, Package, Bike, TrendingUp, Activity, Clock, AlertCircle, Globe } from 'lucide-react';
+import CityDispatchToggle from './CityDispatchToggle';
+import CityDispatchMap from './CityDispatchMap';
+
+const ACTIVE_COURSE_STATUSES = ['recherche_livreur', 'livreur_en_route', 'en_route_expediteur', 'arrive_prise_en_charge', 'colis_recupere', 'en_livraison', 'arrivee'];
 
 export default function CityDispatchAdmin() {
   const [selectedCountry, setSelectedCountry] = useState('');
@@ -20,37 +24,55 @@ export default function CityDispatchAdmin() {
     staleTime: 60000,
   });
 
-  // ── Charger les villeurs disponibles pour le pays sélectionné ──
-  // On utilise distinct sur le champ "ville" de l'entité Livreur
+  // ── Charger les villes pour le pays sélectionné ──
   const { data: cities = [], isFetching: citiesLoading } = useQuery({
     queryKey: ['cities-for-country', selectedCountry],
     queryFn: async () => {
       if (!selectedCountry) return [];
-      // Utiliser filter avec distinct sur ville
-      const result = await base44.entities.Livreur.filter(
-        { country_code: selectedCountry, ville: { $ne: null } },
-        undefined, 200
-      );
+      const [livreurs, courses] = await Promise.all([
+        base44.entities.Livreur.filter(
+          { country_code: selectedCountry, ville: { $ne: null } },
+          undefined, 200
+        ),
+        base44.entities.CourseExterne.filter(
+          { country_code: selectedCountry, ville_depart: { $ne: null } },
+          undefined, 200
+        ),
+      ]);
       const citySet = new Set();
-      for (const l of result || []) {
-        if (l.ville && l.ville.trim()) {
-          citySet.add(l.ville.trim());
-        }
+      for (const l of livreurs || []) {
+        if (l.ville?.trim()) citySet.add(l.ville.trim());
       }
-      // Aussi récupérer les villes depuis les courses
-      const courses = await base44.entities.CourseExterne.filter(
-        { country_code: selectedCountry, ville_depart: { $ne: null } },
-        undefined, 200
-      );
       for (const c of courses || []) {
-        if (c.ville_depart && c.ville_depart.trim()) {
-          citySet.add(c.ville_depart.trim());
-        }
+        if (c.ville_depart?.trim()) citySet.add(c.ville_depart.trim());
       }
       return Array.from(citySet).sort();
     },
     enabled: !!selectedCountry,
     staleTime: 30000,
+  });
+
+  // ── Charger les livreurs et courses pour la carte ──
+  const { data: mapData = { livreurs: [], courses: [] }, isLoading: mapLoading } = useQuery({
+    queryKey: ['city-dispatch-map-data', selectedCountry, selectedCity],
+    queryFn: async () => {
+      if (!selectedCountry) return { livreurs: [], courses: [] };
+      const cityRegex = selectedCity ? { $regex: selectedCity, $options: 'i' } : null;
+      const livreurFilter = { country_code: selectedCountry };
+      const courseFilter = { country_code: selectedCountry, statut: { $in: ACTIVE_COURSE_STATUSES } };
+      if (cityRegex) {
+        livreurFilter.ville = cityRegex;
+        courseFilter.ville_depart = cityRegex;
+      }
+      const [livreurs, courses] = await Promise.all([
+        base44.entities.Livreur.filter(livreurFilter, '-last_seen_at', 200),
+        base44.entities.CourseExterne.filter(courseFilter, '-created_date', 200),
+      ]);
+      return { livreurs: livreurs || [], courses: courses || [] };
+    },
+    enabled: !!selectedCountry,
+    refetchInterval: 20000,
+    staleTime: 0,
   });
 
   // ── Statistiques par ville ──
@@ -59,7 +81,6 @@ export default function CityDispatchAdmin() {
     queryFn: async () => {
       if (!selectedCountry || !selectedCity) return null;
       const cityRegex = { $regex: selectedCity, $options: 'i' };
-
       const [livreurs, coursesAll] = await Promise.all([
         base44.entities.Livreur.filter(
           { country_code: selectedCountry, ville: cityRegex },
@@ -70,43 +91,26 @@ export default function CityDispatchAdmin() {
           '-created_date', 500
         ),
       ]);
-
       const livreursList = livreurs || [];
       const coursesList = coursesAll || [];
-
       const disponible = livreursList.filter(l => l.statut === 'disponible').length;
       const horsLigne = livreursList.filter(l => l.statut === 'hors_ligne').length;
       const enCourse = livreursList.filter(l => l.statut === 'en_course').length;
       const gpsRecent = livreursList.filter(l => {
         if (!l.derniere_position_date) return false;
-        const ageMin = (Date.now() - new Date(l.derniere_position_date).getTime()) / 60000;
-        return ageMin < 10;
+        return (Date.now() - new Date(l.derniere_position_date).getTime()) / 60000 < 10;
       }).length;
-
       const coursesNouvelles = coursesList.filter(c => c.statut === 'nouvelle' || c.statut === 'recherche_livreur').length;
       const coursesEnRecherche = coursesList.filter(c => c.dispatch_status === 'disponible_push').length;
       const coursesEnLivraison = coursesList.filter(c => ['livreur_en_route', 'en_route_expediteur', 'arrive_prise_en_charge', 'colis_recupere', 'en_livraison', 'arrivee'].includes(c.statut)).length;
       const coursesTerminees = coursesList.filter(c => c.statut === 'livree').length;
       const coursesEnAttente = coursesList.filter(c => c.statut === 'en_attente').length;
-
-      // Missions Éco
       const missionIds = new Set();
-      for (const c of coursesList) {
-        if (c.eco_mission_id) missionIds.add(c.eco_mission_id);
-      }
-
+      for (const c of coursesList) { if (c.eco_mission_id) missionIds.add(c.eco_mission_id); }
       return {
-        totalLivreurs: livreursList.length,
-        disponible,
-        horsLigne,
-        enCourse,
-        gpsRecent,
-        coursesNouvelles,
-        coursesEnRecherche,
-        coursesEnLivraison,
-        coursesTerminees,
-        coursesEnAttente,
-        ecoMissions: missionIds.size,
+        totalLivreurs: livreursList.length, disponible, horsLigne, enCourse, gpsRecent,
+        coursesNouvelles, coursesEnRecherche, coursesEnLivraison, coursesTerminees,
+        coursesEnAttente, ecoMissions: missionIds.size,
       };
     },
     enabled: !!selectedCountry && !!selectedCity,
@@ -114,19 +118,19 @@ export default function CityDispatchAdmin() {
     staleTime: 0,
   });
 
-  // ── Feature flag status ──
-  const { data: cityFlagEnabled } = useQuery({
+  // ── Feature flag status pour le pays sélectionné ──
+  const { data: cityFlagEnabled = false } = useQuery({
     queryKey: ['city-dispatch-flag', selectedCountry],
     queryFn: async () => {
       if (!selectedCountry) return false;
-      const configs = await base44.entities.AppConfig.filter({
-        cle: `CITY_DISPATCH_ENABLED:${selectedCountry}`,
-      });
+      const configs = await base44.entities.AppConfig.filter({ cle: `CITY_DISPATCH_ENABLED:${selectedCountry}` });
       return configs?.[0]?.valeur === 'true';
     },
     enabled: !!selectedCountry,
-    staleTime: 30000,
+    staleTime: 15000,
   });
+
+  const selectedCountryObj = useMemo(() => countries.find(c => c.code === selectedCountry), [countries, selectedCountry]);
 
   const stats = [
     { label: 'Total livreurs', value: cityStats?.totalLivreurs ?? 0, icon: Users, color: 'text-blue-600' },
@@ -144,6 +148,7 @@ export default function CityDispatchAdmin() {
 
   return (
     <div className="space-y-4 p-4">
+      {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="text-xl font-bold text-foreground">🏙️ Dispatch par Ville</h2>
         {selectedCountry && (
@@ -153,14 +158,30 @@ export default function CityDispatchAdmin() {
         )}
       </div>
 
-      {/* Sélecteurs */}
+      {/* Section 1 : Interrupteurs par pays */}
+      <Card className="p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <Globe className="w-4 h-4 text-primary" />
+          <h3 className="text-sm font-semibold text-foreground">Configuration par pays</h3>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Activez ou désactivez le filtrage par ville pour chaque pays. OFF par défaut — aucune modification sans validation.
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+          {countries.map(c => (
+            <CityDispatchToggle key={c.code} country={c} />
+          ))}
+        </div>
+      </Card>
+
+      {/* Section 2 : Sélecteurs pays + ville */}
       <div className="flex gap-2 flex-wrap">
         <Select value={selectedCountry} onValueChange={(v) => { setSelectedCountry(v); setSelectedCity(''); }}>
           <SelectTrigger className="w-[200px]">
             <SelectValue placeholder="Sélectionner un pays" />
           </SelectTrigger>
           <SelectContent>
-            {(countries || []).map(c => (
+            {countries.map(c => (
               <SelectItem key={c.code} value={c.code}>
                 {c.emoji_flag} {c.nom}
               </SelectItem>
@@ -173,7 +194,7 @@ export default function CityDispatchAdmin() {
             <SelectValue placeholder={citiesLoading ? "Chargement..." : "Sélectionner une ville"} />
           </SelectTrigger>
           <SelectContent>
-            {(cities || []).map(city => (
+            {cities.map(city => (
               <SelectItem key={city} value={city}>{city}</SelectItem>
             ))}
           </SelectContent>
@@ -186,15 +207,33 @@ export default function CityDispatchAdmin() {
         )}
       </div>
 
-      {/* Stats */}
-      {!selectedCity ? (
+      {/* Section 3 : Carte interactive */}
+      {selectedCountry ? (
+        mapLoading ? (
+          <Card className="p-8 text-center text-muted-foreground">Chargement de la carte...</Card>
+        ) : (
+          <CityDispatchMap
+            livreurs={mapData.livreurs}
+            courses={mapData.courses}
+            country={selectedCountryObj}
+            selectedCity={selectedCity}
+          />
+        )
+      ) : (
         <Card className="p-8 text-center text-muted-foreground">
-          {selectedCountry
-            ? (cities.length === 0
-              ? "Aucune ville trouvée pour ce pays. Les villes sont détectées automatiquement quand les livreurs envoient leur GPS."
-              : "Sélectionnez une ville pour voir les statistiques détaillées.")
-            : "Sélectionnez un pays pour commencer."}
+          Sélectionnez un pays pour voir la carte interactive.
         </Card>
+      )}
+
+      {/* Section 4 : Statistiques détaillées par ville */}
+      {!selectedCity ? (
+        selectedCountry ? (
+          <Card className="p-4 text-center text-muted-foreground text-sm">
+            {cities.length === 0
+              ? "Aucune ville trouvée. Les villes sont détectées automatiquement quand les livreurs envoient leur GPS."
+              : "Sélectionnez une ville pour voir les statistiques détaillées."}
+          </Card>
+        ) : null
       ) : statsLoading ? (
         <Card className="p-8 text-center text-muted-foreground">Chargement des statistiques...</Card>
       ) : (

@@ -76,22 +76,42 @@ export function useCoursesDisponibles(livreurProfil) {
     staleTime: 60000,
   });
 
+  // ── Feature flag city dispatch ──
+  // Vérifie si le filtrage par ville est activé pour le pays du livreur.
+  // Si OFF : comportement historique (toutes les courses du pays sont visibles).
+  // Si ON : filtrage par ville_depart côté frontend (le backend reste l'autorité).
+  const { data: cityDispatchEnabled = false } = useQuery({
+    queryKey: ["city-dispatch-enabled", countryCode],
+    queryFn: async () => {
+      if (!countryCode) return false;
+      const configs = await base44.entities.AppConfig.filter({
+        cle: `CITY_DISPATCH_ENABLED:${countryCode}`,
+      });
+      return configs?.[0]?.valeur === "true";
+    },
+    enabled: !!countryCode,
+    staleTime: 30000,
+    refetchInterval: 60000,
+  });
+
   // ── Courses disponibles (fetch brut) ──
   // La requête ne filtre pas par enterprise_id car MongoDB ne peut pas matcher
   // null + undefined + "" dans une seule requête SDK. Le filtrage enterprise_id
   // est fait côté client dans eligibleCourses (normalisation canonique).
-  // [CITY_DISPATCH] Filtre ville ajouté si le feature flag est activé.
+  // [CITY_DISPATCH] Filtre ville appliqué UNIQUEMENT si le feature flag est ON.
+  // Si OFF : comportement historique exact (toutes les courses du pays visibles).
+  // Si ON : filtrage par ville_depart pour ne pas afficher les courses d'autres villes.
+  // Les missions Éco restent visibles même si la liste Standard est vide.
+  const livreurVille = livreurProfil?.ville?.trim();
   const { data: courses = [], isLoading } = useQuery({
-    queryKey: ["courses-externes-disponibles", livreurId, countryCode, livreurEnterpriseId, isV2Enabled, livreurProfil?.ville],
+    queryKey: ["courses-externes-disponibles", livreurId, countryCode, livreurEnterpriseId, isV2Enabled, livreurVille, cityDispatchEnabled],
     queryFn: async () => {
       if (!countryCode || !isV2Enabled) return [];
       const filter = { dispatch_status: { $in: ["disponible_push", "propose"] }, country_code: countryCode };
-      // [CITY_DISPATCH] Si le livreur a une ville, filtrer les courses par ville_depart.
-      // Le feature flag est vérifié côté backend (dispatch + acceptation).
-      // Côté frontend, on filtre également pour ne pas afficher les courses
-      // d'autres villes dans le fil "Disponibles".
-      const livreurVille = livreurProfil?.ville?.trim();
-      if (livreurVille) {
+      // [CITY_DISPATCH] Filtrer par ville UNIQUEMENT si le feature flag est ON
+      // et que le livreur a une ville opérationnelle.
+      // Si le flag est OFF ou la ville vide → pas de filtre (comportement historique).
+      if (cityDispatchEnabled && livreurVille) {
         filter.ville_depart = { $regex: livreurVille, $options: "i" };
       }
       const all = await base44.entities.CourseExterne.filter(filter, "-created_date", 50);
