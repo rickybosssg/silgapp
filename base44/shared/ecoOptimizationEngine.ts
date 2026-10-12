@@ -1420,5 +1420,37 @@ export async function acceptEcoMission(base44: any, missionId: string, livreurId
   await base44.asServiceRole.entities.EcoMission.update(mission.id, { status: 'accepted' }).catch(() => null);
   await base44.asServiceRole.entities.Livreur.update(livreurId, { statut: 'en_course' }).catch(() => null);
   await Promise.all(courseIds.map((id) => marquerAccepte(base44, id, livreurId).catch(() => null)));
-  return { success: true, accepted: true, mission_id: mission.id, course_ids: courseIds, livreur_id: livreurId };
+
+  // ── OPTIMISATION DU TRAJET AVEC LA POSITION GPS DU LIVREUR ──
+  // Après l'acceptation atomique, on recalcule l'itinéraire en prenant en compte
+  // la position GPS réelle du livreur. Compare les 6 permutations valides (Haversine)
+  // et sélectionne la plus courte. Non-bloquant : si l'optimisation échoue,
+  // l'itinéraire provisoire (calculé au regroupement) est conservé.
+  let routeOptimization = { optimized: false, reason: 'not_attempted' };
+  try {
+    const { optimizeEcoRouteWithDriverGPS } = await import('./ecoRouteOptimizer.ts');
+    routeOptimization = await optimizeEcoRouteWithDriverGPS(
+      base44,
+      courses,
+      livreur,
+      mission.route_plan_json,
+    );
+    if (routeOptimization.optimized) {
+      await base44.asServiceRole.entities.EcoMission.update(mission.id, {
+        route_plan_json: routeOptimization.routePlanJSON,
+      }).catch(() => null);
+    }
+  } catch (e: any) {
+    console.error('[acceptEcoMission] Route optimization failed:', e?.message || String(e));
+    routeOptimization = { optimized: false, reason: 'optimization_error' };
+  }
+
+  return {
+    success: true,
+    accepted: true,
+    mission_id: mission.id,
+    course_ids: courseIds,
+    livreur_id: livreurId,
+    route_optimization: routeOptimization,
+  };
 }
