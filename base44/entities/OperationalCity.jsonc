@@ -1,0 +1,71 @@
+{
+  "name": "OperationalCity",
+  "type": "object",
+  "properties": {
+    "country_code": {
+      "type": "string",
+      "description": "Code pays ISO 2 lettres (ex: BF, CI, TG)"
+    },
+    "nom": {
+      "type": "string",
+      "description": "Nom canonique normalis\u00e9 (ex: ouagadougou). Utilis\u00e9 pour la comparaison et le rattachement."
+    },
+    "nom_affichage": {
+      "type": "string",
+      "description": "Nom d'affichage (ex: Ouagadougou)"
+    },
+    "actif": {
+      "type": "boolean",
+      "default": false,
+      "description": "Ville activ\u00e9e pour le dispatch par zone op\u00e9rationnelle. OFF par d\u00e9faut. Aucune ville n'est activ\u00e9e automatiquement."
+    },
+    "description": {
+      "type": "string",
+      "description": "Description de la zone op\u00e9rationnelle (ex: 'Ouagadougou et p\u00e9riph\u00e9rie: Saaba, Ziniar\u00e9, etc.')"
+    },
+    "communes_rattachees": {
+      "type": "string",
+      "description": "JSON: tableau des noms de communes administratives rattach\u00e9es (ex: [\"Ouagadougou\", \"Saaba\"])"
+    },
+    "date_activation": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "active_par": {
+      "type": "string",
+      "description": "Email de l'admin ayant activ\u00e9 cette zone"
+    },
+    "date_desactivation": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "desactive_par": {
+      "type": "string",
+      "description": "Email de l'admin ayant d\u00e9sactiv\u00e9 cette zone"
+    }
+  },
+  "required": [
+    "country_code",
+    "nom",
+    "nom_affichage",
+    "actif"
+  ],
+  "rls": {
+    "read": {},
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

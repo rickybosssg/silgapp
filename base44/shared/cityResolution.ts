@@ -65,10 +65,14 @@ export async function isCityDispatchEnabled(base44: any, countryCode: string): P
   if (cached && Date.now() < cached.expires) return cached.enabled;
 
   try {
-    const configs = await base44.asServiceRole.entities.AppConfig.filter({
-      cle: `${CITY_FLAG_PREFIX}:${code}`,
+    // ── Nouveau : vérifier si au moins une ville opérationnelle est activée ──
+    // Le dispatch par zone s'active dès qu'au moins une OperationalCity est active.
+    // L'ancien flag CITY_DISPATCH_ENABLED:<country> est déprécié (non vérifié).
+    const cities = await base44.asServiceRole.entities.OperationalCity.filter({
+      country_code: code,
+      actif: true,
     }, undefined, 1).catch(() => []);
-    const enabled = configs?.[0]?.valeur === 'true';
+    const enabled = (cities || []).length > 0;
     CITY_FLAG_CACHE.set(code, { enabled, expires: Date.now() + CITY_FLAG_CACHE_TTL_MS });
     return enabled;
   } catch {
@@ -140,7 +144,9 @@ export async function resolveCityFromGPS(
 
   if (!nearest || nearestDist > maxDistanceKm) return null;
 
-  return normalizeCityName(nearest.ville) || normalizeCityName(nearest.nom);
+  // Priorité: ville_operationnelle > ville > nom
+  // Ex: un quartier à Saaba avec ville_operationnelle="Ouagadougou" → retourne "ouagadougou"
+  return normalizeCityName(nearest.ville_operationnelle) || normalizeCityName(nearest.ville) || normalizeCityName(nearest.nom);
 }
 
 /**
@@ -158,7 +164,18 @@ export async function getDriverOperationalCity(base44: any, livreur: any): Promi
 
   // 1. Ville déjà renseignée sur le profil
   const storedCity = normalizeCityName(livreur.ville);
-  if (storedCity) return storedCity;
+  if (storedCity) {
+    // Vérifier si c'est un nom administratif qui mappe vers une zone opérationnelle
+    // Ex: "Saaba" → "ouagadougou" si le quartier a ville_operationnelle="Ouagadougou"
+    const quartiers = await loadQuartiersForCountry(base44, livreur.country_code);
+    const matchingQuartier = (quartiers || []).find((q: any) =>
+      normalizeCityName(q.ville) === storedCity && q.ville_operationnelle
+    );
+    if (matchingQuartier) {
+      return normalizeCityName(matchingQuartier.ville_operationnelle) || storedCity;
+    }
+    return storedCity;
+  }
 
   // 2. Résolution GPS si position récente et fiable
   const lat = Number(livreur.latitude);
@@ -187,7 +204,18 @@ export async function getCourseDepartureCity(base44: any, course: any): Promise<
 
   // 1. Ville déjà renseignée
   const storedCity = normalizeCityName(course.ville_depart);
-  if (storedCity) return storedCity;
+  if (storedCity) {
+    // Vérifier si c'est un nom administratif qui mappe vers une zone opérationnelle
+    // Ex: "Saaba" → "ouagadougou" si le quartier a ville_operationnelle="Ouagadougou"
+    const quartiers = await loadQuartiersForCountry(base44, course.country_code);
+    const matchingQuartier = (quartiers || []).find((q: any) =>
+      normalizeCityName(q.ville) === storedCity && q.ville_operationnelle
+    );
+    if (matchingQuartier) {
+      return normalizeCityName(matchingQuartier.ville_operationnelle) || storedCity;
+    }
+    return storedCity;
+  }
 
   // 2. Résolution GPS
   const lat = Number(course.gps_depart_lat);
@@ -255,23 +283,34 @@ export async function shouldUpdateDriverCity(
     return { shouldUpdate: false, reason: 'too_far_from_any_quartier' };
   }
 
-  const resolvedCity = normalizeCityName(nearest.ville) || normalizeCityName(nearest.nom);
+  // Priorité: ville_operationnelle > ville > nom
+  const resolvedCity = normalizeCityName(nearest.ville_operationnelle) || normalizeCityName(nearest.ville) || normalizeCityName(nearest.nom);
   if (!resolvedCity) {
     return { shouldUpdate: false, reason: 'city_name_unresolved' };
   }
 
   // 5. Comparer avec la ville actuelle
   const currentCity = normalizeCityName(livreur?.ville);
-  if (resolvedCity === currentCity) {
+  // Résoudre la zone opérationnelle actuelle du livreur (ex: "Saaba" → "ouagadougou")
+  let currentOperationalCity = currentCity;
+  if (currentCity) {
+    const matchingQ = (quartiers || []).find((q: any) =>
+      normalizeCityName(q.ville) === currentCity && q.ville_operationnelle
+    );
+    if (matchingQ) {
+      currentOperationalCity = normalizeCityName(matchingQ.ville_operationnelle) || currentCity;
+    }
+  }
+  if (resolvedCity === currentOperationalCity || resolvedCity === currentCity) {
     return { shouldUpdate: false, reason: 'same_city' };
   }
 
   // 6. Anti-flicker : si la ville actuelle est définie, vérifier l'hystérésis
-  if (currentCity) {
+  if (currentOperationalCity) {
     let currentCityMinDist = Infinity;
     for (const q of quartiers) {
-      const qCity = normalizeCityName(q.ville) || normalizeCityName(q.nom);
-      if (qCity === currentCity) {
+      const qCity = normalizeCityName(q.ville_operationnelle) || normalizeCityName(q.ville) || normalizeCityName(q.nom);
+      if (qCity === currentOperationalCity) {
         const dist = haversineKm(lat, lng, q.latitude, q.longitude);
         if (dist !== null && dist < currentCityMinDist) {
           currentCityMinDist = dist;

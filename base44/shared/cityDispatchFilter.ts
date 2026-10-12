@@ -1,14 +1,25 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// CITY DISPATCH FILTER — Helpers de filtrage MongoDB par ville
+// CITY DISPATCH FILTER — Filtrage MongoDB par zone opérationnelle
 // ═══════════════════════════════════════════════════════════════════════════
-// Construit les filtres MongoDB à ajouter aux requêtes Livreur.filter et
-// CourseExterne.filter pour implémenter le filtrage par ville.
+// Construit les filtres MongoDB pour le dispatch par zone opérationnelle.
 //
-// PRINCIPES :
-// 1. Si le feature flag est OFF → pas de filtre (retourne objet vide).
-// 2. Si la ville de la course est indéterminée → pas de filtre (graceful degradation).
-// 3. Sinon → filtre MongoDB sur le champ `ville` du livreur.
-// 4. Le filtre utilise $regex pour matcher les variantes de casse/accents.
+// RÈGLES DE COEXISTENCE (asymétriques) :
+// 1. Course en zone activée → visible/acceptable UNIQUEMENT par les livreurs
+//    de cette même zone.
+// 2. Course en zone non activée → comportement historique (tous les livreurs
+//    éligibles peuvent la voir et l'accepter).
+// 3. Les livreurs d'une zone non activée ne peuvent PAS accepter les courses
+//    d'une zone activée.
+//
+// IMPLÉMENTATION :
+// - buildLivreurCityFilter : filtre les livreurs pour une course.
+//   Si la zone de la course est activée → $in avec les noms de communes
+//   de cette zone. Sinon → pas de filtre.
+// - buildCourseCityFilterForLivreur : filtre les courses pour le fil
+//   "Disponibles" d'un livreur. Exclut les courses des autres zones
+//   activées via $nin.
+// - verifyCityCompatibility : vérifie la compatibilité pour l'acceptation.
+//   Asymétrique : bloque seulement si la zone de la course est activée.
 // ═══════════════════════════════════════════════════════════════════════════
 
 import {
@@ -18,62 +29,75 @@ import {
   normalizeCityName,
   areCitiesCompatible,
 } from './cityResolution.ts';
+import {
+  isOperationalCityActive,
+  getActivatedZoneCityNames,
+  getOperationalZoneCityNames,
+} from './operationalZones.ts';
 
 /**
- * Construit le filtre MongoDB à ajouter à Livreur.filter() pour le dispatch par ville.
+ * Construit le filtre MongoDB à ajouter à Livreur.filter() pour le dispatch
+ * par zone opérationnelle.
  *
- * @param base44 - Instance SDK
- * @param course - CourseExterne à dispatcher
- * @returns Objet à spread dans le filtre Livreur.filter (ex: { ville: { $regex: /ouagadougou/i } })
- *          ou objet vide si pas de filtre ville.
+ * Si la zone de la course est activée → filtre les livreurs par les noms de
+ * communes rattachées à cette zone (ex: ["Ouagadougou", "Saaba", "ouagadougou"]).
+ * Sinon → pas de filtre (comportement historique).
  */
 export async function buildLivreurCityFilter(base44: any, course: any): Promise<Record<string, any>> {
   const countryCode = String(course?.country_code || '').toUpperCase();
   if (!countryCode) return {};
 
-  // Vérifier le feature flag
-  const enabled = await isCityDispatchEnabled(base44, countryCode);
-  if (!enabled) return {};
-
-  // Résoudre la ville de départ de la course
+  // Résoudre la zone opérationnelle de la course
   const courseCity = await getCourseDepartureCity(base44, course);
   if (!courseCity) return {}; // Graceful degradation
 
-  // Filtrer les livreurs par ville (match insensible à la casse)
-  // On utilise $regex avec le nom normalisé pour matcher les variantes.
-  // MongoDB $regex est indexé si l'index est créé sur `ville`.
-  return { ville: { $regex: courseCity, $options: 'i' } };
+  // Vérifier si cette zone est activée
+  const isActive = await isOperationalCityActive(base44, countryCode, courseCity);
+  if (!isActive) return {}; // Zone non activée → comportement historique
+
+  // Récupérer tous les noms de communes rattachées à cette zone
+  const zoneCityNames = await getOperationalZoneCityNames(base44, countryCode, courseCity);
+  if (zoneCityNames.length === 0) {
+    // Fallback: filtrer par le nom de la zone elle-même
+    return { ville: { $regex: courseCity, $options: 'i' } };
+  }
+
+  return { ville: { $in: zoneCityNames } };
 }
 
 /**
  * Construit le filtre MongoDB à ajouter à CourseExterne.filter() pour le fil
  * "Disponibles" du livreur (côté frontend).
  *
- * @param base44 - Instance SDK
- * @param livreur - Profil livreur
- * @returns Objet à spread dans le filtre CourseExterne.filter
- *          ou objet vide si pas de filtre ville.
+ * Exclut les courses des autres zones activées via $nin.
+ * Si aucune zone n'est activée → pas de filtre (comportement historique).
  */
 export async function buildCourseCityFilterForLivreur(base44: any, livreur: any): Promise<Record<string, any>> {
   const countryCode = String(livreur?.country_code || '').toUpperCase();
   if (!countryCode) return {};
 
-  // Vérifier le feature flag
-  const enabled = await isCityDispatchEnabled(base44, countryCode);
-  if (!enabled) return {};
+  // Vérifier si au moins une zone est activée dans le pays
+  const hasActive = await isCityDispatchEnabled(base44, countryCode);
+  if (!hasActive) return {}; // Aucune zone activée → comportement historique
 
-  // Résoudre la ville opérationnelle du livreur
+  // Résoudre la zone opérationnelle du livreur
   const livreurCity = await getDriverOperationalCity(base44, livreur);
-  if (!livreurCity) return {}; // Graceful degradation
 
-  return { ville_depart: { $regex: livreurCity, $options: 'i' } };
+  // Récupérer les noms de communes des autres zones activées (excluant la zone du livreur)
+  const otherZoneCityNames = await getActivatedZoneCityNames(base44, countryCode, livreurCity);
+  if (otherZoneCityNames.length === 0) return {};
+
+  // Exclure les courses des autres zones activées
+  return { ville_depart: { $nin: otherZoneCityNames } };
 }
 
 /**
- * Vérifie la compatibilité de ville entre une course et un livreur.
- * Utilisé comme garde de défense en profondeur dans accepterCourseV2.
+ * Vérifie la compatibilité de zone entre une course et un livreur.
+ * Utilisé comme garde de défense en profondeur dans l'acceptation backend.
  *
- * @returns true si compatibles (ou si le filtre ne s'applique pas), false si incompatibles.
+ * RÈGLE ASYMÉTRIQUE :
+ * - Si la zone de la course est activée → le livreur doit être dans la même zone.
+ * - Si la zone de la course n'est pas activée → toujours compatible (historique).
  */
 export async function verifyCityCompatibility(base44: any, course: any, livreur: any): Promise<{
   compatible: boolean;
@@ -83,17 +107,17 @@ export async function verifyCityCompatibility(base44: any, course: any, livreur:
 }> {
   const countryCode = String(course?.country_code || '').toUpperCase();
 
-  // Vérifier le feature flag
-  const enabled = await isCityDispatchEnabled(base44, countryCode);
-  if (!enabled) return { compatible: true };
+  // Résoudre la zone opérationnelle de la course
+  const courseCity = await getCourseDepartureCity(base44, course);
+  if (!courseCity) return { compatible: true, courseCity: null };
 
-  // Résoudre les deux villes
-  const [courseCity, livreurCity] = await Promise.all([
-    getCourseDepartureCity(base44, course),
-    getDriverOperationalCity(base44, livreur),
-  ]);
+  // Vérifier si cette zone est activée
+  const isActive = await isOperationalCityActive(base44, countryCode, courseCity);
+  if (!isActive) return { compatible: true, courseCity, reason: 'zone_not_activated' };
 
-  if (!courseCity || !livreurCity) return { compatible: true, courseCity, livreurCity };
+  // La zone est activée → le livreur doit être dans la même zone
+  const livreurCity = await getDriverOperationalCity(base44, livreur);
+  if (!livreurCity) return { compatible: true, courseCity, livreurCity, reason: 'livreur_city_unknown' };
 
   if (!areCitiesCompatible(courseCity, livreurCity)) {
     return {
@@ -111,19 +135,23 @@ export async function verifyCityCompatibility(base44: any, course: any, livreur:
  * Construit le filtre MongoDB pour les courses actives d'un livreur
  * (utilisé dans getLivreursEnCourse et autres fonctions qui listent les courses par pays).
  *
- * @param base44 - Instance SDK
- * @param course - Course de référence (pour le pays et la ville)
- * @returns Objet à spread dans le filtre CourseExterne.filter
+ * Si la zone de référence est activée → filtre par les noms de communes de cette zone.
+ * Sinon → pas de filtre (comportement historique).
  */
 export async function buildCourseCityFilterFromCourse(base44: any, course: any): Promise<Record<string, any>> {
   const countryCode = String(course?.country_code || '').toUpperCase();
   if (!countryCode) return {};
 
-  const enabled = await isCityDispatchEnabled(base44, countryCode);
-  if (!enabled) return {};
-
   const courseCity = await getCourseDepartureCity(base44, course);
   if (!courseCity) return {};
 
-  return { ville_depart: { $regex: courseCity, $options: 'i' } };
+  const isActive = await isOperationalCityActive(base44, countryCode, courseCity);
+  if (!isActive) return {};
+
+  const zoneCityNames = await getOperationalZoneCityNames(base44, countryCode, courseCity);
+  if (zoneCityNames.length === 0) {
+    return { ville_depart: { $regex: courseCity, $options: 'i' } };
+  }
+
+  return { ville_depart: { $in: zoneCityNames } };
 }
