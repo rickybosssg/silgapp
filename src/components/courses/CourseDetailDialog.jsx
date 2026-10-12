@@ -25,6 +25,7 @@ import AdminETABadge from "./AdminETABadge";
 import { getPrixAffichable } from "@/utils/getPrixAffichable";
 import { COURSE_STATUSES } from "@/lib/courseStatuses";
 import EcoMissionAdminView from "@/components/admin/EcoMissionAdminView";
+import TerminerCourseButton from "./TerminerCourseButton";
 
 const STATUTS_INTERNE = [
   "nouvelle", "en_attente_livreur", "acceptee", "en_route_recuperation",
@@ -489,6 +490,9 @@ export default function CourseDetailDialog({ course: courseProp, open, onClose, 
               reseau={reseau}
             />
           )}
+
+          {/* Terminer la course — clôture administrative exceptionnelle */}
+          <TerminerCourseButton course={course} reseau={reseau} />
 
           {/* Livreurs proposés (dispatch externe) */}
           {reseau === "externe" && <ProposedLivreursList course={course} />}
