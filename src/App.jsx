@@ -121,6 +121,7 @@ const ClientsAutonomiser = lazy(() => import('./pages/ClientsAutonomiser.jsx'));
 const GrowthDashboard = lazy(() => import('./pages/GrowthDashboard.jsx'));
 const MetaAdsDashboard = lazy(() => import('./pages/MetaAdsDashboard.jsx'));
 const AutopiloteDashboard = lazy(() => import('./pages/AutopiloteDashboard.jsx'));
+const CityDispatchAdminPage = lazy(() => import('./pages/CityDispatchAdminPage.jsx'));
 const PassZeroCommissionAdmin = lazy(() => import('./pages/PassZeroCommissionAdmin.jsx'));
 import Diag500Panel from './components/admin/Diag500Panel.jsx';
 
@@ -479,6 +480,7 @@ function AppContent() {
           <Route path="/admin/growth" element={<AnimatedRoutes><GrowthDashboard /></AnimatedRoutes>} />
           <Route path="/admin/meta-ads" element={<AnimatedRoutes><MetaAdsDashboard /></AnimatedRoutes>} />
           <Route path="/admin/autopilote" element={<AnimatedRoutes><AutopiloteDashboard /></AnimatedRoutes>} />
+          <Route path="/admin/city-dispatch" element={<AnimatedRoutes><CityDispatchAdminPage /></AnimatedRoutes>} />
           <Route path="/admin/pass-zero-commission" element={<AnimatedRoutes><PassZeroCommissionAdmin /></AnimatedRoutes>} />
           <Route path="/admin/entreprises" element={<AnimatedRoutes><SuperAdminEntreprises /></AnimatedRoutes>} />
           <Route path="/admin/suivi-enterprise" element={<AnimatedRoutes><SuiviEnterprise /></AnimatedRoutes>} />

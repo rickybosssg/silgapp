@@ -401,12 +401,16 @@ export async function processEcoCourseCreated(base44: any, courseId: string) {
   }
 
   const config = await loadEcoConfig(base44, course.country_code);
+  // [CITY_DISPATCH] Filtre ville pour le regroupement Éco
+  const { buildCourseCityFilterFromCourse } = await import('./cityDispatchFilter.ts');
+  const ecoCityFilter = await buildCourseCityFilterFromCourse(base44, course);
   const candidates = await base44.asServiceRole.entities.CourseExterne.filter({
     country_code: course.country_code,
     enterprise_id: null,
     delivery_mode: 'eco',
     eco_status: 'isolated',
     dispatch_status: 'en_attente',
+    ...ecoCityFilter,
   }, '-created_date', 30).catch(() => []);
 
   let best: any = null;
@@ -1270,10 +1274,14 @@ export async function triggerOnRouteProposalsForNewCourse(base44: any, courseId:
   // ── Comportement historique (priorité désactivée ou pas de candidat) ──
   // Créer des propositions pour tous les livreurs compatibles
   const courseEnterpriseId = normalizeEnterpriseId(course.enterprise_id);
+  // [CITY_DISPATCH] Filtre ville pour les courses actives (propositions sur trajet)
+  const { buildCourseCityFilterFromCourse } = await import('./cityDispatchFilter.ts');
+  const onRouteCityFilter = await buildCourseCityFilterFromCourse(base44, course);
   const activeCourses = await base44.asServiceRole.entities.CourseExterne.filter({
     country_code: course.country_code,
     statut: { $in: ACTIVE_STATUSES },
     livreur_id: { $exists: true },
+    ...onRouteCityFilter,
   }, '-updated_date', 50).catch(() => []);
 
   const driverIds = new Set<string>();

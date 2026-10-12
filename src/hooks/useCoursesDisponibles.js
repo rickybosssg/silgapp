@@ -80,14 +80,21 @@ export function useCoursesDisponibles(livreurProfil) {
   // La requête ne filtre pas par enterprise_id car MongoDB ne peut pas matcher
   // null + undefined + "" dans une seule requête SDK. Le filtrage enterprise_id
   // est fait côté client dans eligibleCourses (normalisation canonique).
+  // [CITY_DISPATCH] Filtre ville ajouté si le feature flag est activé.
   const { data: courses = [], isLoading } = useQuery({
-    queryKey: ["courses-externes-disponibles", livreurId, countryCode, livreurEnterpriseId, isV2Enabled],
+    queryKey: ["courses-externes-disponibles", livreurId, countryCode, livreurEnterpriseId, isV2Enabled, livreurProfil?.ville],
     queryFn: async () => {
       if (!countryCode || !isV2Enabled) return [];
-      const all = await base44.entities.CourseExterne.filter(
-        { dispatch_status: { $in: ["disponible_push", "propose"] }, country_code: countryCode },
-        "-created_date", 50
-      );
+      const filter = { dispatch_status: { $in: ["disponible_push", "propose"] }, country_code: countryCode };
+      // [CITY_DISPATCH] Si le livreur a une ville, filtrer les courses par ville_depart.
+      // Le feature flag est vérifié côté backend (dispatch + acceptation).
+      // Côté frontend, on filtre également pour ne pas afficher les courses
+      // d'autres villes dans le fil "Disponibles".
+      const livreurVille = livreurProfil?.ville?.trim();
+      if (livreurVille) {
+        filter.ville_depart = { $regex: livreurVille, $options: "i" };
+      }
+      const all = await base44.entities.CourseExterne.filter(filter, "-created_date", 50);
       return all || [];
     },
     enabled: !!livreurId && !!countryCode && livreurPeutVoirFil && isV2Enabled,

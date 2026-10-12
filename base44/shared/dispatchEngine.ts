@@ -27,6 +27,9 @@ export async function trouverLivreursCandidats(base44, course, exclusions = [], 
     return { tous: [], niveau1: [], niveau2: [], niveau3: [], pickupSource: 'none' };
   }
 
+  // [CITY_DISPATCH] Filtre ville ajouté si le feature flag est activé pour ce pays.
+  const { buildLivreurCityFilter } = await import('./cityDispatchFilter.ts');
+  const cityFilter = await buildLivreurCityFilter(base44, course);
   const tousLivreurs = await base44.asServiceRole.entities.Livreur.filter({
     type_livreur: 'externe',
     validation: 'valide',
@@ -35,6 +38,7 @@ export async function trouverLivreursCandidats(base44, course, exclusions = [], 
     country_code: course.country_code,
     bloque_encours: false,
     manual_hors_ligne: { $ne: true },
+    ...cityFilter,
   }, '-last_seen_at', 50);
 
   if (!tousLivreurs || tousLivreurs.length === 0) {

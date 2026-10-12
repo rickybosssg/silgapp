@@ -66,6 +66,7 @@ export const navItems = [
   { path: "/admin/clients-autonomiser", label: "Clients à autonomiser", icon: Users },
   { path: "/admin/growth", label: "Growth / Croissance", icon: TrendingUp },
   { path: "/admin/autopilote", label: "Autopilote Acquisition", icon: Rocket },
+  { path: "/admin/city-dispatch", label: "Dispatch par Ville", icon: MapPin },
   { path: "/admin/meta-ads", label: "Publicités Meta", icon: Megaphone },
   { path: "/admin/bugs", label: "Suivi des bugs", icon: ShieldAlert },
   { path: "/admin/courses-a-sauver", label: "Courses à sauver", icon: ShieldAlert },

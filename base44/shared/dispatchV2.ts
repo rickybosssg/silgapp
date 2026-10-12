@@ -42,6 +42,7 @@ import { resolveCourseParticipantUserIds } from './conversationSecurity.ts';
 import { figerCommissionAcceptation, evaluerAvantageCommission } from './commissionAvantage.ts';
 import { champsLockCommission, verifierCoherenceLock } from './commissionLock.ts';
 import { normalizeEnterpriseId } from './enterpriseFinance.ts';
+import { buildLivreurCityFilter, buildCourseCityFilterFromCourse, verifyCityCompatibility } from './cityDispatchFilter.ts';
 
 // ── Version du bundle (pour vérifier que la production charge la dernière version) ──
 export const DISPATCH_V2_BUNDLE_VERSION = '2026-09-25-v2-only-unique-moteur';
@@ -80,6 +81,8 @@ async function notifierLivreursEligiblesV2(base44: any, course: any, options: an
 
   // 📦 LECTURE UNIFIÉE : 1 Livreur.filter + 1 DispatchNotification.filter
   // (remplace getLivreursNotifies + getLivreursRefuses → économise 1 read redondant)
+  // [CITY_DISPATCH] Filtre ville ajouté si le feature flag est activé pour ce pays.
+  const cityFilter = await buildLivreurCityFilter(base44, course);
   const [livreurs, allDnRecords] = await Promise.all([
     base44.asServiceRole.entities.Livreur.filter({
       type_livreur: 'externe',
@@ -89,17 +92,10 @@ async function notifierLivreursEligiblesV2(base44: any, course: any, options: an
       country_code: course.country_code,
       bloque_encours: false,
       manual_hors_ligne: { $ne: true },
-      // [CORRECTION 11] admin_hors_ligne retiré du ciblage FCM : un livreur bloqué
-      // par l'Admin continue à recevoir le push "Nouvelle course". L'acceptation
-      // reste bloquée côté accepterCourseV2 (livreur.admin_hors_ligne !== true).
-      // [CORRECTION 12] statut élargi à 'hors_ligne' : un livreur bloqué par l'Admin
-      // a statut='hors_ligne'. Le filtre 'disponible' seul l'excluait des push T+0.
-      // [ENTERPRISE] Isolation : ne proposer que les livreurs du même périmètre.
-      // Pour les courses publiques, on filtre enterprise_id: null qui matche
-      // à la fois null et absent (undefined) en MongoDB.
       ...(courseEnterpriseId
         ? { enterprise_id: courseEnterpriseId }
         : { enterprise_id: null }),
+      ...cityFilter,
     }, '-last_seen_at', 500).catch(() => []),
     base44.asServiceRole.entities.DispatchNotification.filter(
       { course_id: course.id }, '-date_notification', 500
@@ -123,7 +119,8 @@ async function notifierLivreursEligiblesV2(base44: any, course: any, options: an
   let candidats = (livreurs || []).filter((livreur: any) => livreur.user_email && !exclus.has(livreur.id));
 
   // 🚫 Exclure les livreurs déjà en course (même définition que aCourseActive)
-  const livreursEnCourse = await getLivreursEnCourse(base44, course.country_code, courseEnterpriseId);
+  const courseCityFilterForEnCourse = await buildCourseCityFilterFromCourse(base44, course);
+  const livreursEnCourse = await getLivreursEnCourse(base44, course.country_code, courseEnterpriseId, courseCityFilterForEnCourse);
   candidats = candidats.filter((l: any) => !livreursEnCourse.has(l.id));
 
   // 🎯 Priorité : si priorityOnly=true, ne notifier que les livreurs prioritaires (priorite_dispatch > 0)
@@ -143,14 +140,14 @@ async function notifierLivreursEligiblesV2(base44: any, course: any, options: an
 }
 
 // ── Helper : liste des livreurs en course (même définition que aCourseActive) ──
-async function getLivreursEnCourse(base44: any, countryCode: string, courseEnterpriseId: string | null = null): Promise<Set<string>> {
+async function getLivreursEnCourse(base44: any, countryCode: string, courseEnterpriseId: string | null = null, courseCityFilter: Record<string, any> = {}): Promise<Set<string>> {
   if (!countryCode) return new Set();
   const [courses, coursesAccepted] = await Promise.all([
     base44.asServiceRole.entities.CourseExterne.filter(
-      { country_code: countryCode, livreur_id: { $ne: null }, ...(courseEnterpriseId ? { enterprise_id: courseEnterpriseId } : { enterprise_id: null }) }, '-created_date', 200
+      { country_code: countryCode, livreur_id: { $ne: null }, ...(courseEnterpriseId ? { enterprise_id: courseEnterpriseId } : { enterprise_id: null }), ...courseCityFilter }, '-created_date', 200
     ).catch(() => []),
     base44.asServiceRole.entities.CourseExterne.filter(
-      { country_code: countryCode, accepted_by_livreur_id: { $ne: null }, ...(courseEnterpriseId ? { enterprise_id: courseEnterpriseId } : { enterprise_id: null }) }, '-created_date', 200
+      { country_code: countryCode, accepted_by_livreur_id: { $ne: null }, ...(courseEnterpriseId ? { enterprise_id: courseEnterpriseId } : { enterprise_id: null }), ...courseCityFilter }, '-created_date', 200
     ).catch(() => []),
   ]);
   const ids = new Set<string>();
@@ -396,6 +393,18 @@ export async function accepterCourseV2(base44: any, courseId: string, livreurId:
     };
   }
 
+  // [CITY_DISPATCH] Vérification de compatibilité de ville (défense en profondeur).
+  // Si le feature flag est activé pour ce pays et que la ville du livreur ≠ ville de la course,
+  // l'acceptation est bloquée côté backend. Empêche un livreur d'une autre ville
+  // d'accepter une course via un appel backend direct.
+  const cityCheck = await verifyCityCompatibility(base44, course, livreur);
+  if (!cityCheck.compatible) {
+    return {
+      success: false, accepted: false, reason: 'city_mismatch',
+      error: 'Cette course appartient à une autre ville opérationnelle.',
+    };
+  }
+
   // [ENTERPRISE_SUSPENSION] Bloquer l'acceptation si l'entreprise est suspendue.
   if (courseEnterpriseId) {
     const entList = await base44.asServiceRole.entities.Enterprise.filter({
@@ -626,6 +635,8 @@ export async function secoursDispatchV2(base44: any, course: any, nbLivreurs: nu
 
   // 1. Get eligible livreurs
   const courseEnterpriseId = normalizeEnterpriseId(course.enterprise_id);
+  // [CITY_DISPATCH] Filtre ville pour le secours V2
+  const cityFilter = await buildLivreurCityFilter(base44, course);
   const livreurs = await base44.asServiceRole.entities.Livreur.filter({
     type_livreur: 'externe',
     validation: 'valide',
@@ -634,12 +645,10 @@ export async function secoursDispatchV2(base44: any, course: any, nbLivreurs: nu
     country_code: course.country_code,
     bloque_encours: false,
     manual_hors_ligne: { $ne: true },
-    // [CORRECTION 12] statut élargi à 'hors_ligne' : un livreur bloqué par l'Admin
-    // (statut='hors_ligne') doit recevoir les rappels T+5 du secours V2.
-    // [ENTERPRISE] Isolation secours : même périmètre que la course.
     ...(courseEnterpriseId
       ? { enterprise_id: courseEnterpriseId }
       : { enterprise_id: null }),
+    ...cityFilter,
   }, '-last_seen_at', 50);
 
   if (!livreurs || livreurs.length === 0) return { pushed: 0 };
