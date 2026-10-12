@@ -212,7 +212,8 @@ test('12 — areCitiesCompatible : ville nulle → true (graceful degradation)',
 });
 
 test('13 — buildLivreurCityFilter : flag OFF → filtre vide', async () => {
-  const { buildLivreurCityFilter, invalidateCityFlagCache } = await import('../base44/shared/cityDispatchFilter.ts');
+  const { buildLivreurCityFilter } = await import('../base44/shared/cityDispatchFilter.ts');
+  const { invalidateCityFlagCache } = await import('../base44/shared/cityResolution.ts');
   invalidateCityFlagCache('BF');
   const base44 = createMockBase44();
   const course = { country_code: 'BF', ville_depart: 'Ouagadougou', gps_depart_lat: 12.37, gps_depart_lng: -1.52 };
@@ -222,7 +223,8 @@ test('13 — buildLivreurCityFilter : flag OFF → filtre vide', async () => {
 });
 
 test('14 — buildLivreurCityFilter : flag ON → filtre ville', async () => {
-  const { buildLivreurCityFilter, invalidateCityFlagCache } = await import('../base44/shared/cityDispatchFilter.ts');
+  const { buildLivreurCityFilter } = await import('../base44/shared/cityDispatchFilter.ts');
+  const { invalidateCityFlagCache } = await import('../base44/shared/cityResolution.ts');
   invalidateCityFlagCache('BF');
   const base44 = createMockBase44('ouagadougou', 'ouagadougou', true);
   const course = { country_code: 'BF', ville_depart: 'Ouagadougou', gps_depart_lat: 12.37, gps_depart_lng: -1.52 };
@@ -233,7 +235,8 @@ test('14 — buildLivreurCityFilter : flag ON → filtre ville', async () => {
 });
 
 test('15 — buildLivreurCityFilter : ville vide → filtre vide (graceful)', async () => {
-  const { buildLivreurCityFilter, invalidateCityFlagCache } = await import('../base44/shared/cityDispatchFilter.ts');
+  const { buildLivreurCityFilter } = await import('../base44/shared/cityDispatchFilter.ts');
+  const { invalidateCityFlagCache } = await import('../base44/shared/cityResolution.ts');
   invalidateCityFlagCache('BF');
   const base44 = createMockBase44('ouagadougou', 'ouagadougou', true);
   const course = { country_code: 'BF', ville_depart: null, gps_depart_lat: null, gps_depart_lng: null };
@@ -243,7 +246,8 @@ test('15 — buildLivreurCityFilter : ville vide → filtre vide (graceful)', as
 });
 
 test('16 — verifyCityCompatibility : même ville → compatible', async () => {
-  const { verifyCityCompatibility, invalidateCityFlagCache } = await import('../base44/shared/cityDispatchFilter.ts');
+  const { verifyCityCompatibility } = await import('../base44/shared/cityDispatchFilter.ts');
+  const { invalidateCityFlagCache } = await import('../base44/shared/cityResolution.ts');
   invalidateCityFlagCache('BF');
   const base44 = createMockBase44('ouagadougou', 'ouagadougou', true);
   const course = { country_code: 'BF', ville_depart: 'Ouagadougou', gps_depart_lat: 12.37, gps_depart_lng: -1.52 };
@@ -254,7 +258,8 @@ test('16 — verifyCityCompatibility : même ville → compatible', async () => 
 });
 
 test('17 — verifyCityCompatibility : villes différentes → incompatible', async () => {
-  const { verifyCityCompatibility, invalidateCityFlagCache } = await import('../base44/shared/cityDispatchFilter.ts');
+  const { verifyCityCompatibility } = await import('../base44/shared/cityDispatchFilter.ts');
+  const { invalidateCityFlagCache } = await import('../base44/shared/cityResolution.ts');
   invalidateCityFlagCache('BF');
   const base44 = createMockBase44('ouagadougou', 'bobo', true);
   const course = { country_code: 'BF', ville_depart: 'Ouagadougou', gps_depart_lat: 12.37, gps_depart_lng: -1.52 };
@@ -266,7 +271,8 @@ test('17 — verifyCityCompatibility : villes différentes → incompatible', as
 });
 
 test('18 — verifyCityCompatibility : flag OFF → toujours compatible', async () => {
-  const { verifyCityCompatibility, invalidateCityFlagCache } = await import('../base44/shared/cityDispatchFilter.ts');
+  const { verifyCityCompatibility } = await import('../base44/shared/cityDispatchFilter.ts');
+  const { invalidateCityFlagCache } = await import('../base44/shared/cityResolution.ts');
   invalidateCityFlagCache('BF');
   const base44 = createMockBase44('ouagadougou', 'bobo', false);
   const course = { country_code: 'BF', ville_depart: 'Ouagadougou', gps_depart_lat: 12.37, gps_depart_lng: -1.52 };
