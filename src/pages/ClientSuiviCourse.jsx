@@ -10,6 +10,7 @@ import { MapPin, Package, CheckCircle2, Clock, Star, ArrowLeft, Share2, Ruler, B
 import { getPrixAffichable } from "@/utils/getPrixAffichable";
 import { getCourseStatusLabel } from "@/lib/courseStatuses";
 import { haversineKm } from "@/lib/priceEstimate";
+import { loadClientCourseHistory } from "@/lib/clientCourseHistory";
 
 
 // Ouvre WhatsApp via wa.me (fonctionne sur Android/iOS, ouvre l'app si installée)
@@ -69,6 +70,7 @@ export default function ClientSuiviCourse() {
   const navigate = useNavigate();
   const location = useLocation();
   const [userId, setUserId] = useState(null);
+  const [sessionError, setSessionError] = useState(false);
   const [showRating, setShowRating] = useState(false);
   const [showAnnulerDialog, setShowAnnulerDialog] = useState(false);
   const [showAnnulationLivreur, setShowAnnulationLivreur] = useState(false);
@@ -125,7 +127,11 @@ export default function ClientSuiviCourse() {
 
   // Récupérer l'ID user pour filtrer correctement
   useEffect(() => {
-    base44.auth.me().then(u => setUserId(u?.id)).catch(() => null);
+    base44.auth.me().then(u => {
+      setUserId(u?.id);
+      setUserEmail(u?.email);
+      setSessionError(!u?.id || !u?.email);
+    }).catch(() => setSessionError(true));
   }, []);
 
   const [clientProfilId, setClientProfilId] = useState(null);
@@ -159,30 +165,10 @@ export default function ClientSuiviCourse() {
     refetchInterval: 30000,
   });
 
-  const { data: courses = [], refetch, isLoading } = useQuery({
-    queryKey: ["mes-courses-externes", userId, clientProfilId],
+  const { data: courses = [], refetch, isLoading, isError: coursesError } = useQuery({
+    queryKey: ["mes-courses-externes", userId, clientProfilId, userEmail],
     queryFn: async () => {
-      const byCreator = await base44.entities.CourseExterne.filter(
-        { created_by_id: userId }, "-updated_date", 50
-      );
-      let byDest = [];
-      let byExpediteur = [];
-      if (clientProfilId) {
-        // Courses où l'utilisateur est destinataire
-        const allByDest = await base44.entities.CourseExterne.filter(
-          { destinataire_client_id: clientProfilId }, "-updated_date", 50
-        );
-        byDest = (allByDest || []).filter(c => c.created_by_id !== userId);
-        // Courses où l'utilisateur est expéditeur réel (mode "recevoir" initié par quelqu'un d'autre)
-        const allByExp = await base44.entities.CourseExterne.filter(
-          { expediteur_client_id: clientProfilId }, "-updated_date", 50
-        );
-        byExpediteur = (allByExp || []).filter(c => c.created_by_id !== userId);
-      }
-      // Fusionner sans doublons
-      const map = new Map();
-      [...(byCreator || []), ...(byDest || []), ...(byExpediteur || [])].forEach(c => map.set(c.id, c));
-      const courses = [...map.values()].sort((a, b) => new Date(b.updated_date) - new Date(a.updated_date));
+      const courses = await loadClientCourseHistory(base44, { userId, userEmail, clientProfilId });
 
       // CORRECTION : Récupérer le GPS du livreur via fonction backend sécurisée
       // (RLS Livreur empêche le client de lire directement l'entité Livreur)
@@ -204,8 +190,7 @@ export default function ClientSuiviCourse() {
       }
       return courses;
     },
-    enabled: !!userId,
-    initialData: [],
+    enabled: !!userId && !!userEmail,
     refetchInterval: 10000, // ⚡ 5s → 10s : polling optimisé (ETA géré par useETACourse)
     staleTime: 5000,
   });
@@ -403,13 +388,23 @@ export default function ClientSuiviCourse() {
           </div>
         </div>
 
+        {(coursesError || sessionError) && (
+          <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-900">
+            <p>Impossible de charger vos courses. Veuillez réessayer.</p>
+            <Button type="button" variant="outline" onClick={() => sessionError ? window.location.reload() : refetch()}>Réessayer</Button>
+          </div>
+        )}
+
         {/* Bannière frais d'annulation impayés */}
         {fraisImpayes.length > 0 && (
           <FraisAnnulationBannerClient fraisImpayes={fraisImpayes} />
         )}
 
         {/* ── ONGLET HISTORIQUE ── */}
-        {onglet === "historique" && (
+        {(!userId || !userEmail || isLoading) && !coursesError && !sessionError && (
+          <div role="status" className="py-12 text-center text-sm text-gray-600">Chargement de vos courses...</div>
+        )}
+        {onglet === "historique" && userId && userEmail && !isLoading && !coursesError && (
           <HistoriqueCoursesClient
             courses={coursesHistorique}
             fraisAnnulation={fraisImpayes}
@@ -421,7 +416,7 @@ export default function ClientSuiviCourse() {
         )}
 
         {/* ── PAS DE COURSE ACTIVE ── */}
-        {onglet === "actives" && !maCourse && (
+        {onglet === "actives" && !maCourse && userId && userEmail && !isLoading && !coursesError && (
           <div className="py-12 text-center space-y-3">
             <div className="text-6xl">😊</div>
             <p className="text-sm font-medium text-gray-500">Aucune course active en ce moment</p>

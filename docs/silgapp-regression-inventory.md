@@ -248,7 +248,92 @@ when their assertions still match current product decisions.
 - Keep the original priority regression suite: its enabled-feature failures
   must remain visible, not be removed to approve a release.
 
+## Physical Campaign 2026-10-12: Findings For The Next Single Batch
+
+These are observed findings and pending work, not claims of fixes or a new release.
+Private account ids, course ids, screenshots and backend evidence stay outside Git.
+The owner requested one consolidated correction batch and no rebuild during tests.
+
+- Available courses must not return an empty state before checking available Eco
+  missions. `CoursesDisponibles` currently hides grouped missions when its ordinary
+  course list is empty. Reproduced on both driver devices; preserve isolated-course
+  non-acceptability and the existing mission acceptance path when fixing it.
+- One real two-driver Eco acceptance race had a single winner and both courses
+  assigned to that winner. The losing driver's rejection was legitimate, not a
+  false error. This single run is not a general multi-entity transaction guarantee.
+- Eco pickup confirmations advanced the device UI while the stored mission route
+  still showed pending steps. Final delivery brought all four steps to completed.
+  Protect intermediate backend progress as well as final completion.
+- Delivery coordinates were absent on all four delivered TEST records. Eco pickup
+  coordinates were also absent, despite available driver positions. Investigate
+  persistence without inventing or backfilling locations.
+- Normal commission amounts matched individual prices in this campaign, but Eco
+  commission lock metadata was absent. Reconcile and protect traceability without
+  changing financial rules or rewriting balances.
+- Non-exclusive on-route addition succeeded; cancelling the added, uncollected
+  parcel preserved the collected original parcel and returned to CourseActiveCard.
+  The invalidated mission retained stale total/route metadata. Do not mistake an
+  invalidated audit record for an active, acceptable mission.
+- Client history initially displayed no courses, then loaded 54 entries including
+  the new TEST courses. Distinguish loading, genuine empty results and failures;
+  do not claim persistent history loss from the initial empty screen.
+- Admin-origin course contact progression exposes Call/WhatsApp but no explicit
+  independent contact action in the observed state. Review this gate without
+  making unsolicited calls or changing confirmed transition rules.
+- Keep misleading client waiting labels, mobile overflow, duplicate admin bells
+  and VENUS-covered controls in the consolidated visual correction list. Counter
+  differences between pages need scope/pagination checks before being called bugs.
+- New owner request: add a short completion chime to the existing Victory overlay,
+  once per backend-confirmed parcel delivery (Standard or Eco). Preserve the
+  historical growing text, roughly nine-second duration and automatic dismissal.
+  Respect device silent/audio settings; do not replay on rerender, reconnect or a
+  duplicate confirmation. This is planned, NOT implemented or device-validated.
+- Physical Victory was captured for both Standard deliveries and the second Eco
+  parcel. The first Eco parcel's animation was not captured and stays unverified.
+- Keep correction 20 disabled. Video remains explicitly deferred. Background/
+  terminated-app FCM, controlled moving GPS, on-route refusal/expiry and crash
+  recovery were not comprehensively validated by this campaign.
+
 ## 1.0.125 Dispatch Follow-up
 
 - dispatchExterneAuto must fail closed with dispatch_v2_disabled/503 when V2 is off, never call the retired V1 engine. V2 publication and tenant checks remain unchanged. Targeted deployment re-read matched staging; configuration and workflows were not changed.
 - Guard: dispatch-v2-enterprise-reconstruction.mjs scans executable AST imports/calls and executes the real publication branch with isolated adapters for both flag values and Public/Enterprise inputs. It preserves current backend/frontend tenant and suspension guards; it does not prove live acceptance atomicity.
+
+## 1.0.129 Consolidated October 12 Corrections
+
+- Available-feed rendering waits for both ordinary courses and Eco missions.
+  An Eco-only result renders its mission cards; read failures never become an
+  empty success. Mission realtime events invalidate the existing scoped query.
+- Pickup/delivery progress is derived from confirmed course states. Deploy the
+  shared progress implementation with the transition/finalization callers;
+  source-only fixes do not establish remote behavior. Completed steps never regress.
+- Partial cancellation keeps cancelled steps as audit-only records, recomputes
+  active totals, and detaches the individually continuing parcel only after the
+  mission update. Recovery retries incomplete detachment. Never rewrite test history.
+- Eco acceptance writes the existing Pass/Happy Hour commission lock with each
+  course claim, reads both locks back before publishing acceptance, and preserves
+  locks during retries. This is not a multi-entity database transaction.
+- Stage GPS accepts a real fix at most 120 seconds old, with accuracy at most
+  100 metres. Heartbeat timestamps are not location timestamps. Permission denial
+  prevents cache fallback. Missing GPS is logged and does not block delivery.
+- History separates session/loading, request failure, loaded and truly empty
+  states. Existing authenticated identity filters and deduplication remain active.
+- Victory uses the existing overlay and Android notification-stream chime.
+  Persistent per-course deduplication, silent/vibrate/DND and volume checks happen
+  natively. No web/iOS sound is claimed; no sound failure may block the overlay.
+- Admin mobile VENUS is embedded in the header, with one mounted instance per
+  breakpoint and body portals for panels. Preserve both notification destinations
+  while using distinct bell/inbox symbols. Report/Pass/Country headers wrap.
+- Tests: october12-regression (actual rendered feed and isolated production
+  functions), eco-acceptance-recovery, eco-cancellation-runtime,
+  final-corrections-regression and client-history-email-regression.
+- Deployment targets: transitionStatutLivreur, finaliserLivraisonLivreur,
+  annulerCourseExterne, ecoOptimizationOrchestrator, courseEventOrchestrator.
+  Source exports matched all executable dependencies after targeted deployment.
+- Strict Deno graph check: 87 diagnostics at the previous release and 87 now;
+  zero introduced diagnostic signatures. Keep this failure visible, not suppressed.
+- Correction 20 remains disabled, including stale true configuration; its original
+  experimental suite remains separate and failing. No financial history repair,
+  production configuration change or video work belongs to this release.
+- Device installation, visible screens and new delivery/sound/GPS execution must
+  be reported separately; neither simulation nor signed build proves a physical pass.

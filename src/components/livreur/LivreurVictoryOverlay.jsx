@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import confetti from "canvas-confetti";
+import { playVictorySoundOnce } from "@/lib/victorySound";
 
 /**
  * LivreurVictoryOverlay — Animation plein écran de célébration livreur.
@@ -56,6 +57,7 @@ export default function LivreurVictoryOverlay({ courseId, onClose }) {
     // ── Anti-doublon : même courseId = pas de replay ──
     const firstRun = lastCourseIdRef.current !== courseId;
     if (firstRun) {
+      void playVictorySoundOnce(courseId);
       lastCourseIdRef.current = courseId;
       deadlineRef.current = Date.now() + DURATION_MS;
       closedRef.current = false;

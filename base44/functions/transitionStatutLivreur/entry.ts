@@ -1,6 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
 import { updateEcoMissionRouteProgress } from '../../shared/ecoOptimizationEngine.ts';
-import { validatedDeliveryGps } from '../../shared/deliveryGps.ts';
+import { resolveDeliveryGps } from '../../shared/deliveryGps.ts';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TRANSITION STATUT LIVREUR — Toutes les transitions de statut sans prix
@@ -50,7 +50,7 @@ const FORBIDDEN_FIELDS = [
   'client_price_validated_at', 'client_price_refused_at', 'pricing_mode',
   'tracking_token', 'tracking_link', 'tracking_shared_at', 'tracking_opened_count',
   'pickup_qr_token', 'pickup_code_4_digits', 'delivery_qr_token', 'delivery_code_4_digits',
-  'pickup_confirmed_by', 'delivery_confirmed_by',
+  'delivery_confirmed_by',
   'heure_acceptation', 'source', 'country_code', 'type_course', 'is_multi_colis',
   'nb_colis', 'nb_colis_livres', 'nb_colis_annules',
 ];
@@ -152,9 +152,14 @@ export default async function(req: Request): Promise<Response> {
 
     // Champs GPS (uniquement si fournis et valides)
     const gpsFields = GPS_FIELDS_PAR_STATUT[statut_cible];
-    if (gpsFields && validatedDeliveryGps(latitude, longitude)) {
-      updateData[gpsFields[0]] = latitude;
-      updateData[gpsFields[1]] = longitude;
+    if (gpsFields) {
+      const { gps, reason } = resolveDeliveryGps(body, livreur);
+      if (gps) {
+        updateData[gpsFields[0]] = gps.latitude;
+        updateData[gpsFields[1]] = gps.longitude;
+      } else {
+        console.info('[delivery_gps_missing]', JSON.stringify({ course_id, step: statut_cible, reason }));
+      }
     }
 
     // Remarque livreur (champ sûr)

@@ -26,6 +26,13 @@ export default function AppLayout({ reseau }) {
 }
 
 function AppLayoutInner({ reseau }) {
+  const [desktop, setDesktop] = useState(() => window.matchMedia('(min-width: 1024px)').matches);
+  useEffect(() => {
+    const query = window.matchMedia('(min-width: 1024px)');
+    const update = () => setDesktop(query.matches);
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
   const { windows } = useAdminCourseWindows();
   const hasWindows = windows.length > 0;
   const [notifCount, setNotifCount] = useState(0);
@@ -170,11 +177,11 @@ function AppLayoutInner({ reseau }) {
       </div>
 
       {/* Assistant VENUS — bouton flottant sur toutes les pages admin */}
-      <VenusFloatingButton />
+      {desktop && <VenusFloatingButton />}
 
       {/* Mobile layout */}
       <div className="lg:hidden">
-        <MobileNav notificationCount={notifCount} demandesCount={demandesCount} partenaireDemandesCount={partenaireDemandesCount} neoCount={neoCount} messageCount={messageCount} reseau={reseau} />
+        <MobileNav showVenus={!desktop} notificationCount={notifCount} demandesCount={demandesCount} partenaireDemandesCount={partenaireDemandesCount} neoCount={neoCount} messageCount={messageCount} reseau={reseau} />
         <main className="pt-[calc(3.5rem+max(env(safe-area-inset-top),28px))] pb-[calc(4.5rem+env(safe-area-inset-bottom))] min-h-screen bg-background">
           <Outlet />
         </main>

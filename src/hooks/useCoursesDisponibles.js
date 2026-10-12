@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 
 /**
@@ -52,6 +52,7 @@ function normalizeEnterpriseId(val) {
 }
 
 export function useCoursesDisponibles(livreurProfil) {
+  const queryClient = useQueryClient();
   const livreurId = livreurProfil?.id;
   const countryCode = livreurProfil?.country_code;
   const livreurEnterpriseId = normalizeEnterpriseId(livreurProfil?.enterprise_id);
@@ -100,7 +101,7 @@ export function useCoursesDisponibles(livreurProfil) {
   // La requête ne filtre pas par enterprise_id car MongoDB ne peut pas matcher
   // null + undefined + "" dans une seule requête SDK. Le filtrage enterprise_id
   // est fait côté client dans eligibleCourses (normalisation canonique).
-  const { data: courses = [], isLoading } = useQuery({
+  const { data: courses = [], isLoading: coursesLoading, isError: coursesError } = useQuery({
     queryKey: ["courses-externes-disponibles", livreurId, countryCode, livreurEnterpriseId, isV2Enabled],
     queryFn: async () => {
       if (!livreurPeutVoirFil || !isV2Enabled) return [];
@@ -119,7 +120,7 @@ export function useCoursesDisponibles(livreurProfil) {
         },
         "-created_date",
         30
-      ).catch(() => []);
+      );
       const byId = new Map();
       [...(all || []), ...(ecoIsolated || [])].forEach((course) => {
         if (course?.id) byId.set(course.id, course);
@@ -133,7 +134,7 @@ export function useCoursesDisponibles(livreurProfil) {
     refetchOnMount: true,
   });
 
-  const { data: ecoMissions = [] } = useQuery({
+  const { data: ecoMissions = [], isLoading: missionsLoading, isError: missionsError } = useQuery({
     queryKey: ["eco-missions-disponibles", livreurId, countryCode, livreurEnterpriseId, isV2Enabled],
     queryFn: async () => {
       if (!livreurPeutVoirFil || !isV2Enabled || !countryCode) return [];
@@ -142,12 +143,21 @@ export function useCoursesDisponibles(livreurProfil) {
         { status: "available", country_code: countryCode, enterprise_id: null },
         "-created_date",
         20
-      ).catch(() => []);
+      );
     },
     enabled: !!livreurId && !!countryCode && livreurPeutVoirFil && isV2Enabled,
     refetchInterval: 10000,
     staleTime: 0,
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
   });
+
+  useEffect(() => {
+    if (!livreurId || !countryCode || livreurEnterpriseId !== null || !livreurPeutVoirFil) return;
+    return base44.entities.EcoMission.subscribe(() => {
+      queryClient.invalidateQueries({ queryKey: ["eco-missions-disponibles", livreurId, countryCode] });
+    });
+  }, [queryClient, livreurId, countryCode, livreurEnterpriseId, livreurPeutVoirFil]);
 
   // ── Courses refusées (DispatchNotification) ──
   const { data: refusedCourseIds = [] } = useQuery({
@@ -214,7 +224,8 @@ export function useCoursesDisponibles(livreurProfil) {
   return {
     eligibleCourses,
     courses,
-    isLoading,
+    isLoading: coursesLoading || missionsLoading,
+    isError: coursesError || missionsError,
     isV2Enabled,
     livreurDisponible,
     livreurPeutVoirFil,

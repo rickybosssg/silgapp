@@ -10,13 +10,14 @@ export function functionBody(response) {
 
 // Read back this exact course after a lost response; never retry the financial
 // mutation automatically.
-export async function confirmDelivery(api, courseId) {
+export async function confirmDelivery(api, courseId, options = {}) {
   let result;
   let failure;
   try {
     const gps = await captureDeliveryGps();
     result = functionBody(await api.functions.invoke("finaliserLivraisonLivreur", {
       course_id: courseId,
+      ...(options.prix_final_livreur == null ? {} : { prix_final_livreur: options.prix_final_livreur }),
       ...gps,
     }));
     if (result?.success === true) return result;

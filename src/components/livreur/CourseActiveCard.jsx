@@ -127,7 +127,8 @@ function ProgressBar({ statut, isDeplacement, isAdminColis }) {
   );
 }
 
-import { confirmDelivery } from "@/lib/deliveryConfirmation";
+import { confirmDelivery, functionBody } from "@/lib/deliveryConfirmation";
+import { captureDeliveryGps } from "@/lib/deliveryGps";
 
 export default function CourseActiveCard({ course, onColisRecupere, onColisLivre, onClientAnnule, onMettrePause, isPending, isExterne = false, livreurLat, livreurLng, livreurId, livreurNom, onDeliveryVictory }) {
   const navigate = useNavigate();
@@ -142,6 +143,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   // ── Correction 1: état pour les boutons directs (nouveau parcours sans QR/PIN) ──
   const [pickupBoutonPending, setPickupBoutonPending] = useState(false);
   const [deliveryBoutonPending, setDeliveryBoutonPending] = useState(false);
+  const transitionPendingRef = useRef(false);
   // Optimistic status — overrides course.statut immediately on tap
   const [optimisticStatut, setOptimisticStatut] = useState(null);
   // Données de livraison en attente (admin_manuel : saisie montant après validation QR/PIN)
@@ -697,7 +699,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
 
               </div>
               <p className="text-xl font-black text-gray-900">
-                {(course.pricing_mode === "admin_manuel" || course.source === "admin") ? "Livraison confirmée !" : "Course terminée !"}
+                Confirmer la livraison
               </p>
               <p className="text-sm text-gray-500 mt-1">
                 {(course.pricing_mode === "admin_manuel" || course.source === "admin")
@@ -1031,78 +1033,27 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
             const isArrivee = deplacementStatut === "arrivee";
             const isTermine = deplacementStatut === "livree";
 
-            const handlePriseEnCharge = () => {
-              navigator.geolocation.getCurrentPosition(
-                async (pos) => {
-                  const now = new Date().toISOString();
-                  const data = {
-                    statut: "pris_en_charge",
-                    heure_prise_en_charge: now,
-                    latitude_prise_en_charge: pos.coords.latitude,
-                    longitude_prise_en_charge: pos.coords.longitude,
-                  };
-                  updateOptimisticStatut("pris_en_charge", data);
-                  base44.functions.invoke("transitionStatutLivreur", {
-                    course_id: course.id,
-                    statut_cible: "pris_en_charge",
-                    latitude: pos.coords.latitude,
-                    longitude: pos.coords.longitude,
-                  }).catch(() => null);
-                  queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
-                  toast.success("Passager pris en charge ! ");
-                },
-                (err) => {
-                  console.warn("GPS indisponible pour prise en charge:", err?.message);
-                  const now = new Date().toISOString();
-                  const data = { statut: "pris_en_charge", heure_prise_en_charge: now };
-                  updateOptimisticStatut("pris_en_charge", data);
-                  base44.functions.invoke("transitionStatutLivreur", {
-                    course_id: course.id,
-                    statut_cible: "pris_en_charge",
-                  }).catch(() => null);
-                  queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
-                  toast.success("Passager pris en charge ! ");
-                },
-                { enableHighAccuracy: true, timeout: 5000 }
-              );
+            const transitionDeplacement = async (target) => {
+              if (transitionPendingRef.current) return;
+              transitionPendingRef.current = true;
+              try {
+                const result = functionBody(await base44.functions.invoke("transitionStatutLivreur", {
+                  course_id: course.id, statut_cible: target, ...await captureDeliveryGps(),
+                }));
+                if (!result?.success) throw new Error(result?.error || "Transition non confirmée");
+                updateOptimisticStatut(target, result.course || { statut: target });
+                queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+                if (target === "arrivee") setShowPrixModal(true);
+                else toast.success("Passager pris en charge !");
+              } catch (error) {
+                toast.error(error?.message || "Confirmation indisponible. Actualisez avant de réessayer.");
+                queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+              } finally {
+                transitionPendingRef.current = false;
+              }
             };
-
-            const handleArrivee = () => {
-              navigator.geolocation.getCurrentPosition(
-                async (pos) => {
-                  const now = new Date().toISOString();
-                  const data = {
-                    statut: "arrivee",
-                    heure_arrivee: now,
-                    latitude_arrivee_dest: pos.coords.latitude,
-                    longitude_arrivee_dest: pos.coords.longitude,
-                  };
-                  updateOptimisticStatut("arrivee", data);
-                  base44.functions.invoke("transitionStatutLivreur", {
-                    course_id: course.id,
-                    statut_cible: "arrivee",
-                    latitude: pos.coords.latitude,
-                    longitude: pos.coords.longitude,
-                  }).catch(() => null);
-                  queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
-                  // Ouvrir automatiquement la modale de prix
-                  setShowPrixModal(true);
-                },
-                (err) => {
-                  console.warn("GPS indisponible pour arrivee:", err?.message);
-                  const now = new Date().toISOString();
-                  const data = { statut: "arrivee", heure_arrivee: now };
-                  updateOptimisticStatut("arrivee", data);
-                  base44.functions.invoke("transitionStatutLivreur", {
-                    course_id: course.id,
-                    statut_cible: "arrivee",
-                  }).catch(() => null);
-                  queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
-                  setShowPrixModal(true);
-                },
-                { enableHighAccuracy: true, timeout: 5000 }
-              );
-            };
+            const handlePriseEnCharge = () => transitionDeplacement("pris_en_charge");
+            const handleArrivee = () => transitionDeplacement("arrivee");
 
             const handleTerminerDeplacement = () => {
               updateOptimisticStatut("livree", {
@@ -1204,20 +1155,16 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                       if (pickupBoutonPending) return;
                       setPickupBoutonPending(true);
                       const now = new Date().toISOString();
-                      updateOptimisticStatut("colis_recupere", {
-                        heure_recuperation: now,
-                        pickup_confirmed_by: "bouton",
-                        pickup_confirmed_at: now,
-                      });
-                      const invokeTransition = async (lat, lng) => {
+                      const invokeTransition = async (gps) => {
                         try {
-                          const res = await base44.functions.invoke("transitionStatutLivreur", {
+                          const res = functionBody(await base44.functions.invoke("transitionStatutLivreur", {
                             course_id: course.id,
                             statut_cible: "colis_recupere",
-                            ...(lat != null && lng != null ? { latitude: lat, longitude: lng } : {}),
+                            ...gps,
                             confirmation_method: "bouton",
-                          });
+                          }));
                           if (res?.success || res?.skipped) {
+                            updateOptimisticStatut("colis_recupere", { heure_recuperation: now });
                             queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
                             onColisRecupere({ ...course, statut: "colis_recupere", heure_recuperation: now });
                             toast.success("Colis récupéré avec succès !");
@@ -1232,11 +1179,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                         }
                       };
                       // GPS optionnel — ne pas bloquer la récupération si indisponible
-                      navigator.geolocation.getCurrentPosition(
-                        (pos) => invokeTransition(pos.coords.latitude, pos.coords.longitude),
-                        () => invokeTransition(null, null),
-                        { enableHighAccuracy: true, timeout: 5000 }
-                      );
+                      await invokeTransition(await captureDeliveryGps());
                     }}
                     disabled={isPending || pickupBoutonPending}
                   >

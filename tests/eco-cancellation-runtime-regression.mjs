@@ -6,12 +6,12 @@ const source = readFileSync('base44/shared/ecoOptimizationEngine.ts', 'utf8');
 const parsed = ts.createSourceFile('engine.ts', source, ts.ScriptTarget.Latest, true);
 const fn = parsed.statements.find(n => ts.isFunctionDeclaration(n) && n.name?.text === 'recalculateEcoMissionAfterCancellation');
 const code = ts.transpile(fn.getText(parsed).replace('export ', ''), { target: ts.ScriptTarget.ES2022 });
-const recalculate = new Function(`${code}; return recalculateEcoMissionAfterCancellation;`)();
+const recalculate = new Function('TERMINAL_STATUSES', 'prixCourse', `${code}; return recalculateEcoMissionAfterCancellation;`)(['livree', 'annulee'], row => row.prix || 0);
 function fixture({ picked = false, detachFails = false, casFails = false, readFails = false } = {}) {
   const rows = {
     a: { id: 'a', eco_mission_id: 'm', statut: 'en_attente', client_decision_attendue: true,
       heure_recuperation: picked ? '2026-10-11T10:00:00Z' : null, prix: 500, commission: 50 },
-    b: { id: 'b', eco_mission_id: 'm', statut: 'en_livraison', heure_recuperation: '2026-10-11T10:00:00Z', prix: 1000, commission: 100 },
+    b: { id: 'b', eco_mission_id: 'm', livreur_id: 'driver', statut: 'en_livraison', heure_recuperation: '2026-10-11T10:00:00Z', prix: 1000, commission: 100 },
   };
   const mission = { id: 'm', status: 'in_progress', course_ids: ['a', 'b'], livreur_id: 'driver',
     route_plan_json: JSON.stringify([
@@ -24,6 +24,12 @@ function fixture({ picked = false, detachFails = false, casFails = false, readFa
     CourseExterne: {
       get: async id => { if (readFails && id === 'b') throw Error('read'); return structuredClone(rows[id]); },
       update: async (id, patch) => { if (detachFails) { detachFails = false; throw Error('detach'); } Object.assign(rows[id], patch); },
+      updateMany: async (filter, patch) => {
+        if (detachFails) { detachFails = false; throw Error('detach'); }
+        const row = rows[filter.id];
+        if (!Object.entries(filter).every(([k, v]) => row[k] === v)) return { updated: 0 };
+        Object.assign(row, patch.$set); return { updated: 1 };
+      },
       filter: async () => Object.values(rows).filter(c => c.statut === 'en_livraison'),
     },
     EcoMission: {
@@ -39,6 +45,9 @@ await recalculate(f.api, 'a');
 assert.equal(f.rows.a.eco_mission_id, null);
 assert.equal(f.mission.status, 'invalidated');
 assert.equal(f.mission.active_step_index, 1); // Array index, not obsolete order=4.
+assert.equal(f.rows.b.eco_mission_id, null);
+assert.equal(f.mission.total_price, 1000);
+assert.ok(JSON.parse(f.mission.route_plan_json).some(step => step.course_id === 'a' && step.audit_only && step.status === 'cancelled'));
 assert.deepEqual([f.rows.b.prix, f.rows.b.commission], [1000, 100]);
 f = fixture({ picked: true });
 await recalculate(f.api, 'a');
@@ -72,8 +81,8 @@ f = fixture();
 f.mission.livreur_id = null;
 f.rows.b.statut = 'recherche_livreur';
 let candidateCompensated = false;
-const withRelease = new Function('releaseEcoCandidate', `${code}; return recalculateEcoMissionAfterCancellation;`)(
-  async () => { candidateCompensated = true; return true; }
+const withRelease = new Function('releaseEcoCandidate', 'TERMINAL_STATUSES', 'prixCourse', `${code}; return recalculateEcoMissionAfterCancellation;`)(
+  async () => { candidateCompensated = true; return true; }, ['livree', 'annulee'], row => row.prix || 0
 );
 await withRelease(f.api, 'a');
 assert.equal(candidateCompensated, true);

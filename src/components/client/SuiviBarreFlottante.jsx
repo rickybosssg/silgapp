@@ -1,17 +1,17 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronRight, Search, Bike, Box, Truck, CheckCircle2, User, MapPin, Navigation } from "lucide-react";
+import { ChevronRight, Search, Bike, Box, Truck, CheckCircle2, User, MapPin, Navigation, Package } from "lucide-react";
 import { useETACourse } from "@/hooks/useETACourse";
 
 const REASSURANCE_MESSAGES = {
   recherche: [
     "🔍 Nous recherchons le meilleur livreur...",
-    "🛵 Un livreur consulte votre demande...",
+    "Votre demande est en attente d'acceptation.",
     "⚡ Mise en relation en cours...",
   ],
   en_route: [
     "🛵 Le livreur est en route vers vous.",
-    "📍 Il arrive bientôt.",
+    "Consultez sa position sur la carte.",
     "📦 Préparez votre colis.",
   ],
   recupere: [
@@ -20,8 +20,8 @@ const REASSURANCE_MESSAGES = {
   ],
   livraison: [
     "🚚 Votre colis est en route vers la destination.",
-    "📍 Le livreur se rapproche de l'arrivée.",
-    "🎉 Bientôt livré !",
+    "Consultez la progression sur la carte.",
+    "La livraison sera confirmee dans votre suivi.",
   ],
 };
 
@@ -29,6 +29,11 @@ function getBarContent(course) {
   const t = course.type_course;
   const s = course.statut;
   const isDeplacement = t === "deplacement";
+
+  if (s === "annulee") return { icon: Package, text: "Course annulee", color: "bg-slate-500", phase: "cancelled" };
+  if (!course.livreur_id && course.delivery_mode === "eco") {
+    return { icon: Search, text: course.eco_status === "isolated" ? "En attente de regroupement" : "Mission Eco en attente de livreur", color: "bg-green-600", phase: "eco_waiting" };
+  }
 
   if (s === "nouvelle" || (s === "recherche_livreur" && !course.livreur_id)) {
     return { icon: Search, emoji: "🔍", text: "Recherche d'un livreur...", color: "bg-amber-500", phase: "recherche" };

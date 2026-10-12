@@ -7,12 +7,14 @@ const code = ['completeEcoAcceptance', 'compensateEcoAcceptance'].map(name => {
   const fn = parsed.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === name);
   return ts.transpile(fn.getText(parsed).replace('export ', ''), { target: ts.ScriptTarget.ES2022 });
 }).join('\n');
-const { complete, compensate } = new Function('normalizeEnterpriseId', 'TERMINAL_STATUSES', 'ACTIVE_STATUSES', 'marquerAccepte', `${code}; return { complete: completeEcoAcceptance, compensate: compensateEcoAcceptance };`)(
-  value => value || null, ['annulee', 'livree'], ['livreur_en_route', 'colis_recupere'], async () => {});
+const { complete, compensate } = new Function('normalizeEnterpriseId', 'TERMINAL_STATUSES', 'ACTIVE_STATUSES', 'marquerAccepte', 'evaluerAvantageCommission', 'champsLockCommission', `${code}; return { complete: completeEcoAcceptance, compensate: compensateEcoAcceptance };`)(
+  value => value || null, ['annulee', 'livree'], ['livreur_en_route', 'colis_recupere'], async () => {},
+  async () => ({ taux_applique: 0, mode: 'pass_zero' }),
+  (a, time) => ({ commission_locked_at: time, commission_taux_applique: a.taux_applique, commission_mode: a.mode }));
 const matches = (row, filter) => Object.entries(filter).every(([key, expected]) =>
   expected && typeof expected === 'object' ? expected.$in.includes(row[key] ?? null) : (row[key] ?? null) === expected);
 function fixture(fault) {
-  const mission = { id: 'm', status: 'accepting', country_code: 'BF', course_ids: ['a', 'b'], livreur_id: 'driver' };
+  const mission = { id: 'm', status: 'accepting', country_code: 'BF', course_ids: ['a', 'b'], livreur_id: 'driver', accepted_at: '2026-10-12T00:00:00Z' };
   const rows = ['a', 'b'].map(id => ({ id, eco_mission_id: 'm', eco_status: 'grouped', country_code: 'BF',
     enterprise_id: null, statut: 'recherche_livreur', dispatch_status: 'en_attente', livreur_id: null, accepted_by_livreur_id: null }));
   let fail = fault === 'lost-response';
@@ -34,7 +36,7 @@ function fixture(fault) {
   } } };
   return { api, rows, mission };
 }
-const patch = { livreur_id: 'driver', accepted_by_livreur_id: 'driver', statut: 'livreur_en_route', dispatch_status: 'accepte' };
+const patch = { livreur_id: 'driver', accepted_by_livreur_id: 'driver', statut: 'livreur_en_route', dispatch_status: 'accepte', heure_acceptation: '2026-10-12T00:00:00Z' };
 {
   const f = fixture('lost-response');
   const first = await complete(f.api, f.mission, patch);
@@ -44,6 +46,7 @@ const patch = { livreur_id: 'driver', accepted_by_livreur_id: 'driver', statut: 
   assert.equal((await complete(f.api, f.mission, patch)).success, true);
   assert.equal(f.mission.status, 'accepted');
   assert.ok(f.rows.every(row => row.livreur_id === 'driver'));
+  assert.ok(f.rows.every(row => row.commission_locked_at && row.commission_taux_applique === 0 && row.commission_mode === 'pass_zero'));
 }
 for (const conflict of ['cancelled', 'other-owner']) {
   const f = fixture();

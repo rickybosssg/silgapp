@@ -38,6 +38,33 @@ import com.google.mlkit.vision.codescanner.GmsBarcodeScanning;
     }
 )
 public class SilgappNativePlugin extends Plugin {
+    @PluginMethod
+    public synchronized void playVictorySound(PluginCall call) {
+        String id = call.getString("courseId", "");
+        if (id.isEmpty() || id.length() > 128) { call.reject("Invalid course id"); return; }
+        android.content.SharedPreferences prefs = getContext().getSharedPreferences("victory_sound", 0);
+        if (prefs.getBoolean(id, false)) { call.resolve(); return; }
+        // Persist before playback, including silent mode: never replay on reopen.
+        if (!prefs.edit().putBoolean(id, true).commit()) { call.resolve(); return; }
+        android.media.AudioManager audio = (android.media.AudioManager) getContext()
+            .getSystemService(android.content.Context.AUDIO_SERVICE);
+        android.app.NotificationManager notifications = (android.app.NotificationManager) getContext()
+            .getSystemService(android.content.Context.NOTIFICATION_SERVICE);
+        if (audio == null || audio.getRingerMode() != android.media.AudioManager.RINGER_MODE_NORMAL ||
+            audio.getStreamVolume(android.media.AudioManager.STREAM_NOTIFICATION) == 0 ||
+            (Build.VERSION.SDK_INT >= 23 && notifications != null &&
+             notifications.getCurrentInterruptionFilter() != android.app.NotificationManager.INTERRUPTION_FILTER_ALL)) {
+            call.resolve(); return;
+        }
+        try {
+            final android.media.ToneGenerator tone = new android.media.ToneGenerator(
+                android.media.AudioManager.STREAM_NOTIFICATION, 55);
+            tone.startTone(android.media.ToneGenerator.TONE_PROP_ACK, 450);
+            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(tone::release, 700);
+        } catch (RuntimeException ignored) { /* Confirmation must not depend on audio hardware. */ }
+        call.resolve();
+    }
+
     private String heartbeatToken = "";
     private String heartbeatServerUrl = "https://silga-dispatch-go.base44.app";
     private String heartbeatAppId = "6a0ec08f3af5e1d1284254c1";

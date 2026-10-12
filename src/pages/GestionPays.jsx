@@ -179,8 +179,8 @@ export default function GestionPays() {
           <div className="absolute -top-8 -right-8 w-40 h-40 bg-white rounded-full" />
           <div className="absolute -bottom-12 -left-6 w-56 h-56 bg-white rounded-full" />
         </div>
-        <div className="relative flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
+        <div className="relative flex flex-wrap items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
             <Link to="/">
               <Button variant="ghost" size="icon" className="h-9 w-9 text-white hover:bg-white/20 border border-white/30">
                 <ArrowLeft className="w-4 h-4" />

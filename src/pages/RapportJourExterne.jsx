@@ -82,14 +82,14 @@ export default function RapportJourExterne() {
           <div className="absolute -top-8 -right-8 w-40 h-40 bg-white rounded-full" />
           <div className="absolute -bottom-12 -left-6 w-56 h-56 bg-white rounded-full" />
         </div>
-        <div className="relative flex items-center gap-3">
+        <div className="relative flex flex-wrap items-center gap-3">
           <Link to="/">
             <Button variant="ghost" size="sm" className="gap-1.5 text-white hover:bg-white/20 border border-white/30">
               <ArrowLeft className="w-4 h-4" />
               <span className="hidden sm:inline">Retour</span>
             </Button>
           </Link>
-          <div className="flex items-center gap-3 flex-1">
+          <div className="flex items-center gap-3 flex-1 min-w-[180px]">
             <div className="w-10 h-10 rounded-2xl bg-white/15 border border-white/25 flex items-center justify-center text-xl flex-shrink-0">
 
             </div>
@@ -146,7 +146,7 @@ export default function RapportJourExterne() {
           </div>
           {/* Sélecteur pays — affiché uniquement pour les admins globaux */}
           {!isPays && (
-            <div className="[&_button]:!bg-white/20 [&_button]:!text-white [&_button]:!border-white/30 [&_div]:!bg-white [&_div]:!text-slate-800 flex-shrink-0">
+            <div className="min-w-0 max-w-full">
               <CountrySelector
                 value={effectiveCountry || ""}
                 onChange={setSelectedCountry}

@@ -4,15 +4,17 @@ import ts from 'typescript';
 import { captureDeliveryGps } from '../src/lib/deliveryGps.js';
 
 const read = path => readFileSync(path, 'utf8');
-const gpsCode = ts.transpile(read('base44/shared/deliveryGps.ts').replace('export ', ''), { target: ts.ScriptTarget.ES2022 });
+const gpsCode = ts.transpile(read('base44/shared/deliveryGps.ts').replaceAll('export ', ''), { target: ts.ScriptTarget.ES2022 });
 const validateGps = new Function(`${gpsCode};return validatedDeliveryGps;`)();
+const resolveGps = new Function(`${gpsCode};return resolveDeliveryGps;`)();
 assert.deepEqual(validateGps(0, 0), { latitude: 0, longitude: 0 });
 for (const coords of [[91, 0], [0, 181], [null, null], ['', ''], [NaN, 2]]) {
   assert.equal(validateGps(...coords), null);
 }
-assert.deepEqual(await captureDeliveryGps(null), {});
-assert.deepEqual(await captureDeliveryGps({ getCurrentPosition: (_ok, fail) => fail() }), {});
-assert.deepEqual(await captureDeliveryGps({ getCurrentPosition: ok => ok({ coords: { latitude: 12.3, longitude: -1.5 } }) }), { latitude: 12.3, longitude: -1.5 });
+assert.equal((await captureDeliveryGps(null)).gps_reason, 'unavailable');
+assert.equal((await captureDeliveryGps({ getCurrentPosition: (_ok, fail) => fail({ code: 1 }) })).gps_reason, 'permission_denied');
+const gpsTime = Date.now();
+assert.deepEqual(await captureDeliveryGps({ getCurrentPosition: ok => ok({ timestamp: gpsTime, coords: { latitude: 12.3, longitude: -1.5, accuracy: 20 } }) }), { latitude: 12.3, longitude: -1.5, gps_timestamp: gpsTime, gps_accuracy: 20 });
 
 // Execute the real transition endpoint with isolated entity adapters.
 let handlerCode = read('base44/functions/transitionStatutLivreur/entry.ts')
@@ -33,16 +35,17 @@ async function transition({ actor = 'test', current = 'livreur_en_route', race =
     Livreur: { get: async () => ({ user_email: 'test', email: 'test' }) },
     EcoMission: { get: async () => ({ id: 'm', status: missionStatus }) },
   } } };
-  const handler = new Function('createClientFromRequest', 'validatedDeliveryGps', 'updateEcoMissionRouteProgress',
-    `${handlerCode};return handler;`)(() => api, validateGps, async () => { progresses++; return { updated: true }; });
+  const handler = new Function('createClientFromRequest', 'resolveDeliveryGps', 'updateEcoMissionRouteProgress',
+    `${handlerCode};return handler;`)(() => api, resolveGps, async () => { progresses++; return { updated: true }; });
   const response = await handler(new Request('https://isolated.invalid', { method: 'POST', body: JSON.stringify({
-    course_id: 'a', statut_cible: 'colis_recupere', latitude: 12.3, longitude: -1.5, confirmation_method: 'bouton', commission_silga: 0,
+    course_id: 'a', statut_cible: 'colis_recupere', latitude: 12.3, longitude: -1.5, gps_timestamp: Date.now(), gps_accuracy: 20, confirmation_method: 'bouton', commission_silga: 0,
   }) }));
   return { status: response.status, body: await response.json(), row, progresses };
 }
 const pickup = await transition();
 assert.equal(pickup.status, 200);
 assert.equal(pickup.row.latitude_recuperation, 12.3);
+assert.equal(pickup.row.pickup_confirmed_by, 'bouton');
 assert.equal(pickup.row.commission_silga, 250);
 assert.equal(pickup.row.prix_final, 1250);
 assert.equal(pickup.progresses, 1);

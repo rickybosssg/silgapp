@@ -1082,6 +1082,21 @@ export async function recalculateEcoMissionAfterCancellation(base44: any, course
   if (!course?.eco_mission_id) return { recalculated: false, reason: 'no_mission' };
 
   const mission = await base44.asServiceRole.entities.EcoMission.get(course.eco_mission_id);
+  const detachSingleSurvivor = async (state: any) => {
+    if (state?.status !== 'invalidated' || !state.livreur_id) return;
+    const rows = await Promise.all((state.course_ids || []).map((id: string) => base44.asServiceRole.entities.CourseExterne.get(id)));
+    const remaining = rows.filter((row: any) => row && !TERMINAL_STATUSES.includes(row.statut) &&
+      row.statut !== 'en_attente' && !row.client_decision_attendue);
+    if (remaining.length !== 1) return;
+    const row = remaining[0];
+    if (row.eco_mission_id !== state.id || row.livreur_id !== state.livreur_id) return;
+    await base44.asServiceRole.entities.CourseExterne.updateMany({
+      id: row.id, eco_mission_id: state.id, livreur_id: state.livreur_id, statut: row.statut,
+    }, { $set: { eco_mission_id: null } });
+    const saved = await base44.asServiceRole.entities.CourseExterne.get(row.id);
+    if (saved?.eco_mission_id === state.id) throw new Error('eco_cancellation_survivor_detach_retry');
+  };
+  if (mission?.status === 'invalidated') await detachSingleSurvivor(mission);
   if (mission && ['cancelled', 'invalidated'].includes(mission.status) &&
       !mission.course_ids?.includes(courseId) && !course.heure_recuperation &&
       (course.statut === 'annulee' || course.client_decision_attendue === true)) {
@@ -1143,7 +1158,9 @@ export async function recalculateEcoMissionAfterCancellation(base44: any, course
     const isTerminal = c.statut === 'livree';
     const isSuspended = c.statut === 'annulee' || c.statut === 'en_attente' || c.client_decision_attendue === true;
 
-    if (isTerminal && step.status !== 'completed') {
+    const pickupDone = step.type === 'pickup' && (c.heure_recuperation || c.pickup_confirmed_at ||
+      ['colis_recupere', 'en_livraison', 'pris_en_charge', 'arrivee'].includes(c.statut));
+    if ((isTerminal || pickupDone) && step.status !== 'completed') {
       step.status = 'completed';
       routeUpdated = true;
     }
@@ -1156,10 +1173,13 @@ export async function recalculateEcoMissionAfterCancellation(base44: any, course
   // ── Si la course annulée était AVANT récupération → la retirer de la mission ──
   let updatedCourseIds = courseIds;
   let courseRemoved = false;
+  const archivedSteps: any[] = [];
   if (!wasPickedUp && cancelledCourse) {
     updatedCourseIds = courseIds.filter((id: string) => id !== courseId);
     // Retirer ses étapes du route plan
     const beforeLen = routePlan.length;
+    archivedSteps.push(...routePlan.filter((step: any) => step?.course_id === courseId)
+      .map((step: any) => ({ ...step, status: 'cancelled', audit_only: true })));
     routePlan = routePlan.filter((step: any) => step?.course_id !== courseId);
     if (routePlan.length !== beforeLen) routeUpdated = true;
     courseRemoved = true;
@@ -1196,7 +1216,12 @@ export async function recalculateEcoMissionAfterCancellation(base44: any, course
 
   // ── Mettre à jour la mission ──
   const updateData: any = {};
-  if (routeUpdated) updateData.route_plan_json = JSON.stringify(routePlan);
+  // Cancelled, uncollected steps are retained after the operational route for audit.
+  if (routeUpdated) updateData.route_plan_json = JSON.stringify([...routePlan, ...archivedSteps]);
+  const activeTotal = activeCourses.reduce((sum: number, row: any) => sum + prixCourse(row), 0);
+  updateData.total_price = activeTotal;
+  updateData.total_driver_amount = activeCourses.reduce((sum: number, row: any) =>
+    sum + Math.max(0, prixCourse(row) - (Number(row.commission_silga) || 0)), 0);
   if (mission.active_step_index !== newActiveStepIndex) updateData.active_step_index = newActiveStepIndex;
   if (updatedCourseIds.length !== courseIds.length) updateData.course_ids = updatedCourseIds;
   if (newStatus !== mission.status) updateData.status = newStatus;
@@ -1210,6 +1235,8 @@ export async function recalculateEcoMissionAfterCancellation(base44: any, course
     if (write?.updated !== 1) throw new Error('eco_cancellation_mission_changed_retry');
   }
   // Publish the coherent mission state before detaching. A failed detach is retryable.
+  // Detach the survivor first: the cancelled row keeps the retry pointer until last.
+  await detachSingleSurvivor({ ...mission, ...updateData });
   if (courseRemoved) {
     await base44.asServiceRole.entities.CourseExterne.update(courseId, { eco_mission_id: null });
   }
@@ -1506,19 +1533,33 @@ export async function completeEcoAcceptance(base44: any, mission: any, updateDat
           normalizeEnterpriseId(row.enterprise_id) !== null || TERMINAL_STATUSES.includes(row.statut)) {
         return { success: false, reason: 'acceptance_repair_required', retryable: true };
       }
+      // Freeze the existing Pass/Happy Hour policy per parcel, during this acceptance
+      // only. Recovery preserves a persisted lock and never rewrites delivered rows.
+      const lockPresent = row.commission_locked_at && row.commission_taux_applique != null &&
+        row.livreur_id === mission.livreur_id && row.heure_acceptation === mission.accepted_at;
+      const advantage = lockPresent ? null : await evaluerAvantageCommission(
+        base44, mission.livreur_id, mission.country_code, new Date(mission.accepted_at));
+      const commissionPatch = advantage ? champsLockCommission(advantage, mission.accepted_at) : {};
       if (row.livreur_id !== mission.livreur_id || row.accepted_by_livreur_id !== mission.livreur_id) {
         await base44.asServiceRole.entities.CourseExterne.updateMany({
           id, eco_mission_id: mission.id, eco_status: 'grouped', dispatch_status: 'en_attente',
           country_code: mission.country_code, enterprise_id: null,
           statut: { $in: ['nouvelle', 'recherche_livreur', 'en_attente'] },
           livreur_id: { $in: [null, ''] }, accepted_by_livreur_id: { $in: [null, ''] },
-        }, { $set: updateData });
+        }, { $set: { ...updateData, ...commissionPatch } });
+      } else if (!lockPresent) {
+        await base44.asServiceRole.entities.CourseExterne.updateMany({
+          id, eco_mission_id: mission.id, livreur_id: mission.livreur_id,
+          statut: row.statut, heure_acceptation: row.heure_acceptation,
+          commission_locked_at: row.commission_locked_at ?? null,
+        }, { $set: commissionPatch });
       }
     }
     const saved = await Promise.all(ids.map((id: string) => base44.asServiceRole.entities.CourseExterne.get(id)));
     if (saved.some((row: any) => row.eco_mission_id !== mission.id || row.livreur_id !== mission.livreur_id ||
         row.accepted_by_livreur_id !== mission.livreur_id || row.dispatch_status !== 'accepte' ||
-        row.country_code !== mission.country_code || normalizeEnterpriseId(row.enterprise_id) !== null || TERMINAL_STATUSES.includes(row.statut))) {
+        row.country_code !== mission.country_code || normalizeEnterpriseId(row.enterprise_id) !== null || TERMINAL_STATUSES.includes(row.statut) ||
+        !row.commission_locked_at || row.commission_taux_applique == null)) {
       return { success: false, reason: 'acceptance_repair_required', retryable: true };
     }
     await base44.asServiceRole.entities.Livreur.update(mission.livreur_id, { statut: 'en_course' });

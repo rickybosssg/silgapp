@@ -58,6 +58,7 @@ import PassActifBadge from "@/components/livreur/PassActifBadge";
 import HappyHourBadge from "@/components/livreur/HappyHourBadge";
 import PassZeroCommissionSection from "@/components/livreur/PassZeroCommissionSection";
 import LivreurVictoryOverlay from "@/components/livreur/LivreurVictoryOverlay";
+import { confirmDelivery } from "@/lib/deliveryConfirmation";
 import EcoMissionDashboard from "@/components/livreur/EcoMissionDashboard";
 import OnRouteProposalCard from "@/components/livreur/OnRouteProposalCard";
 import { useOnRouteProposals } from "@/hooks/useOnRouteProposals";
@@ -1467,10 +1468,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         if (dist && dist >= 0.1) distUpdate.distance_reelle_km = Number(dist.toFixed(2));
       }
 
-      await base44.functions.invoke("finaliserLivraisonLivreur", {
-        course_id: course.id,
-        prix_final_livreur: montantSaisi,
-      });
+      await confirmDelivery(base44, course.id, { prix_final_livreur: montantSaisi });
       await verifierEncoursApresCourse(course.id);
       // [ECO] Ne pas remettre disponible si la course fait partie d'une mission Eco
       if (!course.eco_mission_id) {
@@ -1522,14 +1520,9 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         return;
       }
 
-      await base44.functions.invoke("finaliserLivraisonLivreur", {
-        course_id: course.id,
-        prix_final_livreur: prixFinal,
-      });
+      await confirmDelivery(base44, course.id, { prix_final_livreur: prixFinal });
     } else {
-      await base44.functions.invoke("finaliserLivraisonLivreur", {
-        course_id: course.id,
-      });
+      await confirmDelivery(base44, course.id);
     }
 
     await verifierEncoursApresCourse(course.id);

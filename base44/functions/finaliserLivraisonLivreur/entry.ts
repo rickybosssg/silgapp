@@ -3,7 +3,7 @@ import { chargerConfigPays, normalizeCommissionPct } from '../../shared/dispatch
 import { comptabiliserCommissionEnterprise, normalizeEnterpriseId } from '../../shared/enterpriseFinance.ts';
 import { tauxCommissionEffectif, zeroCommissionFields } from '../../shared/commissionLock.ts';
 import { completeEcoMissionIfNeeded, updateEcoMissionRouteProgress } from '../../shared/ecoOptimizationEngine.ts';
-import { validatedDeliveryGps } from '../../shared/deliveryGps.ts';
+import { resolveDeliveryGps } from '../../shared/deliveryGps.ts';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // FINALISER LIVRAISON LIVREUR — Source de vérité pour la livraison
@@ -126,7 +126,8 @@ export default async function(req: Request): Promise<Response> {
     }
 
     const now = new Date().toISOString();
-    const gps = validatedDeliveryGps(body.latitude, body.longitude);
+    const { gps, reason: gpsReason } = resolveDeliveryGps(body, livreur);
+    if (!gps) console.info('[delivery_gps_missing]', JSON.stringify({ course_id, step: 'livree', reason: gpsReason }));
     const deliveryGps = gps ? { latitude_livraison: gps.latitude, longitude_livraison: gps.longitude } : {};
 
     // ── CAS 1: Course admin — le livreur saisit le prix (montant brut) ──

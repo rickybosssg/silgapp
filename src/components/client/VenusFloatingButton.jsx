@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, Move } from "lucide-react";
 import VenusChat from "./VenusChat";
@@ -11,7 +12,7 @@ import { useQuery } from "@tanstack/react-query";
 
 const VENUS_AVATAR_URL = "https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/17cf522aa_file_0000000034b871f7bf133c0de0c9eb62.png";
 
-export default function VenusFloatingButton({ forcedCountryCode = null }) {
+export default function VenusFloatingButton({ forcedCountryCode = null, embedded = false }) {
   const [showChat, setShowChat] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
@@ -144,26 +145,28 @@ export default function VenusFloatingButton({ forcedCountryCode = null }) {
       <motion.button
         data-venus-floating="true"
         ref={buttonRef}
-        drag
+        drag={!embedded}
         dragMomentum={false}
         dragElastic={0}
         dragConstraints={constraint}
         onDragStart={() => setIsDragging(true)}
         onDragEnd={handleDragEnd}
-        initial={{ scale: 1, opacity: 1, x: position.x, y: position.y }}
-        animate={{ scale: 1, opacity: 1, x: position.x, y: position.y }}
+        initial={{ scale: 1, opacity: 1, x: embedded ? 0 : position.x, y: embedded ? 0 : position.y }}
+        animate={{ scale: 1, opacity: 1, x: embedded ? 0 : position.x, y: embedded ? 0 : position.y }}
         exit={{ scale: 0, opacity: 0 }}
         whileHover={{ scale: isDragging ? 1 : 1.1 }}
         whileTap={{ scale: isDragging ? 1 : 0.95 }}
         onClick={() => { if (!isDragging) { setShowChat(true); if (isAdmin) resetUnread(); } }}
-        className="fixed z-[60] flex items-center justify-center w-16 h-16 rounded-full shadow-2xl overflow-hidden border-4 border-white cursor-grab active:cursor-grabbing"
+        aria-label="Ouvrir VENUS"
+        title="VENUS"
+        className={embedded ? "relative shrink-0 flex items-center justify-center w-9 h-9 rounded-full overflow-hidden border border-white" : "fixed z-[60] flex items-center justify-center w-16 h-16 rounded-full shadow-2xl overflow-hidden border-4 border-white cursor-grab active:cursor-grabbing"}
         style={{
           background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
           boxShadow: isDragging
             ? "0 12px 40px rgba(102, 126, 234, 0.5)"
             : "0 8px 32px rgba(102, 126, 234, 0.4), 0 0 20px rgba(118, 75, 162, 0.3)",
-          right: "24px",
-          bottom: "24px",
+          right: embedded ? undefined : "24px",
+          bottom: embedded ? undefined : "24px",
         }}
       >
         {/* Animation glow/pulse */}
@@ -230,13 +233,13 @@ export default function VenusFloatingButton({ forcedCountryCode = null }) {
       </motion.button>
 
       {/* Toast P0/P1 — alertes immédiates pour admin */}
-      {isAdmin && <VenusAdminToast toast={activeToast} onDismiss={dismissToast} />}
+      {isAdmin && createPortal(<VenusAdminToast toast={activeToast} onDismiss={dismissToast} />, document.body)}
 
       {/* Chat VENUS (client/livreur/partenaire) ou Panneau Admin */}
-      <AnimatePresence>
+      {createPortal(<AnimatePresence>
         {showChat && isAdmin && <VenusAdminPanel onClose={() => setShowChat(false)} />}
         {showChat && !isAdmin && <VenusChat onClose={() => setShowChat(false)} countryContext={countryContext} />}
-      </AnimatePresence>
+      </AnimatePresence>, document.body)}
 
       {/* Styles CSS pour l'animation */}
       <style>{`

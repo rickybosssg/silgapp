@@ -57,7 +57,7 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
   const livreurLng = livreurProfil?.longitude;
 
   // ── Source unique de vérité : hook partagé avec ActiviteTempsReel ──
-  const { eligibleCourses, courses, isLoading, isV2Enabled, livreurDisponible, livreurPeutVoirFil, raisonBlocage, refusedCourseIds, setRefusedIds, ecoMissions } = useCoursesDisponibles(livreurProfil);
+  const { eligibleCourses, courses, isLoading, isError, isV2Enabled, livreurDisponible, livreurPeutVoirFil, raisonBlocage, refusedCourseIds, setRefusedIds, ecoMissions = [] } = useCoursesDisponibles(livreurProfil);
 
   // ── Tracking vue_at — DÉDUPLICATION LOCALE (Option C) ──
   // Un seul appel marquer_vue_course par course et par session composant.
@@ -239,7 +239,17 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
     );
   }
 
-  if (coursesWithDistance.length === 0) {
+  if (isError && coursesWithDistance.length === 0 && ecoMissions.length === 0) {
+    return <div role="alert" className="p-4 text-center text-sm">
+      Chargement des courses indisponible.
+      <button type="button" className="ml-2 underline" onClick={() => {
+        queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles"] });
+        queryClient.invalidateQueries({ queryKey: ["eco-missions-disponibles"] });
+      }}>Réessayer</button>
+    </div>;
+  }
+
+  if (coursesWithDistance.length === 0 && ecoMissions.length === 0) {
     return (
       <div className="rounded-2xl bg-white border border-black/5 p-8 text-center space-y-3 shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
         <div className="w-14 h-14 rounded-2xl bg-orange-50 flex items-center justify-center mx-auto">
@@ -261,7 +271,7 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
           <h2 className="mt-0.5 text-lg font-bold text-foreground">Courses disponibles</h2>
         </div>
         <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-full bg-foreground px-2 text-xs font-bold text-white">
-          {coursesWithDistance.length}
+          {coursesWithDistance.length + ecoMissions.length}
         </span>
       </div>
 

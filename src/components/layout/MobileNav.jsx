@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Menu, X, LogOut, Bell, ChevronDown, MessageCircle } from "lucide-react";
+import { Menu, X, LogOut, Bell, Inbox, ChevronDown, MessageCircle } from "lucide-react";
+import VenusFloatingButton from "@/components/client/VenusFloatingButton";
 import { cn } from "@/lib/utils";
 import { clearPersistedToken } from "@/lib/authPersistence";
 import { Badge } from "@/components/ui/badge";
@@ -29,7 +30,7 @@ function restoreScrollPosition(pathname) {
   } catch (_) { return 0; }
 }
 
-export default function MobileNav({ notificationCount = 0, demandesCount = 0, partenaireDemandesCount = 0, neoCount = 0, messageCount = 0, reseau }) {
+export default function MobileNav({ notificationCount = 0, demandesCount = 0, partenaireDemandesCount = 0, neoCount = 0, messageCount = 0, reseau, showVenus = true }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
@@ -95,19 +96,19 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
     <>
       {/* ===== MOBILE HEADER ===== */}
       <header className="lg:hidden fixed top-0 left-0 right-0 bg-sidebar/95 backdrop-blur-xl border-b border-white/5 z-40 flex items-center justify-between px-4 shadow-sm safe-area-top" style={{ minHeight: '3.5rem' }}>
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 shrink-0">
           <img
             src="https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/962cfba1f_IMG-20260819-WA0003.jpg"
             alt="SILGAPP"
             className="w-8 h-8 rounded-xl object-cover"
           />
-          <div>
+          <div className="hidden min-[380px]:block">
             <h1 className="font-extrabold text-sm text-white leading-tight">SILGAPP</h1>
             <p className="text-[9px] text-slate-300 leading-tight">SILGAPP Livraison</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 min-w-0">
           {demandesCount > 0 && (
             <Link to="/admin/demandes-livreurs" className="relative">
               <span className="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center text-white text-[10px] font-black">
@@ -139,14 +140,15 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
             </Link>
           )}
           {inboxUnread > 0 && (
-            <Link to="/admin/centre-notifications" className="relative">
-              <Bell className="w-5 h-5 text-slate-400" />
+            <Link to="/admin/centre-notifications" className="relative" aria-label="Boite de reception administrative" title="Boite de reception administrative">
+              <Inbox className="w-5 h-5 text-slate-400" />
               <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center animate-pulse">
                 {inboxUnread > 9 ? '9+' : inboxUnread}
               </span>
             </Link>
           )}
-          <Button variant="ghost" size="icon" onClick={() => setShowMenu(true)} className="text-slate-400">
+          {showVenus && <VenusFloatingButton embedded />}
+          <Button variant="ghost" size="icon" onClick={() => setShowMenu(true)} className="text-slate-400 shrink-0">
             <Menu className="w-5 h-5" />
           </Button>
         </div>
