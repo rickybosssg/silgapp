@@ -59,15 +59,36 @@ export default async function(req: Request): Promise<Response> {
       updated_date: { $lte: thresholdDate },
     }, 'created_date', MAX_COURSES_PER_TICK).catch(() => []);
 
-    // ── Cas 3 : Courses en 'nouvelle' avec dispatch_status='disponible_push' ──
-    // Cas rare : la course a été publiée mais le statut n'a pas été mis à jour.
-    // On ne corrige pas ce cas ici — le watchdog s'en charge (ANOMALIE 1).
-    // On ne publie pas non plus les courses qui sont déjà en 'disponible_push'.
+    // ── Cas 3 : Courses en 'disponible_push' depuis > 60s avec 0 DispatchNotification ──
+    // CAS CRITIQUE : la course a été publiée (dispatch_status='disponible_push') mais
+    // la notification a échoué silencieusement (Livreur.filter en erreur, bulkCreate en
+    // erreur, etc.). Aucun push n'a été envoyé → les livreurs ne savent pas que la
+    // course existe. On re-tente la notification via publierCourseDansFil qui détecte
+    // ce cas et re-notifie (re-notification de secours dans dispatchV2.ts).
+    const coursesSansNotif: any[] = [];
+    const coursesPubliees = await base44.asServiceRole.entities.CourseExterne.filter({
+      statut: 'recherche_livreur',
+      dispatch_status: 'disponible_push',
+      updated_date: { $lte: thresholdDate },
+    }, 'created_date', MAX_COURSES_PER_TICK).catch(() => []);
+
+    for (const c of (coursesPubliees || [])) {
+      if (!c?.id) continue;
+      if (c.client_decision_attendue === true) continue;
+      if (c.livreur_id || c.accepted_by_livreur_id) continue;
+      // Vérifier si la course a au moins 1 DispatchNotification
+      const dnCheck = await base44.asServiceRole.entities.DispatchNotification.filter(
+        { course_id: c.id }, undefined, 1
+      ).catch(() => []);
+      if (!dnCheck || dnCheck.length === 0) {
+        coursesSansNotif.push(c);
+      }
+    }
 
     // ── Combiner et dédupliquer ──
     const seenIds = new Set<string>();
     const stuckCourses: any[] = [];
-    for (const c of [...(coursesNouvelles || []), ...(coursesEnAttente || [])]) {
+    for (const c of [...(coursesNouvelles || []), ...(coursesEnAttente || []), ...(coursesSansNotif || [])]) {
       if (!c?.id || seenIds.has(c.id)) continue;
       // Exclure les courses Eco isolées (en attente de regroupement)
       if (c.delivery_mode === 'eco' && c.eco_status === 'isolated') continue;
@@ -75,8 +96,15 @@ export default async function(req: Request): Promise<Response> {
       if (c.client_decision_attendue === true) continue;
       // Exclure les courses déjà acceptées
       if (c.livreur_id || c.accepted_by_livreur_id) continue;
-      // Exclure les courses déjà publiées
-      if (c.dispatch_status === 'disponible_push' || c.dispatch_status === 'propose') continue;
+      // Exclure les courses déjà publiées (sauf cas 3 — 0 notif, déjà ajoutées dans coursesSansNotif)
+      if (c.dispatch_status === 'disponible_push' || c.dispatch_status === 'propose') {
+        // Cas 3 : course publiée mais 0 notif → ne pas exclure, elle est dans coursesSansNotif
+        if (coursesSansNotif.find(s => s.id === c.id)) {
+          // OK, on la garde pour re-notification
+        } else {
+          continue;
+        }
+      }
       seenIds.add(c.id);
       stuckCourses.push(c);
     }
