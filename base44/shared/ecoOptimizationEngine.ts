@@ -10,7 +10,6 @@ import {
 } from './commissionLock.ts';
 import { marquerAccepte } from './dispatchNotifications.ts';
 import { claimCourseForLivreur } from './courseAcceptanceLock.ts';
-import { checkAndReserveCapacity, releaseCapacityLock, getMaxActiveCourses } from './livreurCapacityGuard.ts';
 
 const ACTIVE_STATUSES = [
   'livreur_en_route',
@@ -735,19 +734,6 @@ export async function respondToOnRouteProposal(base44: any, proposalId: string, 
     return { success: false, reason: 'livreur_indisponible' };
   }
 
-  // ── [CAPACITY GUARD] Vérification atomique de la capacité (max 2 courses actives) ──
-  // Acquiert un verrou temporaire (TTL 30s) + compte les courses actives.
-  // Empêche deux acceptations simultanées de contourner la limite.
-  const capacityCheck = await checkAndReserveCapacity(base44, livreurId, course.country_code, 1, [course.id]);
-  if (!capacityCheck.success) {
-    await base44.asServiceRole.entities.EcoProposal.update(proposal.id, {
-      status: 'invalidated',
-      responded_at: new Date().toISOString(),
-      invalidation_reason: capacityCheck.reason,
-    }).catch(() => null);
-    return { success: false, reason: capacityCheck.reason, error: 'Capacité maximale atteinte (2 courses actives).' };
-  }
-
   const now = new Date().toISOString();
   const updateData: any = {
     dispatch_status: 'accepte',
@@ -771,7 +757,6 @@ export async function respondToOnRouteProposal(base44: any, proposalId: string, 
       avantageAcceptation = await evaluerAvantageCommission(base44, livreurId, course.country_code, new Date(now));
       Object.assign(updateData, champsLockCommission(avantageAcceptation, now));
     } catch (error: any) {
-      await releaseCapacityLock(base44, livreurId);
       return { success: false, reason: 'commission_lookup_error', retryable: true, error: error?.message || 'PASS_LOOKUP_ERROR' };
     }
   }
@@ -781,7 +766,6 @@ export async function respondToOnRouteProposal(base44: any, proposalId: string, 
     { $set: { status: 'accepted', responded_at: now } }
   );
   if (!claimProposal || claimProposal.updated !== 1) {
-    await releaseCapacityLock(base44, livreurId);
     return { success: false, reason: 'proposal_race_lost' };
   }
 
@@ -795,13 +779,8 @@ export async function respondToOnRouteProposal(base44: any, proposalId: string, 
   const fresh = claimCourse.course;
   if (!claimCourse.claimed) {
     await base44.asServiceRole.entities.EcoProposal.update(proposal.id, { status: 'invalidated', responded_at: now }).catch(() => null);
-    await releaseCapacityLock(base44, livreurId);
     return { success: false, reason: 'course_race_lost' };
   }
-  // ── Course claimée avec succès → libérer le verrou de capacité ──
-  // La course est maintenant active (statut=livreur_en_route), le comptage
-  // dynamique la prendra en compte automatiquement pour les futures vérifications.
-  await releaseCapacityLock(base44, livreurId);
   if (avantageAcceptation) verifierCoherenceLock(fresh, avantageAcceptation);
   if (normalizeEnterpriseId(fresh.enterprise_id)) {
     await figerCommissionAcceptation(base44, course.id, livreurId, fresh.country_code, now).catch(() => null);
@@ -1356,21 +1335,11 @@ export async function triggerOnRouteProposalsForNewCourse(base44: any, courseId:
     ...onRouteCityFilter,
   }, '-updated_date', 50).catch(() => []);
 
-  // ── [CAPACITY GUARD] Filtrer les livreurs avec MAX courses actives ──
-  // Un livreur ayant déjà 2 courses actives ne doit plus recevoir de propositions.
-  // Comptage depuis les données déjà chargées (activeCourses) — aucun appel supplémentaire.
-  const maxActiveCourses = await getMaxActiveCourses(base44, course.country_code);
-  const driverActiveCount = new Map<string, number>();
+  const driverIds = new Set<string>();
   for (const ac of activeCourses || []) {
     if (!ac?.livreur_id) continue;
     if (normalizeEnterpriseId(ac.enterprise_id) !== courseEnterpriseId) continue;
-    driverActiveCount.set(ac.livreur_id, (driverActiveCount.get(ac.livreur_id) || 0) + 1);
-  }
-  const driverIds = new Set<string>();
-  for (const [driverId, count] of driverActiveCount) {
-    if (count < maxActiveCourses) {
-      driverIds.add(driverId);
-    }
+    driverIds.add(ac.livreur_id);
   }
 
   if (driverIds.size === 0) {
@@ -1450,21 +1419,12 @@ export async function acceptEcoMission(base44: any, missionId: string, livreurId
     courses.push(course);
   }
 
-  // ── [CAPACITY GUARD] Vérification atomique de la capacité (mission de N courses) ──
-  // Une mission Éco de N courses réserve N places atomiquement.
-  // Si la capacité est insuffisante, la mission n'est jamais partiellement attribuée.
-  const capacityCheck = await checkAndReserveCapacity(base44, livreurId, mission.country_code, courseIds.length);
-  if (!capacityCheck.success) {
-    return { success: false, reason: capacityCheck.reason, error: 'Capacité insuffisante pour cette mission Éco.' };
-  }
-
   const now = new Date().toISOString();
   const claimMission = await base44.asServiceRole.entities.EcoMission.updateMany(
     { id: mission.id, status: 'available' },
     { $set: { status: 'accepting', livreur_id: livreurId, livreur_user_email: livreur.user_email || null, accepted_at: now } },
   );
   if (!claimMission || claimMission.updated !== 1) {
-    await releaseCapacityLock(base44, livreurId);
     return { success: false, reason: 'mission_race_lost' };
   }
 
@@ -1496,12 +1456,9 @@ export async function acceptEcoMission(base44: any, missionId: string, livreurId
 
   if (!claimCourses || claimCourses.updated !== courseIds.length) {
     await base44.asServiceRole.entities.EcoMission.update(mission.id, { status: 'invalidated' }).catch(() => null);
-    await releaseCapacityLock(base44, livreurId);
     return { success: false, reason: 'course_race_lost' };
   }
 
-  // ── Toutes les courses claimées avec succès → libérer le verrou de capacité ──
-  await releaseCapacityLock(base44, livreurId);
   await base44.asServiceRole.entities.EcoMission.update(mission.id, { status: 'accepted' }).catch(() => null);
   await base44.asServiceRole.entities.Livreur.update(livreurId, { statut: 'en_course' }).catch(() => null);
   await Promise.all(courseIds.map((id) => marquerAccepte(base44, id, livreurId).catch(() => null)));

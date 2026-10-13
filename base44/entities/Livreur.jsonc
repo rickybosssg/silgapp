@@ -333,11 +333,6 @@
     "silga_score_anomalies": {
       "type": "string",
       "description": "JSON: tableau des anomalies d\u00e9tect\u00e9es lors du calcul (ex: score \u00e9lev\u00e9 mais taux d'annulation \u00e9lev\u00e9, score faible par manque de donn\u00e9es). Pour audit et calibration."
-    },
-    "capacity_lock_until": {
-      "type": "string",
-      "format": "date-time",
-      "description": "Verrou temporaire anti-acceptation concurrente (TTL 30s). Emp\u00eache deux acceptations simultan\u00e9es par le m\u00eame livreur de contourner la limite de 2 courses actives. Auto-expire apr\u00e8s 30s en cas de crash. Ne jamais modifier manuellement."
     }
   },
   "required": [
