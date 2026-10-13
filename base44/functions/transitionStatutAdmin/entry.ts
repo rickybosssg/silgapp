@@ -70,19 +70,23 @@ export default async function(req: Request): Promise<Response> {
     // pour Éco isolée).
     //
     // Blocages de sécurité :
-    //   - client_decision_attendue = true → l'admin ne peut PAS contourner
-    //     la décision du client après annulation livreur. Retourner l'erreur.
+    //   - client_decision_attendue = true → l'admin PEUT forcer le redispatch
+    //     (override explicite). Le flag bloque le dispatch AUTOMATIQUE, pas l'admin.
     //   - Course Éco isolée → réintégrer au moteur Éco, pas au dispatch Standard.
     //   - Course déjà en disponible_push → déjà visible, skip.
     // ═══════════════════════════════════════════════════════════════════════════
     if (statut_cible === 'recherche_livreur') {
-      // ── Bloquer si la course est en attente de décision client ──
+      // ── Admin override : si la course est en attente de décision client,
+      //    l'admin peut explicitement forcer le redispatch. Le flag
+      //    client_decision_attendue bloque le dispatch AUTOMATIQUE (watchdog,
+      //    orchestrator) mais ne doit pas bloquer une action admin explicite. ──
       if (course.client_decision_attendue === true) {
-        return Response.json({
-          error: 'Cette course est en attente de la décision du client après annulation du livreur. Le client doit choisir entre relancer la recherche ou annuler définitivement. Vous ne pouvez pas contourner cette protection.',
-          blocked_reason: 'client_decision_attendue',
-          course_id,
-        }, { status: 400 });
+        await base44.asServiceRole.entities.CourseExterne.update(course_id, {
+          client_decision_attendue: false,
+          client_decision_action: 'chercher_autre_livreur',
+          client_decision_at: new Date().toISOString(),
+        }).catch(() => null);
+        console.log(`[TRANSITION_ADMIN] Admin ${user.email} a levé client_decision_attendue pour course ${course_id} — redispatch forcé`);
       }
 
       // ── Course Éco isolée → réintégrer au moteur Éco ──
