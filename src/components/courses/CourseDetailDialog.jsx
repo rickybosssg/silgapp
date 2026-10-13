@@ -128,6 +128,9 @@ export default function CourseDetailDialog({ course: courseProp, open, onClose, 
       if (variables.data.statut === "annulee") {
         toast.success("Course annulée avec succès");
         onClose();
+      } else if (variables.data.statut === "livree") {
+        toast.success(result?.message || "Course terminée avec succès.");
+        onClose();
       } else {
         toast.success("Statut mis à jour");
         onClose();
