@@ -99,6 +99,16 @@ export default function CourseDetailDialog({ course: courseProp, open, onClose, 
         }
         return result.data;
       }
+      // ── "livree" = finalisation métier officielle via terminerCourseAdmin ──
+      // Pas un simple update : calcule commission, libère le livreur, comptabilise.
+      if (data.statut === "livree" && reseau === "externe") {
+        const result = await base44.functions.invoke("terminerCourseAdmin", { course_id: id });
+        const resData = result?.data || result;
+        if (!resData?.success && resData?.error) {
+          throw new Error(resData.error);
+        }
+        return resData;
+      }
       // Utiliser la fonction backend sécurisée pour les courses externes
       if (reseau === "externe") {
         const result = await base44.functions.invoke("transitionStatutAdmin", {
