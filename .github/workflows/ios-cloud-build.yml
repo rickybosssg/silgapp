@@ -1,0 +1,31 @@
+name: iOS unsigned build check
+on:
+  push:
+    branches: [test-ios-cloud-build]
+    paths:
+      - '.github/workflows/ios-cloud-build.yml'
+  workflow_dispatch:
+jobs:
+  ios-build:
+    runs-on: macos-15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - name: Install web dependencies
+        run: npm ci
+      - name: Build web application
+        run: npm run build
+      - name: Sync Capacitor iOS
+        run: npx cap sync ios
+      - name: Install CocoaPods
+        working-directory: ios/App
+        run: pod install --repo-update
+      - name: Compile iOS simulator without signing
+        working-directory: ios/App
+        run: |
+          xcodebuild -workspace App.xcworkspace -scheme App -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
