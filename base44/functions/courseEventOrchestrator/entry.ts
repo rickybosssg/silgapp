@@ -118,33 +118,19 @@ Deno.serve(async (req) => {
         });
       }
 
-      // ── Correction 20 : Propositions sur trajet AVANT dispatch ──
-      // Si un livreur compatible est trouvé et que la priorité exclusive est
-      // activée, créer une réservation exclusive (15s) et NE PAS dispatcher
-      // immédiatement. La course reste en 'en_attente' (invisible des autres).
-      // Après refus ou expiration, le dispatch normal reprend.
-      const onRouteResult = await triggerOnRouteProposalsForNewCourse(base44, courseId).catch((error) => {
-        const msg = error?.message || String(error);
-        console.error('[COURSE_ORCHESTRATOR] ❌ onRouteProposals:', msg);
-        errors.push({ module: 'onRouteProposals', error: msg });
-        return { success: false, error: msg };
-      });
-      called.push('onRouteProposals');
-
-      // Si une réservation exclusive a été créée, ne pas dispatcher
-      if (onRouteResult?.exclusive_reservation_created) {
-        await fireInvoke('notifyClientSync', { event, data });
-        await emitCourseCreated(base44, course).catch(() => {});
-        return Response.json({
-          success: true,
-          event: 'create',
-          course_id: courseId,
-          on_route_result: onRouteResult,
-          exclusive_reservation: true,
-          called,
-          errors,
-        });
-      }
+      // ═════════════════════════════════════════════════════════════════════
+      // DISPATCH EN PREMIER — la course doit être publiée immédiatement
+      // ═════════════════════════════════════════════════════════════════════
+      // Correction critique 2026-10-13 : triggerOnRouteProposalsForNewCourse
+      // s'exécutait AVANT le dispatch. Si cette fonction était lente (5-15s) ou
+      // si l'orchestrateur timeout (20-30s sur les workers Cloudflare), la course
+      // n'était jamais publiée. Elle restait en 'en_attente' jusqu'à ce que le
+      // watchdog la récupère (2-7+ min plus tard).
+      //
+      // Désormais : le dispatch est appelé EN PREMIER. La course est publiée dans
+      // le fil « Disponibles » (disponible_push) immédiatement. Les propositions
+      // sur trajet sont créées APRÈS (non-bloquantes).
+      // ═════════════════════════════════════════════════════════════════════
 
       // 1. Dispatch : V2 (fil) ou V1 (vagues) selon feature flag
       const v2Enabled = await isV2Enabled(base44);
@@ -174,6 +160,18 @@ Deno.serve(async (req) => {
 
       // 3. VENUS Admin Event (non-bloquant)
       await emitCourseCreated(base44, course).catch(() => {});
+
+      // 4. Propositions sur trajet (APRÈS dispatch — non-bloquant)
+      // Les propositions sur trajet sont un bonus : elles informent les livreurs
+      // déjà en route qu'une course compatible existe. Elles ne doivent JAMAIS
+      // bloquer ou retarder la publication de la course dans le fil « Disponibles ».
+      const onRouteResult = await triggerOnRouteProposalsForNewCourse(base44, courseId).catch((error) => {
+        const msg = error?.message || String(error);
+        console.error('[COURSE_ORCHESTRATOR] ❌ onRouteProposals:', msg);
+        errors.push({ module: 'onRouteProposals', error: msg });
+        return { success: false, error: msg };
+      });
+      called.push('onRouteProposals');
 
       return Response.json({
         success: true,

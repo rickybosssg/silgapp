@@ -116,8 +116,15 @@ export async function runWatchdog(base44, body = {}) {
 
   // ═══ ANOMALIE 1: Course nouvelle jamais traitée par l'automation create ═══
   // Une course nouvelle > 2 min sans aucune notification = l'entity automation create a échoué
+  // BORNÉ : max 15 courses par tick pour éviter que le watchdog se bloque
+  let anomaly1Count = 0;
+  const ANOMALY1_MAX = 15;
   for (const course of courses) {
     if (course.statut !== 'nouvelle') continue;
+    if (anomaly1Count >= ANOMALY1_MAX) {
+      console.warn(`[WATCHDOG] ⏭️ ANOMALIE 1: limite ${ANOMALY1_MAX} courses/tick atteinte — reste reporté au prochain tick`);
+      break;
+    }
     const ageMs = now.getTime() - new Date(course.created_date).getTime();
     if (ageMs <= WATCHDOG_GRACE_MS) continue;
     if (courseIdsWithNotifs.has(course.id)) continue;
@@ -128,6 +135,7 @@ export async function runWatchdog(base44, body = {}) {
       continue;
     }
 
+    anomaly1Count++;
     const ageMin = Math.round(ageMs / 60000);
     anomalies.push({ course_id: course.id, type: 'nouvelle_jamais_traitee', severity: 'critique', description: `Course nouvelle depuis ${ageMin}min sans notification` });
 
@@ -149,13 +157,21 @@ export async function runWatchdog(base44, body = {}) {
 
   // ═══ ANOMALIE 2: Course en recherche_livreur sans vague active ═══
   // dispatch_status en_attente + statut recherche_livreur + > 2 min sans notification
+  // BORNÉ : max 15 courses par tick pour éviter que le watchdog se bloque
+  let anomaly2Count = 0;
+  const ANOMALY2_MAX = 15;
   for (const course of courses) {
     if (course.statut !== 'recherche_livreur') continue;
+    if (anomaly2Count >= ANOMALY2_MAX) {
+      console.warn(`[WATCHDOG] ⏭️ ANOMALIE 2: limite ${ANOMALY2_MAX} courses/tick atteinte — reste reporté au prochain tick`);
+      break;
+    }
     if (course.dispatch_status !== 'en_attente') continue;
     const ageMs = now.getTime() - new Date(course.updated_date).getTime();
     if (ageMs <= WATCHDOG_GRACE_MS) continue;
     if (courseIdsWithNotifs.has(course.id)) continue;
 
+    anomaly2Count++;
     const ageMin = Math.round(ageMs / 60000);
     anomalies.push({ course_id: course.id, type: 'recherche_sans_vague', severity: 'critique', description: `Course en_attente depuis ${ageMin}min sans vague` });
 
