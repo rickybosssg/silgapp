@@ -18,6 +18,7 @@ import { getLivreursNotifies, getLivreursRefuses } from './dispatchNotifications
 import { chargerConfigDispatch, chargerConfigVaguesGPS } from './dispatchConfig.ts';
 import { isV2Enabled, secoursDispatchV2, calculerScore, publierCourseDansFil } from './dispatchV2.ts';
 import { gererPushGeneralT10 } from './pushGeneralT10.ts';
+import { gererRappelPeriodique } from './pushRappelPeriodique.ts';
 
 /** Crée une alerte admin si aucune alerte récente n'existe pour la même course. */
 async function createAdminAlert(base44, titre, message, courseId, alertDedupMs = 5 * 60 * 1000) {
@@ -508,6 +509,18 @@ export async function runWatchdog(base44, body = {}) {
     await gererPushGeneralT10(base44);
   } catch (err) {
     console.error('[WATCHDOG] Erreur push général T+10:', err?.message || String(err));
+  }
+
+  // ═══ RAPPEL PÉRIODIQUE TOUTES LES 5 MINUTES ═══
+  // Rappel sonore récurrent aux livreurs éligibles tant que des courses
+  // restent disponibles. Indépendant des mécanismes T+5, T+10, T+20.
+  // Cooldown par pays (AppConfig) + verrou anti-concurrence.
+  // Message groupé : "SILGAPP — N courses attendent un livreur."
+  // Backend uniquement — pas de rebuild APK/AAB/iOS.
+  try {
+    await gererRappelPeriodique(base44);
+  } catch (err) {
+    console.error('[WATCHDOG] Erreur rappel périodique 5 min:', err?.message || String(err));
   }
 
   console.log(`[WATCHDOG] 📋 ${anomalies.length} anomalie(s) détectée(s), ${corrections.length} correction(s) appliquée(s), ${logsSkipped} log(s) ignoré(s) par cooldown`);
