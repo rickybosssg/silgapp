@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
 import { figerCommissionAcceptation } from '../../shared/commissionAvantage.ts';
+import { checkAndReserveCapacity, releaseCapacityLock } from '../../shared/livreurCapacityGuard.ts';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ASSIGNER LIVREUR ADMIN — Assignation manuelle forcée par l'admin
@@ -67,6 +68,17 @@ export default async function(req: Request): Promise<Response> {
       });
     }
 
+    // ── [CAPACITY GUARD] Vérification atomique de la capacité (max 2 courses) ──
+    // L'admin peut attribuer manuellement une 2e course, mais jamais une 3e.
+    const capacityCheck = await checkAndReserveCapacity(base44, livreur_id, course.country_code, 1, [course_id]);
+    if (!capacityCheck.success) {
+      return Response.json({
+        success: false,
+        error: `Ce livreur a déjà atteint la limite de ${capacityCheck.maxCourses || 2} courses actives.`,
+        reason: capacityCheck.reason,
+      }, { status: 400 });
+    }
+
     // ── Construire l'update ──
     const now = new Date().toISOString();
     const livreurNom = `${livreur.prenom || ''} ${livreur.nom || ''}`.trim();
@@ -89,6 +101,9 @@ export default async function(req: Request): Promise<Response> {
 
     // ── Mettre à jour la course ──
     const updated = await base44.asServiceRole.entities.CourseExterne.update(course_id, updateData);
+
+    // ── Course assignée → libérer le verrou de capacité ──
+    await releaseCapacityLock(base44, livreur_id);
 
     // ── Mettre le livreur en course ──
     await base44.asServiceRole.entities.Livreur.update(livreur_id, {
@@ -140,6 +155,7 @@ export default async function(req: Request): Promise<Response> {
 
   } catch (error) {
     console.error('[ASSIGN_ADMIN] Erreur:', error);
+    // Le verrou de capacité auto-expire après 30s — pas besoin de libération manuelle ici.
     return Response.json({ error: error.message }, { status: 500 });
   }
 }

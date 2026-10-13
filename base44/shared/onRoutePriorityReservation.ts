@@ -31,6 +31,7 @@
  */
 
 import { normalizeEnterpriseId } from './enterpriseFinance.ts';
+import { getMaxActiveCourses } from './livreurCapacityGuard.ts';
 
 const ACTIVE_STATUSES = [
   'livreur_en_route',
@@ -174,12 +175,20 @@ export async function findBestOnRouteDriver(
 
   if (driverCoursesMap.size === 0) return null;
 
+  // ── [CAPACITY GUARD] Filtrer les livreurs ayant déjà MAX courses actives ──
+  // Un livreur avec 2 courses actives ne doit plus recevoir de propositions sur trajet.
+  // Utilise les données déjà chargées (driverCoursesMap) — aucun appel Base44 supplémentaire.
+  const maxActiveCourses = await getMaxActiveCourses(base44, course.country_code);
+
   let bestDriver: any = null;
   let bestScore = -1;
   let bestCompatibility: any = null;
   let bestActiveCourses: any[] = [];
 
   for (const [livreurId, courses] of driverCoursesMap.entries()) {
+    // Skip drivers with MAX or more active courses
+    if (courses.length >= maxActiveCourses) continue;
+
     // Récupérer le livreur
     const livreur = await base44.asServiceRole.entities.Livreur.get(livreurId).catch(() => null);
     if (!livreur) continue;
