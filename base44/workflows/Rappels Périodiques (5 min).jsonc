@@ -1,0 +1,45 @@
+{
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "rappels_periodiques_5min",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "rappel_periodique": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "rappelPeriodiqueAuto",
+            "args": {}
+          },
+          "then": "end",
+          "x-base44": {
+            "title": "Rappel p\u00e9riodique 5 min",
+            "description": "Push FCM group\u00e9 aux livreurs \u00e9ligibles"
+          }
+        }
+      }
+    ]
+  },
+  "name": "Rappels P\u00e9riodiques (5 min)",
+  "description": "Envoie un rappel sonore FCM toutes les 5 minutes aux livreurs \u00e9ligibles tant que des courses restent disponibles. Ind\u00e9pendant du watchdog \u2014 garanti m\u00eame si le watchdog est lent ou en timeout. Anti-doublon par verrou atomique par pays.",
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "recurring",
+      "cron_expression": "*/5 * * * *",
+      "one_time_date": null,
+      "timezone": "Africa/Ouagadougou",
+      "interval_value": null,
+      "interval_unit": null,
+      "interval_anchor": null,
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  }
+}

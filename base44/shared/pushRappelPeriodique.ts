@@ -59,8 +59,9 @@ async function acquireCountryLock(base44: any, countryCode: string, ttlSec = DEF
   const invocationId = generateInvocationId();
 
   try {
-    const existing = await base44.asServiceRole.entities.AppConfig.filter({ cle: lockKey });
-    const current = existing?.[0];
+    const existingResult = await base44.asServiceRole.entities.AppConfig.filter({ cle: lockKey });
+    const existing = existingResult?.items || existingResult || [];
+    const current = existing[0];
 
     if (current) {
       let lockData: any = null;
@@ -99,8 +100,9 @@ async function acquireCountryLock(base44: any, countryCode: string, ttlSec = DEF
 async function releaseCountryLock(base44: any, countryCode: string, invocationId: string) {
   const lockKey = `${LOCK_APPCONFIG_PREFIX}${countryCode}`;
   try {
-    const existing = await base44.asServiceRole.entities.AppConfig.filter({ cle: lockKey });
-    if (!existing?.[0]) return;
+    const existingResult = await base44.asServiceRole.entities.AppConfig.filter({ cle: lockKey });
+    const existing = existingResult?.items || existingResult || [];
+    if (!existing[0]) return;
     let lockData: any = null;
     try { lockData = existing[0].valeur ? JSON.parse(existing[0].valeur) : null; } catch {}
     if (lockData?.owner && lockData.owner !== invocationId) return;
@@ -117,18 +119,20 @@ async function releaseCountryLock(base44: any, countryCode: string, invocationId
 async function getCountryLastSent(base44: any, countryCode: string): Promise<number> {
   const key = `${COOLDOWN_APPCONFIG_PREFIX}${countryCode}`;
   try {
-    const existing = await base44.asServiceRole.entities.AppConfig.filter({ cle: key });
-    if (!existing?.[0]?.valeur) return 0;
-    return parseInt(existing[0].valeur, 10) || 0;
+    const result = await base44.asServiceRole.entities.AppConfig.filter({ cle: key });
+    const items = result?.items || result || [];
+    if (!items[0]?.valeur) return 0;
+    return parseInt(items[0].valeur, 10) || 0;
   } catch { return 0; }
 }
 
 async function setCountryLastSent(base44: any, countryCode: string, ts: number) {
   const key = `${COOLDOWN_APPCONFIG_PREFIX}${countryCode}`;
   try {
-    const existing = await base44.asServiceRole.entities.AppConfig.filter({ cle: key });
-    if (existing?.[0]) {
-      await base44.asServiceRole.entities.AppConfig.update(existing[0].id, { valeur: String(ts) });
+    const result = await base44.asServiceRole.entities.AppConfig.filter({ cle: key });
+    const items = result?.items || result || [];
+    if (items[0]) {
+      await base44.asServiceRole.entities.AppConfig.update(items[0].id, { valeur: String(ts) });
     } else {
       await base44.asServiceRole.entities.AppConfig.create({ cle: key, valeur: String(ts) });
     }
@@ -141,9 +145,10 @@ async function setCountryLastSent(base44: any, countryCode: string, ts: number) 
 
 async function getIntervalMin(base44: any): Promise<number> {
   try {
-    const existing = await base44.asServiceRole.entities.AppConfig.filter({ cle: APPCONFIG_INTERVAL_KEY });
-    if (!existing?.[0]?.valeur) return DEFAULT_INTERVAL_MIN;
-    const n = parseInt(existing[0].valeur, 10);
+    const result = await base44.asServiceRole.entities.AppConfig.filter({ cle: APPCONFIG_INTERVAL_KEY });
+    const items = result?.items || result || [];
+    if (!items[0]?.valeur) return DEFAULT_INTERVAL_MIN;
+    const n = parseInt(items[0].valeur, 10);
     return Number.isFinite(n) && n >= 3 && n <= 30 ? n : DEFAULT_INTERVAL_MIN;
   } catch { return DEFAULT_INTERVAL_MIN; }
 }
@@ -281,9 +286,10 @@ export async function gererRappelPeriodique(base44: any, intervalMinOverride?: n
 
         // c. Revalider les courses (race condition — une course a pu être acceptée)
         const courseIds = courses.map((c: any) => c.id);
-        const freshCourses = await base44.asServiceRole.entities.CourseExterne.filter({
+        const freshResult = await base44.asServiceRole.entities.CourseExterne.filter({
           id: { $in: courseIds },
         });
+        const freshCourses = freshResult?.items || freshResult || [];
         const validCourses = (freshCourses || []).filter((c: any) =>
           c.statut === 'recherche_livreur' &&
           !c.livreur_id &&
@@ -299,6 +305,28 @@ export async function gererRappelPeriodique(base44: any, intervalMinOverride?: n
         const destinataires = await getLivreursDestinataires(base44, countryCode);
         if (destinataires.length === 0) {
           resultats.push({ country_code: countryCode, status: 'no_recipient', courses: validCourses.length });
+          continue;
+        }
+
+        // d-bis. Exclure les livreurs actuellement en course (même logique que envoiNotificationPushBatch)
+        // Les livreurs en livraison ne doivent pas recevoir le rappel "courses disponibles".
+        // On interroge les courses actives du pays pour identifier ces livreurs.
+        const STATUTS_ACTIFS_COURSE = [
+          'livreur_en_route', 'client_contacte', 'en_route_expediteur',
+          'arrive_prise_en_charge', 'colis_recupere', 'passager_embarque',
+          'pris_en_charge', 'en_livraison', 'arrivee',
+        ];
+        const coursesActives = await base44.asServiceRole.entities.CourseExterne.filter(
+          { country_code: countryCode, statut: { $in: STATUTS_ACTIFS_COURSE }, livreur_id: { $exists: true } },
+          undefined, 200
+        ).catch(() => []);
+        const livreurIdsInCourse = new Set<string>();
+        for (const ac of coursesActives || []) {
+          if (ac.livreur_id) livreurIdsInCourse.add(String(ac.livreur_id));
+        }
+        const destinatairesFinaux = destinataires.filter((l: any) => !livreurIdsInCourse.has(String(l.id)));
+        if (destinatairesFinaux.length === 0) {
+          resultats.push({ country_code: countryCode, status: 'all_in_course', courses: validCourses.length });
           continue;
         }
 
