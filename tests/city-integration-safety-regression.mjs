@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import ts from 'typescript';
-import { cityNamePattern, normalizeCityName } from '../base44/shared/cityNames.js';
+import { cityNamePattern, normalizeCityName, cityNamesPattern, operationalCityAliases, resolveOperationalName, canSeeOperationalCourse } from '../base44/shared/cityNames.js';
 import { invalidateCityFlagCache, invalidateQuartierCache, resolveCityFromGPS, shouldUpdateDriverCity, getDriverOperationalCity } from '../base44/shared/cityResolution.ts';
 import { verifyCityCompatibility } from '../base44/shared/cityDispatchFilter.ts';
 import { acceptEcoMission, createOnRouteProposal } from '../base44/shared/ecoOptimizationEngine.ts';
@@ -13,6 +13,7 @@ assert.ok(new RegExp(cityNamePattern('Lome'), 'i').test('Lomé'));
 assert.ok(!new RegExp(cityNamePattern('A.*'), 'i').test('Abidjan'));
 assert.equal(normalizeCityName('  ÉTÉ  '), 'ete');
 
+import { invalidateOperationalCityCache } from '../base44/shared/operationalZones.ts';
 let flag = false, writes = 0;
 const driver = { id: 'd', user_email: 'driver@example.test', country_code: 'BF', ville: 'Ouagadougou',
   type_livreur: 'externe', validation: 'valide', actif: true, statut: 'disponible', enterprise_id: null };
@@ -22,6 +23,7 @@ const courses = ['a', 'b'].map((id, i) => ({ id, country_code: 'BF', enterprise_
 const sdk = { auth: { me: async () => ({ email: driver.user_email }) }, asServiceRole: { entities: {
   AppConfig: { filter: async query => typeof query.cle === 'string' ? (flag ? [{ valeur: 'true' }] : []) :
     ['ENABLED', 'GROUPING_ENABLED', 'ON_ROUTE_ENABLED'].map(key => ({ cle: `ECO:BF:${key}`, valeur: 'true' })) },
+  OperationalCity: { filter: async () => ['ouagadougou', 'bobo-dioulasso'].map(nom => ({ nom, actif: flag })) },
   Livreur: { get: async () => driver },
   EcoMission: { get: async () => mission, updateMany: async () => { writes++; throw Error('Unexpected write'); } },
   CourseExterne: { get: async id => courses.find(c => c.id === id) },
@@ -29,9 +31,9 @@ const sdk = { auth: { me: async () => ({ email: driver.user_email }) }, asServic
     { ville: 'Bobo-Dioulasso', latitude: 11.17, longitude: -4.30 },
     { nom: 'Not a city', latitude: 0, longitude: 0 }] },
 } } };
-invalidateCityFlagCache(); invalidateQuartierCache();
+invalidateCityFlagCache(); invalidateOperationalCityCache(); invalidateQuartierCache();
 assert.equal((await verifyCityCompatibility(sdk, courses[1], driver)).compatible, true);
-flag = true; invalidateCityFlagCache();
+flag = true; invalidateCityFlagCache(); invalidateOperationalCityCache();
 assert.equal((await verifyCityCompatibility(sdk, courses[1], driver)).compatible, false);
 assert.equal((await acceptEcoMission(sdk, 'm', 'd')).reason, 'city_mismatch');
 assert.equal(writes, 0, 'second incompatible parcel rejected before any claim');
@@ -42,8 +44,8 @@ for (const accuracy of [undefined, NaN, -1, 101]) assert.equal((await shouldUpda
 assert.equal((await shouldUpdateDriverCity(sdk, { ...driver, statut: 'en_course' }, 11.17, -4.3, 10)).shouldUpdate, false);
 assert.equal((await shouldUpdateDriverCity(sdk, driver, 11.17, -4.3, 10)).newCity, 'bobo-dioulasso');
 assert.equal((await shouldUpdateDriverCity(sdk, { ...driver, ville: 'Bobo-Dioulasso' }, 12.37, -1.52, 10)).newCity, 'ouagadougou');
-invalidateCityFlagCache();
-sdk.asServiceRole.entities.AppConfig.filter = async () => { throw Error('network'); };
+invalidateCityFlagCache(); invalidateOperationalCityCache();
+sdk.asServiceRole.entities.OperationalCity.filter = async () => { throw Error('network'); };
 await assert.rejects(verifyCityCompatibility(sdk, courses[1], driver), /configuration_unavailable/);
 
 const v2 = readFileSync('base44/shared/dispatchV2.ts', 'utf8');
@@ -64,10 +66,10 @@ for (const enabled of [false, true]) {
     EcoMission: { filter: async () => [mission] },
   } };
   const compiledHook = ts.transpile(hook.replace(/^import .*;\r?\n/gm, '').replace('export function', 'function'), { target: ts.ScriptTarget.ES2022 });
-  const useFeed = new Function('useEffect', 'useMemo', 'useState', 'useQuery', 'useQueryClient', 'base44', 'cityNamePattern', 'normalizeCityName', `${compiledHook};return useCoursesDisponibles;`)(
+  const useFeed = new Function('useEffect', 'useMemo', 'useState', 'useQuery', 'useQueryClient', 'base44', 'cityNamesPattern', 'operationalCityAliases', 'resolveOperationalName', 'canSeeOperationalCourse', `${compiledHook};return useCoursesDisponibles;`)(
     () => {}, fn => fn(), initial => [typeof initial === 'function' ? initial() : initial, () => {}],
-    query => { queries.set(query.queryKey[0], query); return query.queryKey[0] === 'city-dispatch-enabled' ? { data: enabled } : {}; },
-    () => ({}), uiSdk, cityNamePattern, normalizeCityName);
+    query => { queries.set(query.queryKey[0], query); return query.queryKey[0] === 'operational-zone-policy' ? { data: { cities: [{ nom: 'ouagadougou', actif: enabled }, { nom: 'bobo-dioulasso', actif: enabled }], quartiers: [] } } : {}; },
+    () => ({}), uiSdk, cityNamesPattern, operationalCityAliases, resolveOperationalName, canSeeOperationalCourse);
   useFeed(driver);
   await queries.get('courses-externes-disponibles').queryFn();
   assert.equal(Boolean(reads[0].ville_depart), enabled);

@@ -128,22 +128,24 @@ Deno.serve(async (req) => {
             updateData.gps_accuracy = Number(accuracy);
           }
 
-          // [CITY_DISPATCH] Détection automatique de la ville opérationnelle du livreur.
-          // Utilise shouldUpdateDriverCity qui encapsule toutes les règles de sécurité :
+          // [OPERATIONAL ZONES] Détection automatique de la zone opérationnelle du livreur.
+          // Utilise shouldUpdateDriverOperationalCity qui encapsule toutes les règles :
           // - Pas de changement pendant une mission (statut = en_course)
           // - GPS avec précision > 100m ignoré
-          // - Hystérésis anti-flicker (5km) aux limites de villes
+          // - Hystérésis anti-flicker (5km) aux limites de zones
+          // - Utilise ville_operationnelle des quartiers (ex: Saaba → ouagadougou)
           // - Ne jamais effacer une ville existante par une position incertaine
           // Aucune API externe — utilise le cache des quartiers (TTL 10 min).
           try {
-            const { isCityDispatchEnabled, shouldUpdateDriverCity } = await import('../../shared/cityResolution.ts');
+            const { isCityDispatchEnabled } = await import('../../shared/cityResolution.ts');
+            const { shouldUpdateDriverOperationalCity } = await import('../../shared/operationalZones.ts');
             const cityEnabled = await isCityDispatchEnabled(base44, livreur.country_code);
             const fixTime = typeof gps_timestamp === 'number' ? gps_timestamp : Date.parse(gps_timestamp || '');
             const fixAge = Date.now() - fixTime;
             // Only a timestamped fix can change the operational city. Old APKs keep their stored city.
             if (cityEnabled && Number.isFinite(fixAge) && fixAge >= 0 && fixAge <= 120000) {
               const accuracyVal = accuracy !== undefined && accuracy !== null ? Number(accuracy) : undefined;
-              const cityUpdate = await shouldUpdateDriverCity(base44, livreur, latNum, lngNum, accuracyVal);
+              const cityUpdate = await shouldUpdateDriverOperationalCity(base44, livreur, latNum, lngNum, accuracyVal);
               if (cityUpdate.shouldUpdate && cityUpdate.newCity) {
                 updateData.ville = cityUpdate.newCity;
                 console.log('[heartbeatAuto] 🏙️ Ville livreur mise à jour', {
@@ -153,10 +155,11 @@ Deno.serve(async (req) => {
                   raison: cityUpdate.reason,
                 });
               }
+
             }
           } catch (cityError: any) {
             // Non-bloquant : la détection de ville est une optimisation, pas une obligation.
-            console.error('[heartbeatAuto] ⚠️ City resolution failed:', cityError?.message || String(cityError));
+            console.error('[heartbeatAuto] ⚠️ Operational zone resolution failed:', cityError?.message || String(cityError));
           }
         }
 

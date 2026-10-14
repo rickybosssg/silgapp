@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { cityNamePattern, normalizeCityName } from "../../base44/shared/cityNames.js";
+import { cityNamesPattern, operationalCityAliases, resolveOperationalName, canSeeOperationalCourse } from "../../base44/shared/cityNames.js";
 
 /**
  * useCoursesDisponibles — SOURCE UNIQUE DE VÉRITÉ pour les courses disponibles
@@ -98,42 +98,33 @@ export function useCoursesDisponibles(livreurProfil) {
     staleTime: 60000,
   });
 
-  // ── Feature flag city dispatch ──
-  // Vérifie si le filtrage par ville est activé pour le pays du livreur.
-  // Si OFF : comportement historique (toutes les courses du pays sont visibles).
-  // Si ON : filtrage par ville_depart côté frontend (le backend reste l'autorité).
-  const { data: cityDispatchEnabled = false, isLoading: cityLoading, isError: cityError } = useQuery({
-    queryKey: ["city-dispatch-enabled", countryCode],
+  const { data: zonePolicy = { cities: [], quartiers: [] }, isLoading: cityLoading, isError: cityError } = useQuery({
+    queryKey: ['operational-zone-policy', countryCode],
     queryFn: async () => {
-      if (!countryCode) return false;
-      const configs = await base44.entities.AppConfig.filter({
-        cle: `CITY_DISPATCH_ENABLED:${countryCode}`,
-      });
-      return configs?.[0]?.valeur === "true";
+      const cities = await base44.entities.OperationalCity.filter({ country_code: countryCode }, undefined, 100);
+      const quartiers = cities.some(c => c.actif === true)
+        ? await base44.entities.Quartier.filter({ country_code: countryCode, actif: true }, undefined, 1000) : [];
+      return { cities, quartiers };
     },
-    enabled: !!countryCode,
-    staleTime: 30000,
-    refetchInterval: 60000,
+    enabled: !!countryCode, staleTime: 30000, refetchInterval: 60000,
   });
-
   useEffect(() => {
     if (!countryCode) return;
-    return base44.entities.AppConfig.subscribe(event => {
-      if (!event?.data?.cle || event.data.cle === `CITY_DISPATCH_ENABLED:${countryCode}`) {
-        queryClient.invalidateQueries({ queryKey: ['city-dispatch-enabled', countryCode] });
-      }
-    });
+    const refresh = () => queryClient.invalidateQueries({ queryKey: ['operational-zone-policy', countryCode] });
+    const unsubscribeCities = base44.entities.OperationalCity.subscribe(refresh);
+    const unsubscribeQuartiers = base44.entities.Quartier.subscribe(refresh);
+    return () => { unsubscribeCities(); unsubscribeQuartiers(); };
   }, [queryClient, countryCode]);
-
-  // ── Courses disponibles (fetch brut) ──
-  // La requête ne filtre pas par enterprise_id car MongoDB ne peut pas matcher
-  // null + undefined + "" dans une seule requête SDK. Le filtrage enterprise_id
-  // est fait côté client dans eligibleCourses (normalisation canonique).
+  const cityDispatchEnabled = zonePolicy.cities.some(c => c.actif === true);
   const livreurVille = livreurProfil?.ville?.trim();
-  const cityFilter = cityDispatchEnabled && livreurVille
-    ? { ville_depart: { $regex: cityNamePattern(livreurVille), $options: "i" } } : {};
+  const driverZone = resolveOperationalName(livreurVille, zonePolicy.cities, zonePolicy.quartiers);
+  const excludedAliases = zonePolicy.cities.filter(c => c.actif === true && c.nom !== driverZone)
+    .flatMap(c => operationalCityAliases(c, zonePolicy.quartiers));
+  const cityFilter = excludedAliases.length
+    ? { ville_depart: { $not: { $regex: cityNamesPattern(excludedAliases), $options: 'i' } } } : {};
+  const policyKey = JSON.stringify(zonePolicy);
   const { data: courses = [], isLoading: coursesLoading, isError: coursesError } = useQuery({
-    queryKey: ["courses-externes-disponibles", livreurId, countryCode, livreurEnterpriseId, isV2Enabled, livreurVille, cityDispatchEnabled],
+    queryKey: ["courses-externes-disponibles", livreurId, countryCode, livreurEnterpriseId, isV2Enabled, livreurVille, policyKey],
     queryFn: async () => {
       if (!livreurPeutVoirFil || !isV2Enabled) return [];
       if (!countryCode || !isV2Enabled) return [];
@@ -157,7 +148,7 @@ export function useCoursesDisponibles(livreurProfil) {
       [...(all || []), ...(ecoIsolated || [])].forEach((course) => {
         if (course?.id) byId.set(course.id, course);
       });
-      return Array.from(byId.values());
+      return Array.from(byId.values()).filter(c => canSeeOperationalCourse(c, livreurVille, zonePolicy.cities, zonePolicy.quartiers));
     },
     enabled: !!livreurId && !!countryCode && livreurPeutVoirFil && isV2Enabled && !cityLoading && !cityError,
     refetchInterval: 10000,
@@ -167,7 +158,7 @@ export function useCoursesDisponibles(livreurProfil) {
   });
 
   const { data: ecoMissions = [], isLoading: missionsLoading, isError: missionsError } = useQuery({
-    queryKey: ["eco-missions-disponibles", livreurId, countryCode, livreurEnterpriseId, isV2Enabled, livreurVille, cityDispatchEnabled],
+    queryKey: ["eco-missions-disponibles", livreurId, countryCode, livreurEnterpriseId, isV2Enabled, livreurVille, policyKey],
     queryFn: async () => {
       if (!livreurPeutVoirFil || !isV2Enabled || !countryCode) return [];
       if (livreurEnterpriseId !== null) return [];
@@ -176,15 +167,14 @@ export function useCoursesDisponibles(livreurProfil) {
         "-created_date",
         20
       );
-      if (!cityDispatchEnabled || !livreurVille || !missions?.length) return missions || [];
+      if (!cityDispatchEnabled || !missions?.length) return missions || [];
       const ids = [...new Set(missions.flatMap(m => m.course_ids || []))];
       if (!ids.length) return [];
       const records = await base44.entities.CourseExterne.filter({ id: { $in: ids }, country_code: countryCode, enterprise_id: null }, undefined, ids.length);
       const byId = new Map((records || []).map(c => [c.id, c]));
-      const city = normalizeCityName(livreurVille);
       return missions.filter(m => m.course_ids?.length && m.course_ids.every(id => {
         const c = byId.get(id);
-        return c && normalizeCityName(c.ville_depart) === city;
+        return c && canSeeOperationalCourse(c, livreurVille, zonePolicy.cities, zonePolicy.quartiers);
       }));
     },
     enabled: !!livreurId && !!countryCode && livreurPeutVoirFil && isV2Enabled && !cityLoading && !cityError,

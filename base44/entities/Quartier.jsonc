@@ -8,7 +8,11 @@
     },
     "ville": {
       "type": "string",
-      "description": "Ville du quartier (ex: Ouagadougou, Abidjan, Lom\u00e9)"
+      "description": "Ville administrative du quartier (ex: Ouagadougou, Saaba, Abidjan, Lom\u00e9)"
+    },
+    "ville_operationnelle": {
+      "type": "string",
+      "description": "Ville op\u00e9rationnelle SILGAPP (ex: ouagadougou). Permet de rattacher une commune p\u00e9riph\u00e9rique (ex: Saaba) \u00e0 une ville op\u00e9rationnelle (ex: Ouagadougou). Si vide, utilise 'ville' comme fallback. Normalis\u00e9 en minuscules sans accents."
     },
     "nom": {
       "type": "string",

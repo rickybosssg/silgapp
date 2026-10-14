@@ -4,10 +4,11 @@ import { useQuery } from '@tanstack/react-query';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { MapPin, Users, Package, Bike, TrendingUp, Activity, Clock, AlertCircle, Globe } from 'lucide-react';
-import CityDispatchToggle from './CityDispatchToggle';
+import { MapPin, Users, Package, Bike, TrendingUp, Activity, Clock, AlertCircle, Building2 } from 'lucide-react';
 import CityDispatchMap from './CityDispatchMap';
-import { cityNamePattern, normalizeCityName } from '../../../base44/shared/cityNames.js';
+import { cityNamesPattern, normalizeCityName, operationalCityAliases } from '../../../base44/shared/cityNames.js';
+import OperationalCityManager from './OperationalCityManager';
+
 
 const ACTIVE_COURSE_STATUSES = ['nouvelle', 'en_attente', 'client_contacte', 'recherche_livreur', 'livreur_en_route', 'en_route_expediteur', 'arrive_prise_en_charge', 'colis_recupere', 'en_livraison', 'arrivee'];
 
@@ -30,35 +31,22 @@ export default function CityDispatchAdmin() {
     queryKey: ['cities-for-country', selectedCountry],
     queryFn: async () => {
       if (!selectedCountry) return [];
-      const [livreurs, courses] = await Promise.all([
-        base44.entities.Livreur.filter(
-          { country_code: selectedCountry, ville: { $ne: null } },
-          undefined, 200
-        ),
-        base44.entities.CourseExterne.filter(
-          { country_code: selectedCountry, ville_depart: { $ne: null } },
-          undefined, 200
-        ),
-      ]);
-      const citySet = new Set();
-      for (const l of livreurs || []) {
-        if (l.ville?.trim()) citySet.add(normalizeCityName(l.ville));
-      }
-      for (const c of courses || []) {
-        if (c.ville_depart?.trim()) citySet.add(normalizeCityName(c.ville_depart));
-      }
-      return Array.from(citySet).sort();
+      return await base44.entities.OperationalCity.filter({ country_code: selectedCountry }, 'nom_affichage', 100);
     },
     enabled: !!selectedCountry,
     staleTime: 30000,
   });
+
+  const selectedCityRecord = cities.find(c => normalizeCityName(c.nom) === normalizeCityName(selectedCity));
+  const selectedCityAliases = selectedCityRecord ? operationalCityAliases(selectedCityRecord) : selectedCity ? [selectedCity] : [];
+  const selectedCityPattern = selectedCityAliases.length ? cityNamesPattern(selectedCityAliases) : null;
 
   // ── Charger les livreurs et courses pour la carte ──
   const { data: mapData = { livreurs: [], courses: [] }, isLoading: mapLoading, isError: mapError } = useQuery({
     queryKey: ['city-dispatch-map-data', selectedCountry, selectedCity],
     queryFn: async () => {
       if (!selectedCountry) return { livreurs: [], courses: [] };
-      const cityRegex = selectedCity ? { $regex: cityNamePattern(selectedCity), $options: 'i' } : null;
+      const cityRegex = selectedCity ? { $regex: selectedCityPattern, $options: 'i' } : null;
       const livreurFilter = { country_code: selectedCountry };
       const courseFilter = { country_code: selectedCountry, statut: { $in: ACTIVE_COURSE_STATUSES } };
       if (cityRegex) {
@@ -81,7 +69,7 @@ export default function CityDispatchAdmin() {
     queryKey: ['city-stats', selectedCountry, selectedCity],
     queryFn: async () => {
       if (!selectedCountry || !selectedCity) return null;
-      const cityRegex = { $regex: cityNamePattern(selectedCity), $options: 'i' };
+      const cityRegex = { $regex: selectedCityPattern, $options: 'i' };
       const [livreurs, coursesAll] = await Promise.all([
         base44.entities.Livreur.filter(
           { country_code: selectedCountry, ville: cityRegex },
@@ -125,8 +113,8 @@ export default function CityDispatchAdmin() {
     queryKey: ['city-dispatch-enabled', selectedCountry],
     queryFn: async () => {
       if (!selectedCountry) return false;
-      const configs = await base44.entities.AppConfig.filter({ cle: `CITY_DISPATCH_ENABLED:${selectedCountry}` });
-      return configs?.[0]?.valeur === 'true';
+      const cities = await base44.entities.OperationalCity.filter({ country_code: selectedCountry, actif: true }, undefined, 1);
+      return cities.length > 0;
     },
     enabled: !!selectedCountry,
     staleTime: 15000,
@@ -162,20 +150,17 @@ export default function CityDispatchAdmin() {
         )}
       </div>
 
-      {/* Section 1 : Interrupteurs par pays */}
+      {/* Section 1 : Villes opérationnelles (activation individuelle) */}
       <Card className="p-4 space-y-3">
         <div className="flex items-center gap-2">
-          <Globe className="w-4 h-4 text-primary" />
-          <h3 className="text-sm font-semibold text-foreground">Configuration par pays</h3>
+          <Building2 className="w-4 h-4 text-primary" />
+          <h3 className="text-sm font-semibold text-foreground">Villes opérationnelles</h3>
         </div>
         <p className="text-xs text-muted-foreground">
-          Activez ou désactivez le filtrage par ville pour chaque pays. OFF par défaut — aucune modification sans validation.
+          Activez les villes une par une. Une zone activée réserve ses courses aux livreurs de cette zone.
+          Saaba est rattachée à Ouagadougou. OFF par défaut.
         </p>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-          {countries.map(c => (
-            <CityDispatchToggle key={c.code} country={c} />
-          ))}
-        </div>
+        <OperationalCityManager countries={countries} countryCode={selectedCountry} />
       </Card>
 
       {/* Section 2 : Sélecteurs pays + ville */}
@@ -199,7 +184,7 @@ export default function CityDispatchAdmin() {
           </SelectTrigger>
           <SelectContent>
             {cities.map(city => (
-              <SelectItem key={city} value={city}>{city}</SelectItem>
+              <SelectItem key={city.id} value={city.nom}>{city.nom_affichage}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -221,6 +206,7 @@ export default function CityDispatchAdmin() {
             courses={mapData.courses}
             country={selectedCountryObj}
             selectedCity={selectedCity}
+          cityAliases={selectedCityAliases}
           />
         )
       ) : (

@@ -44,6 +44,13 @@ function createEcoMockBase44(opts = {}) {
     configs.set(`CITY_DISPATCH_ENABLED:${countryCode}`, { cle: `CITY_DISPATCH_ENABLED:${countryCode}`, valeur: 'true' });
   }
 
+  // OperationalCity (nouveau système de zones opérationnelles)
+  const opCities = new Map();
+  if (flagEnabled) {
+    const opCityName = courseCity === 'ouagadougou' ? 'ouagadougou' : courseCity === 'bobo' ? 'bobo-dioulasso' : courseCity === 'abidjan' ? 'abidjan' : courseCity;
+    opCities.set(opCityName, { id: 'oc1', country_code: countryCode, nom: opCityName, nom_affichage: opCityName, actif: true });
+  }
+
   // Course
   const courseVille = courseCity === 'ouagadougou' ? 'Ouagadougou' : courseCity === 'bobo' ? 'Bobo-Dioulasso' : courseCity === 'abidjan' ? 'Abidjan' : null;
   const courseLat = courseCity === 'ouagadougou' ? 12.37 : courseCity === 'bobo' ? 11.17 : courseCity === 'abidjan' ? 5.35 : 0;
@@ -175,6 +182,14 @@ function createEcoMockBase44(opts = {}) {
             return results;
           },
         },
+        OperationalCity: {
+          filter: async (query) => {
+            let results = [...opCities.values()];
+            if (query?.country_code) results = results.filter(c => c.country_code === query.country_code);
+            if (query?.actif !== undefined) results = results.filter(c => c.actif === query.actif);
+            return results;
+          },
+        },
         Quartier: {
           filter: async (query) => {
             let results = [...quartiers.values()];
@@ -294,8 +309,9 @@ test('8. Basculement OFF → restrictions cessent immédiatement (cache 30s)', a
   assert.strictEqual(beforeToggle, true, 'Flag ON avant bascule');
   // Invalider le cache (simule la désactivation)
   invalidateCityFlagCache('BF');
-  // Maintenant le mock ne renvoie plus la config → flag OFF
-  mockSdk.asServiceRole.entities.AppConfig.filter = async () => [];
+  try { const { invalidateOperationalCityCache } = await import('../base44/shared/operationalZones.ts'); invalidateOperationalCityCache('BF'); } catch {}
+  // Maintenant le mock ne renvoie plus de villes activées → flag OFF
+  mockSdk.asServiceRole.entities.OperationalCity.filter = async () => [];
   const afterToggle = await isCityDispatchEnabled(mockSdk, 'BF');
   assert.strictEqual(afterToggle, false, 'Flag OFF après bascule (cache invalidé)');
 });
@@ -487,8 +503,9 @@ test('24. invalidateCityFlagCache → cache vidé immédiatement', async () => {
   assert.strictEqual(before, true, 'Cache chargé');
   // Invalider
   invalidateCityFlagCache('BF');
-  // Le mock ne renvoie plus la config → flag OFF
-  mockSdk.asServiceRole.entities.AppConfig.filter = async () => [];
+  try { const { invalidateOperationalCityCache } = await import('../base44/shared/operationalZones.ts'); invalidateOperationalCityCache('BF'); } catch {}
+  // Le mock ne renvoie plus de villes activées → flag OFF
+  mockSdk.asServiceRole.entities.OperationalCity.filter = async () => [];
   const after = await isCityDispatchEnabled(mockSdk, 'BF');
   assert.strictEqual(after, false, 'Cache vidé → flag OFF lu depuis DB');
 });
@@ -508,6 +525,10 @@ async function runTests() {
       const { invalidateCityFlagCache, invalidateQuartierCache } = await import('../base44/shared/cityResolution.ts');
       invalidateCityFlagCache();
       invalidateQuartierCache();
+    } catch {}
+    try {
+      const { invalidateOperationalCityCache } = await import('../base44/shared/operationalZones.ts');
+      invalidateOperationalCityCache();
     } catch {}
     try {
       await fn();

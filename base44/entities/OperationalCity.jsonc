@@ -1,0 +1,82 @@
+{
+  "name": "OperationalCity",
+  "type": "object",
+  "properties": {
+    "country_code": {
+      "type": "string",
+      "description": "Code pays ISO 2 lettres (ex: BF, CI, TG)"
+    },
+    "nom": {
+      "type": "string",
+      "description": "Nom canonique normalisé (ex: ouagadougou). Utilisé pour la comparaison et le rattachement."
+    },
+    "nom_affichage": {
+      "type": "string",
+      "description": "Nom d'affichage (ex: Ouagadougou)"
+    },
+    "actif": {
+      "type": "boolean",
+      "default": false,
+      "description": "Ville activée pour le dispatch par zone opérationnelle. OFF par défaut. Aucune ville n'est activée automatiquement."
+    },
+    "description": {
+      "type": "string",
+      "description": "Description de la zone opérationnelle (ex: 'Ouagadougou et périphérie: Saaba, Ziniaré, etc.')"
+    },
+    "communes_rattachees": {
+      "type": "string",
+      "description": "JSON: tableau des noms de communes administratives rattachées (ex: [\"Ouagadougou\", \"Saaba\"])"
+    },
+    "date_activation": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "active_par": {
+      "type": "string",
+      "description": "Email de l'admin ayant activé cette zone"
+    },
+    "date_desactivation": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "desactive_par": {
+      "type": "string",
+      "description": "Email de l'admin ayant désactivé cette zone"
+    },
+    "historique_modifications": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string"
+          },
+          "actor": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "previous_active": {
+            "type": "boolean"
+          },
+          "active": {
+            "type": "boolean"
+          }
+        }
+      }
+    }
+  },
+  "required": [
+    "country_code",
+    "nom",
+    "nom_affichage",
+    "actif"
+  ],
+  "rls": {
+    "read": {},
+    "create": false,
+    "update": false,
+    "delete": false
+  }
+}

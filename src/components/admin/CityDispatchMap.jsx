@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { Card } from '@/components/ui/card';
 import DispatchMap from '@/components/carte/DispatchMap';
-import { cityNamePattern } from '../../../base44/shared/cityNames.js';
+import { cityNamesPattern } from '../../../base44/shared/cityNames.js';
 import { Users, Bike, Package, AlertCircle, MapPin, Activity, TrendingUp } from 'lucide-react';
 
 /**
@@ -10,9 +10,9 @@ import { Users, Bike, Package, AlertCircle, MapPin, Activity, TrendingUp } from 
  * Réutilise DispatchMap avec les livreurs et courses filtrés par ville.
  * Affiche les compteurs par ville en overlay.
  */
-export default function CityDispatchMap({ livreurs = [], courses = [], country, selectedCity }) {
+export default function CityDispatchMap({ livreurs = [], courses = [], country, selectedCity, cityAliases = [] }) {
   // Filtrer par ville si sélectionnée
-  const cityRegex = useMemo(() => selectedCity ? new RegExp(cityNamePattern(selectedCity), 'i') : null, [selectedCity]);
+  const cityRegex = useMemo(() => selectedCity ? new RegExp(cityNamesPattern(cityAliases.length ? cityAliases : [selectedCity]), 'i') : null, [selectedCity, cityAliases]);
 
   const filteredLivreurs = useMemo(() => {
     if (!cityRegex) return livreurs;

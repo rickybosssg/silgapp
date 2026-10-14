@@ -11,12 +11,11 @@
 // 5. Cache en mémoire des quartiers par pays (TTL 10 min).
 // ═══════════════════════════════════════════════════════════════════════════
 
-import { normalizeCityName } from './cityNames.js';
+import { normalizeCityName, resolveOperationalName } from './cityNames.js';
 export { normalizeCityName } from './cityNames.js';
 
 import { haversineKm } from './geoUtils.ts';
 
-const CITY_FLAG_PREFIX = 'CITY_DISPATCH_ENABLED';
 const CITY_FLAG_CACHE_TTL_MS = 30 * 1000; // 30 sec — délai court pour désactivation immédiate
 const QUARTIER_CACHE_TTL_MS = 10 * 60 * 1000; // 10 min
 
@@ -54,10 +53,8 @@ export async function isCityDispatchEnabled(base44: any, countryCode: string): P
   if (cached && Date.now() < cached.expires) return cached.enabled;
 
   try {
-    const configs = await base44.asServiceRole.entities.AppConfig.filter({
-      cle: `${CITY_FLAG_PREFIX}:${code}`,
-    }, undefined, 1);
-    const enabled = configs?.[0]?.valeur === 'true';
+    const { hasAnyActiveCity } = await import('./operationalZones.ts');
+    const enabled = await hasAnyActiveCity(base44, code);
     CITY_FLAG_CACHE.set(code, { enabled, expires: Date.now() + CITY_FLAG_CACHE_TTL_MS });
     return enabled;
   } catch {
@@ -81,12 +78,12 @@ export async function loadQuartiersForCountry(base44: any, countryCode: string):
     const quartiers = await base44.asServiceRole.entities.Quartier.filter({
       country_code: code,
       actif: true,
-    }, 'nom', 500).catch(() => []);
-    const data = (quartiers || []).filter((q: any) => normalizeCityName(q.ville) && validCoordinates(q.latitude, q.longitude));
+    }, 'nom', 500);
+    const data = (quartiers || []).filter((q: any) => normalizeCityName(q.ville_operationnelle) || normalizeCityName(q.ville));
     QUARTIER_CACHE.set(code, { data, expires: Date.now() + QUARTIER_CACHE_TTL_MS });
     return data;
   } catch {
-    return [];
+    throw new Error('city_reference_unavailable');
   }
 }
 
@@ -119,6 +116,7 @@ export async function resolveCityFromGPS(
   let nearestDist = Infinity;
 
   for (const q of quartiers) {
+    if (!validCoordinates(q.latitude, q.longitude)) continue;
     const dist = haversineKm(lat, lng, q.latitude, q.longitude);
     if (dist === null) continue;
     if (dist < nearestDist) {
@@ -129,7 +127,7 @@ export async function resolveCityFromGPS(
 
   if (!nearest || nearestDist > maxDistanceKm) return null;
 
-  return normalizeCityName(nearest.ville);
+  return normalizeCityName(nearest.ville_operationnelle) || normalizeCityName(nearest.ville);
 }
 
 /**
@@ -147,7 +145,14 @@ export async function getDriverOperationalCity(base44: any, livreur: any): Promi
 
   // 1. Ville déjà renseignée sur le profil
   const storedCity = normalizeCityName(livreur.ville);
-  if (storedCity) return storedCity;
+  if (storedCity) {
+    // Vérifier si c'est un nom administratif qui mappe vers une zone opérationnelle
+    // Ex: "Saaba" → "ouagadougou" si le quartier a ville_operationnelle="Ouagadougou"
+    const quartiers = await loadQuartiersForCountry(base44, livreur.country_code);
+    const { loadOperationalCities } = await import('./operationalZones.ts');
+    const cities = await loadOperationalCities(base44, livreur?.country_code);
+    return resolveOperationalName(storedCity, cities, quartiers);
+  }
 
   // 2. Résolution GPS si position récente et fiable
   if (!validCoordinates(livreur.latitude, livreur.longitude)) return null;
@@ -177,7 +182,14 @@ export async function getCourseDepartureCity(base44: any, course: any): Promise<
 
   // 1. Ville déjà renseignée
   const storedCity = normalizeCityName(course.ville_depart);
-  if (storedCity) return storedCity;
+  if (storedCity) {
+    // Vérifier si c'est un nom administratif qui mappe vers une zone opérationnelle
+    // Ex: "Saaba" → "ouagadougou" si le quartier a ville_operationnelle="Ouagadougou"
+    const quartiers = await loadQuartiersForCountry(base44, course.country_code);
+    const { loadOperationalCities } = await import('./operationalZones.ts');
+    const cities = await loadOperationalCities(base44, course?.country_code);
+    return resolveOperationalName(storedCity, cities, quartiers);
+  }
 
   // 2. Résolution GPS
   if (!validCoordinates(course.gps_depart_lat, course.gps_depart_lng)) return null;
@@ -236,6 +248,7 @@ export async function shouldUpdateDriverCity(
   let nearest: any = null;
   let nearestDist = Infinity;
   for (const q of quartiers) {
+    if (!validCoordinates(q.latitude, q.longitude)) continue;
     const dist = haversineKm(lat, lng, q.latitude, q.longitude);
     if (dist === null) continue;
     if (dist < nearestDist) {
@@ -248,24 +261,36 @@ export async function shouldUpdateDriverCity(
     return { shouldUpdate: false, reason: 'too_far_from_any_quartier' };
   }
 
-  const resolvedCity = normalizeCityName(nearest.ville) || normalizeCityName(nearest.nom);
+  // Priorité: ville_operationnelle > ville > nom
+  const resolvedCity = normalizeCityName(nearest.ville_operationnelle) || normalizeCityName(nearest.ville);
   if (!resolvedCity) {
     return { shouldUpdate: false, reason: 'city_name_unresolved' };
   }
 
   // 5. Comparer avec la ville actuelle
   const currentCity = normalizeCityName(livreur?.ville);
-  if (resolvedCity === currentCity) {
+  // Résoudre la zone opérationnelle actuelle du livreur (ex: "Saaba" → "ouagadougou")
+  let currentOperationalCity = currentCity;
+  if (currentCity) {
+    const matchingQ = (quartiers || []).find((q: any) =>
+      normalizeCityName(q.ville) === currentCity && q.ville_operationnelle
+    );
+    if (matchingQ) {
+      currentOperationalCity = normalizeCityName(matchingQ.ville_operationnelle) || currentCity;
+    }
+  }
+  if (resolvedCity === currentOperationalCity || resolvedCity === currentCity) {
     return { shouldUpdate: false, reason: 'same_city' };
   }
 
   // 6. Anti-flicker : si la ville actuelle est définie, vérifier l'hystérésis
-  if (currentCity) {
+  if (currentOperationalCity) {
     let currentCityMinDist = Infinity;
     for (const q of quartiers) {
-      const qCity = normalizeCityName(q.ville);
-      if (qCity === currentCity) {
-        const dist = haversineKm(lat, lng, q.latitude, q.longitude);
+      const qCity = normalizeCityName(q.ville_operationnelle) || normalizeCityName(q.ville);
+      if (qCity === currentOperationalCity) {
+        if (!validCoordinates(q.latitude, q.longitude)) continue;
+    const dist = haversineKm(lat, lng, q.latitude, q.longitude);
         if (dist !== null && dist < currentCityMinDist) {
           currentCityMinDist = dist;
         }
