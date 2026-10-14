@@ -408,3 +408,12 @@ unknown-origin broadcast fallback described in this historical section.
   harmless without checking authentication and schema restoration.
 - Physical screens, real GPS movement, FCM, adversarial RLS and production ON
   behavior require separate evidence. All-OFF read-back and mocks are not such proof.
+- Release 1.0.131/138 was signed with the existing upload certificate and installed
+  without data clearing on Fold4, A06 and Moto g35. Client history/tracking/map,
+  chat entry, driver feed/profile/dashboard and history were physically opened.
+  This is not a new-delivery, FCM, moving-GPS or activated-zone validation.
+- Fold7 carries a Play-signed installation and refuses the locally upload-key-signed
+  APK. Preserve its data; use a matching Play-signed update, never a new keystore or
+  an unauthorized uninstall. New Admin city/map physical validation remains pending.
+- Existing client/driver VENUS overlaps and the compact A06 reliability tile remain
+  visible residual UI findings; those components were not redesigned in this merge.
