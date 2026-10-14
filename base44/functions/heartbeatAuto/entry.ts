@@ -214,6 +214,6 @@ Deno.serve(async (req) => {
     });
   } catch (error) {
     console.error('[heartbeatAuto] Erreur:', error);
-    return Response.json({ error: error.message }, { status: 500 });
+    return Response.json({ error: error instanceof Error ? error.message : 'heartbeat_failed' }, { status: 500 });
   }
 });

@@ -83,6 +83,9 @@ async function notifierLivreursEligiblesV2(base44: any, course: any, options: an
   // (remplace getLivreursNotifies + getLivreursRefuses → économise 1 read redondant)
   // [CITY_DISPATCH] Filtre ville ajouté si le feature flag est activé pour ce pays.
   const cityFilter = await buildLivreurCityFilter(base44, course);
+  // ❌ PAS DE .catch(() => []) sur Livreur.filter — si la lecture échoue (auth, rate limit,
+  // timeout), l'erreur doit se propager à withAuthRetry pour retry. Un .catch(() => [])
+  // avale silencieusement l'erreur et retourne 0 livreur → 0 push → course invisible.
   const [livreurs, allDnRecords] = await Promise.all([
     base44.asServiceRole.entities.Livreur.filter({
       type_livreur: 'externe',
@@ -96,10 +99,10 @@ async function notifierLivreursEligiblesV2(base44: any, course: any, options: an
         ? { enterprise_id: courseEnterpriseId }
         : { enterprise_id: null }),
       ...cityFilter,
-    }, '-last_seen_at', 500).catch(() => []),
+    }, '-last_seen_at', 500),
     base44.asServiceRole.entities.DispatchNotification.filter(
       { course_id: course.id }, '-date_notification', 500
-    ).catch(() => []),
+    ),
   ]);
 
 
@@ -276,7 +279,30 @@ export async function publierCourseDansFil(base44: any, course: any) {
   if (!coursePubliee) return { error: 'Course introuvable' };
 
   if (coursePubliee.heure_sollicitation !== nowIso) {
-    dispatchLog(`[V2] ⏭️ Course ${course.id} déjà publiée par un autre appel (heure_sollicitation=${coursePubliee.heure_sollicitation}) — skip republication`);
+    // ── RE-NOTIFICATION DE SECOURS ──
+    // La course a déjà été publiée par un premier appel, mais le premier appel a pu
+    // échouer silencieusement à l'étape de notification (Livreur.filter en erreur,
+    // NotificationToken.filter en erreur, bulkCreate en erreur). Si la course a 0
+    // DispatchNotification, on re-tente la notification au lieu de skipper.
+    const existingDnCount = await base44.asServiceRole.entities.DispatchNotification.filter(
+      { course_id: course.id }, undefined, 1
+    ).catch(() => []);
+
+    if (!existingDnCount || existingDnCount.length === 0) {
+      dispatchLog(`[V2] ⚠️ Course ${course.id} déjà publiée mais 0 DispatchNotification — re-tente notification de secours`);
+      journaliserDispatch(base44, {
+        course_id: course.id,
+        evenement: 'publier_fil_v2_renotify',
+        raison_passage: `already_published_but_0_notifs — re-notification de secours`,
+      });
+      const renotifyResult = await notifierLivreursEligiblesV2(base44, coursePubliee, {
+        priorityOnly: false,
+        skipAlreadyPublishedCheck: true,
+      });
+      return { success: true, published: true, renotified: true, batch: renotifyResult };
+    }
+
+    dispatchLog(`[V2] ⏭️ Course ${course.id} déjà publiée (heure_sollicitation=${coursePubliee.heure_sollicitation}) — skip republication`);
     journaliserDispatch(base44, {
       course_id: course.id,
       evenement: 'publier_fil_v2_skip',

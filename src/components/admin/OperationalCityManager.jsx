@@ -12,7 +12,7 @@ import { MapPin, Plus, Search, Building2, CheckCircle2, XCircle, AlertCircle, Li
 import { normalizeCityName, resolveOperationalName } from '../../../base44/shared/cityNames.js';
 import { toast } from 'sonner';
 
-export default function OperationalCityManager({ countries, countryCode }) {
+export default function OperationalCityManager({ countries, countryCode, onCountryChange }) {
   const [selectedCountry, setSelectedCountry] = useState(countryCode || '');
   const [pendingToggle, setPendingToggle] = useState(null);
   useEffect(() => { if (countryCode) setSelectedCountry(countryCode); }, [countryCode]);
@@ -24,7 +24,7 @@ export default function OperationalCityManager({ countries, countryCode }) {
   const [activating, setActivating] = useState(false);
   const queryClient = useQueryClient();
   const refreshPolicy = () => {
-    for (const queryKey of [['operational-zone-policy'], ['city-dispatch-enabled'], ['op-cities'], ['courses-externes-disponibles'], ['eco-missions-disponibles']]) queryClient.invalidateQueries({ queryKey });
+    for (const queryKey of [['operational-zone-policy'], ['city-dispatch-enabled'], ['op-cities'], ['cities-for-country'], ['city-dispatch-map-data'], ['city-stats'], ['courses-externes-disponibles'], ['eco-missions-disponibles']]) queryClient.invalidateQueries({ queryKey });
   };
 
   // ── Charger les villes opérationnelles du pays ──
@@ -132,7 +132,9 @@ export default function OperationalCityManager({ countries, countryCode }) {
         city_name: city.nom,
         expected_active: city.actif,
       });
-      if (res?.data?.success || res?.success) {
+      const data = res?.data ?? res;
+      if (!data?.success) throw new Error(data?.error || 'Modification non confirmee');
+      if (data.success) {
         toast.success(city.actif ? `Ville "${city.nom_affichage}" désactivée` : `Ville "${city.nom_affichage}" activée`);
         refetch();
         refreshPolicy();
@@ -157,7 +159,7 @@ export default function OperationalCityManager({ countries, countryCode }) {
 
   return (
     <div className="space-y-4">
-      <Select value={selectedCountry} onValueChange={value => { setSelectedCountry(value); setSearchCity(''); }}>
+      <Select value={selectedCountry} onValueChange={value => { setSelectedCountry(value); onCountryChange?.(value); setSearchCity(''); }}>
         <SelectTrigger aria-label="Pays des zones operationnelles" className="w-full sm:w-64 bg-white text-black"><SelectValue placeholder="Selectionner un pays" /></SelectTrigger>
         <SelectContent>{countries.map(c => <SelectItem key={c.code} value={c.code}>{c.emoji_flag} {c.nom}</SelectItem>)}</SelectContent>
       </Select>

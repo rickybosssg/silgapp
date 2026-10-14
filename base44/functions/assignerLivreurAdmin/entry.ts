@@ -25,6 +25,7 @@ export default async function(req: Request): Promise<Response> {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Non autorisé' }, { status: 401 });
+    if (user.role !== 'admin') return Response.json({ error: 'Administrateur requis' }, { status: 403 });
 
     const body = await req.json();
     const { course_id, livreur_id, motif } = body;
@@ -45,6 +46,16 @@ export default async function(req: Request): Promise<Response> {
     const livreur = await base44.asServiceRole.entities.Livreur.get(livreur_id).catch(() => null);
     if (!livreur) return Response.json({ error: 'Livreur introuvable' }, { status: 404 });
 
+    const tenant = (value: unknown) => String(value || '').trim();
+    if (course.country_code !== livreur.country_code || tenant(course.enterprise_id) !== tenant(livreur.enterprise_id) ||
+        (user.admin_type === 'pays' && user.country_code !== course.country_code) ||
+        (user.enterprise_id && tenant(user.enterprise_id) !== tenant(course.enterprise_id))) {
+      return Response.json({ error: 'Perimetre incompatible' }, { status: 403 });
+    }
+    const { verifyCityCompatibility } = await import('../../shared/cityDispatchFilter.ts');
+    if (!(await verifyCityCompatibility(base44, course, livreur)).compatible) {
+      return Response.json({ error: 'Zone operationnelle incompatible' }, { status: 409 });
+    }
     // ── Validation du livreur ──
     if (!livreur.actif) {
       return Response.json({ error: 'Ce livreur est inactif' }, { status: 400 });
@@ -140,6 +151,7 @@ export default async function(req: Request): Promise<Response> {
 
   } catch (error) {
     console.error('[ASSIGN_ADMIN] Erreur:', error);
+    // Le verrou de capacité auto-expire après 30s — pas besoin de libération manuelle ici.
     return Response.json({ error: error.message }, { status: 500 });
   }
 }

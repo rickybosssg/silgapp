@@ -25,6 +25,7 @@ import AdminETABadge from "./AdminETABadge";
 import { getPrixAffichable } from "@/utils/getPrixAffichable";
 import { COURSE_STATUSES } from "@/lib/courseStatuses";
 import EcoMissionAdminView from "@/components/admin/EcoMissionAdminView";
+import TerminerCourseButton from "./TerminerCourseButton";
 
 const STATUTS_INTERNE = [
   "nouvelle", "en_attente_livreur", "acceptee", "en_route_recuperation",
@@ -98,6 +99,16 @@ export default function CourseDetailDialog({ course: courseProp, open, onClose, 
         }
         return result.data;
       }
+      // ── "livree" = finalisation métier officielle via terminerCourseAdmin ──
+      // Pas un simple update : calcule commission, libère le livreur, comptabilise.
+      if (data.statut === "livree" && reseau === "externe") {
+        const result = await base44.functions.invoke("terminerCourseAdmin", { course_id: id });
+        const resData = result?.data || result;
+        if (!resData?.success && resData?.error) {
+          throw new Error(resData.error);
+        }
+        return resData;
+      }
       // Utiliser la fonction backend sécurisée pour les courses externes
       if (reseau === "externe") {
         const result = await base44.functions.invoke("transitionStatutAdmin", {
@@ -116,6 +127,9 @@ export default function CourseDetailDialog({ course: courseProp, open, onClose, 
       queryClient.invalidateQueries();
       if (variables.data.statut === "annulee") {
         toast.success("Course annulée avec succès");
+        onClose();
+      } else if (variables.data.statut === "livree") {
+        toast.success(result?.message || "Course terminée avec succès.");
         onClose();
       } else {
         toast.success("Statut mis à jour");
@@ -489,6 +503,9 @@ export default function CourseDetailDialog({ course: courseProp, open, onClose, 
               reseau={reseau}
             />
           )}
+
+          {/* Terminer la course — clôture administrative exceptionnelle */}
+          <TerminerCourseButton course={course} reseau={reseau} />
 
           {/* Livreurs proposés (dispatch externe) */}
           {reseau === "externe" && <ProposedLivreursList course={course} />}

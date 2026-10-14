@@ -340,6 +340,9 @@ The owner requested one consolidated correction batch and no rebuild during test
 
 ## City Dispatch Integration (October 12)
 
+The operational-zone policy below supersedes country-flag activation and the
+unknown-origin broadcast fallback described in this historical section.
+
 - Base44 source: origin/main 740fd296; previous validated Android baseline:
   11889120 (1.0.129/136). Preserve the Eco-only feed and both loading/error states
   while resolving the incoming hook/engine merge conflicts.
@@ -366,3 +369,42 @@ The owner requested one consolidated correction batch and no rebuild during test
 - Physical city switching, ON dispatch/FCM, permission/RLS adversarial integration
   and whole-city population counts require separate evidence. Local test success
   alone does not validate these scenarios.
+
+## Operational Zones (October 14)
+
+- Sources: Base44 origin/main a4c8f6fd, operational prefix eafef669; stable Codex
+  baseline 11889120. Preserve commission locks, acceptance recovery, route progress,
+  partial cancellation, Eco-only availability, tracking, chat and Victory.
+- OperationalCity.actif alone controls per-city filtering. All seven real cities
+  were read OFF. Legacy country flags and exclusive-priority flags cannot activate
+  this policy. Correction 20 remains deferred and disabled.
+- Explicit communes and Quartier.ville_operationnelle resolve Saaba to Ouagadougou.
+  Real BF audit: 235 quartiers, 223 Ouaga, 10 Bobo, two Saaba explicitly attached.
+  Other 233 use their existing ville; do not claim they all have explicit mappings.
+- Active origin zones restrict visibility, notifications and acceptance. Inactive
+  origin zones retain historical driver eligibility, but grouping cannot import a
+  parcel from another protected zone. Unknown origins fail closed when a zone is
+  active. With every zone OFF, no additional geographic filter is applied.
+- Country/Enterprise checks stay independent. Manual assignment enforces admin,
+  tenant, country and active-zone scope. Busy-driver detection is never city-limited.
+- Only fresh accurate GPS changes a city; heartbeat is not GPS. Preserve active
+  missions and geographic hysteresis. No paid map lookup or fabricated movement.
+- Admin city configuration uses authenticated global Super Admin backend writes,
+  expected-state fencing, confirmation, read-back and audit. Direct entity writes
+  are denied. Creation uses inactive records and duplicate checks, not an unproven
+  multi-entity transaction or database uniqueness guarantee.
+- Reuse DispatchMap; bound map/statistical counts are labeled. Country selection
+  remains reachable before opening a dialog. Client/driver presentation unchanged.
+- Preserve completed route steps when a new optimizer is integrated; do not remove
+  a picked parcel's remaining delivery or overwrite concurrent progress.
+- Tests: city-dispatch (30), eco-city (24), operational-zones (32), city-integration,
+  operational-zones-safety, city-manual-assignment and historical suites. The
+  former unknown-origin broadcast assertion is strengthened to deny broadcast ON;
+  OFF equivalence is separately retained. Grouping fault assertions are unchanged.
+- Deployment schema incident: the API omitted User from App.entities and reported
+  its deletion during schema sync. Its saved custom schema was restored exactly;
+  merged schema equivalence was verified ignoring required-field order. Preserve
+  User explicitly in future complete snapshots. Do not describe the incident as
+  harmless without checking authentication and schema restoration.
+- Physical screens, real GPS movement, FCM, adversarial RLS and production ON
+  behavior require separate evidence. All-OFF read-back and mocks are not such proof.

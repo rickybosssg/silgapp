@@ -23,7 +23,7 @@ export function operationalCityAliases(city, quartiers = []) {
   if (!Array.isArray(communes)) throw new Error('invalid_zone_aliases');
   return [...new Set([canonical, city.nom_affichage, ...communes,
     ...quartiers.filter(q => normalizeCityName(q.ville_operationnelle || q.ville) === canonical).map(q => q.ville)
-  ].map(normalizeCityName).filter(Boolean))];
+  ].map(normalizeCityName).filter(value => typeof value === 'string'))];
 }
 
 export function resolveOperationalName(name, cities = [], quartiers = []) {

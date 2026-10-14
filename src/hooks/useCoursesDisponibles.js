@@ -104,6 +104,14 @@ export function useCoursesDisponibles(livreurProfil) {
       const cities = await base44.entities.OperationalCity.filter({ country_code: countryCode }, undefined, 100);
       const quartiers = cities.some(c => c.actif === true)
         ? await base44.entities.Quartier.filter({ country_code: countryCode, actif: true }, undefined, 1000) : [];
+      // Invalid or overlapping aliases are a query error, not a render-time crash.
+      if (cities.some(c => c.actif === true)) {
+        for (const city of cities) {
+          for (const alias of operationalCityAliases(city, quartiers)) {
+            resolveOperationalName(alias, cities, quartiers);
+          }
+        }
+      }
       return { cities, quartiers };
     },
     enabled: !!countryCode, staleTime: 30000, refetchInterval: 60000,
@@ -117,7 +125,8 @@ export function useCoursesDisponibles(livreurProfil) {
   }, [queryClient, countryCode]);
   const cityDispatchEnabled = zonePolicy.cities.some(c => c.actif === true);
   const livreurVille = livreurProfil?.ville?.trim();
-  const driverZone = resolveOperationalName(livreurVille, zonePolicy.cities, zonePolicy.quartiers);
+  const driverZone = cityDispatchEnabled
+    ? resolveOperationalName(livreurVille, zonePolicy.cities, zonePolicy.quartiers) : null;
   const excludedAliases = zonePolicy.cities.filter(c => c.actif === true && c.nom !== driverZone)
     .flatMap(c => operationalCityAliases(c, zonePolicy.quartiers));
   const cityFilter = excludedAliases.length

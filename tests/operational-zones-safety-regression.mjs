@@ -4,7 +4,7 @@ import ts from 'typescript';
 import { normalizeCityName, resolveOperationalName, canSeeOperationalCourse } from '../base44/shared/cityNames.js';
 import { invalidateOperationalCityCache, getOperationalZoneCityNames } from '../base44/shared/operationalZones.ts';
 import { invalidateQuartierCache } from '../base44/shared/cityResolution.ts';
-import { verifyCityCompatibility, buildLivreurCityFilter } from '../base44/shared/cityDispatchFilter.ts';
+import { verifyCityCompatibility, buildLivreurCityFilter, buildCourseCityFilterFromCourse } from '../base44/shared/cityDispatchFilter.ts';
 
 const cities = [{ id: 'ouaga', nom: 'ouagadougou', country_code: 'BF', actif: true, communes_rattachees: '["Ouagadougou","Saaba"]' },
   { id: 'bobo', nom: 'bobo-dioulasso', country_code: 'BF', actif: false }];
@@ -19,6 +19,10 @@ assert.equal((await verifyCityCompatibility(sdk, ouagaCourse, { country_code: 'B
 assert.equal((await verifyCityCompatibility(sdk, { ...ouagaCourse, ville_depart: 'Bobo-Dioulasso' }, { country_code: 'BF', ville: 'Ouagadougou' })).compatible, true, 'inactive course retains historical eligibility');
 assert.equal(canSeeOperationalCourse(ouagaCourse, 'Bobo-Dioulasso', cities, []), false);
 assert.equal(canSeeOperationalCourse(ouagaCourse, 'SAABA', cities, []), true);
+assert.deepEqual(await buildLivreurCityFilter(sdk, { country_code: 'BF' }), { id: { $in: [] } }, 'unknown origin must not broadcast while a zone is protected');
+const inactiveGrouping = await buildCourseCityFilterFromCourse(sdk, { country_code: 'BF', ville_depart: 'Bobo-Dioulasso' });
+assert.ok(new RegExp(inactiveGrouping.ville_depart.$not.$regex, 'i').test('Saaba'), 'inactive reference excludes active-zone candidates');
+assert.ok(!new RegExp(inactiveGrouping.ville_depart.$not.$regex, 'i').test('Bobo-Dioulasso'));
 reset(); cities.forEach(c => { c.actif = false; });
 sdk.asServiceRole.entities.Quartier.filter = async () => { throw Error('OFF must not query geographic data'); };
 assert.deepEqual(await buildLivreurCityFilter(sdk, ouagaCourse), {});
@@ -44,7 +48,7 @@ new Function('Deno', 'createClientFromRequest', 'normalizeCityName', 'resolveOpe
     return { entities };
   } }), normalizeCityName, resolveOperationalName);
 const request = body => handler(new Request('https://isolated.invalid', { method: 'POST', body: JSON.stringify(body) }));
-for (const user of [{ role: 'user' }, { role: 'admin', enterprise_id: 'private-enterprise' }]) {
+for (const user of [{ role: 'user' }, { role: 'admin', enterprise_id: 'private-enterprise' }, { role: 'admin', admin_type: 'pays' }]) {
   activeUser = user; assert.equal((await request({ action: 'activate' })).status, 403);
 }
 activeUser = { role: 'admin', email: 'admin@example.test' };

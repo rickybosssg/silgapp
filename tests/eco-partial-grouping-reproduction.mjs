@@ -34,6 +34,7 @@ function adapter(fault) {
   let progressRace = false;
   const entities = {
     AppConfig: { filter: async () => [] },
+    OperationalCity: { filter: async () => [] },
     CourseExterne: {
       get: async id => structuredClone(rows.get(id)),
       filter: async filter => [...rows.values()].filter(row => matches(row, filter)).map(row => structuredClone(row)),

@@ -249,14 +249,14 @@ test('14 — buildLivreurCityFilter : flag ON → filtre ville', async () => {
   invalidateCityFlagCache('BF');
 });
 
-test('15 — buildLivreurCityFilter : ville vide → filtre vide (graceful)', async () => {
+test('15 — buildLivreurCityFilter : zone ON et origine inconnue → aucune diffusion', async () => {
   const { buildLivreurCityFilter } = await import('../base44/shared/cityDispatchFilter.ts');
   const { invalidateCityFlagCache } = await import('../base44/shared/cityResolution.ts');
   invalidateCityFlagCache('BF');
   const base44 = createMockBase44('ouagadougou', 'ouagadougou', true);
   const course = { country_code: 'BF', ville_depart: null, gps_depart_lat: null, gps_depart_lng: null };
   const filter = await buildLivreurCityFilter(base44, course);
-  assert.deepStrictEqual(filter, {}, 'Ville vide → pas de filtre');
+  assert.deepStrictEqual(filter, { id: { $in: [] } }, 'Ne pas diffuser sans origine fiable vers une zone protégée');
   invalidateCityFlagCache('BF');
 });
 

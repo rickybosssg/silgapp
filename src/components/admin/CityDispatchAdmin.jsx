@@ -160,7 +160,7 @@ export default function CityDispatchAdmin() {
           Activez les villes une par une. Une zone activée réserve ses courses aux livreurs de cette zone.
           Saaba est rattachée à Ouagadougou. OFF par défaut.
         </p>
-        <OperationalCityManager countries={countries} countryCode={selectedCountry} />
+        <OperationalCityManager countries={countries} countryCode={selectedCountry} onCountryChange={value => { setSelectedCountry(value); setSelectedCity(''); }} />
       </Card>
 
       {/* Section 2 : Sélecteurs pays + ville */}
@@ -206,7 +206,7 @@ export default function CityDispatchAdmin() {
             courses={mapData.courses}
             country={selectedCountryObj}
             selectedCity={selectedCity}
-          cityAliases={selectedCityAliases}
+            cityAliases={selectedCityAliases}
           />
         )
       ) : (

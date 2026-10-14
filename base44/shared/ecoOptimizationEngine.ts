@@ -850,7 +850,9 @@ export async function respondToOnRouteProposal(base44: any, proposalId: string, 
     { id: proposal.id, status: 'pending' },
     { $set: { status: 'accepted', responded_at: now } }
   );
-  if (!claimProposal || claimProposal.updated !== 1) return { success: false, reason: 'proposal_race_lost' };
+  if (!claimProposal || claimProposal.updated !== 1) {
+    return { success: false, reason: 'proposal_race_lost' };
+  }
 
   const claimCourse = await claimCourseForLivreur(
     base44,
@@ -876,6 +878,9 @@ export async function respondToOnRouteProposal(base44: any, proposalId: string, 
   // multi-delivery dashboard (EcoMissionDashboard) for Standard courses too.
   // A Standard course stays Standard — only the mission grouping changes.
   // The route plan is computed via Haversine (ORS reserved for top candidates only).
+  let missionIdForOptimization: string | null = null;
+  let routePlanForOptimization: string | null = null;
+  let coursesForOptimization: any[] = [];
   try {
     const activeCoursesForMission = await base44.asServiceRole.entities.CourseExterne.filter({
       livreur_id: livreurId,
@@ -899,21 +904,26 @@ export async function respondToOnRouteProposal(base44: any, proposalId: string, 
           if (currentCourseIds.length < config.maxCoursesPerMission) {
             const updatedCourseIds = [...new Set([...currentCourseIds, fresh.id])];
             const allCoursesForMission = [...otherActiveCourses, fresh].filter(c => updatedCourseIds.includes(c.id));
+            const newRoutePlan = JSON.stringify(routePlanForEcoMission(allCoursesForMission));
             await base44.asServiceRole.entities.EcoMission.update(existingMission.id, {
               course_ids: updatedCourseIds,
-              route_plan_json: JSON.stringify(routePlanForEcoMission(allCoursesForMission)),
+              route_plan_json: newRoutePlan,
               total_price: allCoursesForMission.reduce((sum, c) => sum + prixCourse(c), 0),
               total_driver_amount: allCoursesForMission.reduce((sum, c) => sum + Math.max(0, prixCourse(c) - (Number(c.commission_silga) || 0)), 0),
             }).catch(() => null);
             await base44.asServiceRole.entities.CourseExterne.update(fresh.id, {
               eco_mission_id: existingMission.id,
             }).catch(() => null);
+            missionIdForOptimization = existingMission.id;
+            routePlanForOptimization = newRoutePlan;
+            coursesForOptimization = allCoursesForMission;
           }
         }
       } else {
         // ── Create a new mission with the active course + new course ──
         const allCoursesForMission = [...otherActiveCourses.slice(0, config.maxCoursesPerMission - 1), fresh];
         const nowIso = new Date().toISOString();
+        const newRoutePlan = JSON.stringify(routePlanForEcoMission(allCoursesForMission));
         const newMission = await base44.asServiceRole.entities.EcoMission.create({
           country_code: fresh.country_code,
           enterprise_id: null,
@@ -921,7 +931,7 @@ export async function respondToOnRouteProposal(base44: any, proposalId: string, 
           status: 'accepted',
           livreur_id: livreurId,
           livreur_user_email: livreur.user_email || null,
-          route_plan_json: JSON.stringify(routePlanForEcoMission(allCoursesForMission)),
+          route_plan_json: newRoutePlan,
           active_step_index: 0,
           total_price: allCoursesForMission.reduce((sum, c) => sum + prixCourse(c), 0),
           total_driver_amount: allCoursesForMission.reduce((sum, c) => sum + Math.max(0, prixCourse(c) - (Number(c.commission_silga) || 0)), 0),
@@ -933,6 +943,9 @@ export async function respondToOnRouteProposal(base44: any, proposalId: string, 
             { id: { $in: allCoursesForMission.map(c => c.id) } },
             { $set: { eco_mission_id: newMission.id } }
           ).catch(() => null);
+          missionIdForOptimization = newMission.id;
+          routePlanForOptimization = newRoutePlan;
+          coursesForOptimization = allCoursesForMission;
         }
       }
     }
@@ -941,7 +954,36 @@ export async function respondToOnRouteProposal(base44: any, proposalId: string, 
     // Non-blocking: the course is already claimed, the driver can proceed.
   }
 
-  return { success: true, accepted: true, course_id: course.id, proposal_id: proposal.id };
+  // ── OPTIMISATION DU TRAJET AVEC LA POSITION GPS DU LIVREUR ──
+  // Après la création/mise à jour de la mission, on recalcule l'itinéraire
+  // en prenant en compte la position GPS réelle du livreur. On utilise
+  // optimizeEcoRoutePreservingCompleted car le livreur a déjà une course active
+  // (certaines étapes peuvent déjà être terminées). Compare les permutations
+  // valides (Haversine) et sélectionne la plus courte. Non-bloquant.
+  let routeOptimization: { optimized: boolean; reason: string; routePlanJSON?: string; distanceKm?: number } = { optimized: false, reason: 'not_attempted' };
+  if (missionIdForOptimization && coursesForOptimization.length >= 2) {
+    try {
+      const { optimizeEcoRoutePreservingCompleted } = await import('./ecoRouteOptimizer.ts');
+      routeOptimization = await optimizeEcoRoutePreservingCompleted(
+        base44,
+        coursesForOptimization,
+        livreur,
+        routePlanForOptimization,
+      );
+      if (routeOptimization.optimized && typeof routeOptimization.routePlanJSON === 'string') {
+        const result = await base44.asServiceRole.entities.EcoMission.updateMany({
+          id: missionIdForOptimization, status: { $in: ['accepted', 'in_progress'] },
+          route_plan_json: routePlanForOptimization,
+        }, { $set: { route_plan_json: routeOptimization.routePlanJSON } });
+        if (result?.updated !== 1) routeOptimization = { optimized: false, reason: 'route_changed' };
+      }
+    } catch (e: any) {
+      console.error('[respondToOnRouteProposal] Route optimization failed:', e?.message || String(e));
+      routeOptimization = { optimized: false, reason: 'optimization_error' };
+    }
+  }
+
+  return { success: true, accepted: true, course_id: course.id, proposal_id: proposal.id, route_optimization: routeOptimization };
 }
 
 export async function completeEcoMissionIfNeeded(base44: any, courseId: string) {
@@ -1527,6 +1569,7 @@ export async function acceptEcoMission(base44: any, missionId: string, livreurId
     { $set: { status: 'accepting', livreur_id: livreurId, livreur_user_email: livreur.user_email || null, accepted_at: now } },
   );
   if (!claimMission || claimMission.updated !== 1) return { success: false, reason: 'mission_race_lost' };
+
   }
 
   const updateData: any = {
@@ -1591,6 +1634,16 @@ export async function completeEcoAcceptance(base44: any, mission: any, updateDat
         row.country_code !== mission.country_code || normalizeEnterpriseId(row.enterprise_id) !== null || TERMINAL_STATUSES.includes(row.statut) ||
         !row.commission_locked_at || row.commission_taux_applique == null)) {
       return { success: false, reason: 'acceptance_repair_required', retryable: true };
+    }
+    try {
+      const driver = await base44.asServiceRole.entities.Livreur.get(mission.livreur_id);
+      const { optimizeEcoRoutePreservingCompleted } = await import('./ecoRouteOptimizer.ts');
+      const route = await optimizeEcoRoutePreservingCompleted(base44, saved, driver, mission.route_plan_json);
+      if (route.optimized) await base44.asServiceRole.entities.EcoMission.updateMany({
+        id: mission.id, status: 'accepting', livreur_id: mission.livreur_id, route_plan_json: mission.route_plan_json,
+      }, { $set: { route_plan_json: route.routePlanJSON } });
+    } catch (error) {
+      console.warn('[completeEcoAcceptance] Existing route preserved after optimization failure');
     }
     await base44.asServiceRole.entities.Livreur.update(mission.livreur_id, { statut: 'en_course' });
     await base44.asServiceRole.entities.EcoMission.updateMany({ id: mission.id, status: 'accepting', livreur_id: mission.livreur_id },
@@ -1680,3 +1733,4 @@ export async function compensateEcoAcceptance(base44: any, mission: any, rows: a
     { $set: { locked_at: null } });
   return true;
 }
+

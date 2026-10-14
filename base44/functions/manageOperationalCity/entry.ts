@@ -22,7 +22,7 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (user.role !== 'admin' || Boolean(user.enterprise_id)) {
+    if (user.role !== 'admin' || Boolean(user.enterprise_id) || user.admin_type === 'pays') {
       return Response.json({ error: 'Forbidden — Super Admin only' }, { status: 403 });
     }
 

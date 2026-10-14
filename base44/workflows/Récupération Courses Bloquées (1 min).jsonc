@@ -1,0 +1,45 @@
+{
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "recuperer_courses_bloquees_1min",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "recuperer_courses": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "recupererCoursesBloquees",
+            "args": {}
+          },
+          "then": "end",
+          "x-base44": {
+            "title": "R\u00e9cup\u00e9ration courses bloqu\u00e9es",
+            "description": "Publie les courses Standard en attente depuis > 60s"
+          }
+        }
+      }
+    ]
+  },
+  "name": "R\u00e9cup\u00e9ration Courses Bloqu\u00e9es (1 min)",
+  "description": "M\u00e9canisme l\u00e9ger de r\u00e9cup\u00e9ration : publie les courses Standard qui n'ont pas \u00e9t\u00e9 dispatch\u00e9es \u00e0 la cr\u00e9ation (orchestrateur timeout, erreur r\u00e9seau). Toutes les 1 minute, max 20 courses par tick. Idempotent \u2014 ne cr\u00e9e jamais de doublon.",
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "recurring",
+      "cron_expression": "* * * * *",
+      "one_time_date": null,
+      "timezone": "Africa/Ouagadougou",
+      "interval_value": null,
+      "interval_unit": null,
+      "interval_anchor": null,
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  }
+}

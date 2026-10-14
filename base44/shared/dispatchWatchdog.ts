@@ -18,6 +18,7 @@ import { getLivreursNotifies, getLivreursRefuses } from './dispatchNotifications
 import { chargerConfigDispatch, chargerConfigVaguesGPS } from './dispatchConfig.ts';
 import { isV2Enabled, secoursDispatchV2, calculerScore, publierCourseDansFil } from './dispatchV2.ts';
 import { gererPushGeneralT10 } from './pushGeneralT10.ts';
+import { gererRappelPeriodique } from './pushRappelPeriodique.ts';
 
 /** Crée une alerte admin si aucune alerte récente n'existe pour la même course. */
 async function createAdminAlert(base44, titre, message, courseId, alertDedupMs = 5 * 60 * 1000) {
@@ -115,8 +116,15 @@ export async function runWatchdog(base44, body = {}) {
 
   // ═══ ANOMALIE 1: Course nouvelle jamais traitée par l'automation create ═══
   // Une course nouvelle > 2 min sans aucune notification = l'entity automation create a échoué
+  // BORNÉ : max 15 courses par tick pour éviter que le watchdog se bloque
+  let anomaly1Count = 0;
+  const ANOMALY1_MAX = 15;
   for (const course of courses) {
     if (course.statut !== 'nouvelle') continue;
+    if (anomaly1Count >= ANOMALY1_MAX) {
+      console.warn(`[WATCHDOG] ⏭️ ANOMALIE 1: limite ${ANOMALY1_MAX} courses/tick atteinte — reste reporté au prochain tick`);
+      break;
+    }
     const ageMs = now.getTime() - new Date(course.created_date).getTime();
     if (ageMs <= WATCHDOG_GRACE_MS) continue;
     if (courseIdsWithNotifs.has(course.id)) continue;
@@ -127,6 +135,7 @@ export async function runWatchdog(base44, body = {}) {
       continue;
     }
 
+    anomaly1Count++;
     const ageMin = Math.round(ageMs / 60000);
     anomalies.push({ course_id: course.id, type: 'nouvelle_jamais_traitee', severity: 'critique', description: `Course nouvelle depuis ${ageMin}min sans notification` });
 
@@ -148,13 +157,21 @@ export async function runWatchdog(base44, body = {}) {
 
   // ═══ ANOMALIE 2: Course en recherche_livreur sans vague active ═══
   // dispatch_status en_attente + statut recherche_livreur + > 2 min sans notification
+  // BORNÉ : max 15 courses par tick pour éviter que le watchdog se bloque
+  let anomaly2Count = 0;
+  const ANOMALY2_MAX = 15;
   for (const course of courses) {
     if (course.statut !== 'recherche_livreur') continue;
+    if (anomaly2Count >= ANOMALY2_MAX) {
+      console.warn(`[WATCHDOG] ⏭️ ANOMALIE 2: limite ${ANOMALY2_MAX} courses/tick atteinte — reste reporté au prochain tick`);
+      break;
+    }
     if (course.dispatch_status !== 'en_attente') continue;
     const ageMs = now.getTime() - new Date(course.updated_date).getTime();
     if (ageMs <= WATCHDOG_GRACE_MS) continue;
     if (courseIdsWithNotifs.has(course.id)) continue;
 
+    anomaly2Count++;
     const ageMin = Math.round(ageMs / 60000);
     anomalies.push({ course_id: course.id, type: 'recherche_sans_vague', severity: 'critique', description: `Course en_attente depuis ${ageMin}min sans vague` });
 
@@ -508,6 +525,18 @@ export async function runWatchdog(base44, body = {}) {
     await gererPushGeneralT10(base44);
   } catch (err) {
     console.error('[WATCHDOG] Erreur push général T+10:', err?.message || String(err));
+  }
+
+  // ═══ RAPPEL PÉRIODIQUE TOUTES LES 5 MINUTES ═══
+  // Rappel sonore récurrent aux livreurs éligibles tant que des courses
+  // restent disponibles. Indépendant des mécanismes T+5, T+10, T+20.
+  // Cooldown par pays (AppConfig) + verrou anti-concurrence.
+  // Message groupé : "SILGAPP — N courses attendent un livreur."
+  // Backend uniquement — pas de rebuild APK/AAB/iOS.
+  try {
+    await gererRappelPeriodique(base44);
+  } catch (err) {
+    console.error('[WATCHDOG] Erreur rappel périodique 5 min:', err instanceof Error ? err.message : String(err));
   }
 
   console.log(`[WATCHDOG] 📋 ${anomalies.length} anomalie(s) détectée(s), ${corrections.length} correction(s) appliquée(s), ${logsSkipped} log(s) ignoré(s) par cooldown`);

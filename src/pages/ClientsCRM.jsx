@@ -9,6 +9,7 @@ import ClientFicheDialog from "@/components/crm/ClientFicheDialog";
 import CrmConversionDashboard from "@/components/crm/CrmConversionDashboard";
 import CrmProspectionPanel from "@/components/crm/CrmProspectionPanel";
 import ProsAutonomiserScore, { ProsBadge } from "@/components/crm/ProsAutonomiserScore";
+import ExportClientsBFButton from "@/components/crm/ExportClientsBFButton";
 import { normalizePhoneForWhatsapp } from "@/lib/courseContact";
 import { cn } from "@/lib/utils";
 
@@ -196,6 +197,7 @@ export default function ClientsCRM() {
             </h1>
             <p className="text-xs text-gray-500">Conversion CRM → App · {localStats.total} fiches · {localStats.withApp} avec App</p>
           </div>
+          <ExportClientsBFButton />
         </div>
 
         {/* Tableau de bord conversion */}

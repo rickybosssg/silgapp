@@ -45,6 +45,7 @@
     },
     "historique_modifications": {
       "type": "array",
+      "rls": { "read": false },
       "items": {
         "type": "object",
         "properties": {

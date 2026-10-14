@@ -56,6 +56,9 @@ export default async function(req: Request): Promise<Response> {
       timeout_expires_at: null,
       dispatch_next_wave_at: null,
       dispatch_v2_secours_phase: 0,
+      client_decision_attendue: false,
+      client_decision_action: 'chercher_autre_livreur',
+      client_decision_at: now,
       notes: (course.notes || '') + ` | [${noteLabel}]`,
     };
 

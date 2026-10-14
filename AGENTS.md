@@ -128,8 +128,12 @@ product decision that supersedes an older behavior.
 
 ## City dispatch integration
 
-- Keep every CITY_DISPATCH_ENABLED:<COUNTRY_CODE> OFF until separate activation
-  approval. Missing keys mean OFF; a failed configuration read is not an OFF result.
+- OperationalCity.actif is now the sole activation source, per city. Legacy
+  CITY_DISPATCH_ENABLED keys do not activate operational zones. Keep all cities
+  OFF until separate approval; a failed configuration read is not an OFF result.
+- Preserve explicit commune mappings, especially Saaba -> Ouagadougou. Unknown
+  origins must not broadcast across protected active zones. All OFF preserves
+  historical geographic eligibility. Never fabricate a city from a quartier name.
 - OFF must preserve tenant queries and non-exclusive Standard/Eco dispatch.
 - City matching uses canonical complete names, never substring or unescaped regex.
 - Check every parcel before claiming an Eco mission. Preserve claim fencing,
@@ -142,3 +146,10 @@ product decision that supersedes an older behavior.
   backend authorization, confirmation and read-back; never a client-only role check.
 - Base44's 54 city tests include mocks and source checks, not 54 production tests.
   Retain them and run city-integration-safety-regression plus historical suites.
+- Also run the 32 operational-zone tests and actual-helper safety/manual-assignment
+  adapters. Report physical ON/OFF validation separately; never activate production
+  merely to test a switch.
+- Schema synchronization is destructive for omitted definitions. App.entities
+  excludes the User schema: preserve additional_user_data_schema as User as well.
+  Snapshot and compare all schemas, re-read every preserved definition, and stop
+  on any unexpected deletion. Prefer a verified targeted schema API when available.

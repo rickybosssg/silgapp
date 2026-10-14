@@ -50,7 +50,7 @@ export async function buildLivreurCityFilter(base44: any, course: any): Promise<
 
   // Résoudre la zone opérationnelle de la course
   const courseCity = await getCourseDepartureCity(base44, course);
-  if (!courseCity) return {}; // Graceful degradation
+  if (!courseCity) return { id: { $in: [] } }; // Unknown origin cannot invite drivers to an unacceptably scoped course.
 
   // Vérifier si cette zone est activée
   const isActive = await isOperationalCityActive(base44, countryCode, courseCity);
@@ -146,10 +146,15 @@ export async function buildCourseCityFilterFromCourse(base44: any, course: any):
   if (!countryCode || !await isCityDispatchEnabled(base44, countryCode)) return {};
 
   const courseCity = await getCourseDepartureCity(base44, course);
-  if (!courseCity) return {};
+  if (!courseCity) return { id: { $in: [] } };
 
   const isActive = await isOperationalCityActive(base44, countryCode, courseCity);
-  if (!isActive) return {};
+  if (!isActive) {
+    // An inactive reference course must not pull parcels out of another protected zone.
+    const protectedNames = await getActivatedZoneCityNames(base44, countryCode, courseCity);
+    return protectedNames.length
+      ? { ville_depart: { $not: { $regex: cityNamesPattern(protectedNames), $options: 'i' } } } : {};
+  }
 
   const zoneCityNames = await getOperationalZoneCityNames(base44, countryCode, courseCity);
   if (zoneCityNames.length === 0) {

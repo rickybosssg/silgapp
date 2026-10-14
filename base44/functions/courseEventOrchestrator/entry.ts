@@ -119,6 +119,7 @@ Deno.serve(async (req) => {
       }
 
       // 1. Preserve normal dispatch before non-blocking on-route proposals.
+
       const v2Enabled = await isV2Enabled(base44);
       if (v2Enabled) {
         // V2 : dispatchExterneAuto publie et notifie de façon idempotente.
