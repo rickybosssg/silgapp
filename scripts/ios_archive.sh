@@ -90,9 +90,7 @@ xcodebuild -workspace ios/App/App.xcworkspace -scheme App -configuration Release
   archive
 
 APP_PATH="$ARCHIVE_PATH/Products/Applications/App.app"
-test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP_PATH/Info.plist")" = "$IOS_RELEASE_VERSION"
-test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP_PATH/Info.plist")" = "$IOS_RELEASE_BUILD"
-test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP_PATH/Info.plist")" = "$APP_BUNDLE_ID"
+python3 scripts/ios_release.py app-info --path "$APP_PATH/Info.plist"
 codesign --verify --deep --strict "$APP_PATH"
 codesign -d --entitlements :- "$APP_PATH" > "$SIGNING_TEMP/app-entitlements.plist"
 python3 scripts/ios_release.py signed-app --path "$SIGNING_TEMP/app-entitlements.plist"

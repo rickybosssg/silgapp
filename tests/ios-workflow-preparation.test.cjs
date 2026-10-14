@@ -65,3 +65,18 @@ test('all embedded workflow shell blocks pass a syntax-only Bash check', () => {
     }
   }
 });
+
+test('both workflows select installed Xcode 26.2 and reject an obsolete SDK before restoring secrets', () => {
+  for (const file of ['ios-cloud-build.yml', 'ios-signed-archive.yml']) {
+    const workflow = yaml.load(read(`.github/workflows/${file}`));
+    for (const job of Object.values(workflow.jobs)) {
+      assert.equal(job.env.DEVELOPER_DIR, '/Applications/Xcode_26.2.app/Contents/Developer');
+      const check = job.steps.findIndex(step => step.name === 'Validate App Store Xcode and iOS SDK');
+      const restore = job.steps.findIndex(step => step.name === 'Restore existing Firebase iOS configuration');
+      assert.ok(check >= 0 && check < restore);
+      assert.match(job.steps[check].run, /"\$XCODE_MAJOR" -ge 26 && test "\$SDK_MAJOR" -ge 26/);
+    }
+  }
+  const archive = read('scripts/ios_archive.sh');
+  assert.ok(archive.indexOf('ios_release.py app-info') < archive.indexOf('xcodebuild -exportArchive'));
+});

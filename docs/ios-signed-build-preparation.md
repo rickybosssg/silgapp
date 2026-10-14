@@ -106,8 +106,8 @@ web/Android favicon references are preserved.
 
 ## Local verification and limits
 
-- Python unittest: 15 release/profile/entitlement/identity safety tests passed.
-- Node test: 5 workflow YAML/trigger/artifact/private-key handling and embedded
+- Python unittest: 17 release/profile/entitlement/identity safety tests passed.
+- Node test: 6 workflow YAML/trigger/artifact/private-key handling and embedded
   Bash syntax tests passed.
 - Node branding tests: 4 passed. Approved image SHA-256/opaque RGB dimensions,
   native launch variants, Android/web fallback and exact component-source
@@ -130,8 +130,8 @@ web/Android favicon references are preserved.
   validator; the CMS signature check also returns success. Signer trust-chain
   validation remains outside this local check.
 - Bash syntax validation passed; archive script was not executed.
-- Native archive/export completion, App Store Connect acceptance and device
-  behavior remain unverified. See the authorized CI attempt below.
+- Native archive/export succeeded in retry r1. App Store Connect acceptance and
+  device behavior remain unverified; the current upload SDK requirement is not met.
 
 No P12/private key was opened or decrypted on the Windows host during source
 preparation. The owner configured all five GitHub secrets himself and explicitly
@@ -155,3 +155,25 @@ through the existing CocoaPods xcodeproj library, with no workspace-wide signing
 override. A regression check protects that scope. Retry tags retain 1.0.60/67 and
 use a suffix instead of moving the original tag. The remote ios source and the
 App Store Connect concurrent-upload recheck still guard a future submission.
+
+Retry `ios-signed-v1.0.60-b67-r1`, commit
+`f290fc5013cc2a31401bbbf84d43c69100fdab23`, succeeded:
+https://github.com/rickybosssg/silgapp/actions/runs/38526602652 . Archive, strict
+codesign verification, production entitlements and IPA export all passed.
+The only artifact is `SILGAPP-signed-ipa` (ID 11875529986), 9,606,913 bytes,
+SHA-256 `e00f42765bf80a5515bff96aa359f950551937901d546add810a307dd91a5aae`,
+expiring 2026-10-17 07:13:23 UTC. It contains only App.ipa.
+
+Final metadata inspection found that the runner default was Xcode 16.4 / iOS
+SDK 18.5. This successful IPA does not meet Apple's current upload SDK requirement:
+https://developer.apple.com/news/upcoming-requirements/ requires Xcode 26 and an
+iOS 26 SDK or later since 2026-04-28. The following correction selects the
+already installed Xcode 26.2 through DEVELOPER_DIR in both workflows and validates
+the toolchain before restoring signing configuration. The actual archived app SDK
+is checked before export. The runner's exact software report confirms this Xcode
+installation: https://github.com/actions/runner-images/blob/macos-15-arm64/20260907.0337/images/macos/macos-15-arm64-Readme.md .
+No duplicate run was launched while the parent requested stopping relaunches
+after r1 success. Once the SDK defect was established, the parent explicitly
+authorized pushing this toolchain correction and launching a new attempt with an
+immutable retry tag. It keeps 1.0.60/67, the standard macos-15 runner and the same
+five owner-configured secrets. Apple upload/submission remains unauthorized.

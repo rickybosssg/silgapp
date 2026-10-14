@@ -9,10 +9,21 @@ jobs:
   ios-build:
     runs-on: macos-15
     timeout-minutes: 40
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - name: Validate App Store Xcode and iOS SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -d "$DEVELOPER_DIR" || { echo '::error::Reviewed Xcode installation is unavailable'; exit 1; }
+          xcodebuild -version
+          XCODE_MAJOR="$(xcodebuild -version | awk '/^Xcode / {split($2, parts, "."); print parts[1]}')"
+          SDK_MAJOR="$(xcrun --sdk iphoneos --show-sdk-version | cut -d. -f1)"
+          test "$XCODE_MAJOR" -ge 26 && test "$SDK_MAJOR" -ge 26 || { echo '::error::App Store requires Xcode 26 and iOS SDK 26 or later'; exit 1; }
       - uses: actions/setup-node@v4
         with:
           node-version: '20'

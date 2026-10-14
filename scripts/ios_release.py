@@ -100,6 +100,20 @@ def validate_signed_entitlements(entitlements):
         raise ValueError("Archived app signing entitlements are not the reviewed production identity.")
 
 
+def validate_app_metadata(info, settings):
+    if not (
+        info.get("CFBundleIdentifier") == BUNDLE_ID
+        and info.get("CFBundleShortVersionString") == settings.get("marketing_version")
+        and info.get("CFBundleVersion") == settings.get("build_number")
+    ):
+        raise ValueError("Archived app bundle/version/build differs from the reviewed release.")
+    sdk = info.get("DTSDKName")
+    match = re.fullmatch(r"iphoneos([0-9]+)(?:\.[0-9]+)*", sdk) if isinstance(sdk, str) else None
+    if match is None or int(match.group(1)) < 26:
+        raise ValueError("Archived app must use iOS SDK 26 or later for current App Store uploads.")
+    return {"version": info["CFBundleShortVersionString"], "build": info["CFBundleVersion"], "sdk": sdk}
+
+
 def write_outputs(values, output_path):
     if output_path:
         with Path(output_path).open("a", encoding="utf-8") as handle:
@@ -111,7 +125,7 @@ def write_outputs(values, output_path):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("release", "firebase", "profile", "signed-app"))
+    parser.add_argument("command", choices=("release", "firebase", "profile", "signed-app", "app-info"))
     parser.add_argument("--settings", default="ios/release-settings.json")
     parser.add_argument("--remote-head")
     parser.add_argument("--ref")
@@ -133,6 +147,9 @@ def main():
         settings = json.loads(Path(args.settings).read_text(encoding="utf-8"))
         if args.command == "release":
             values = validate_release(settings, args.remote_head, args.ref)
+        elif args.command == "app-info":
+            with Path(args.path).open("rb") as handle:
+                values = validate_app_metadata(plistlib.load(handle), settings)
         else:
             with Path(args.path).open("rb") as handle:
                 profile = plistlib.load(handle)

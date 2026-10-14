@@ -145,6 +145,20 @@ class IOSReleaseTests(unittest.TestCase):
         self.assertEqual(project.count('"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Distribution";'), 2)
         self.assertEqual(project.count('CODE_SIGN_IDENTITY = "Apple Distribution";'), 0)
 
+    def test_archived_app_has_reviewed_metadata_and_current_app_store_sdk(self):
+        info = dict(CFBundleIdentifier=ios.BUNDLE_ID, CFBundleShortVersionString="1.0.60",
+                    CFBundleVersion="67", DTSDKName="iphoneos26.2")
+        self.assertEqual(ios.validate_app_metadata(info, self.settings)["sdk"], "iphoneos26.2")
+
+    def test_archive_rejects_old_missing_sdk_or_wrong_release_metadata(self):
+        info = dict(CFBundleIdentifier=ios.BUNDLE_ID, CFBundleShortVersionString="1.0.60",
+                    CFBundleVersion="67", DTSDKName="iphoneos26.2")
+        for changes in ({"CFBundleIdentifier": "another.app"}, {"CFBundleVersion": "66"},
+                        {"CFBundleShortVersionString": "1.0.59"}, {"DTSDKName": "iphoneos18.5"},
+                        {"DTSDKName": "iphonesimulator26.2"}, {"DTSDKName": None}):
+            with self.subTest(changes=changes), self.assertRaises(ValueError):
+                ios.validate_app_metadata(info | changes, self.settings)
+
 
 if __name__ == "__main__":
     unittest.main()
