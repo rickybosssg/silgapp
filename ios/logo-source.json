@@ -1,0 +1,11 @@
+{
+  "library_file_id": "libfile_c46d1780680c81918cb4695a74b832da",
+  "library_version": 0,
+  "file_name": "SILGAPP-AppIcon-1024.png",
+  "approved_at_utc": "2026-10-14T06:04:32Z",
+  "sha256": "12f592bbdde1ed319dc4e5be4e58707622a4612e3102abb6d500f9667e139fee",
+  "width": 1024,
+  "height": 1024,
+  "mode": "RGB",
+  "internal_platform_scope": "native-ios-only"
+}

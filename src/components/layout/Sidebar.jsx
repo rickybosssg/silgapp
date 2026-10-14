@@ -1,3 +1,4 @@
+import { silgappLogo } from "@/lib/iosBranding";
 import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { clearPersistedToken } from "@/lib/authPersistence";
@@ -126,7 +127,7 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, part
       )}>
         <div className="w-9 h-9 rounded-xl bg-sidebar-primary flex items-center justify-center silgapp-relief flex-shrink-0">
           <img 
-            src="https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/962cfba1f_IMG-20260819-WA0003.jpg"
+            src={silgappLogo("https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/962cfba1f_IMG-20260819-WA0003.jpg")}
             alt="SILGAPP"
             className="w-full h-full rounded-xl object-cover"
           />

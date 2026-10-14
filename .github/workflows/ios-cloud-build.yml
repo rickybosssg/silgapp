@@ -1,0 +1,48 @@
+name: iOS unsigned build check
+on:
+  push:
+    tags: ['ios-check-*']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  ios-build:
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - name: Restore existing Firebase iOS configuration
+        env:
+          FIREBASE_CONFIG_BASE64: ${{ secrets.IOS_FIREBASE_CONFIG_BASE64 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          test -n "$FIREBASE_CONFIG_BASE64" || { echo '::error::Missing IOS_FIREBASE_CONFIG_BASE64'; exit 1; }
+          printf '%s' "$FIREBASE_CONFIG_BASE64" | base64 --decode > ios/App/App/GoogleService-Info.plist
+          python3 scripts/ios_release.py firebase --path ios/App/App/GoogleService-Info.plist
+      - name: Install and build web application
+        run: |
+          npm ci
+          npm run build
+          npx cap sync ios
+      - name: Install CocoaPods
+        working-directory: ios/App
+        run: pod install --repo-update
+      - name: Check native property lists
+        run: plutil -lint ios/App/App/Info.plist ios/App/App/App.entitlements ios/App/App.xcodeproj/project.pbxproj
+      - name: Compile simulator without signing
+        working-directory: ios/App
+        run: |
+          xcodebuild -workspace App.xcworkspace -scheme App -configuration Debug \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO build
+      - name: Remove restored local configuration
+        if: always()
+        run: rm -f ios/App/App/GoogleService-Info.plist

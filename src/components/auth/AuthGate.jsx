@@ -1,3 +1,4 @@
+import { silgappLogo } from "@/lib/iosBranding";
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { base44, detectedToken } from "@/api/base44Client";
@@ -562,7 +563,7 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
       <div className="fixed inset-0 flex items-center justify-center bg-background">
         <div className="text-center space-y-4">
           <img
-            src="https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/962cfba1f_IMG-20260819-WA0003.jpg"
+            src={silgappLogo("https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/962cfba1f_IMG-20260819-WA0003.jpg")}
             alt="SILGAPP"
             className="w-16 h-16 rounded-2xl object-cover mx-auto shadow-lg"
           />
@@ -582,7 +583,7 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
             <div className="relative">
               <div className="mb-5 flex items-center justify-between">
                 <img
-                  src="https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/962cfba1f_IMG-20260819-WA0003.jpg"
+                  src={silgappLogo("https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/962cfba1f_IMG-20260819-WA0003.jpg")}
                   alt="SILGAPP"
                   className="h-14 w-14 rounded-2xl border border-white/20 shadow-lg object-cover"
                 />
@@ -876,7 +877,7 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
     <div className="fixed inset-0 flex items-center justify-center bg-background">
       <div className="text-center space-y-4">
         <img
-          src="https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/962cfba1f_IMG-20260819-WA0003.jpg"
+          src={silgappLogo("https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/962cfba1f_IMG-20260819-WA0003.jpg")}
           alt="SILGAPP"
           className="w-16 h-16 rounded-2xl object-cover mx-auto shadow-lg"
         />

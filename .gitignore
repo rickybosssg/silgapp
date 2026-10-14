@@ -39,3 +39,11 @@ work-certs/
 .env
 .vite
 base44/.app.jsonc
+
+# iOS local configuration/signing material must never be committed.
+/ios/App/App/GoogleService-Info.plist
+*.p12
+*.pfx
+*.mobileprovision
+*private-key*.pem
+__pycache__/

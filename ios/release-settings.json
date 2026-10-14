@@ -1,0 +1,23 @@
+{
+  "source_branch": "ios",
+  "source_commit": "d52bf1da9c2e8b794175f5d8e633b613f20fed5a",
+  "bundle_id": "com.base6a0ec08f3af5e1d1284254c1.app",
+  "team_id": "X7N95F8KTJ",
+  "app_store_connect_confirmed": true,
+  "latest_app_store_version": "1.0.59",
+  "latest_app_store_build": "66",
+  "marketing_version": "1.0.60",
+  "build_number": "67",
+  "app_store_connect_evidence": {
+    "source": "owner screenshot visually reviewed by parent task",
+    "library_file_id": "libfile_cac4a7f3cec481919821fb08561ea1bf",
+    "received_at_utc": "2026-10-14T06:30:00Z",
+    "app_store_app_id": "6782046749",
+    "screen": "TestFlight iOS, version 1.0.59, build 66, Ready to Submit",
+    "scope": "last visible build only; not an exhaustive highest-uploaded-build check"
+  },
+  "app_store_connect_recheck_required_before_submission": true,
+  "profile_name": "SILGAPP_APPSTORE_2026_10_14",
+  "profile_uuid": "90843184-68cd-4f34-a648-4f31057ee6cc",
+  "certificate_sha256": "89243A26883BE151928016B722D054718B373AC13F298762CAF14296ECDC974B"
+}

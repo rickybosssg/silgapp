@@ -1,5 +1,26 @@
 # SILGAPP Regression Inventory
 
+## Isolated iOS signing preparation — 2026-10-14
+
+- Source: verified remote ios d52bf1da. Native iOS metadata, build-preparation files
+  and guarded iOS logo selection change; Android images and business/dispatch/finance
+  implementations stay intact.
+- Preserve the existing native plugins, background location/remote notifications,
+  callbacks, bundle identity and all operational-zone/commission safeguards below.
+- APNs entitlements are development in Debug and production in Release. Existing
+  matching Firebase configuration is a Git-ignored resource, not a fabricated key.
+- Signed CI fails before signing unless owner-confirmed App Store version/build,
+  latest ios source, exact profile/certificate identity and production rights match.
+- Local release/profile safety tests, YAML trigger/artifact checks and Bash syntax
+  checks pass: 14 Python + 4 workflow + 4 branding tests. Typecheck, lint and local
+  web build (native Vite config loader) pass. No native iOS build, GitHub execution,
+  signing import or publication occurred.
+- The owner-approved logo is used only on native iOS; original Android/web URLs
+  and all component logic are preserved. Local iOS 1.0.60/67 follows the owner's
+  06:30 UTC screenshot showing the last visible 1.0.59/66. Recheck concurrent
+  uploads before submission; the Apple Developer agreement remains pending.
+  See docs/ios-signed-build-preparation.md for scope and separate approvals.
+
 ## Corrections 18 And 19
 
 Base44 origin/main f481f1ec integrated without replacing Codex changes. Active

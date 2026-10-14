@@ -1,3 +1,4 @@
+import { silgappLogo } from "@/lib/iosBranding";
 import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { Truck, Package, ArrowRight, ArrowLeft, Loader2, CheckCircle, Store } from "lucide-react";
@@ -60,7 +61,7 @@ export default function RoleSelection({ onPartenaire }) {
         <div className="w-full max-w-md space-y-8">
           <div className="text-center space-y-3">
             <img
-              src="https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/962cfba1f_IMG-20260819-WA0003.jpg"
+              src={silgappLogo("https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/962cfba1f_IMG-20260819-WA0003.jpg")}
               alt="SILGAPP"
               className="w-20 h-20 rounded-2xl object-cover mx-auto shadow-lg"
             />
