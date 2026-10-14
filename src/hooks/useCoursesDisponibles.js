@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { cityNamesPattern, operationalCityAliases, resolveOperationalName, canSeeOperationalCourse } from "../../base44/shared/cityNames.js";
+import { currentDriverGpsCity, gpsFixTime, CITY_GPS_MAX_AGE_MS } from "../../base44/shared/currentGpsCity.js";
 
 /**
  * useCoursesDisponibles — SOURCE UNIQUE DE VÉRITÉ pour les courses disponibles
@@ -124,16 +125,43 @@ export function useCoursesDisponibles(livreurProfil) {
     return () => { unsubscribeCities(); unsubscribeQuartiers(); };
   }, [queryClient, countryCode]);
   const cityDispatchEnabled = zonePolicy.cities.some(c => c.actif === true);
-  const livreurVille = livreurProfil?.ville?.trim();
-  const driverZone = cityDispatchEnabled
-    ? resolveOperationalName(livreurVille, zonePolicy.cities, zonePolicy.quartiers) : null;
+  const { data: liveGpsDriver, isError: gpsError } = useQuery({
+    queryKey: ['driver-current-gps', livreurId, countryCode],
+    queryFn: async () => {
+      const driver = await base44.entities.Livreur.get(livreurId);
+      if (driver?.country_code !== countryCode || normalizeEnterpriseId(driver?.enterprise_id) !== livreurEnterpriseId) {
+        throw new Error('driver_scope_mismatch');
+      }
+      return driver;
+    },
+    enabled: !!livreurId && !!countryCode && cityDispatchEnabled && !cityError,
+    refetchInterval: 10000, staleTime: 0,
+  });
+  const [gpsClock, setGpsClock] = useState(() => Date.now());
+  useEffect(() => {
+    const acquired = gpsFixTime(liveGpsDriver?.gps_fix_date);
+    if (!cityDispatchEnabled || !Number.isFinite(acquired) || acquired + CITY_GPS_MAX_AGE_MS < Date.now()) return;
+    const timeout = setTimeout(() => setGpsClock(Date.now()), Math.max(0, acquired + CITY_GPS_MAX_AGE_MS - Date.now() + 1));
+    return () => clearTimeout(timeout);
+  }, [cityDispatchEnabled, liveGpsDriver?.gps_fix_date]);
+  useEffect(() => {
+    if (!cityDispatchEnabled || !livreurId) return;
+    return base44.entities.Livreur.subscribe(event => {
+      const changedId = event?.data?.id ?? event?.id;
+      if (!changedId || String(changedId) === String(livreurId)) {
+        queryClient.invalidateQueries({ queryKey: ['driver-current-gps', livreurId, countryCode] });
+      }
+    });
+  }, [queryClient, cityDispatchEnabled, livreurId, countryCode]);
+  const driverZone = cityDispatchEnabled && !gpsError
+    ? currentDriverGpsCity(liveGpsDriver, zonePolicy.cities, zonePolicy.quartiers, Math.max(gpsClock, Date.now())) : null;
   const excludedAliases = zonePolicy.cities.filter(c => c.actif === true && c.nom !== driverZone)
     .flatMap(c => operationalCityAliases(c, zonePolicy.quartiers));
   const cityFilter = excludedAliases.length
     ? { ville_depart: { $not: { $regex: cityNamesPattern(excludedAliases), $options: 'i' } } } : {};
   const policyKey = JSON.stringify(zonePolicy);
   const { data: courses = [], isLoading: coursesLoading, isError: coursesError } = useQuery({
-    queryKey: ["courses-externes-disponibles", livreurId, countryCode, livreurEnterpriseId, isV2Enabled, livreurVille, policyKey],
+    queryKey: ["courses-externes-disponibles", livreurId, countryCode, livreurEnterpriseId, isV2Enabled, driverZone, policyKey],
     queryFn: async () => {
       if (!livreurPeutVoirFil || !isV2Enabled) return [];
       if (!countryCode || !isV2Enabled) return [];
@@ -157,7 +185,7 @@ export function useCoursesDisponibles(livreurProfil) {
       [...(all || []), ...(ecoIsolated || [])].forEach((course) => {
         if (course?.id) byId.set(course.id, course);
       });
-      return Array.from(byId.values()).filter(c => canSeeOperationalCourse(c, livreurVille, zonePolicy.cities, zonePolicy.quartiers));
+      return Array.from(byId.values()).filter(c => canSeeOperationalCourse(c, driverZone, zonePolicy.cities, zonePolicy.quartiers));
     },
     enabled: !!livreurId && !!countryCode && livreurPeutVoirFil && isV2Enabled && !cityLoading && !cityError,
     refetchInterval: 10000,
@@ -167,7 +195,7 @@ export function useCoursesDisponibles(livreurProfil) {
   });
 
   const { data: ecoMissions = [], isLoading: missionsLoading, isError: missionsError } = useQuery({
-    queryKey: ["eco-missions-disponibles", livreurId, countryCode, livreurEnterpriseId, isV2Enabled, livreurVille, policyKey],
+    queryKey: ["eco-missions-disponibles", livreurId, countryCode, livreurEnterpriseId, isV2Enabled, driverZone, policyKey],
     queryFn: async () => {
       if (!livreurPeutVoirFil || !isV2Enabled || !countryCode) return [];
       if (livreurEnterpriseId !== null) return [];
@@ -183,7 +211,7 @@ export function useCoursesDisponibles(livreurProfil) {
       const byId = new Map((records || []).map(c => [c.id, c]));
       return missions.filter(m => m.course_ids?.length && m.course_ids.every(id => {
         const c = byId.get(id);
-        return c && canSeeOperationalCourse(c, livreurVille, zonePolicy.cities, zonePolicy.quartiers);
+        return c && canSeeOperationalCourse(c, driverZone, zonePolicy.cities, zonePolicy.quartiers);
       }));
     },
     enabled: !!livreurId && !!countryCode && livreurPeutVoirFil && isV2Enabled && !cityLoading && !cityError,
@@ -235,7 +263,9 @@ export function useCoursesDisponibles(livreurProfil) {
   // ce filtre empêche la course d'apparaître dans le fil "Disponibles" du livreur.
   // Normalisation canonique : null/undefined/"" → null (réseau public).
   const eligibleCourses = useMemo(() => {
+    if (cityLoading || cityError) return [];
     const standardAndEcoCourses = courses.filter(course => {
+      if (course.country_code !== countryCode || !canSeeOperationalCourse(course, driverZone, zonePolicy.cities, zonePolicy.quartiers)) return false;
       // [ENTERPRISE] Isolation stricte : le livreur ne voit que les courses de son périmètre.
       const courseEnterpriseId = normalizeEnterpriseId(course.enterprise_id);
       if (courseEnterpriseId !== livreurEnterpriseId) return false;
@@ -260,7 +290,7 @@ export function useCoursesDisponibles(livreurProfil) {
       return true;
     });
     return standardAndEcoCourses;
-  }, [courses, refusedIds, refusedCourseIds, livreurId, livreurEnterpriseId]);
+  }, [courses, refusedIds, refusedCourseIds, livreurId, livreurEnterpriseId, countryCode, driverZone, zonePolicy, cityLoading, cityError]);
 
   return {
     eligibleCourses,

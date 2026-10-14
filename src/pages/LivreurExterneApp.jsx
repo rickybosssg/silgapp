@@ -6,6 +6,7 @@ import { AlertTriangle, Check, Truck, X, Wallet, ChevronRight } from "lucide-rea
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { useHeartbeat } from "@/hooks/useHeartbeat";
+import { useCoursesDisponibles } from "@/hooks/useCoursesDisponibles";
 import { useAppVersionSync } from "@/hooks/useAppVersionSync";
 import { useDispatchConfig } from "@/hooks/useDispatchConfig";
 import { useGPSNatif } from "@/hooks/useGPSNatif";
@@ -240,26 +241,11 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   // ── Compteur de courses disponibles (pilote le point rouge) ──
   // ⚠️ Garde cohérente avec CoursesDisponibles.jsx : statut === "recherche_livreur"
   //    ET dispatch_status === "disponible_push" | "propose"
-  const { data: availableCoursesCount = 0 } = useQuery({
-    queryKey: ["courses-disponibles-count", livreurProfil?.id, livreurProfil?.country_code, isV2Enabled],
-    queryFn: async () => {
-      if (!livreurProfil?.country_code || !isV2Enabled) return 0;
-      const all = await base44.entities.CourseExterne.filter(
-        { dispatch_status: { $in: ["disponible_push", "propose"] }, country_code: livreurProfil.country_code },
-        "-created_date", 50
-      );
-      return (all || []).filter(c =>
-        c.statut === "recherche_livreur" &&
-        (c.dispatch_status === "disponible_push" || c.dispatch_status === "propose") &&
-        !c.livreur_id &&
-        !c.accepted_by_livreur_id
-      ).length;
-    },
-    enabled: !!livreurProfil?.id && !!livreurProfil?.country_code && isV2Enabled,
-    refetchInterval: 10000,
-    staleTime: 0,
-    refetchOnWindowFocus: true,
-  });
+  // Reuse the feed policy for badges and new-offer popups. Active missions
+  // continue to use mesCourses and are not filtered by this new-work policy.
+  const { eligibleCourses: cityEligibleCourses } = useCoursesDisponibles(livreurProfil);
+  const availableCoursesCount = cityEligibleCourses.length;
+  const cityEligibleCourseIds = useMemo(() => new Set(cityEligibleCourses.map(course => course.id)), [cityEligibleCourses]);
 
   // Le point rouge s'affiche dès qu'il y a des courses disponibles ET que le livreur
   // n'est pas sur l'onglet "Disponibles"
@@ -682,23 +668,24 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     const checkCourseProposee = async () => {
       try {
         if (!livreurProfil?.country_code) return;
-        const allCourses = await base44.entities.CourseExterne.filter(
-          { country_code: livreurProfil.country_code },
-          "-created_date", 50
-        );
+        const allCourses = cityEligibleCourses;
         if (cancelled) return;
 
         // ── Récupérer les notifications actives du livreur depuis DispatchNotification ──
         // (remplace l'ancien champ JSON dispatch_notified_ids qui n'est plus mis à jour)
         let notifiedCourseIds = [];
         try {
+          if (allCourses.some(course => course.dispatch_status === "propose")) {
           const myNotifs = await base44.entities.DispatchNotification.filter(
             { livreur_id: livreurId, statut: 'notifie' }, '-date_notification', 50
           );
           notifiedCourseIds = (myNotifs || []).map(n => n.course_id);
+          }
         } catch {}
 
+        if (cancelled) return;
         const found = (allCourses || []).find((course) => {
+          if (!cityEligibleCourseIds.has(course.id)) return false;
           if (course.livreur_id || course.accepted_by_livreur_id) return false;
           if (FINAL_COURSE_STATUSES.has(course.statut)) return false;
           if (course.manual_price_status === "pending_client_validation") return false;
@@ -730,7 +717,11 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [livreurId, livreurProfil?.country_code, isV2Enabled]);
+  }, [livreurId, livreurProfil?.country_code, isV2Enabled, cityEligibleCourseIds, cityEligibleCourses]);
+
+  useEffect(() => {
+    setCourseProposeeDirecte(current => current && !cityEligibleCourseIds.has(current.id) ? null : current);
+  }, [cityEligibleCourseIds]);
 
   const { data: mesCourses = [] } = useQuery({
     queryKey: ["mes-courses-externes", livreurId, livreurEmail, notificationCourseId],

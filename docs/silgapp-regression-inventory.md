@@ -451,3 +451,56 @@ unknown-origin broadcast fallback described in this historical section.
   an unauthorized uninstall. New Admin city/map physical validation remains pending.
 - Existing client/driver VENUS overlaps and the compact A06 reliability tile remain
   visible residual UI findings; those components were not redesigned in this merge.
+
+
+## Current GPS eligibility and integrated native candidate (October 14)
+
+Detailed policy, compatibility, costs and validation are recorded in
+`gps-city-social-auth-preparation-2026-10-14.md`.
+
+- Isolated branch codex/release-gps-social-20261014 combines iOS preparation
+  2986923a with GPS changes based on integrated d52bf1da, including main a4c8f6fd.
+  Existing email login and all three iOS AuthGate branding selections remain.
+- Active-origin new work requires a genuine GPS acquisition <=120 seconds,
+  known accuracy <=100 m, valid country-scoped coordinates and a known quartier
+  <=30 km. Profile city and ordinary heartbeats are not GPS acquisition proof.
+  Saaba resolves canonically to Ouagadougou; future fixes are rejected.
+- OperationalCity.actif is the sole activation source. All OFF and inactive
+  origins preserve historical geographic eligibility. Bobo ON / Ouaga OFF is
+  covered explicitly; country and Enterprise isolation remain independent.
+- Heartbeat stores separate acquisition date/validity/index fields. Android Java
+  sends Location.getTime(); native JS preserves timestamp/time and missing accuracy.
+  Invalid new fixes revoke proof; an ordinary heartbeat does not renew it.
+- Feed, badge and new-offer popup share eligibility, ignoring obsolete async results.
+  Unified/batch notifications reread candidates in one batch. Direct new-course
+  push checks scope/GPS. Standard and new Eco claims reread current GPS.
+- Accepted work, existing manual assignment and partial Eco acceptance recovery
+  keep their existing behavior. Busy-driver checks remain unfiltered. Pricing,
+  commissions, idempotency, course CAS, route steps and tracking are preserved.
+- Affected source: currentGpsCity, cityResolution/cityDispatchFilter, heartbeat,
+  Livreur schema, notification paths, dispatchV2/Eco, nativeAndroid,
+  SilgappLocationService, useCoursesDisponibles and LivreurExterneApp.
+- Three optional Livreur fields are prepared, not deployed. Schema application
+  must be targeted/additive, preserve User and all other definitions, and read back.
+  Older mobile clients lacking acquisition timestamps fail closed for active origins;
+  updated clients must precede city activation. No city was activated here.
+- Social preparation uses installed SDK browser routes, verifies return URL scope
+  and keeps web/native session gates closed. Both providerEnabled observations
+  are true; no actual OAuth session, consent, account merge or new grant is claimed.
+  Seven source/adapter tests cover SDK routing and existing email session handling.
+- Integrated checks: 27 regression suites PASS, lint/typecheck PASS, web build PASS.
+  Historical finance/recovery/route/Victory and iOS branding/release-tool suites remain.
+  Typecheck has checkJs false and does not cover all backend JavaScript/Deno/Java.
+- Deno strict comparison: transition 80/80 and changed entry graphs 140/140 existing
+  diagnostics, zero added/removed signatures. All exit 1, not PASS. Correction 20
+  stays deferred. This is local TypeScript verification, not production integration.
+- Android debug compilation PASS, 224 tasks in 7m4s, official package 1.0.132/139.
+  Existing tools/dependencies/debug key used; no device install, release APK/AAB
+  or store publication. Capacitor temporary foreign paths were restored.
+- iOS candidate is 1.0.61/68 with confirmation false. Unsigned simulator workflow
+  is diagnostic only. Final source pin, store numbers, signing/upload configuration
+  and readiness must be reviewed before a future release. Previous 1.0.60/67 stays.
+- Physical GPS/zone switching, FCM, hostile RLS, native OAuth return/persistence
+  and production schema readback remain outstanding. GPS is client-reported;
+  GPS reread plus course CAS is not a multi-entity transaction. Both wrappers
+  embed dist without server.url; mobile feed changes require new releases.

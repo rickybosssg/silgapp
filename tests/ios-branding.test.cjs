@@ -42,7 +42,7 @@ test('only native iOS selects the new asset; Android and web preserve their exac
   }
 });
 
-test('shared components differ from the source only by brand-image selection and its import', () => {
+test('shared components preserve source logic with iOS branding and the approved gated social entry', () => {
   const git = process.env.IOS_TEST_GIT || 'git';
   const files = ['src/components/auth/AuthGate.jsx', 'src/components/layout/MobileNav.jsx',
     'src/components/layout/Sidebar.jsx', 'src/components/IOSAppStoreBanner.jsx',
@@ -52,6 +52,13 @@ test('shared components differ from the source only by brand-image selection and
     const baseline = normalize(execFileSync(git, ['--no-optional-locks', '-C', root, 'show', `${sourceCommit}:${file}`], { encoding: 'utf8' }));
     let current = normalize(fs.readFileSync(path.join(root, file), 'utf8'));
     current = current.replace('import { silgappLogo } from "@/lib/iosBranding";\n', '');
+    if (file === 'src/components/auth/AuthGate.jsx') {
+      const socialImport = 'import SocialLoginButtons from "@/components/auth/SocialLoginButtons";\n';
+      const socialEntry = '          {authMode === "login" && <SocialLoginButtons onError={setLoginError} />}\n';
+      assert.equal(current.split(socialImport).length - 1, 1);
+      assert.equal(current.split(socialEntry).length - 1, 1);
+      current = current.replace(socialImport, '').replace(socialEntry, '');
+    }
     current = current.replace(/src=\{silgappLogo\(("[^"]+")\)\}/g, (_, url) => {
       imageCount += 1;
       return `src=${url}`;

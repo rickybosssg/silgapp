@@ -83,7 +83,7 @@ function createEcoMockBase44(opts = {}) {
     ville: livreurVille,
     latitude: livreurLat,
     longitude: livreurLng,
-    derniere_position_date: new Date().toISOString(),
+    gps_fix_valid: true, gps_fix_date: new Date().toISOString(), gps_accuracy: 20, derniere_position_date: new Date().toISOString(),
     enterprise_id: enterpriseId,
     type_livreur: 'externe',
     validation: 'valide',
@@ -260,7 +260,7 @@ test('5. acceptEcoMission City ON → livreur Bobo ne peut pas accepter mission 
   // Créer un livreur valide
   mockSdk.asServiceRole.entities.Livreur.get = async () => ({
     id: 'livreur-1', country_code: 'BF', ville: 'Bobo-Dioulasso',
-    latitude: 11.17, longitude: -4.30, derniere_position_date: new Date().toISOString(),
+    latitude: 11.17, longitude: -4.30, gps_fix_valid: true, gps_fix_date: new Date().toISOString(), gps_accuracy: 20, derniere_position_date: new Date().toISOString(),
     enterprise_id: null, type_livreur: 'externe', validation: 'valide', actif: true,
     statut: 'disponible', bloque_encours: false, manual_hors_ligne: false, admin_hors_ligne: false,
     user_email: 'livreur@test.com', prenom: 'Test', nom: 'Livreur', telephone: '123', vehicule: 'moto',

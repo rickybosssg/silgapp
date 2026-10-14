@@ -113,6 +113,20 @@
       "type": "number",
       "description": "Pr\u00e9cision GPS en m\u00e8tres au moment de la derni\u00e8re position enregistr\u00e9e. Plus c'est bas, plus c'est pr\u00e9cis."
     },
+    "gps_fix_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Heure réelle du relevé GPS reçu par heartbeatAuto, distincte de son heure de réception. Aucun repli sur last_seen_at."
+    },
+    "gps_fix_valid": {
+      "type": "boolean",
+      "default": false,
+      "description": "Le dernier relevé reçu comporte coordonnées, précision et horodatage admissibles pour les nouvelles courses protégées."
+    },
+    "gps_operational_city": {
+      "type": "string",
+      "description": "Index GPS canonique calculé côté serveur. La ville du profil n'autorise pas une nouvelle course protégée."
+    },
     "courses_du_jour": {
       "type": "number",
       "default": 0

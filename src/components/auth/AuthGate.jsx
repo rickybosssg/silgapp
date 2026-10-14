@@ -9,6 +9,7 @@ import { registerPushToken } from "@/lib/notifications";
 import { persistToken, clearPersistedToken } from "@/lib/authPersistence";
 import RoleSelection from "@/pages/RoleSelection";
 import BlockedLivreurScreen from "@/components/auth/BlockedLivreurScreen";
+import SocialLoginButtons from "@/components/auth/SocialLoginButtons";
 
 const AUTH_TOKEN_KEYS = ["base44_access_token", "access_token", "base44_token", "token"];
 
@@ -619,6 +620,7 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
           </div>
 
           <div className="space-y-5 px-6 py-6">
+          {authMode === "login" && <SocialLoginButtons onError={setLoginError} />}
           <form onSubmit={handleEmailSubmit} className="space-y-4">
             <label className="block">
               <span className="mb-1.5 block text-xs font-bold text-slate-700 dark:text-slate-200">Adresse e-mail</span>

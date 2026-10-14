@@ -5,6 +5,7 @@ import {
   ANDROID_CHANNEL_ID, ANDROID_CLICK_ACTION, APP_URL,
 } from '../../shared/fcmUtils.ts';
 import { mettreAJourStatutPush, mettreAJourStatutPushBulk } from '../../shared/dispatchNotifications.ts';
+import { filterCurrentCityCandidates } from '../../shared/cityDispatchFilter.ts';
 
 const STATUTS_ACTIFS_COURSE = [
   'recherche_livreur', 'livreur_en_route', 'client_contacte', 'en_route_expediteur',
@@ -64,9 +65,14 @@ Deno.serve(async (req) => {
 
     // ── 2. Récupérer tous les livreurs en une seule requête ──
     const uniqueIds = [...new Set(livreur_ids.map(String).filter(Boolean))];
-    const livreurs = await base44.asServiceRole.entities.Livreur.filter(
+    let livreurs = await base44.asServiceRole.entities.Livreur.filter(
       { id: { $in: uniqueIds }, actif: true }
     ).catch(() => []);
+
+    if (String(type || '') === 'nouvelle_course') {
+      if (!courseData) return Response.json({ error: 'course_unavailable' }, { status: 400 });
+      livreurs = await filterCurrentCityCandidates(base44, courseData, livreurs || []);
+    }
 
     if (!livreurs || livreurs.length === 0) {
       return Response.json({ success: false, error: 'Aucun livreur trouvé', destinataires: 0, succes: 0, echecs: 0 });

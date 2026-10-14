@@ -13,8 +13,8 @@
 //
 // IMPLÉMENTATION :
 // - buildLivreurCityFilter : filtre les livreurs pour une course.
-//   Si la zone de la course est activée → $in avec les noms de communes
-//   de cette zone. Sinon → pas de filtre.
+//   Si l'origine est active, index de ville GPS recente, puis relecture
+//   des coordonnees. Sinon, pas de nouveau filtre geographique.
 // - buildCourseCityFilterForLivreur : filtre les courses pour le fil
 //   "Disponibles" d'un livreur. Exclut les courses des autres zones
 //   activées via $nin.
@@ -23,6 +23,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { cityNamesPattern } from './cityNames.js';
+import { currentGpsCityQuery } from './currentGpsCity.js';
 
 import {
   isCityDispatchEnabled,
@@ -40,8 +41,8 @@ import {
  * Construit le filtre MongoDB à ajouter à Livreur.filter() pour le dispatch
  * par zone opérationnelle.
  *
- * Si la zone de la course est activée → filtre les livreurs par les noms de
- * communes rattachées à cette zone (ex: ["Ouagadougou", "Saaba", "ouagadougou"]).
+ * Une origine active utilise l'index GPS recent comme preselection ;
+ * les coordonnees sont ensuite verifiees avant notification ou acceptation.
  * Sinon → pas de filtre (comportement historique).
  */
 export async function buildLivreurCityFilter(base44: any, course: any): Promise<Record<string, any>> {
@@ -56,15 +57,7 @@ export async function buildLivreurCityFilter(base44: any, course: any): Promise<
   const isActive = await isOperationalCityActive(base44, countryCode, courseCity);
   if (!isActive) return {}; // Zone non activée → comportement historique
 
-  // Récupérer tous les noms de communes rattachées à cette zone
-  const zoneCityNames = await getOperationalZoneCityNames(base44, countryCode, courseCity);
-  if (zoneCityNames.length === 0) {
-    // Fallback: filtrer par le nom de la zone elle-même
-    return { ville: { $regex: cityNamesPattern([courseCity]), $options: 'i' } };
-  }
-
-  return { ville: { $regex: cityNamesPattern(zoneCityNames), $options: 'i' } };
-
+  return currentGpsCityQuery(courseCity);
 }
 
 /**
@@ -132,6 +125,46 @@ export async function verifyCityCompatibility(base44: any, course: any, livreur:
   }
 
   return { compatible: true, courseCity, livreurCity };
+}
+
+/** Re-read candidates immediately before creating new-course notifications.
+ * A selection made before a GPS change is not an authorization to notify.
+ * Existing country/tenant checks remain independent of the city policy.
+ */
+export async function filterCurrentCityCandidates(base44: any, course: any, candidates: any[]): Promise<any[]> {
+  const country = String(course?.country_code || '').toUpperCase();
+  const tenant = (value: any) => value == null || String(value).trim() === '' ? null : String(value).trim();
+  const scoped = candidates.filter(driver => String(driver.country_code || '').toUpperCase() === country && tenant(driver.enterprise_id) === tenant(course.enterprise_id));
+  if (!country) return [];
+  if (!await isCityDispatchEnabled(base44, country)) return scoped;
+  const courseCity = await getCourseDepartureCity(base44, course);
+  if (!courseCity) return [];
+  if (!await isOperationalCityActive(base44, country, courseCity)) return scoped;
+  const ids = [...new Set(scoped.map(c => c.id).filter(Boolean))];
+  if (!ids.length) return [];
+  const fresh = await base44.asServiceRole.entities.Livreur.filter({
+    id: { $in: ids }, country_code: country, ...currentGpsCityQuery(courseCity),
+  }, undefined, ids.length);
+  const eligible = [];
+  for (const driver of fresh || []) {
+    if (String(driver.country_code || '').toUpperCase() !== country || tenant(driver.enterprise_id) !== tenant(course.enterprise_id)) continue;
+    if ((await verifyCityCompatibility(base44, course, driver)).compatible) eligible.push(driver);
+  }
+  return eligible;
+}
+
+/** Recheck acquisition proof after asynchronous pricing/busy checks, at claim. */
+export async function verifyCurrentCityAtClaim(base44: any, course: any, driver: any) {
+  const country = String(course?.country_code || '').toUpperCase();
+  if (!country || !await isCityDispatchEnabled(base44, country)) return { compatible: true };
+  const city = await getCourseDepartureCity(base44, course);
+  if (!city) return { compatible: false, reason: 'course_city_unknown' };
+  if (!await isOperationalCityActive(base44, country, city)) return { compatible: true };
+  const fresh = await base44.asServiceRole.entities.Livreur.get(driver.id);
+  const tenant = (value: any) => value == null || String(value).trim() === '' ? null : String(value).trim();
+  if (!fresh || fresh.user_email !== driver.user_email || String(fresh.country_code || '').toUpperCase() !== country ||
+      tenant(fresh.enterprise_id) !== tenant(course.enterprise_id)) return { compatible: false, reason: 'driver_scope_mismatch' };
+  return verifyCityCompatibility(base44, course, fresh);
 }
 
 /**

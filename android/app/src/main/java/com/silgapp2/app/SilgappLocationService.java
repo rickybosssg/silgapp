@@ -237,14 +237,16 @@ public class SilgappLocationService extends Service {
 
                 String deviceId = ("android_native_" + Build.MODEL + "_" + Build.ID).replaceAll("[^A-Za-z0-9_]", "_");
                 String safeSessionId = sessionId == null ? "" : sessionId.replace("\\", "\\\\").replace("\"", "\\\"");
-                float accuracy = location.hasAccuracy() ? location.getAccuracy() : 0f;
+                String accuracyJson = location.hasAccuracy()
+                    ? String.format(Locale.US, "%.2f", location.getAccuracy()) : "null";
                 String payload = String.format(
                     Locale.US,
-                    "{\"user_type\":\"%s\",\"latitude\":%.8f,\"longitude\":%.8f,\"accuracy\":%.2f,\"app_active\":false,\"background_active\":true,\"device_id\":\"%s\",\"session_id\":\"%s\"}",
+                    "{\"user_type\":\"%s\",\"latitude\":%.8f,\"longitude\":%.8f,\"accuracy\":%s,\"gps_timestamp\":%d,\"app_active\":false,\"background_active\":true,\"device_id\":\"%s\",\"session_id\":\"%s\"}",
                     userType,
                     latitude,
                     longitude,
-                    accuracy,
+                    accuracyJson,
+                    location.getTime(),
                     deviceId,
                     safeSessionId
                 );

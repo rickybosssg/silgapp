@@ -52,10 +52,6 @@ export default async function(req: Request): Promise<Response> {
         (user.enterprise_id && tenant(user.enterprise_id) !== tenant(course.enterprise_id))) {
       return Response.json({ error: 'Perimetre incompatible' }, { status: 403 });
     }
-    const { verifyCityCompatibility } = await import('../../shared/cityDispatchFilter.ts');
-    if (!(await verifyCityCompatibility(base44, course, livreur)).compatible) {
-      return Response.json({ error: 'Zone operationnelle incompatible' }, { status: 409 });
-    }
     // ── Validation du livreur ──
     if (!livreur.actif) {
       return Response.json({ error: 'Ce livreur est inactif' }, { status: 400 });
@@ -79,6 +75,10 @@ export default async function(req: Request): Promise<Response> {
     }
 
     // ── Construire l'update ──
+    const { verifyCityCompatibility } = await import('../../shared/cityDispatchFilter.ts');
+    if (!(await verifyCityCompatibility(base44, course, livreur)).compatible) {
+      return Response.json({ error: 'Zone operationnelle incompatible' }, { status: 409 });
+    }
     const now = new Date().toISOString();
     const livreurNom = `${livreur.prenom || ''} ${livreur.nom || ''}`.trim();
     const noteAdmin = motif || `Assigné manuellement par admin → ${livreurNom}`;

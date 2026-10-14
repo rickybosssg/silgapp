@@ -1,13 +1,13 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // CITY RESOLUTION — Résolution automatique de la ville opérationnelle
 // ═══════════════════════════════════════════════════════════════════════════
-// Solution hybride Ville + GPS pour le dispatch par ville.
+// GPS actuel pour le livreur ; origine canonique pour la course.
 //
 // PRINCIPES :
-// 1. Réutilise le champ `ville` existant sur Livreur, CourseExterne, Quartier.
+// 1. La ville de profil du livreur ne constitue pas une preuve de position.
 // 2. Aucune API cartographique payante — utilise les Quartiers en base comme référentiel.
-// 3. Feature flag par pays (OFF par défaut) — activation progressive contrôlée.
-// 4. Graceful degradation : si ville vide/indisponible → pas de filtre (comportement actuel).
+// 3. OperationalCity.actif est la seule source d'activation par ville.
+// 4. Origine active : GPS inconnu refuse ; origine inactive : historique.
 // 5. Cache en mémoire des quartiers par pays (TTL 10 min).
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -15,6 +15,7 @@ import { normalizeCityName, resolveOperationalName } from './cityNames.js';
 export { normalizeCityName } from './cityNames.js';
 
 import { haversineKm } from './geoUtils.ts';
+import { currentDriverGpsCity, resolveGpsOperationalCity } from './currentGpsCity.js';
 
 const CITY_FLAG_CACHE_TTL_MS = 30 * 1000; // 30 sec — délai court pour désactivation immédiate
 const QUARTIER_CACHE_TTL_MS = 10 * 60 * 1000; // 10 min
@@ -38,12 +39,8 @@ const QUARTIER_CACHE = new Map<string, { data: any[]; expires: number }>();
  * "Ouagadougou", "ouagadougou", " Ouagadougou " → "ouagadougou"
  */
 
-/**
- * Vérifie si le filtrage par ville est activé pour un pays.
- * OFF par défaut — doit être activé explicitement via AppConfig.
- *
- * Clé AppConfig: CITY_DISPATCH_ENABLED:<COUNTRY_CODE>
- * Valeur: "true" pour activer, tout le reste = désactivé.
+/** Une OperationalCity.actif suffit à activer la politique de ce pays.
+ * Une erreur de lecture n'est jamais assimilée à toutes les villes OFF.
  */
 export async function isCityDispatchEnabled(base44: any, countryCode: string): Promise<boolean> {
   const code = String(countryCode || '').toUpperCase();
@@ -112,61 +109,23 @@ export async function resolveCityFromGPS(
   const quartiers = await loadQuartiersForCountry(base44, countryCode);
   if (!quartiers || quartiers.length === 0) return null;
 
-  let nearest: any = null;
-  let nearestDist = Infinity;
-
-  for (const q of quartiers) {
-    if (!validCoordinates(q.latitude, q.longitude)) continue;
-    const dist = haversineKm(lat, lng, q.latitude, q.longitude);
-    if (dist === null) continue;
-    if (dist < nearestDist) {
-      nearestDist = dist;
-      nearest = q;
-    }
-  }
-
-  if (!nearest || nearestDist > maxDistanceKm) return null;
-
-  return normalizeCityName(nearest.ville_operationnelle) || normalizeCityName(nearest.ville);
+  const { loadOperationalCities } = await import('./operationalZones.ts');
+  const cities = await loadOperationalCities(base44, countryCode);
+  return resolveGpsOperationalCity(lat, lng, countryCode, cities, quartiers, maxDistanceKm);
 }
 
 /**
- * Détermine la ville opérationnelle d'un livreur.
- *
- * Logique :
- * 1. Si livreur.ville est renseigné → l'utiliser (priorité à la saisie manuelle).
- * 2. Sinon, si GPS récent (< 10 min) et fiable → résoudre depuis les quartiers.
- * 3. Sinon → null (pas de filtre ville, comportement actuel).
- *
- * @returns Nom de ville normalisé, ou null si indéterminé.
+ * Ville décisionnaire pour une nouvelle course protégée : GPS horodaté,
+ * récent et précis exclusivement. Ni Livreur.ville ni last_seen_at ne sont
+ * des preuves de position. L'absence de ville est refusée dans une zone ON.
  */
 export async function getDriverOperationalCity(base44: any, livreur: any): Promise<string | null> {
   if (!livreur) return null;
-
-  // 1. Ville déjà renseignée sur le profil
-  const storedCity = normalizeCityName(livreur.ville);
-  if (storedCity) {
-    // Vérifier si c'est un nom administratif qui mappe vers une zone opérationnelle
-    // Ex: "Saaba" → "ouagadougou" si le quartier a ville_operationnelle="Ouagadougou"
-    const quartiers = await loadQuartiersForCountry(base44, livreur.country_code);
-    const { loadOperationalCities } = await import('./operationalZones.ts');
-    const cities = await loadOperationalCities(base44, livreur?.country_code);
-    return resolveOperationalName(storedCity, cities, quartiers);
-  }
-
-  // 2. Résolution GPS si position récente et fiable
-  if (!validCoordinates(livreur.latitude, livreur.longitude)) return null;
-  const lat = Number(livreur.latitude);
-  const lng = Number(livreur.longitude);
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-
-  const gpsDate = livreur.derniere_position_date;
-  if (!gpsDate) return null;
-
-  const gpsAgeMin = (Date.now() - new Date(gpsDate).getTime()) / 60000;
-  if (!Number.isFinite(gpsAgeMin) || gpsAgeMin < 0 || gpsAgeMin > 10 || (livreur.gps_accuracy != null && (!Number.isFinite(Number(livreur.gps_accuracy)) || Number(livreur.gps_accuracy) < 0 || Number(livreur.gps_accuracy) > GPS_ACCURACY_THRESHOLD_M))) return null; // GPS trop ancien
-
-  return await resolveCityFromGPS(base44, lat, lng, livreur.country_code);
+  // New-course eligibility has no profile-city or heartbeat-time fallback.
+  const { loadOperationalCities } = await import('./operationalZones.ts');
+  const cities = await loadOperationalCities(base44, livreur.country_code);
+  const quartiers = await loadQuartiersForCountry(base44, livreur.country_code);
+  return currentDriverGpsCity(livreur, cities, quartiers);
 }
 
 /**

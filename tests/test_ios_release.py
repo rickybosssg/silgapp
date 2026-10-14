@@ -26,18 +26,24 @@ class IOSReleaseTests(unittest.TestCase):
                                       "ios-signed-v1.0.60-b67")
         self.assertEqual(result["version"], "1.0.60")
 
-    def test_repository_settings_and_native_versions_match_screenshot_review(self):
+    def test_new_candidate_versions_match_and_signing_stays_blocked_pending_recheck(self):
         reviewed = json.loads((ROOT / "ios/release-settings.json").read_text())
-        self.assertEqual(ios.validate_release(reviewed, reviewed["source_commit"],
-                                              "ios-signed-v1.0.60-b67")["build"], "67")
-        self.assertEqual(reviewed["latest_app_store_build"], "66")
+        self.assertFalse(reviewed["app_store_connect_confirmed"])
+        with self.assertRaisesRegex(ValueError, "owner confirmation"):
+            ios.validate_release(reviewed, reviewed["source_commit"], "ios-signed-v1.0.61-b68")
+        approved_fixture = copy.deepcopy(reviewed)
+        approved_fixture["app_store_connect_confirmed"] = True
+        self.assertEqual(ios.validate_release(approved_fixture, approved_fixture["source_commit"],
+                                              "ios-signed-v1.0.61-b68")["build"], "68")
+        self.assertEqual(reviewed["latest_app_store_build"], "67")
+        self.assertEqual(reviewed["latest_app_store_version"], "1.0.60")
         self.assertTrue(reviewed["app_store_connect_recheck_required_before_submission"])
         evidence = reviewed["app_store_connect_evidence"]
-        self.assertEqual(evidence["library_file_id"], "libfile_cac4a7f3cec481919821fb08561ea1bf")
-        self.assertIn("last visible build only", evidence["scope"])
+        self.assertIn("owner-confirmed", evidence["source"])
+        self.assertIn("last confirmed submitted build only", evidence["scope"])
         project = (ROOT / "ios/App/App.xcodeproj/project.pbxproj").read_text()
-        self.assertEqual(project.count("MARKETING_VERSION = 1.0.60;"), 2)
-        self.assertEqual(project.count("CURRENT_PROJECT_VERSION = 67;"), 2)
+        self.assertEqual(project.count("MARKETING_VERSION = 1.0.61;"), 2)
+        self.assertEqual(project.count("CURRENT_PROJECT_VERSION = 68;"), 2)
 
     def test_unconfirmed_release_still_blocks_signing(self):
         pending = json.loads((ROOT / "ios/release-settings.json").read_text())

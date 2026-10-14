@@ -42,7 +42,7 @@ import { resolveCourseParticipantUserIds } from './conversationSecurity.ts';
 import { figerCommissionAcceptation, evaluerAvantageCommission } from './commissionAvantage.ts';
 import { champsLockCommission, verifierCoherenceLock } from './commissionLock.ts';
 import { normalizeEnterpriseId } from './enterpriseFinance.ts';
-import { buildLivreurCityFilter, verifyCityCompatibility } from './cityDispatchFilter.ts';
+import { buildLivreurCityFilter, verifyCityCompatibility, verifyCurrentCityAtClaim } from './cityDispatchFilter.ts';
 
 // ── Version du bundle (pour vérifier que la production charge la dernière version) ──
 export const DISPATCH_V2_BUNDLE_VERSION = '2026-09-25-v2-only-unique-moteur';
@@ -518,6 +518,11 @@ export async function accepterCourseV2(base44: any, courseId: string, livreurId:
     } catch (error) {
       return { success: false, accepted: false, retryable: true, reason: 'commission_lookup_error', error: error?.message };
     }
+  }
+
+  const finalCityCheck = await verifyCurrentCityAtClaim(base44, course, livreur);
+  if (!finalCityCheck.compatible) {
+    return { success: false, accepted: false, reason: 'city_mismatch', error: 'Position GPS actualisée requise dans la ville de départ.' };
   }
 
   // Le statut constitue le verrou atomique. Ne pas filtrer livreur_id avec une

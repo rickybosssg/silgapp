@@ -27,6 +27,7 @@ import {
 } from './fcmUtils.ts';
 
 const CHUNK_SIZE = 25;
+import { filterCurrentCityCandidates } from './cityDispatchFilter.ts';
 
 /**
  * Notifie une liste de livreurs candidats en une seule passe unifiée.
@@ -38,6 +39,7 @@ const CHUNK_SIZE = 25;
  * @returns {{ notified, push_sent, push_failed }}
  */
 export async function notifierLivreursUnifie(base44: any, course: any, candidats: any[], existingDnRecords?: any[]) {
+  candidats = await filterCurrentCityCandidates(base44, course, candidats || []);
   if (!candidats || candidats.length === 0) {
     console.log('[PushUnifie] ⚠️ 0 candidat — course ' + course?.id);
     return { notified: 0, push_sent: 0, push_failed: 0, reason: 'no_candidates' };
