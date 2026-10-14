@@ -114,7 +114,7 @@ function vibrateUrgentPattern() {
 }
 
 function stopNativeUrgentAlert(cancelNotification = true) {
-  if (!Capacitor.isNativePlatform()) return;
+  if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== "android") return;
   if (cancelNotification) {
     SilgappPush.stopUrgentCourseAlert?.().catch(() => null);
     return;
@@ -123,7 +123,7 @@ function stopNativeUrgentAlert(cancelNotification = true) {
 }
 
 function startNativeUrgentAlert(options = {}, config = {}) {
-  if (!Capacitor.isNativePlatform()) return;
+  if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== "android") return;
   if (!options.courseId) return;
   SilgappPush.startUrgentCourseAlert?.({
     courseId: String(options.courseId),

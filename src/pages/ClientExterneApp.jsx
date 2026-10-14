@@ -334,7 +334,7 @@ export default function ClientExterneApp() {
     if (notif.course_id && clientProfil && position) {
       checkStatus(position, clientProfil);
     }
-  });
+  }, clientProfil?.id);
 
   // Heartbeat automatique — sync toutes les 30s + événements lifecycle
   // Activé dès que le profil est chargé (même sans GPS pour anciens utilisateurs)

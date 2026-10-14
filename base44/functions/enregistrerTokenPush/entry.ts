@@ -19,7 +19,7 @@ Deno.serve(async (req) => {
     console.log('[enregistrerTokenPush] Request received', {
       platform,
       hasToken: !!token,
-      tokenPrefix: token ? String(token).slice(0, 16) : '',
+      tokenLength: token ? String(token).length : 0,
       tokenIsWeb: token ? String(token).startsWith('web_') : false,
       livreur_id: livreur_id || '',
       client_id: client_id || '',
@@ -54,13 +54,20 @@ Deno.serve(async (req) => {
       platform: normalizedPlatform,
     });
 
+    // An omitted id must not erase the current client's country-scoped identity.
+    // Never inherit the previous account's id when a physical token changes owner.
+    const previous = existingTokens[0];
+    const sameAccount = String(previous?.user_email || '').trim().toLowerCase() === normalizedEmail;
+    const resolvedClientId = String(client_id || '').trim() ||
+      (resolvedUserType === 'client' && sameAccount ? previous?.client_id || '' : '');
+
     const payload = {
       user_email: normalizedEmail,
       token,
       platform: normalizedPlatform,
       user_type: resolvedUserType,
       livreur_id: livreur_id || '',
-      client_id: client_id || '',
+      client_id: resolvedClientId,
       device_id: normalizedDeviceId,
       actif: true,
       derniere_utilisation: new Date().toISOString(),
@@ -157,6 +164,7 @@ Deno.serve(async (req) => {
     return Response.json({ success: true, action: 'created', user_email: normalizedEmail, user_type: resolvedUserType });
   } catch (error) {
     console.error('[enregistrerTokenPush] Error', error);
-    return Response.json({ error: error.message }, { status: 500 });
+    const message = error instanceof Error ? error.message : String(error);
+    return Response.json({ error: message }, { status: 500 });
   }
 });

@@ -504,3 +504,47 @@ Detailed policy, compatibility, costs and validation are recorded in
   and production schema readback remain outstanding. GPS is client-reported;
   GPS reread plus course CAS is not a multi-entity transaction. Both wrappers
   embed dist without server.url; mobile feed changes require new releases.
+
+## Native iPhone push registration preparation (October 14)
+
+- Local changes follow candidate 3f65a178. They have not been published, deployed,
+  installed or included in the previous successful iOS simulator compilation.
+- Capacitor 5 emits an APNs token on iOS, while the existing backend sends through
+  FCM. AppDelegate now maps APNs into Firebase Messaging, retrieves the FCM string
+  and forwards refreshes through the existing Capacitor registration event. No
+  Firebase dependency, APNs entitlement, signing material or credential is changed.
+- iOS support and permission helpers use the common native plugin. Android-only
+  intent/channel/token APIs stay Android-only. iOS foreground presentation keeps
+  the existing native alert/sound/badge configuration without a duplicate local alert.
+  livreurUrgentAlert also gates its native start/stop bridge on Android, preserving
+  its Android arguments and shared JavaScript cleanup.
+- Client registration passes clientProfil.id through useClientNotifications.
+  The server and direct fallback retain an existing client_id when an update omits
+  it, only for the same normalized email. A token moving accounts cannot inherit
+  the previous account's client_id. Other devices and all four roles are preserved.
+- Native persistence is serialized in one JavaScript runtime and checks the active
+  authenticated email. Delayed old contexts and logged-out profiles cannot write
+  or fall back. New login writes follow an already in-flight request. This is not a
+  distributed cancellation or transaction guarantee for old app versions/requests.
+- Token prefixes are removed from the modified registration diagnostics. No
+  PushTelemetry, production sends, live customer records or new grants are used.
+- Tests: ios-push-registration-regression executes the actual JS and server handler
+  with synthetic adapters and checks the Swift source contract. Twenty-three cases
+  cover iOS/Android, roles, permissions, rotation, account changes, delayed writes,
+  sequential idempotence and absent/null/empty client ids. This is not native runtime,
+  production RLS, concurrent database upsert or physical push reception evidence.
+- Historical 27-suite regressions, project lint and project TypeScript pass. Full
+  project typecheck has checkJs false and lint excludes several backend/lib paths;
+  the targeted adapters execute those changed paths. The changed registration
+  handler passes isolated strict Deno checking (baseline one diagnostic, patched
+  zero); earlier GPS graphs retain their separately documented baseline errors.
+  Web build succeeds with the public SILGAPP app id and native Vite config loader;
+  final validation logs record the result for this diff.
+- Windows cannot compile this Swift diff: a newly authorized unsigned macOS/Xcode
+  run is required. The earlier run 38561892804 and signed Android 1.0.132/139 APK
+  cover commit 3f65a178 only. The APK remains uninstalled and unchanged.
+- The cause of Annick's specific missed TestFlight message is not independently
+  established. Her build, permission/Focus/app state and targeted sender result
+  remain unverified. General reception requires a compiled updated iPhone build,
+  separately authorized server deployment and controlled device validation. Existing
+  Firebase/APNs configuration must be confirmed without reading private credentials.
