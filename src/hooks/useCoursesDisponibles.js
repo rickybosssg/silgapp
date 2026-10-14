@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
+import { cityNamePattern, normalizeCityName } from "../../base44/shared/cityNames.js";
 
 /**
  * useCoursesDisponibles — SOURCE UNIQUE DE VÉRITÉ pour les courses disponibles
@@ -97,17 +98,47 @@ export function useCoursesDisponibles(livreurProfil) {
     staleTime: 60000,
   });
 
+  // ── Feature flag city dispatch ──
+  // Vérifie si le filtrage par ville est activé pour le pays du livreur.
+  // Si OFF : comportement historique (toutes les courses du pays sont visibles).
+  // Si ON : filtrage par ville_depart côté frontend (le backend reste l'autorité).
+  const { data: cityDispatchEnabled = false, isLoading: cityLoading, isError: cityError } = useQuery({
+    queryKey: ["city-dispatch-enabled", countryCode],
+    queryFn: async () => {
+      if (!countryCode) return false;
+      const configs = await base44.entities.AppConfig.filter({
+        cle: `CITY_DISPATCH_ENABLED:${countryCode}`,
+      });
+      return configs?.[0]?.valeur === "true";
+    },
+    enabled: !!countryCode,
+    staleTime: 30000,
+    refetchInterval: 60000,
+  });
+
+  useEffect(() => {
+    if (!countryCode) return;
+    return base44.entities.AppConfig.subscribe(event => {
+      if (!event?.data?.cle || event.data.cle === `CITY_DISPATCH_ENABLED:${countryCode}`) {
+        queryClient.invalidateQueries({ queryKey: ['city-dispatch-enabled', countryCode] });
+      }
+    });
+  }, [queryClient, countryCode]);
+
   // ── Courses disponibles (fetch brut) ──
   // La requête ne filtre pas par enterprise_id car MongoDB ne peut pas matcher
   // null + undefined + "" dans une seule requête SDK. Le filtrage enterprise_id
   // est fait côté client dans eligibleCourses (normalisation canonique).
+  const livreurVille = livreurProfil?.ville?.trim();
+  const cityFilter = cityDispatchEnabled && livreurVille
+    ? { ville_depart: { $regex: cityNamePattern(livreurVille), $options: "i" } } : {};
   const { data: courses = [], isLoading: coursesLoading, isError: coursesError } = useQuery({
-    queryKey: ["courses-externes-disponibles", livreurId, countryCode, livreurEnterpriseId, isV2Enabled],
+    queryKey: ["courses-externes-disponibles", livreurId, countryCode, livreurEnterpriseId, isV2Enabled, livreurVille, cityDispatchEnabled],
     queryFn: async () => {
       if (!livreurPeutVoirFil || !isV2Enabled) return [];
       if (!countryCode || !isV2Enabled) return [];
       const all = await base44.entities.CourseExterne.filter(
-        { dispatch_status: { $in: ["disponible_push", "propose"] }, country_code: countryCode },
+        { dispatch_status: { $in: ["disponible_push", "propose"] }, country_code: countryCode, ...cityFilter },
         "-created_date", 50
       );
       const ecoIsolated = await base44.entities.CourseExterne.filter(
@@ -117,6 +148,7 @@ export function useCoursesDisponibles(livreurProfil) {
           delivery_mode: "eco",
           eco_status: "isolated",
           dispatch_status: "en_attente",
+          ...cityFilter,
         },
         "-created_date",
         30
@@ -127,7 +159,7 @@ export function useCoursesDisponibles(livreurProfil) {
       });
       return Array.from(byId.values());
     },
-    enabled: !!livreurId && !!countryCode && livreurPeutVoirFil && isV2Enabled,
+    enabled: !!livreurId && !!countryCode && livreurPeutVoirFil && isV2Enabled && !cityLoading && !cityError,
     refetchInterval: 10000,
     staleTime: 0,
     refetchOnWindowFocus: true,
@@ -135,17 +167,27 @@ export function useCoursesDisponibles(livreurProfil) {
   });
 
   const { data: ecoMissions = [], isLoading: missionsLoading, isError: missionsError } = useQuery({
-    queryKey: ["eco-missions-disponibles", livreurId, countryCode, livreurEnterpriseId, isV2Enabled],
+    queryKey: ["eco-missions-disponibles", livreurId, countryCode, livreurEnterpriseId, isV2Enabled, livreurVille, cityDispatchEnabled],
     queryFn: async () => {
       if (!livreurPeutVoirFil || !isV2Enabled || !countryCode) return [];
       if (livreurEnterpriseId !== null) return [];
-      return await base44.entities.EcoMission.filter(
+      const missions = await base44.entities.EcoMission.filter(
         { status: "available", country_code: countryCode, enterprise_id: null },
         "-created_date",
         20
       );
+      if (!cityDispatchEnabled || !livreurVille || !missions?.length) return missions || [];
+      const ids = [...new Set(missions.flatMap(m => m.course_ids || []))];
+      if (!ids.length) return [];
+      const records = await base44.entities.CourseExterne.filter({ id: { $in: ids }, country_code: countryCode, enterprise_id: null }, undefined, ids.length);
+      const byId = new Map((records || []).map(c => [c.id, c]));
+      const city = normalizeCityName(livreurVille);
+      return missions.filter(m => m.course_ids?.length && m.course_ids.every(id => {
+        const c = byId.get(id);
+        return c && normalizeCityName(c.ville_depart) === city;
+      }));
     },
-    enabled: !!livreurId && !!countryCode && livreurPeutVoirFil && isV2Enabled,
+    enabled: !!livreurId && !!countryCode && livreurPeutVoirFil && isV2Enabled && !cityLoading && !cityError,
     refetchInterval: 10000,
     staleTime: 0,
     refetchOnWindowFocus: true,
@@ -224,8 +266,8 @@ export function useCoursesDisponibles(livreurProfil) {
   return {
     eligibleCourses,
     courses,
-    isLoading: coursesLoading || missionsLoading,
-    isError: coursesError || missionsError,
+    isLoading: cityLoading || coursesLoading || missionsLoading,
+    isError: cityError || coursesError || missionsError,
     isV2Enabled,
     livreurDisponible,
     livreurPeutVoirFil,

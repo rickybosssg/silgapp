@@ -5,7 +5,7 @@
  * Calcule la distance à vol d'oiseau entre deux points GPS (formule de Haversine).
  * @returns {number|null} Distance en km, ou null si coordonnées invalides.
  */
-export function haversineKm(lat1, lon1, lat2, lon2) {
+export function haversineKm(lat1: unknown, lon1: unknown, lat2: unknown, lon2: unknown) {
   if (!lat1 || !lon1 || !lat2 || !lon2) return null;
   if (typeof lat1 !== "number" || typeof lon1 !== "number") return null;
   if (typeof lat2 !== "number" || typeof lon2 !== "number") return null;
@@ -22,7 +22,7 @@ export function haversineKm(lat1, lon1, lat2, lon2) {
 /**
  * Vérifie qu'une coordonnée GPS est valide (non nulle, dans les bornes, pas 0,0).
  */
-export function isValidCoord(lat, lng) {
+export function isValidCoord(lat: unknown, lng: unknown) {
   return (
     typeof lat === "number" &&
     typeof lng === "number" &&
@@ -38,7 +38,7 @@ export function isValidCoord(lat, lng) {
  * ETA approximatif basé sur la distance à vol d'oiseau et une vitesse moyenne moto (25 km/h).
  * @returns {number} Minutes estimées (0 si distance invalide).
  */
-export function computeFallbackEta(distKm) {
+export function computeFallbackEta(distKm: number | null | undefined) {
   if (!distKm || distKm <= 0) return 0;
   return Math.round((distKm / 25) * 60);
 }

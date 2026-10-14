@@ -110,6 +110,20 @@ Deno.serve(async (req) => {
         continue;
       }
 
+      // ── [CITY DISPATCH] Vérification de compatibilité ville ──
+      // Une proposition sur trajet d'une autre ville n'est pas visible
+      // lorsque le filtrage par ville est activé. Défense en profondeur backend.
+      try {
+        const { verifyCityCompatibility } = await import('../../shared/cityDispatchFilter.ts');
+        const cityCheck = await verifyCityCompatibility(base44, course, livreur);
+        if (!cityCheck.compatible) {
+          continue;
+        }
+      } catch (cityErr: any) {
+        console.error('[getOnRouteProposals] city check failed:', cityErr?.message || String(cityErr));
+        return Response.json({ success: false, error: 'city_configuration_unavailable' }, { status: 503 });
+      }
+
       // Parser le route_delta_json pour le détour
       let routeDelta: any = null;
       try {

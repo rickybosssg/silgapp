@@ -42,6 +42,7 @@ export function useHeartbeat({ user_type, position, enabled = true, debugLabel =
       const lat = pos?.latitude ?? position?.latitude ?? null;
       const lng = pos?.longitude ?? position?.longitude ?? null;
       const acc = pos?.accuracy ?? position?.accuracy ?? null;
+      const gpsTimestamp = pos?.timestamp ?? position?.timestamp;
       const hasValidGps = lat !== null && lng !== null &&
         Number.isFinite(Number(lat)) && Number.isFinite(Number(lng)) &&
         Number(lat) >= -90 && Number(lat) <= 90 &&
@@ -55,6 +56,7 @@ export function useHeartbeat({ user_type, position, enabled = true, debugLabel =
         background_active: isNative,
         device_id: navigator.userAgent.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 50),
         session_id: session_id || undefined,
+        gps_timestamp: gpsTimestamp,
       };
 
       const res = await base44.functions.invoke("heartbeatAuto", payload);

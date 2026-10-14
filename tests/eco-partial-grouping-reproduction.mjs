@@ -9,7 +9,9 @@ const names = ['releaseEcoCandidate', 'recoverEcoCandidates', 'processEcoCourseC
 const code = names.map(name => {
   const fn = parsed.statements.find(n => ts.isFunctionDeclaration(n) && n.name?.text === name);
   assert.ok(fn, name);
-  return ts.transpile(fn.getText(parsed).replace('export ', ''), { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None });
+  // Extracted functions run from tests/, so retain the real dependency with an absolute module URL.
+  const extracted = fn.getText(parsed).replace('export ', '').replace("'./cityDispatchFilter.ts'", JSON.stringify(new URL('../base44/shared/cityDispatchFilter.ts', import.meta.url).href));
+  return ts.transpile(extracted, { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None });
 }).join('\n');
 const dependencies = {
   shouldHoldEcoCourseOnCreate: async () => true,
@@ -31,6 +33,7 @@ function adapter(fault) {
   const missions = new Map();
   let progressRace = false;
   const entities = {
+    AppConfig: { filter: async () => [] },
     CourseExterne: {
       get: async id => structuredClone(rows.get(id)),
       filter: async filter => [...rows.values()].filter(row => matches(row, filter)).map(row => structuredClone(row)),

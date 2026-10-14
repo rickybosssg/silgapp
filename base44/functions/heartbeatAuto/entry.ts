@@ -20,6 +20,7 @@ Deno.serve(async (req) => {
       latitude,
       longitude,
       accuracy,
+      gps_timestamp,
       app_active = true,
       background_active = false,
       device_id,
@@ -30,7 +31,7 @@ Deno.serve(async (req) => {
     // ✅ Validation numérique complète — ne pas traiter 0,0 ou valeurs non-finies comme GPS valide
     const latNum = Number(latitude);
     const lngNum = Number(longitude);
-    const hasGps = Number.isFinite(latNum) && Number.isFinite(lngNum) &&
+    const hasGps = latitude != null && longitude != null && latitude !== '' && longitude !== '' && Number.isFinite(latNum) && Number.isFinite(lngNum) &&
       latNum >= -90 && latNum <= 90 && lngNum >= -180 && lngNum <= 180;
 
     // --- VÉRIFICATION SESSION UNIQUE POUR LES LIVREURS ---
@@ -110,7 +111,7 @@ Deno.serve(async (req) => {
       const livreurs = await base44.asServiceRole.entities.Livreur.filter({ user_email: user.email });
       if (livreurs && livreurs.length > 0) {
         const livreur = livreurs[0];
-        const updateData = {
+        const updateData: Record<string, unknown> = {
           last_seen_at: now,
           app_active: app_active,
           background_active: background_active,
@@ -125,6 +126,37 @@ Deno.serve(async (req) => {
           updateData.derniere_position_date = now;
           if (accuracy !== undefined && accuracy !== null) {
             updateData.gps_accuracy = Number(accuracy);
+          }
+
+          // [CITY_DISPATCH] Détection automatique de la ville opérationnelle du livreur.
+          // Utilise shouldUpdateDriverCity qui encapsule toutes les règles de sécurité :
+          // - Pas de changement pendant une mission (statut = en_course)
+          // - GPS avec précision > 100m ignoré
+          // - Hystérésis anti-flicker (5km) aux limites de villes
+          // - Ne jamais effacer une ville existante par une position incertaine
+          // Aucune API externe — utilise le cache des quartiers (TTL 10 min).
+          try {
+            const { isCityDispatchEnabled, shouldUpdateDriverCity } = await import('../../shared/cityResolution.ts');
+            const cityEnabled = await isCityDispatchEnabled(base44, livreur.country_code);
+            const fixTime = typeof gps_timestamp === 'number' ? gps_timestamp : Date.parse(gps_timestamp || '');
+            const fixAge = Date.now() - fixTime;
+            // Only a timestamped fix can change the operational city. Old APKs keep their stored city.
+            if (cityEnabled && Number.isFinite(fixAge) && fixAge >= 0 && fixAge <= 120000) {
+              const accuracyVal = accuracy !== undefined && accuracy !== null ? Number(accuracy) : undefined;
+              const cityUpdate = await shouldUpdateDriverCity(base44, livreur, latNum, lngNum, accuracyVal);
+              if (cityUpdate.shouldUpdate && cityUpdate.newCity) {
+                updateData.ville = cityUpdate.newCity;
+                console.log('[heartbeatAuto] 🏙️ Ville livreur mise à jour', {
+                  livreur_id: livreur.id,
+                  ancienne_ville: livreur.ville || '(vide)',
+                  nouvelle_ville: cityUpdate.newCity,
+                  raison: cityUpdate.reason,
+                });
+              }
+            }
+          } catch (cityError: any) {
+            // Non-bloquant : la détection de ville est une optimisation, pas une obligation.
+            console.error('[heartbeatAuto] ⚠️ City resolution failed:', cityError?.message || String(cityError));
           }
         }
 

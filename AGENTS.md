@@ -125,3 +125,20 @@ APK/AAB build:
 Do not restore old files wholesale when Base44 has newer fixes. Restore the
 minimal behavior, add or update a regression test, and document any intentional
 product decision that supersedes an older behavior.
+
+## City dispatch integration
+
+- Keep every CITY_DISPATCH_ENABLED:<COUNTRY_CODE> OFF until separate activation
+  approval. Missing keys mean OFF; a failed configuration read is not an OFF result.
+- OFF must preserve tenant queries and non-exclusive Standard/Eco dispatch.
+- City matching uses canonical complete names, never substring or unescaped regex.
+- Check every parcel before claiming an Eco mission. Preserve claim fencing,
+  compensation, per-course commissions and completed route steps.
+- Do not city-filter the busy-driver check: an interurban delivery still occupies
+  its driver. Country and Enterprise guards remain independent of city filtering.
+- A heartbeat is not a GPS fix. Only fresh, accurate, timestamped coordinates can
+  change a driver's city; no city switching during an active mission.
+- Reuse DispatchMap. Configuration writes require authenticated Super Admin
+  backend authorization, confirmation and read-back; never a client-only role check.
+- Base44's 54 city tests include mocks and source checks, not 54 production tests.
+  Retain them and run city-integration-safety-regression plus historical suites.

@@ -337,3 +337,32 @@ The owner requested one consolidated correction batch and no rebuild during test
   production configuration change or video work belongs to this release.
 - Device installation, visible screens and new delivery/sound/GPS execution must
   be reported separately; neither simulation nor signed build proves a physical pass.
+
+## City Dispatch Integration (October 12)
+
+- Base44 source: origin/main 740fd296; previous validated Android baseline:
+  11889120 (1.0.129/136). Preserve the Eco-only feed and both loading/error states
+  while resolving the incoming hook/engine merge conflicts.
+- CITY_DISPATCH_ENABLED is independent for BF/CI/SN/TG/BJ/ML/GN. Production read
+  found no stored activation keys, hence all OFF. No country was activated.
+- Known city matching is exact, normalized and regex-escaped, with accent-aware
+  query patterns shared by frontend/backend. Base44's unknown-city fallback remains;
+  do not claim hard city isolation for records without an operational city.
+- Standard notification/acceptance/rescue paths use the country feature flag.
+  Busy-driver detection remains tenant-wide, including interurban courses.
+- Eco acceptance checks all parcels before any claim; on-route creation and
+  acceptance check the driver's city. A temporarily hidden proposal is not expired
+  merely because a city filter hides it. Read failures are not successful empty data.
+- Automatic city changes require a fresh timestamped fix, accuracy <=100m,
+  valid coordinates, known Quartier.ville, and a driver outside a mission.
+  Existing geographic hysteresis remains; no paid mapping API is added.
+- Admin reuses DispatchMap, remounts on country/city change, shows read failures,
+  and labels bounded counter populations. Its configuration setter checks Super
+  Admin identity, expected value and persisted result. No activation in device tests.
+- Tests: original city-dispatch-regression (30), eco-city-dispatch-regression (24),
+  additional city-integration-safety-regression (real functions/hooks with isolated
+  adapters). Historical grouping test resolves its new real import by module URL;
+  its assertions and fault scenarios are unchanged.
+- Physical city switching, ON dispatch/FCM, permission/RLS adversarial integration
+  and whole-city population counts require separate evidence. Local test success
+  alone does not validate these scenarios.

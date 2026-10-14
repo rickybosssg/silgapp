@@ -87,6 +87,12 @@ export default async function(req) {
     });
     Object.assign(courseData, ecoFields);
 
+    const { isCityDispatchEnabled, getCourseDepartureCity } = await import('../../shared/cityResolution.ts');
+    if (await isCityDispatchEnabled(base44, courseData.country_code)) {
+      const city = await getCourseDepartureCity(base44, courseData);
+      if (city) courseData.ville_depart = city;
+    }
+
     const course = await base44.entities.CourseExterne.create(courseData);
 
     // [CORRECTION PIN/QR] Message automatique des codes supprimé — les PIN/QR ne sont plus utilisés.

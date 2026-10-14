@@ -455,12 +455,16 @@ export async function processEcoCourseCreated(base44: any, courseId: string) {
   if (!config.enabled || !config.groupingEnabled) {
     return { success: true, handled: true, grouped: false, reason: 'grouping_disabled' };
   }
+  // [CITY_DISPATCH] Filtre ville pour le regroupement Éco
+  const { buildCourseCityFilterFromCourse } = await import('./cityDispatchFilter.ts');
+  const ecoCityFilter = await buildCourseCityFilterFromCourse(base44, course);
   const candidates = await base44.asServiceRole.entities.CourseExterne.filter({
     country_code: course.country_code,
     enterprise_id: null,
     delivery_mode: 'eco',
     eco_status: 'isolated',
     dispatch_status: 'en_attente',
+    ...ecoCityFilter,
   }, '-created_date', 30).catch(() => []);
 
   let best: any = null;
@@ -659,6 +663,9 @@ export async function createOnRouteProposal(base44: any, courseId: string, livre
   const course = await base44.asServiceRole.entities.CourseExterne.get(courseId).catch(() => null);
   const livreur = await base44.asServiceRole.entities.Livreur.get(livreurId).catch(() => null);
   if (!course || !livreur) return { success: false, reason: 'missing_course_or_driver' };
+  if (course.country_code !== livreur.country_code) return { success: false, reason: 'country_mismatch' };
+  const { verifyCityCompatibility } = await import('./cityDispatchFilter.ts');
+  if (!(await verifyCityCompatibility(base44, course, livreur)).compatible) return { success: false, reason: 'city_mismatch' };
   const courseEnterpriseId = normalizeEnterpriseId(course.enterprise_id);
   const livreurEnterpriseId = normalizeEnterpriseId(livreur.enterprise_id);
   if (courseEnterpriseId !== livreurEnterpriseId) return { success: false, reason: 'enterprise_mismatch' };
@@ -765,6 +772,18 @@ export async function respondToOnRouteProposal(base44: any, proposalId: string, 
     const identityCheck = await verifyLivreurIdentity(base44, livreurId);
     if (!identityCheck.verified) {
       return { success: false, reason: 'identity_mismatch', error: identityCheck.error || 'Vérification d\'identité échouée' };
+    }
+    // ── [CITY DISPATCH] Vérification de compatibilité ville avant acceptation ──
+    // Une proposition sur trajet d'une autre ville ne peut pas être acceptée
+    // lorsque le filtrage par ville est activé. Défense en profondeur backend.
+    const proposalCourse = await base44.asServiceRole.entities.CourseExterne.get(proposal.course_id).catch(() => null);
+    if (!proposalCourse) return { success: false, reason: 'course_unavailable' };
+    if (proposalCourse) {
+      const { verifyCityCompatibility } = await import('./cityDispatchFilter.ts');
+      const cityCheck = await verifyCityCompatibility(base44, proposalCourse, identityCheck.livreur);
+      if (!cityCheck.compatible) {
+        return { success: false, reason: 'city_mismatch', courseCity: cityCheck.courseCity, livreurCity: cityCheck.livreurCity };
+      }
     }
   }
   if (proposal.expires_at && new Date(proposal.expires_at) < new Date()) {
@@ -1406,10 +1425,14 @@ export async function triggerOnRouteProposalsForNewCourse(base44: any, courseId:
   // ── Comportement historique (priorité désactivée ou pas de candidat) ──
   // Créer des propositions pour tous les livreurs compatibles
   const courseEnterpriseId = normalizeEnterpriseId(course.enterprise_id);
+  // [CITY_DISPATCH] Filtre ville pour les courses actives (propositions sur trajet)
+  const { buildCourseCityFilterFromCourse } = await import('./cityDispatchFilter.ts');
+  const onRouteCityFilter = await buildCourseCityFilterFromCourse(base44, course);
   const activeCourses = await base44.asServiceRole.entities.CourseExterne.filter({
     country_code: course.country_code,
     statut: { $in: ACTIVE_STATUSES },
     livreur_id: { $exists: true },
+    ...onRouteCityFilter,
   }, '-updated_date', 50).catch(() => []);
 
   const driverIds = new Set<string>();
@@ -1470,6 +1493,11 @@ export async function acceptEcoMission(base44: any, missionId: string, livreurId
     return { success: false, reason: 'livreur_indisponible' };
   }
 
+  // ── [CITY DISPATCH] Vérification de compatibilité ville avant acceptation ──
+  // Une mission Éco de Ouagadougou ne peut pas être acceptée par un livreur de Bobo-Dioulasso
+  // lorsque le filtrage par ville est activé. Défense en profondeur backend.
+  const { verifyCityCompatibility } = await import('./cityDispatchFilter.ts');
+
   const courseIds = Array.isArray(mission.course_ids) ? mission.course_ids : [];
   if (courseIds.length !== 2 || new Set(courseIds).size !== 2) return { success: false, reason: 'mission_incomplete' };
 
@@ -1477,6 +1505,8 @@ export async function acceptEcoMission(base44: any, missionId: string, livreurId
   for (const id of courseIds) {
     const course = await base44.asServiceRole.entities.CourseExterne.get(id).catch(() => null);
     if (!course) return { success: false, reason: 'missing_course', course_id: id };
+    const cityCheck = await verifyCityCompatibility(base44, course, livreur);
+    if (!cityCheck.compatible) return { success: false, reason: 'city_mismatch', course_id: id };
     if (normalizeEnterpriseId(course.enterprise_id) !== normalizeEnterpriseId(mission.enterprise_id)) {
       return { success: false, reason: 'enterprise_mismatch', course_id: id };
     }

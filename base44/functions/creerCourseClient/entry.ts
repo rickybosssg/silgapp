@@ -257,6 +257,28 @@ export default async function(req: Request): Promise<Response> {
     });
     Object.assign(cleanData, ecoFields);
 
+    // [CITY_DISPATCH] Attribution automatique de la ville de départ.
+    // Si le feature flag est activé pour ce pays et que ville_depart est vide,
+    // résoudre la ville depuis les coordonnées GPS de départ.
+    // Aucune API externe — utilise le cache des quartiers (TTL 10 min).
+    try {
+      const { isCityDispatchEnabled, resolveCityFromGPS, normalizeCityName } = await import('../../shared/cityResolution.ts');
+      const cityEnabled = await isCityDispatchEnabled(base44, cleanData.country_code);
+      if (cityEnabled && !normalizeCityName(cleanData.ville_depart)) {
+        const lat = Number(cleanData.gps_depart_lat);
+        const lng = Number(cleanData.gps_depart_lng);
+        if (cleanData.gps_depart_lat != null && cleanData.gps_depart_lng != null && Number.isFinite(lat) && Number.isFinite(lng)) {
+          const resolvedCity = await resolveCityFromGPS(base44, lat, lng, cleanData.country_code);
+          if (resolvedCity) {
+            cleanData.ville_depart = resolvedCity;
+          }
+        }
+      }
+    } catch (cityError: any) {
+      // Non-bloquant : la résolution de ville est une optimisation.
+      console.error('[creerCourseClient] ⚠️ City resolution failed:', cityError?.message || String(cityError));
+    }
+
     // ── S'assurer que les champs multi-colis sont préservés ──
     // is_multi_colis, nb_colis, nb_colis_livres, nb_colis_annules ne sont pas sensibles
     // et doivent être conservés tels quels depuis le frontend.
