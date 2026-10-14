@@ -55,7 +55,7 @@ test('archive provisioning applies only to App Release and cannot leak into Pods
 
 test('all embedded workflow shell blocks pass a syntax-only Bash check', () => {
   const bash = process.env.IOS_TEST_BASH || 'bash';
-  for (const file of ['ios-cloud-build.yml', 'ios-signed-archive.yml']) {
+  for (const file of ['ios-cloud-build.yml', 'ios-signed-archive.yml', 'ios-appstore-upload.yml']) {
     const workflow = yaml.load(read(`.github/workflows/${file}`));
     for (const job of Object.values(workflow.jobs)) {
       for (const step of job.steps.filter(item => item.run)) {
@@ -64,6 +64,25 @@ test('all embedded workflow shell blocks pass a syntax-only Bash check', () => {
       }
     }
   }
+});
+
+test('upload uses only exact r2 artifact and an immutable separate tag, with a public receipt artifact', () => {
+  const workflow = yaml.load(read('.github/workflows/ios-appstore-upload.yml'));
+  assert.deepEqual(workflow.on.push.tags, ['ios-upload-v1.0.60-b67-r2']);
+  assert.equal(workflow.on.workflow_dispatch, undefined);
+  assert.deepEqual(workflow.permissions, { contents: 'read', actions: 'read' });
+  assert.equal(workflow.concurrency['cancel-in-progress'], false);
+  const job = workflow.jobs.upload;
+  assert.equal(job.if, 'github.run_attempt == 1');
+  assert.equal(job['runs-on'], 'macos-15');
+  const download = job.steps.find(step => step.uses === 'actions/download-artifact@v4');
+  assert.equal(download.with['run-id'], 38528393904);
+  assert.equal(download.with.name, 'SILGAPP-signed-ipa');
+  const artifact = job.steps.find(step => step.uses === 'actions/upload-artifact@v4');
+  assert.equal(artifact.with.path, '${{ runner.temp }}/ios-appstore-upload-receipt.json');
+  const upload = job.steps.find(step => step.run?.includes('ios_appstore_upload.py'));
+  assert.deepEqual(Object.keys(upload.env).sort(), ['APP_STORE_CONNECT_API_ISSUER_ID', 'APP_STORE_CONNECT_API_KEY_ID', 'APP_STORE_CONNECT_API_PRIVATE_KEY']);
+  assert.ok(job.steps.every(step => !/npm ci|xcodebuild.*archive|ios_archive.sh/.test(step.run || '')));
 });
 
 test('both workflows select installed Xcode 26.2 and reject an obsolete SDK before restoring secrets', () => {

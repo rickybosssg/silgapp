@@ -2,6 +2,12 @@
 
 ## Isolated iOS signing preparation — 2026-10-14
 
+- Upload-only workflow reuses the exact verified r2 IPA, without rebuilding or
+  changing product code. The owner configured API secrets manually. An immutable
+  separate upload tag, first-attempt guard, Apple duplicate-build preflight and
+  restricted public receipt artifact protect the transfer. No TestFlight campaign
+  or automatic compliance declaration is added; submission is a separate step.
+
 - Source: verified remote ios d52bf1da. Native iOS metadata, build-preparation files
   and guarded iOS logo selection change; Android images and business/dispatch/finance
   implementations stay intact.

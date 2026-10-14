@@ -44,6 +44,7 @@ base44/.app.jsonc
 /ios/App/App/GoogleService-Info.plist
 *.p12
 *.pfx
+*.p8
 *.mobileprovision
 *private-key*.pem
 __pycache__/
