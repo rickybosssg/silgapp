@@ -42,7 +42,8 @@ def validate_release(settings, remote_head, ref=None):
         raise ValueError("Release version must exceed the version confirmed in the App Store Connect evidence.")
     if build_number(build) <= build_number(settings.get("latest_app_store_build")):
         raise ValueError("Build must exceed the last visible build confirmed in the App Store Connect evidence.")
-    if ref is not None and ref != f"ios-signed-v{version}-b{build}":
+    tag_pattern = rf"ios-signed-v{re.escape(version)}-b{re.escape(build)}(?:-r[1-9][0-9]*)?"
+    if ref is not None and re.fullmatch(tag_pattern, ref) is None:
         raise ValueError("Signed tag must exactly match the reviewed version and build settings.")
     return {"version": version, "build": build, "bundle_id": BUNDLE_ID, "team_id": TEAM_ID}
 

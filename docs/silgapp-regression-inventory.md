@@ -12,13 +12,16 @@
 - Signed CI fails before signing unless owner-confirmed App Store version/build,
   latest ios source, exact profile/certificate identity and production rights match.
 - Local release/profile safety tests, YAML trigger/artifact checks and Bash syntax
-  checks pass: 14 Python + 4 workflow + 4 branding tests. Typecheck, lint and local
-  web build (native Vite config loader) pass. No native iOS build, GitHub execution,
-  signing import or publication occurred.
+  checks pass: 15 Python + 5 workflow + 4 branding tests. Typecheck, lint and local
+  web build (native Vite config loader) pass. The authorized first macos-15 run
+  passed web/Pods/signing-asset validation, then failed because an app profile was
+  also imposed on Pods. Signing overrides now apply only to App Release; retry
+  tags preserve the reviewed version/build without moving an existing tag.
 - The owner-approved logo is used only on native iOS; original Android/web URLs
   and all component logic are preserved. Local iOS 1.0.60/67 follows the owner's
   06:30 UTC screenshot showing the last visible 1.0.59/66. Recheck concurrent
-  uploads before submission; the Apple Developer agreement remains pending.
+  uploads before submission. Eric reports accepting the Apple Developer agreement
+  at 06:37 UTC; this has not been independently rechecked. No publication occurred.
   See docs/ios-signed-build-preparation.md for scope and separate approvals.
 
 ## Corrections 18 And 19

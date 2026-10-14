@@ -62,13 +62,32 @@ test ! -e "$PROFILE_INSTALL_PATH" || { echo 'Profile already exists on runner; r
 cp "$PROFILE_PATH" "$PROFILE_INSTALL_PATH"
 INSTALLED_PROFILE="$PROFILE_INSTALL_PATH"
 
+# A workspace-wide signing override also reaches Pods, which cannot use the
+# application's provisioning profile. Apply manual signing to App Release only.
+PROFILE_NAME="$PROFILE_NAME" ruby -r xcodeproj <<'RUBY'
+project = Xcodeproj::Project.open('ios/App/App.xcodeproj')
+targets = project.targets.select do |target|
+  target.name == 'App' && target.product_type == 'com.apple.product-type.application'
+end
+abort 'Expected exactly one App application target' unless targets.length == 1
+configurations = targets.first.build_configurations.select { |config| config.name == 'Release' }
+abort 'Expected exactly one App Release configuration' unless configurations.length == 1
+settings = configurations.first.build_settings
+settings['DEVELOPMENT_TEAM'] = ENV.fetch('TEAM_ID')
+settings['CODE_SIGN_STYLE'] = 'Manual'
+settings['CODE_SIGN_IDENTITY'] = 'iPhone Distribution'
+settings['CODE_SIGN_IDENTITY[sdk=iphoneos*]'] = 'iPhone Distribution'
+settings['PROVISIONING_PROFILE_SPECIFIER'] = ENV.fetch('PROFILE_NAME')
+settings['PRODUCT_BUNDLE_IDENTIFIER'] = ENV.fetch('APP_BUNDLE_ID')
+settings['MARKETING_VERSION'] = ENV.fetch('IOS_RELEASE_VERSION')
+settings['CURRENT_PROJECT_VERSION'] = ENV.fetch('IOS_RELEASE_BUILD')
+project.save
+RUBY
+
 ARCHIVE_PATH="$RUNNER_TEMP/SILGAPP.xcarchive"
 xcodebuild -workspace ios/App/App.xcworkspace -scheme App -configuration Release \
   -sdk iphoneos -destination 'generic/platform=iOS' -archivePath "$ARCHIVE_PATH" \
-  DEVELOPMENT_TEAM="$TEAM_ID" CODE_SIGN_STYLE=Manual \
-  CODE_SIGN_IDENTITY='iPhone Distribution' PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
-  PRODUCT_BUNDLE_IDENTIFIER="$APP_BUNDLE_ID" MARKETING_VERSION="$IOS_RELEASE_VERSION" \
-  CURRENT_PROJECT_VERSION="$IOS_RELEASE_BUILD" archive
+  archive
 
 APP_PATH="$ARCHIVE_PATH/Products/Applications/App.app"
 test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP_PATH/Info.plist")" = "$IOS_RELEASE_VERSION"

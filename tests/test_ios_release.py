@@ -49,6 +49,14 @@ class IOSReleaseTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "advanced"):
             ios.validate_release(self.settings, "a" * 40)
 
+    def test_retry_tags_preserve_reviewed_version_build_and_immutable_first_tag(self):
+        for tag in ("ios-signed-v1.0.60-b67-r1", "ios-signed-v1.0.60-b67-r12"):
+            self.assertEqual(ios.validate_release(self.settings, self.settings["source_commit"], tag)["build"], "67")
+        for tag in ("ios-signed-v1.0.60-b68-r1", "ios-signed-v1.0.61-b67-r1",
+                    "ios-signed-v1.0.60-b67-r0", "ios-signed-v1.0.60-b67-r1-extra"):
+            with self.subTest(tag=tag), self.assertRaisesRegex(ValueError, "tag"):
+                ios.validate_release(self.settings, self.settings["source_commit"], tag)
+
     def test_rejects_wrong_tag_old_version_or_reused_build(self):
         cases = ({"marketing_version": "1.0.56"}, {"build_number": "66"},
                  {"marketing_version": "1.0.60; echo unsafe"}, {"build_number": "67\nextra"})

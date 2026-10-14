@@ -31,7 +31,8 @@ Eric prefers direct App Store review without a TestFlight campaign. Export uses
 no upload or submission is performed. A separate owner screenshot at 06:27 UTC
 shows an Apple Developer agreement still pending. The owner must review and accept
 it before Apple services requiring the agreement can proceed; this task did not
-accept any agreement.
+accept any agreement. Eric subsequently reported accepting it at 06:37 UTC;
+the resulting Apple account state has not been independently rechecked.
 
 The signed workflow fails closed if confirmation is removed and passes the
 reviewed numbers explicitly to Xcode.
@@ -59,8 +60,9 @@ tag push starts the corresponding build:
 - `ios-check-*`: simulator build without signing.
 - `ios-signed-v<reviewed-version>-b<reviewed-build>`: signed archive and IPA export.
 
-The signed tag must exactly match the reviewed release settings. No tag is created
-or pushed in this task. `workflow_dispatch` is retained for an available registered
+The signed tag must exactly match the reviewed release settings, with an optional
+`-r<positive-integer>` suffix for a new build attempt. Existing tags are never
+moved or force-pushed. `workflow_dispatch` is retained for an available registered
 workflow, but the initial path does not rely on the default branch containing it.
 `main` remains unchanged. The workflows use macos-15, Node 20, npm ci, the current
 web build, Capacitor iOS sync, and the existing CocoaPods dependencies.
@@ -104,8 +106,8 @@ web/Android favicon references are preserved.
 
 ## Local verification and limits
 
-- Python unittest: 14 release/profile/entitlement/identity safety tests passed.
-- Node test: 4 workflow YAML/trigger/artifact/private-key handling and embedded
+- Python unittest: 15 release/profile/entitlement/identity safety tests passed.
+- Node test: 5 workflow YAML/trigger/artifact/private-key handling and embedded
   Bash syntax tests passed.
 - Node branding tests: 4 passed. Approved image SHA-256/opaque RGB dimensions,
   native launch variants, Android/web fallback and exact component-source
@@ -128,11 +130,28 @@ web/Android favicon references are preserved.
   validator; the CMS signature check also returns success. Signer trust-chain
   validation remains outside this local check.
 - Bash syntax validation passed; archive script was not executed.
-- Native Xcode archive/export, certificate-chain availability on the macOS runner,
-  App Store Connect acceptance and device behavior remain untested.
+- Native archive/export completion, App Store Connect acceptance and device
+  behavior remain unverified. See the authorized CI attempt below.
 
-No P12/private key was opened or decrypted in this preparation. No npm install,
-native build, GitHub run, push, signing import, credential upload, or publication
-was performed. The Apple Developer agreement, the future App Store Connect
-concurrent-upload recheck and the separate approvals for GitHub transfer/push and
-CI execution remain outstanding.
+No P12/private key was opened or decrypted on the Windows host during source
+preparation. The owner configured all five GitHub secrets himself and explicitly
+authorized branch push and signed CI at 06:58:52 UTC. No secret was read back or
+transferred again by this task. App Store upload/publication remains unauthorized.
+
+## Authorized CI attempts
+
+The first commit `a21209fa9cfe3c10a34c838a907d197baff316b3` was pushed only to
+`codex/prepare-ios-signed-20261014`, then tagged `ios-signed-v1.0.60-b67`.
+Run https://github.com/rickybosssg/silgapp/actions/runs/38525979819 started on the
+standard `macos-15` runner in the public repository. Source/version checks, secret
+presence, Firebase validation, web build and CocoaPods succeeded. The existing
+P12/profile were used by the authorized ephemeral signing job, without being
+included in artifacts. Archive failed with exit 65 because a workspace command-line
+provisioning profile override also reached Pods targets, which cannot use an app
+profile. The Firebase cleanup step succeeded; no IPA artifact was produced.
+
+The correction applies signing and version settings only to the App Release target
+through the existing CocoaPods xcodeproj library, with no workspace-wide signing
+override. A regression check protects that scope. Retry tags retain 1.0.60/67 and
+use a suffix instead of moving the original tag. The remote ios source and the
+App Store Connect concurrent-upload recheck still guard a future submission.

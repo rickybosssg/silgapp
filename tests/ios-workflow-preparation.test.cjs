@@ -38,10 +38,19 @@ test('archive never exports a plaintext private key or submits to a store', () =
   assert.match(archive, /'destination': 'export'/);
   assert.match(archive, /'method': 'app-store-connect'/);
   assert.match(archive, /'testFlightInternalTestingOnly': False/);
-  assert.match(archive, /MARKETING_VERSION="\$IOS_RELEASE_VERSION"/);
-  assert.match(archive, /CURRENT_PROJECT_VERSION="\$IOS_RELEASE_BUILD"/);
+  assert.match(archive, /settings\['MARKETING_VERSION'\] = ENV.fetch\('IOS_RELEASE_VERSION'\)/);
+  assert.match(archive, /settings\['CURRENT_PROJECT_VERSION'\] = ENV.fetch\('IOS_RELEASE_BUILD'\)/);
   assert.match(archive, /trap cleanup EXIT/);
   assert.match(archive, /security delete-keychain/);
+});
+
+test('archive provisioning applies only to App Release and cannot leak into Pods', () => {
+  const archive = read('scripts/ios_archive.sh');
+  assert.match(archive, /target.name == 'App' && target.product_type == 'com.apple.product-type.application'/);
+  assert.match(archive, /config.name == 'Release'/);
+  assert.match(archive, /settings\['PROVISIONING_PROFILE_SPECIFIER'\] = ENV.fetch\('PROFILE_NAME'\)/);
+  const archiveCommand = archive.match(/xcodebuild -workspace[\s\S]*?\n  archive/)[0];
+  assert.doesNotMatch(archiveCommand, /PROVISIONING_PROFILE|CODE_SIGN_|DEVELOPMENT_TEAM/);
 });
 
 test('all embedded workflow shell blocks pass a syntax-only Bash check', () => {
