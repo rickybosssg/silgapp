@@ -22,7 +22,10 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
 const TRANSITIONS_VALIDES: Record<string, string[]> = {
   'client_contacte': ['livreur_en_route', 'recherche_livreur'],
   'en_route_expediteur': ['client_contacte', 'livreur_en_route'],
-  'colis_recupere': ['en_route_expediteur', 'arrive_prise_en_charge', 'livreur_en_route'],
+  // [FIX 400] 'client_contacte' ajouté : le livreur peut récupérer le colis directement après avoir
+  // contacté le client, sans attendre l'étape intermédiaire 'en_route_expediteur'. Corrige la
+  // race condition où le clic « Colis récupéré » arrive avant la fin de la transition précédente.
+  'colis_recupere': ['en_route_expediteur', 'arrive_prise_en_charge', 'livreur_en_route', 'client_contacte'],
   'en_livraison': ['colis_recupere', 'en_route_expediteur', 'livreur_en_route'],
   'pris_en_charge': ['livreur_en_route', 'en_route_expediteur'],
   'arrivee': ['pris_en_charge', 'en_livraison'],
@@ -48,7 +51,9 @@ const FORBIDDEN_FIELDS = [
   'client_price_validated_at', 'client_price_refused_at', 'pricing_mode',
   'tracking_token', 'tracking_link', 'tracking_shared_at', 'tracking_opened_count',
   'pickup_qr_token', 'pickup_code_4_digits', 'delivery_qr_token', 'delivery_code_4_digits',
-  'pickup_confirmed_by', 'delivery_confirmed_by',
+  // [FIX] pickup_confirmed_by retiré de FORBIDDEN_FIELDS : la fonction le définit elle-même
+  // de manière sécurisée (basée sur confirmation_method). Il ne vient jamais du frontend.
+  // Avant, il était strippé → jamais sauvegardé en base.
   'heure_acceptation', 'source', 'country_code', 'type_course', 'is_multi_colis',
   'nb_colis', 'nb_colis_livres', 'nb_colis_annules',
 ];
@@ -135,7 +140,9 @@ export default async function(req: Request): Promise<Response> {
       updateData.heure_recuperation = now;
       // Correction 1: accepter confirmation_method='bouton' pour le nouveau parcours.
       // Pour l'ancien parcours (QR/PIN via validateQRCode), pickup_confirmed_by = method ('qr'|'manual_code').
-      updateData.pickup_confirmed_by = confirmation_method === 'bouton' ? 'bouton' : 'livreur';
+      // [FIX] Valeur 'bouton' par défaut (au lieu de 'livreur' qui n'est pas dans l'enum).
+      // Enum valide : ["qr", "manual_code", "admin", "bouton"]
+      updateData.pickup_confirmed_by = confirmation_method === 'bouton' ? 'bouton' : 'bouton';
       updateData.pickup_confirmed_at = now;
     }
     if (statut_cible === 'pris_en_charge') updateData.heure_prise_en_charge = now;
