@@ -490,7 +490,8 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
       toast.success("Tous les colis sont recuperes");
     } catch (error) {
       console.error("Erreur recuperation multi-colis:", error);
-      toast.error("Erreur lors de la recuperation des colis");
+      const errMsg = error?.data?.error || error?.message || "Erreur lors de la recuperation des colis";
+      toast.error(errMsg);
       setOptimisticStatut(null);
     } finally {
       setMultiPickupPending(false);
@@ -1215,10 +1216,11 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                             throw new Error(res?.error || "Erreur lors de la récupération");
                           }
                         } catch (err) {
-                          setOptimisticStatut(null);
-                          toast.error(err?.message || "Erreur lors de la récupération. Réessayez.");
+                        setOptimisticStatut(null);
+                        const errMsg = err?.data?.error || err?.message || "Erreur lors de la récupération. Réessayez.";
+                        toast.error(errMsg);
                         } finally {
-                          setPickupBoutonPending(false);
+                        setPickupBoutonPending(false);
                         }
                       };
                       // GPS optionnel — ne pas bloquer la récupération si indisponible
@@ -1270,7 +1272,8 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                         toast.success("Colis récupéré avec succès !");
                       } catch (err) {
                         setOptimisticStatut(null);
-                        toast.error(err?.message || "Erreur réseau. Réessayez.");
+                        const errMsg = err?.data?.error || err?.message || "Erreur réseau. Réessayez.";
+                        toast.error(errMsg);
                       }
                     }}
                     disabled={isPending}
