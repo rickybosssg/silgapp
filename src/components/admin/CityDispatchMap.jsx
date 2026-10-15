@@ -1,66 +1,51 @@
 import React, { useMemo } from 'react';
 import { Card } from '@/components/ui/card';
 import DispatchMap from '@/components/carte/DispatchMap';
-import { Users, Bike, Package, AlertCircle, MapPin, Activity, Clock, TrendingUp } from 'lucide-react';
+import { Users, Bike, Package, AlertCircle, MapPin, Activity, TrendingUp, Clock } from 'lucide-react';
 
 /**
  * CityDispatchMap — Carte interactive Super Admin pour le dispatch par ville.
  *
- * Réutilise DispatchMap avec les livreurs et courses filtrés par ville.
- * Affiche les compteurs par ville en overlay.
+ * Les livreurs sont déjà filtrés par GPS par le parent (CityDispatchAdmin).
+ * Cette carte reçoit les données pré-filtrées et les affiche.
+ * Les compteurs sont calculés à partir des données reçues + classifications.
  */
-export default function CityDispatchMap({ livreurs = [], courses = [], country, selectedCity }) {
-  // Filtrer par ville si sélectionnée
-  const cityRegex = selectedCity ? new RegExp(selectedCity, 'i') : null;
-
-  const filteredLivreurs = useMemo(() => {
-    if (!cityRegex) return livreurs;
-    return livreurs.filter(l => l.ville && cityRegex.test(l.ville));
-  }, [livreurs, cityRegex]);
-
-  const filteredCourses = useMemo(() => {
-    if (!cityRegex) return courses;
-    return courses.filter(c => c.ville_depart && cityRegex.test(c.ville_depart));
-  }, [courses, cityRegex]);
-
+export default function CityDispatchMap({ livreurs = [], courses = [], country, selectedCity, classifications = {} }) {
   // Position initiale de la carte
   const position = useMemo(() => {
     if (country?.latitude_centre && country?.longitude_centre) {
       return { latitude: country.latitude_centre, longitude: country.longitude_centre, zoom: 11 };
     }
-    // Fallback : utiliser le premier livreur avec GPS
-    const firstWithGps = filteredLivreurs.find(l => l.latitude && l.longitude);
+    const firstWithGps = livreurs.find(l => l.latitude && l.longitude);
     if (firstWithGps) {
       return { latitude: firstWithGps.latitude, longitude: firstWithGps.longitude, zoom: 12 };
     }
-    return { latitude: 12.3714, longitude: -1.5197, zoom: 6 }; // Ouaga fallback
-  }, [country, filteredLivreurs]);
+    return { latitude: 12.3714, longitude: -1.5197, zoom: 6 };
+  }, [country, livreurs]);
 
-  // Compteurs
-  const totalLivreurs = filteredLivreurs.length;
-  const disponible = filteredLivreurs.filter(l => l.statut === 'disponible').length;
-  const enCourse = filteredLivreurs.filter(l => l.statut === 'en_course').length;
-  const horsLigne = filteredLivreurs.filter(l => l.statut === 'hors_ligne').length;
-  const gpsRecent = filteredLivreurs.filter(l => {
-    if (!l.derniere_position_date) return false;
-    return (Date.now() - new Date(l.derniere_position_date).getTime()) / 60000 < 10;
-  }).length;
-  const coursesEnAttente = filteredCourses.filter(c =>
+  // Compteurs basés sur les classifications GPS
+  const totalLivreurs = livreurs.length;
+  const located = livreurs.filter(l => classifications[l.id]?.displayStatus === 'located').length;
+  const stale = livreurs.filter(l => classifications[l.id]?.displayStatus === 'stale').length;
+  const disponible = livreurs.filter(l => l.statut === 'disponible').length;
+  const enCourse = livreurs.filter(l => l.statut === 'en_course').length;
+  const horsLigne = livreurs.filter(l => l.statut === 'hors_ligne').length;
+  const coursesEnAttente = courses.filter(c =>
     c.statut === 'recherche_livreur' && (c.dispatch_status === 'disponible_push' || c.dispatch_status === 'propose')
   ).length;
-  const coursesEnLivraison = filteredCourses.filter(c =>
+  const coursesEnLivraison = courses.filter(c =>
     ['livreur_en_route', 'en_route_expediteur', 'arrive_prise_en_charge', 'colis_recupere', 'en_livraison'].includes(c.statut)
   ).length;
 
-  // Courses avec GPS pour affichage sur la carte
-  const coursesForMap = filteredCourses.filter(c => c.gps_depart_lat && c.gps_depart_lng && !c.livreur_id);
+  const coursesForMap = courses.filter(c => c.gps_depart_lat && c.gps_depart_lng && !c.livreur_id);
 
   const miniStats = [
     { label: 'Livreurs', value: totalLivreurs, icon: Users, color: 'text-blue-600' },
+    { label: 'Localisés', value: located, icon: MapPin, color: 'text-green-600' },
+    { label: 'À actualiser', value: stale, icon: Clock, color: 'text-amber-600' },
     { label: 'Dispo', value: disponible, icon: Bike, color: 'text-green-600' },
     { label: 'Mission', value: enCourse, icon: Package, color: 'text-orange-600' },
     { label: 'Hors ligne', value: horsLigne, icon: AlertCircle, color: 'text-gray-500' },
-    { label: 'GPS<10min', value: gpsRecent, icon: MapPin, color: 'text-teal-600' },
     { label: 'En attente', value: coursesEnAttente, icon: Activity, color: 'text-red-600' },
     { label: 'En livraison', value: coursesEnLivraison, icon: TrendingUp, color: 'text-indigo-600' },
   ];
@@ -68,7 +53,7 @@ export default function CityDispatchMap({ livreurs = [], courses = [], country, 
   return (
     <div className="space-y-3">
       {/* Mini stats */}
-      <div className="grid grid-cols-4 md:grid-cols-7 gap-2">
+      <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
         {miniStats.map((s, i) => {
           const Icon = s.icon;
           return (
@@ -85,7 +70,7 @@ export default function CityDispatchMap({ livreurs = [], courses = [], country, 
       <Card className="overflow-hidden" style={{ height: '60vh', minHeight: 400 }}>
         <DispatchMap
           position={position}
-          livreurs={filteredLivreurs}
+          livreurs={livreurs}
           courses={coursesForMap}
           showClients={false}
           showPartenaires={false}
