@@ -1,0 +1,44 @@
+name: Submit existing SILGAPP iOS 1.0.61 build 68 for Apple review
+on:
+  push:
+    tags: ['ios-review-v1.0.61-b68']
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: silgapp-appstore-6782046749
+  cancel-in-progress: false
+jobs:
+  review:
+    if: github.run_attempt == 1
+    runs-on: macos-15
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Download the public receipt of the existing accepted upload
+        uses: actions/download-artifact@v4
+        with:
+          name: SILGAPP-AppStore-upload-receipt
+          run-id: 38721421848
+          repository: rickybosssg/silgapp
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/silgapp-review-upload-proof
+      - name: Verify existing Apple build and submit only version 1.0.61 for review
+        env:
+          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          APP_STORE_CONNECT_API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
+          APP_STORE_CONNECT_API_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_API_PRIVATE_KEY }}
+        run: |
+          python3 scripts/ios_appstore_review.py \
+            --upload-receipt "$RUNNER_TEMP/silgapp-review-upload-proof/ios-appstore-upload-receipt.json" \
+            --receipt "$RUNNER_TEMP/ios-appstore-review-receipt.json"
+      - name: Keep public review receipt only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: SILGAPP-AppStore-review-receipt
+          path: ${{ runner.temp }}/ios-appstore-review-receipt.json
+          if-no-files-found: ignore
+          retention-days: 3
