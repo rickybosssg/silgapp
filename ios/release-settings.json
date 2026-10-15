@@ -3,20 +3,23 @@
   "source_commit": "e7125f37dafb2632b64a2199ce61ff2a85e5e4e6",
   "bundle_id": "com.base6a0ec08f3af5e1d1284254c1.app",
   "team_id": "X7N95F8KTJ",
-  "app_store_connect_confirmed": false,
+  "app_store_connect_confirmed": true,
   "latest_app_store_version": "1.0.60",
   "latest_app_store_build": "67",
   "marketing_version": "1.0.61",
   "build_number": "68",
   "app_store_connect_evidence": {
-    "source": "owner-confirmed previous submission and statically verified IPA",
+    "source": "owner_confirmation",
     "app_store_app_id": "6782046749",
-    "screen": "Previously submitted iOS 1.0.60 build 67, Waiting for Review",
-    "scope": "last confirmed submitted build only; recheck latest before candidate signing/upload"
+    "version": "1.0.60",
+    "highest_uploaded_build": "67",
+    "review_state": "available_on_app_store",
+    "no_later_uploads_confirmed": true,
+    "scope": "Current version, maximum uploaded build and availability confirmed by owner; no independent Apple API or browser inspection."
   },
   "app_store_connect_recheck_required_before_submission": true,
   "profile_name": "SILGAPP_APPSTORE_2026_10_14",
   "profile_uuid": "90843184-68cd-4f34-a648-4f31057ee6cc",
   "certificate_sha256": "89243A26883BE151928016B722D054718B373AC13F298762CAF14296ECDC974B",
-  "candidate_status": "Published source pinned; current App Store Connect numbering and signed CI execution remain gated."
+  "candidate_status": "Reviewed for signed archive/export of 1.0.61 build 68; App Store submission requires a separate recheck."
 }
