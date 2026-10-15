@@ -43,7 +43,7 @@ const isCapacitor = () => {
     console.log('[base44Client] Check Capacitor:', !!(window.Capacitor));
     return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
   } catch(e) {
-    console.error('[base44Client] Erreur Capacitor:', e);
+    console.error('[base44Client] Erreur Capacitor:');
     return false;
   }
 };
@@ -60,8 +60,8 @@ try {
   console.log('[base44Client] Mode Capacitor:', cap);
   console.log('[base44Client] === FIN INITIALISATION ===');
 } catch (err) {
-  console.error('[base44Client] ERREUR CRITIQUE INITIALISATION:', err);
-  console.error('[base44Client] Stack:', err.stack);
+  console.error('[base44Client] ERREUR CRITIQUE INITIALISATION:');
+  console.error('[base44Client] Stack:');
   throw err;
 }
 

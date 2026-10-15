@@ -26,6 +26,7 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(SilgappPushPlugin.class);
         registerPlugin(SilgappNativePlugin.class);
+        registerPlugin(SilgappAuthSecureStorePlugin.class);
         createDefaultNotificationChannel();
         createUrgentCourseChannel();
         requestBatteryOptimizationExemption();

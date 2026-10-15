@@ -1,0 +1,94 @@
+name: iOS signed archive preparation
+on:
+  push:
+    tags: ['ios-signed-v*']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  signed-archive:
+    runs-on: macos-15
+    timeout-minutes: 45
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate reviewed version, build and latest ios source
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+          REMOTE_IOS_SHA="$(git ls-remote https://github.com/rickybosssg/silgapp.git refs/heads/ios | cut -f1)"
+          SOURCE_SHA="$(python3 -c 'import json; print(json.load(open("ios/release-settings.json"))["source_commit"])')"
+          git merge-base --is-ancestor "$SOURCE_SHA" HEAD
+          REF_ARGS=()
+          if [[ "$GITHUB_EVENT_NAME" == push ]]; then REF_ARGS=(--ref "$GITHUB_REF_NAME"); fi
+          python3 scripts/ios_release.py release --remote-head "$REMOTE_IOS_SHA" \
+            "${REF_ARGS[@]}" --github-output "$GITHUB_OUTPUT"
+      - name: Validate App Store Xcode and iOS SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -d "$DEVELOPER_DIR" || { echo '::error::Reviewed Xcode installation is unavailable'; exit 1; }
+          xcodebuild -version
+          XCODE_MAJOR="$(xcodebuild -version | awk '/^Xcode / {split($2, parts, "."); print parts[1]}')"
+          SDK_MAJOR="$(xcrun --sdk iphoneos --show-sdk-version | cut -d. -f1)"
+          test "$XCODE_MAJOR" -ge 26 && test "$SDK_MAJOR" -ge 26 || { echo '::error::App Store requires Xcode 26 and iOS SDK 26 or later'; exit 1; }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - name: Validate required configuration names
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_PASSWORD }}
+          PROFILE_BASE64: ${{ secrets.IOS_APPSTORE_PROFILE_BASE64 }}
+          FIREBASE_CONFIG_BASE64: ${{ secrets.IOS_FIREBASE_CONFIG_BASE64 }}
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in CERTIFICATE_BASE64 CERTIFICATE_PASSWORD PROFILE_BASE64 FIREBASE_CONFIG_BASE64 TEAM_ID; do
+            if [[ -z "${!name}" ]]; then echo "::error::Missing required configuration: $name"; exit 1; fi
+          done
+          test "$TEAM_ID" = '${{ steps.release.outputs.team_id }}' || { echo '::error::Wrong signing team'; exit 1; }
+      - name: Restore existing Firebase iOS configuration
+        env:
+          FIREBASE_CONFIG_BASE64: ${{ secrets.IOS_FIREBASE_CONFIG_BASE64 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          printf '%s' "$FIREBASE_CONFIG_BASE64" | base64 --decode > ios/App/App/GoogleService-Info.plist
+          python3 scripts/ios_release.py firebase --path ios/App/App/GoogleService-Info.plist
+      - name: Install and build web app
+        run: |
+          npm ci
+          npm run build
+          npx cap sync ios
+      - name: Install CocoaPods
+        working-directory: ios/App
+        run: pod install --repo-update
+      - name: Archive and export reviewed App Store IPA
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_PASSWORD }}
+          PROFILE_BASE64: ${{ secrets.IOS_APPSTORE_PROFILE_BASE64 }}
+          IOS_RELEASE_VERSION: ${{ steps.release.outputs.version }}
+          IOS_RELEASE_BUILD: ${{ steps.release.outputs.build }}
+          APP_BUNDLE_ID: ${{ steps.release.outputs.bundle_id }}
+          TEAM_ID: ${{ steps.release.outputs.team_id }}
+        run: bash scripts/ios_archive.sh
+      - name: Keep only the signed IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SILGAPP-signed-ipa
+          path: ${{ runner.temp }}/ios-export/*.ipa
+          if-no-files-found: error
+          retention-days: 3
+      - name: Remove restored local configuration
+        if: always()
+        run: rm -f ios/App/App/GoogleService-Info.plist

@@ -38,8 +38,9 @@ const TYPE_LABELS = {
  *
  * @param {string|null} userEmail - Email de l'utilisateur connecté
  * @param {function} [onNotification] - Callback optionnel lors d'une nouvelle notif
+ * @param {string|null} [clientId] - Profil client du compte courant
  */
-export function useClientNotifications(userEmail, onNotification) {
+export function useClientNotifications(userEmail, onNotification, clientId = null) {
   const subscribedRef = useRef(false);
 
   useEffect(() => {
@@ -51,6 +52,7 @@ export function useClientNotifications(userEmail, onNotification) {
       email: userEmail,
       user_email: userEmail,
       user_type: "client",
+      client_id: clientId || "",
     }).catch(() => null);
 
     // S'abonner aux notifications temps réel
@@ -83,5 +85,5 @@ export function useClientNotifications(userEmail, onNotification) {
       subscribedRef.current = false;
       unsub?.();
     };
-  }, [userEmail]);
+  }, [userEmail, clientId]);
 }

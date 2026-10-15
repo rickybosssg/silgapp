@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
+import { verifyCityCompatibility } from '../../shared/cityDispatchFilter.ts';
 
 const FCM_SCOPE = 'https://www.googleapis.com/auth/firebase.messaging';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
@@ -203,6 +204,7 @@ async function assertNotificationCountry(base44, { course_id, livreur_id, client
     targets.push(...partnerMatches);
   }
 
+
   for (const target of targets) {
     const targetCountry = normalizeCountryCode(target.entity?.country_code);
     if (!targetCountry || targetCountry !== courseCountry) {
@@ -211,6 +213,16 @@ async function assertNotificationCountry(base44, { course_id, livreur_id, client
         status: 403,
         payload: countryMismatchPayload(course, target.entity, target.context),
       };
+    }
+  }
+
+  if (String(type || '') === 'nouvelle_course') {
+    for (const target of targets.filter(target => ['livreur_id', 'destinataire_email_livreur'].includes(target.context))) {
+      const tenant = (value: unknown) => value == null || String(value).trim() === '' ? null : String(value).trim();
+      if (tenant(target.entity.enterprise_id) !== tenant(course.enterprise_id)) return { ok: false, status: 403, payload: { success: false, blocked_reason: 'enterprise_mismatch' } };
+      if (!(await verifyCityCompatibility(base44, course, target.entity)).compatible) {
+        return { ok: false, status: 409, payload: { success: false, blocked_reason: 'city_gps_ineligible' } };
+      }
     }
   }
 

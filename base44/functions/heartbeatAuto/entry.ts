@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
+import { currentGpsFix, currentDriverGpsCity, gpsFixTime } from '../../shared/currentGpsCity.js';
 
 /**
  * Heartbeat automatique - appelé toutes les 30s par les apps
@@ -116,16 +117,45 @@ Deno.serve(async (req) => {
           app_active: app_active,
           background_active: background_active,
         };
+        const receivedGps = latitude !== undefined || longitude !== undefined || gps_timestamp !== undefined;
+        if (receivedGps && !hasGps) {
+          updateData.gps_fix_valid = false;
+          updateData.gps_fix_date = null;
+          updateData.gps_operational_city = null;
+        }
 
         // 📍 Ne mettre à jour le GPS que si des coordonnées valides sont reçues.
         // Cela garantit que derniere_position_date reflète le VRAI moment de réception GPS,
         // et non un heartbeat sans coordonnées (app en arrière-plan sans GPS).
         if (hasGps) {
-          updateData.latitude = latitude;
-          updateData.longitude = longitude;
+          updateData.latitude = latNum;
+          updateData.longitude = lngNum;
           updateData.derniere_position_date = now;
-          if (accuracy !== undefined && accuracy !== null) {
+          if (accuracy !== undefined && accuracy !== null && Number.isFinite(Number(accuracy))) {
             updateData.gps_accuracy = Number(accuracy);
+          }
+
+          // Keep acquisition time distinct from heartbeat receipt time. A bad
+          // new fix invalidates city eligibility rather than reusing old proof.
+          const currentFixDriver = { ...livreur, latitude: latNum, longitude: lngNum,
+            gps_accuracy: accuracy == null ? undefined : Number(accuracy),
+            gps_fix_date: gps_timestamp, gps_fix_valid: true };
+          const currentFix = currentGpsFix(currentFixDriver);
+          updateData.gps_fix_valid = Boolean(currentFix);
+          updateData.gps_fix_date = currentFix ? new Date(currentFix.time).toISOString() : null;
+          updateData.gps_operational_city = null;
+          if (currentFix) {
+            try {
+              const { loadOperationalCities } = await import('../../shared/operationalZones.ts');
+              const { loadQuartiersForCountry } = await import('../../shared/cityResolution.ts');
+              const cities = await loadOperationalCities(base44, livreur.country_code);
+              if (cities.some((city: any) => city.actif === true)) {
+                updateData.gps_operational_city = currentDriverGpsCity(currentFixDriver, cities,
+                  await loadQuartiersForCountry(base44, livreur.country_code));
+              }
+            } catch (error: any) {
+              console.error('[heartbeatAuto] GPS city unavailable:', error?.message || String(error));
+            }
           }
 
           // [OPERATIONAL ZONES] Détection automatique de la zone opérationnelle du livreur.
@@ -140,7 +170,7 @@ Deno.serve(async (req) => {
             const { isCityDispatchEnabled } = await import('../../shared/cityResolution.ts');
             const { shouldUpdateDriverOperationalCity } = await import('../../shared/operationalZones.ts');
             const cityEnabled = await isCityDispatchEnabled(base44, livreur.country_code);
-            const fixTime = typeof gps_timestamp === 'number' ? gps_timestamp : Date.parse(gps_timestamp || '');
+            const fixTime = gpsFixTime(gps_timestamp);
             const fixAge = Date.now() - fixTime;
             // Only a timestamped fix can change the operational city. Old APKs keep their stored city.
             if (cityEnabled && Number.isFinite(fixAge) && fixAge >= 0 && fixAge <= 120000) {

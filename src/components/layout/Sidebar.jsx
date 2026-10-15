@@ -1,6 +1,7 @@
+import { silgappLogo } from "@/lib/iosBranding";
 import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { clearPersistedToken } from "@/lib/authPersistence";
+import { logoutPersistent } from "@/lib/authPersistence";
 import { 
   LayoutDashboard, MapPin, Plus, Truck, BarChart3, Bell,
   Package, TrendingUp, ChevronLeft, ChevronRight, LogOut, Wallet, Shield, Globe, Settings, MessageCircle, Users, Megaphone, ChevronDown, Check, UserCheck, ShieldAlert, Store, UtensilsCrossed, Pill, PieChart, Sparkles, Brain, FlaskConical, Cpu, Crown, Zap, Coins, Radio, Trophy, Activity, Ticket, Building2, Rocket
@@ -12,11 +13,12 @@ import { useQuery } from "@tanstack/react-query";
 import { useAdminContext } from "@/hooks/useAdminContext.js";
 import { usePaysActifs } from "@/components/international/CountrySelector.jsx";
 
-const doLogout = () => {
+const doLogout = async () => {
   ['base44_access_token', 'access_token', 'base44_token', 'token'].forEach(k => {
     try { localStorage.removeItem(k); } catch(_) {}
   });
-  { clearPersistedToken(); base44.auth.logout(); };
+  try { await logoutPersistent(); }
+  catch { window.alert("La déconnexion n’a pas pu être enregistrée. Réessayez."); return; }
   setTimeout(() => window.location.reload(), 300);
 };
 
@@ -126,7 +128,7 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, part
       )}>
         <div className="w-9 h-9 rounded-xl bg-sidebar-primary flex items-center justify-center silgapp-relief flex-shrink-0">
           <img 
-            src="https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/962cfba1f_IMG-20260819-WA0003.jpg"
+            src={silgappLogo("https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/962cfba1f_IMG-20260819-WA0003.jpg")}
             alt="SILGAPP"
             className="w-full h-full rounded-xl object-cover"
           />

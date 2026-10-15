@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { clearPersistedToken } from "@/lib/authPersistence";
+import { logoutPersistent } from "@/lib/authPersistence";
 import { Truck } from "lucide-react";
 import { toast } from "sonner";
 import { registerPushToken, subscribeToNotifications } from "@/lib/notifications";
@@ -373,7 +373,7 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
     }).catch(err => toast.error("Erreur : " + err.message));
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     // Marquer inactif avant déconnexion
     if (livreurProfil?.id) {
       saveLivreur(livreurProfil.id, { app_active: false }).catch(() => null);
@@ -381,7 +381,8 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
     ['base44_access_token', 'access_token', 'base44_token', 'token'].forEach(k => {
       try { localStorage.removeItem(k); } catch(_) {}
     });
-    { clearPersistedToken(); base44.auth.logout(); };
+    try { await logoutPersistent(); }
+    catch { toast.error("La déconnexion n’a pas pu être enregistrée. Réessayez."); return; }
     setTimeout(() => window.location.reload(), 300);
   };
 

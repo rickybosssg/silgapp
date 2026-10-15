@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { motion } from "framer-motion";
 import { base44 } from "@/api/base44Client";
-import { clearPersistedToken } from "@/lib/authPersistence";
+import { createScopedRefreshQueue } from "@/lib/scopedRefreshQueue";
+import { logoutPersistent } from "@/lib/authPersistence";
 import { useNavigate } from "react-router-dom";
 import { extractLocalPhone } from "@/lib/phoneUtils";
 import { Button } from "@/components/ui/button";
@@ -10,7 +11,7 @@ import { useHeartbeat } from "@/hooks/useHeartbeat";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { useDispatchConfig } from "@/hooks/useDispatchConfig";
 import { useClientNotifications } from "@/hooks/useClientNotifications";
-import { registerPushToken, consumePendingNotificationData } from "@/lib/notifications";
+import { registerPushToken, consumePendingNotificationData, subscribeToNotificationOpened } from "@/lib/notifications";
 import { usePushTokenRetry } from "@/hooks/usePushTokenRetry";
 import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
@@ -127,6 +128,16 @@ export default function ClientExterneApp() {
   useEffect(() => { positionRef.current = position; }, [position]);
   const checkStatusRef = useRef(null);
   useEffect(() => { checkStatusRef.current = checkStatus; });
+  const statusRefreshRef = useRef(null);
+  if (!statusRefreshRef.current) statusRefreshRef.current = createScopedRefreshQueue();
+  const statusScope = JSON.stringify([userId, clientProfil?.id, clientProfil?.user_email,
+    clientProfil?.country_code, clientProfil?.enterprise_id || null]);
+  statusRefreshRef.current.setScope(statusScope);
+  useEffect(() => {
+    const queue = statusRefreshRef.current;
+    queue.setScope(statusScope);
+    return () => queue.cancelScope(statusScope);
+  }, [statusScope]);
   const canShowCodePromo = aUnCodePromo && !!(clientProfil?.user_email || clientProfil?.email);
 
   // ── Configuration dynamique depuis le backend (Country + AppConfig) ──
@@ -334,7 +345,7 @@ export default function ClientExterneApp() {
     if (notif.course_id && clientProfil && position) {
       checkStatus(position, clientProfil);
     }
-  });
+  }, clientProfil?.id);
 
   // Heartbeat automatique — sync toutes les 30s + événements lifecycle
   // Activé dès que le profil est chargé (même sans GPS pour anciens utilisateurs)
@@ -447,11 +458,11 @@ export default function ClientExterneApp() {
         }
       }
     };
-    window.addEventListener("silgapp:notification-opened", handleNotificationOpened);
+    const unsubscribeOpened = subscribeToNotificationOpened(handleNotificationOpened, clientProfil?.user_email);
     // Cold start : vérifier si l'app a été ouverte depuis une notification
     consumePendingNotificationData();
-    return () => window.removeEventListener("silgapp:notification-opened", handleNotificationOpened);
-  }, [navigate]);
+    return unsubscribeOpened;
+  }, [navigate, clientProfil?.user_email]);
 
   useEffect(() => {
     loadProfil();
@@ -640,10 +651,10 @@ export default function ClientExterneApp() {
   useEffect(() => {
     if (!onboardingDone || !clientProfil || !userId) return;
     const interval = setInterval(() => {
-      checkStatus(position, clientProfil);
+      checkStatusRef.current?.(positionRef.current, clientProfilRef.current);
     }, 8000); //  5s → 8s : checkStatus fait 4-5 requêtes imbriquées
     return () => clearInterval(interval);
-  }, [onboardingDone, clientProfil?.id, position, userId]);
+  }, [onboardingDone, clientProfil?.id, userId]);
 
   // Charger dès que l'identité est prête, sans attendre le GPS ni le prochain tick.
   useEffect(() => {
@@ -663,7 +674,7 @@ export default function ClientExterneApp() {
     };
     document.addEventListener('visibilitychange', refresh);
     return () => document.removeEventListener('visibilitychange', refresh);
-  }, [userId, clientProfil?.id, queryClient]);
+  }, [userId, clientProfil?.id, statusScope, queryClient]);
 
   // ── Subscription WebSocket temps réel — met à jour les courses instantanément ──
   // Complète le polling 8s : si un livreur accepte/annule, le client le voit immédiatement
@@ -818,10 +829,10 @@ export default function ClientExterneApp() {
     checkStatus(gps, profil);
   };
 
-  const checkStatus = async (pos, profil) => {
+  const checkStatus = (pos, profil) => statusRefreshRef.current.run(statusScope, async (isCurrent) => {
     try {
       const currentUserId = userIdRef.current;
-      if (!currentUserId) return;
+      if (!currentUserId || !profil?.id || !isCurrent()) return;
 
       // La création service-role rattache la course par client_user_email.
       // Garder created_by_id pour les anciennes courses créées directement.
@@ -829,12 +840,14 @@ export default function ClientExterneApp() {
         $or: [{ client_user_email: profil.user_email }, { created_by_id: currentUserId }],
         statut: { $in: STATUTS_SUIVABLES_CLIENT },
       }, "-created_date", 100);
+      if (!isCurrent()) return;
       const actives = (coursesClient || []).filter(c => STATUTS_SUIVABLES_CLIENT.includes(c.statut));
 
       // 2. Courses où l'utilisateur est destinataire
       let activesDestinataire = [];
       if (profil?.id) {
         const coursesDestinataire = await base44.entities.CourseExterne.filter({ destinataire_client_id: profil.id, statut: { $in: STATUTS_SUIVABLES_CLIENT } }, "-created_date", 100);
+        if (!isCurrent()) return;
         activesDestinataire = (coursesDestinataire || []).filter(c =>
           STATUTS_SUIVABLES_CLIENT.includes(c.statut) &&
           c.created_by_id !== currentUserId
@@ -845,6 +858,7 @@ export default function ClientExterneApp() {
       let activesExpediteur = [];
       if (profil?.id) {
         const coursesExpediteur = await base44.entities.CourseExterne.filter({ expediteur_client_id: profil.id, statut: { $in: STATUTS_SUIVABLES_CLIENT } }, "-created_date", 100);
+        if (!isCurrent()) return;
         activesExpediteur = (coursesExpediteur || []).filter(c =>
           STATUTS_SUIVABLES_CLIENT.includes(c.statut) &&
           c.created_by_id !== currentUserId && // ne pas dupliquer
@@ -867,6 +881,7 @@ export default function ClientExterneApp() {
         const livreursData = await Promise.all(
           livreurIds.map(id => base44.entities.Livreur.filter({ id }).then(r => r?.[0]).catch(() => null))
         );
+        if (!isCurrent()) return;
         const livreurMap = {};
         livreursData.forEach(l => { if (l) livreurMap[l.id] = l; });
         coursesEnrichies = toutes.map(c => {
@@ -885,9 +900,10 @@ export default function ClientExterneApp() {
       setCoursesActives(coursesEnrichies);
 
       // Nettoyer les notifications obsolètes (courses supprimées ou terminées)
-      const currentUserEmail = clientProfil?.user_email;
+      const currentUserEmail = profil.user_email;
       if (!currentUserEmail) return;
       const userNotifications = await base44.entities.Notification.filter({ destinataire_email: currentUserEmail, lue: false });
+      if (!isCurrent()) return;
       if (userNotifications && userNotifications.length > 0) {
         const validCourseIds = new Map(toutes.map(c => [c.id, true]));
         const notificationsValides = userNotifications.filter(n =>
@@ -908,6 +924,7 @@ export default function ClientExterneApp() {
           // Vérifier que la course est bien annulée par timeout (pas manuellement)
           try {
             const coursesAnnulees = await base44.entities.CourseExterne.filter({ id: notifAnnulee.course_id });
+            if (!isCurrent()) return;
             const c = coursesAnnulees?.[0];
             if (c && c.statut === 'annulee' && c.dispatch_status === 'expire') {
               setCourseAnnuleeRelance(c);
@@ -933,7 +950,7 @@ export default function ClientExterneApp() {
     } catch (err) {
       console.error("Erreur vérification statut:", err);
     }
-  };
+  });
 
   const loadLivreursProches = async (pos) => {
     try {
@@ -962,24 +979,25 @@ export default function ClientExterneApp() {
     }
   };
 
-  // ── Polling 30s : rafraîchissement léger du compteur livreurs ──
+  // Compteur : délai initial 5s, puis 120s, indépendamment des fixes GPS.
   // Le badge affiche "Temps réel" — le compteur doit refléter l'état actuel.
   // Réutilise loadLivreursProches avec la dernière position connue.
   // Anti-flash : loadLivreursProches conserve déjà la dernière valeur en cas d'erreur.
   const lastPosRef = useRef(null);
   if (position) lastPosRef.current = position;
+  const hasCounterPosition = !!position;
 
   useEffect(() => {
-    if (!clientProfil?.country_code) return;
+    if (!clientProfil?.country_code || !hasCounterPosition) return;
     const pollLivreurs = () => {
-      const pos = lastPosRef.current || position;
+      const pos = lastPosRef.current;
       if (pos) loadLivreursProches(pos);
     };
     // Premier appel après 5s (laisser le temps à l'écran de se stabiliser)
     const initial = setTimeout(pollLivreurs, 5000);
     const interval = setInterval(pollLivreurs, 120000);
     return () => { clearTimeout(initial); clearInterval(interval); };
-  }, [clientProfil?.country_code, position]);
+  }, [clientProfil?.country_code, hasCounterPosition]);
 
   // ── Session expirée ───────────────────────────────────────────────────────
   if (sessionExpired) {
@@ -996,10 +1014,11 @@ export default function ClientExterneApp() {
             </p>
           </div>
           <button
-            onClick={() => {
+            onClick={async () => {
               if (!window.confirm("Voulez-vous vraiment vous déconnecter ?")) return;
               try { localStorage.removeItem("silgapp_client_session_id"); } catch {}
-              { clearPersistedToken(); base44.auth.logout(); };
+              try { await logoutPersistent(); }
+              catch { toast.error("La déconnexion n’a pas pu être enregistrée. Réessayez."); return; }
               setTimeout(() => window.location.reload(), 300);
             }}
             className="inline-flex items-center justify-center w-full h-12 rounded-2xl bg-[#00a86b] hover:bg-[#00c47a] text-white font-bold text-sm transition-colors"

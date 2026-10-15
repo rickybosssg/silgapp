@@ -1,3 +1,4 @@
+import { buildPromoShareMessage } from "@/lib/promoShareMessage";
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
@@ -48,9 +49,7 @@ export default function OngletCodePromoPartenaire({ partenaireId }) {
   };
 
   const partagerWhatsApp = () => {
-    const msg = encodeURIComponent(
-      `Utilise mon code promo *${monCode.code}* sur SILGAPP et bénéficie de *100 FCFA de réduction* sur ta première course !\n\nTélécharge SILGAPP et inscris-toi maintenant.`
-    );
+    const msg = encodeURIComponent(buildPromoShareMessage({ code: monCode.code }));
     const a = document.createElement("a");
     a.href = `whatsapp://send?text=${msg}`;
     a.click();

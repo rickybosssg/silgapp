@@ -153,3 +153,19 @@ product decision that supersedes an older behavior.
   excludes the User schema: preserve additional_user_data_schema as User as well.
   Snapshot and compare all schemas, re-read every preserved definition, and stop
   on any unexpected deletion. Prefer a verified targeted schema API when available.
+# SILGAPP OFFICIEL: release continuation, 2026-10-15
+
+- Reconcile against the verified installed artifact and its source manifest, not
+  a stale chat summary. The 139 reference is the grouped signed 1.0.132 APK.
+- Preserve concurrent checkouts. This continuation uses a separate local checkout;
+  source dirty files must be backed up and hash-compared before reconciliation.
+- Native Google/Apple remain disabled for this delivery. Keep email/password and
+  preparatory code. No native bearer URL, sensitive SDK-error logging, or claim of
+  working provider login/secure session exchange without device/server evidence.
+- Do not convert a server two-parcel initial-claim contract into a new product
+  limit or hide larger missions. Preserve accepted on-route multi-delivery work;
+  report incompatible server contracts before changing acceptance rules.
+- Simulated refresh savings do not prove the seven-minute production incident is
+  resolved. No production course, notification, deployment, or activation is
+  implied by local build authorization. Recheck Apple submission state and version
+  before signing/upload; a candidate number is not a verified available number.

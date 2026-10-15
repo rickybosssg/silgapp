@@ -1,0 +1,46 @@
+name: Upload verified SILGAPP iOS r2 to App Store Connect
+on:
+  push:
+    tags: ['ios-upload-v1.0.60-b67-r2']
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: silgapp-appstore-6782046749-1.0.60-67
+  cancel-in-progress: false
+jobs:
+  upload:
+    if: github.run_attempt == 1
+    runs-on: macos-15
+    timeout-minutes: 20
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Download only the verified r2 IPA
+        uses: actions/download-artifact@v4
+        with:
+          name: SILGAPP-signed-ipa
+          run-id: 38528393904
+          repository: rickybosssg/silgapp
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/silgapp-upload-r2
+      - name: Upload exact r2 once and check Apple processing
+        env:
+          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          APP_STORE_CONNECT_API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
+          APP_STORE_CONNECT_API_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_API_PRIVATE_KEY }}
+        run: |
+          python3 scripts/ios_appstore_upload.py \
+            --ipa "$RUNNER_TEMP/silgapp-upload-r2/App.ipa" \
+            --receipt "$RUNNER_TEMP/ios-appstore-upload-receipt.json"
+      - name: Keep public upload receipt only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: SILGAPP-AppStore-upload-receipt
+          path: ${{ runner.temp }}/ios-appstore-upload-receipt.json
+          if-no-files-found: ignore
+          retention-days: 3

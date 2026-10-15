@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { clearPersistedToken } from "@/lib/authPersistence";
+import { logoutPersistent } from "@/lib/authPersistence";
 import { toast } from "sonner";
 import { User, Save, X, Check, Trash2, LogOut } from "lucide-react";
 import ClientCountrySelect from "@/components/client/ClientCountrySelect";
@@ -77,10 +77,10 @@ export default function ProfilModal({ clientProfil, onClose, onSave }) {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     if (!window.confirm("Voulez-vous vraiment vous déconnecter ?")) return;
-    clearPersistedToken();
-    base44.auth.logout();
+    try { await logoutPersistent(); }
+    catch { toast.error("La déconnexion n’a pas pu être enregistrée. Réessayez."); }
   };
 
   const telValide = telAffiche.replace(/\D/g, "").length === countryInfo.len;
@@ -212,7 +212,7 @@ export default function ProfilModal({ clientProfil, onClose, onSave }) {
                   try {
                     await base44.entities.ClientExterne.update(clientProfil.id, { actif: false });
                     toast.success("Compte désactivé. Contactez le support pour toute question.");
-                    { clearPersistedToken(); base44.auth.logout(); };
+                    await logoutPersistent();
                   } catch {
                     toast.error("Erreur lors de la suppression");
                     setDeleting(false);

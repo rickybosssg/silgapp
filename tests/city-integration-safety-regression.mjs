@@ -1,9 +1,11 @@
+import { selectAvailableCourseOffers } from '../src/lib/availableCourseOffers.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 import { cityNamePattern, normalizeCityName, cityNamesPattern, operationalCityAliases, resolveOperationalName, canSeeOperationalCourse } from '../base44/shared/cityNames.js';
 import { invalidateCityFlagCache, invalidateQuartierCache, resolveCityFromGPS, shouldUpdateDriverCity, getDriverOperationalCity } from '../base44/shared/cityResolution.ts';
 import { verifyCityCompatibility } from '../base44/shared/cityDispatchFilter.ts';
+import { currentDriverGpsCity, gpsFixTime, CITY_GPS_MAX_AGE_MS } from '../base44/shared/currentGpsCity.js';
 import { acceptEcoMission, createOnRouteProposal } from '../base44/shared/ecoOptimizationEngine.ts';
 
 const cityPattern = new RegExp(cityNamePattern('Bobo-Dioulasso'), 'i');
@@ -16,6 +18,7 @@ assert.equal(normalizeCityName('  ÉTÉ  '), 'ete');
 import { invalidateOperationalCityCache } from '../base44/shared/operationalZones.ts';
 let flag = false, writes = 0;
 const driver = { id: 'd', user_email: 'driver@example.test', country_code: 'BF', ville: 'Ouagadougou',
+  latitude: 12.37, longitude: -1.52, gps_fix_valid: true, gps_fix_date: new Date().toISOString(), gps_accuracy: 20,
   type_livreur: 'externe', validation: 'valide', actif: true, statut: 'disponible', enterprise_id: null };
 const mission = { id: 'm', country_code: 'BF', enterprise_id: null, status: 'available', course_ids: ['a', 'b'] };
 const courses = ['a', 'b'].map((id, i) => ({ id, country_code: 'BF', enterprise_id: null, ville_depart: i ? 'Bobo-Dioulasso' : 'Ouagadougou',
@@ -66,17 +69,17 @@ for (const enabled of [false, true]) {
     EcoMission: { filter: async () => [mission] },
   } };
   const compiledHook = ts.transpile(hook.replace(/^import .*;\r?\n/gm, '').replace('export function', 'function'), { target: ts.ScriptTarget.ES2022 });
-  const useFeed = new Function('useEffect', 'useMemo', 'useState', 'useQuery', 'useQueryClient', 'base44', 'cityNamesPattern', 'operationalCityAliases', 'resolveOperationalName', 'canSeeOperationalCourse', `${compiledHook};return useCoursesDisponibles;`)(
+  const useFeed = new Function('useEffect', 'useMemo', 'useState', 'useQuery', 'useQueryClient', 'base44', 'cityNamesPattern', 'operationalCityAliases', 'resolveOperationalName', 'canSeeOperationalCourse', 'currentDriverGpsCity', 'gpsFixTime', 'CITY_GPS_MAX_AGE_MS', 'selectAvailableCourseOffers', `${compiledHook};return useCoursesDisponibles;`)(
     () => {}, fn => fn(), initial => [typeof initial === 'function' ? initial() : initial, () => {}],
-    query => { queries.set(query.queryKey[0], query); return query.queryKey[0] === 'operational-zone-policy' ? { data: { cities: [{ nom: 'ouagadougou', actif: enabled }, { nom: 'bobo-dioulasso', actif: enabled }], quartiers: [] } } : {}; },
-    () => ({}), uiSdk, cityNamesPattern, operationalCityAliases, resolveOperationalName, canSeeOperationalCourse);
+    query => { queries.set(query.queryKey[0], query); return query.queryKey[0] === 'operational-zone-policy' ? { data: { cities: [{ nom: 'ouagadougou', actif: enabled }, { nom: 'bobo-dioulasso', actif: enabled }], quartiers: [{ ville: 'Ouagadougou', latitude: 12.37, longitude: -1.52 }] } } : query.queryKey[0] === 'driver-current-gps' ? { data: driver } : {}; },
+    () => ({}), uiSdk, cityNamesPattern, operationalCityAliases, resolveOperationalName, canSeeOperationalCourse, currentDriverGpsCity, gpsFixTime, CITY_GPS_MAX_AGE_MS, selectAvailableCourseOffers);
   useFeed(driver);
   await queries.get('courses-externes-disponibles').queryFn();
   assert.equal(Boolean(reads[0].ville_depart), enabled);
   assert.equal(Boolean(reads[1].ville_depart), enabled, 'isolated Eco uses the same city filter');
   const visible = await queries.get('eco-missions-disponibles').queryFn();
   assert.equal(visible.length, enabled ? 0 : 1, 'mixed-city mission hidden only ON; Eco-only preserved OFF');
-  assert.equal(reads.some(r => r.id), enabled, 'OFF adds no mission-course lookups');
+  assert.equal(reads.some(r => r.id), true, 'membership validation rereads ids ON and OFF without adding geographic filtering OFF');
 }
 const setter = readFileSync('base44/functions/setCityDispatchConfig/entry.ts', 'utf8');
 const executable = ts.transpile(setter.replace(/^import .*;\r?\n/gm, ''), { target: ts.ScriptTarget.ES2022 });

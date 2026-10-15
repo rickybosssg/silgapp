@@ -7,6 +7,7 @@ import { startUrgentCourseAlert, stopUrgentCourseAlert } from "@/lib/livreurUrge
 import { getPrixAffichable } from "@/utils/getPrixAffichable";
 import { useCoursesDisponibles } from "@/hooks/useCoursesDisponibles";
 import EcoMissionCard from "@/components/livreur/EcoMissionCard";
+import { isEcoDeliveryCourse } from "@/lib/availableCourseOffers";
 // Correction 2: AcceptConfirmationModal supprimé — acceptation en un seul clic
 
 function calculerDistance(lat1, lng1, lat2, lng2) {
@@ -52,12 +53,11 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
   const vueInFlightRef = useRef(new Set());
 
   const livreurId = livreurProfil?.id;
-  const countryCode = livreurProfil?.country_code;
   const livreurLat = livreurProfil?.latitude;
   const livreurLng = livreurProfil?.longitude;
 
   // ── Source unique de vérité : hook partagé avec ActiviteTempsReel ──
-  const { eligibleCourses, courses, isLoading, isError, isV2Enabled, livreurDisponible, livreurPeutVoirFil, raisonBlocage, refusedCourseIds, setRefusedIds, ecoMissions = [] } = useCoursesDisponibles(livreurProfil);
+  const { eligibleCourses, courses, availableOffersCount, isLoading, isError, isV2Enabled, livreurDisponible, livreurPeutVoirFil, raisonBlocage, refusedCourseIds, setRefusedIds, ecoMissions = [] } = useCoursesDisponibles(livreurProfil);
 
   // ── Tracking vue_at — DÉDUPLICATION LOCALE (Option C) ──
   // Un seul appel marquer_vue_course par course et par session composant.
@@ -95,16 +95,7 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
     }
   }, [courses, livreurId]);
 
-  // Realtime subscription — mise à jour instantanée
-  useEffect(() => {
-    if (!livreurId) return;
-    const unsubscribe = base44.entities.CourseExterne.subscribe((event) => {
-      if (event.type === "create" || event.type === "update" || event.type === "delete") {
-        queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles", livreurId, countryCode] });
-      }
-    });
-    return unsubscribe;
-  }, [livreurId, countryCode, queryClient]);
+  // Realtime invalidation is shared by the feed hook's mounted observers.
 
   // ── eligibleCourses provient du hook useCoursesDisponibles (source unique) ──
 
@@ -271,7 +262,7 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
           <h2 className="mt-0.5 text-lg font-bold text-foreground">Courses disponibles</h2>
         </div>
         <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-full bg-foreground px-2 text-xs font-bold text-white">
-          {coursesWithDistance.length + ecoMissions.length}
+          {availableOffersCount}
         </span>
       </div>
 
@@ -280,6 +271,7 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
         <EcoMissionCard
           key={mission.id}
           mission={mission}
+          availableCourses={mission.__available_courses}
           livreurProfil={livreurProfil}
           onAcceptSuccess={onAcceptSuccess}
           canAccept={livreurDisponible}
@@ -288,6 +280,7 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
       ))}
 
       {coursesWithDistance.map(course => {
+        const isEco = isEcoDeliveryCourse(course);
         const isEcoIsolated =
           course.delivery_mode === "eco" &&
           course.eco_status === "isolated" &&
@@ -303,7 +296,7 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-[11px] font-bold uppercase text-slate-400">
-                    {isEcoIsolated ? "Course Eco" : "Course Standard"}
+                    {isEco ? "Course Eco" : "Course Standard"}
                   </span>
                   {isEcoIsolated && (
                     <span className="rounded-full bg-green-50 px-2 py-1 text-[10px] font-bold text-green-700">
@@ -378,10 +371,10 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
           </div>
 
           <div className="grid grid-cols-[1fr_52px] gap-2.5 border-t border-slate-100 bg-muted p-3">
-            {isEcoIsolated ? (
+            {isEco ? (
               <div className="h-12 rounded-lg bg-green-50 text-xs font-bold text-green-700 flex items-center justify-center gap-1.5 px-2 text-center">
                 <Lock className="h-3.5 w-3.5 shrink-0" />
-                <span className="leading-tight">Course Eco en attente de regroupement</span>
+                <span className="leading-tight">{isEcoIsolated ? "Course Eco en attente de regroupement" : "Course Eco à accepter avec sa mission"}</span>
               </div>
             ) : raisonBlocage ? (
               <div className="h-12 rounded-lg bg-slate-100 text-xs font-medium text-slate-500 flex items-center justify-center gap-1.5 px-2 text-center">

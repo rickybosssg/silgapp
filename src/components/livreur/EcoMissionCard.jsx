@@ -21,11 +21,11 @@ import { parseRoutePlan, prixCourseEco, totalPriceEco, totalDistanceKm } from "@
  *
  * L'acceptation est atomique : le backend verrouille la mission et les deux courses.
  */
-export default function EcoMissionCard({ mission, livreurProfil, onAcceptSuccess, canAccept = false, blockedReason }) {
+export default function EcoMissionCard({ mission, availableCourses, livreurProfil, onAcceptSuccess, canAccept = false, blockedReason }) {
   const queryClient = useQueryClient();
   const [accepting, setAccepting] = useState(false);
 
-  const { data: courses = [], isLoading } = useQuery({
+  const { data: fetchedCourses = [], isLoading: fetchingCourses } = useQuery({
     queryKey: ["eco-mission-courses", mission?.id],
     queryFn: async () => {
       if (!mission?.course_ids?.length) return [];
@@ -34,9 +34,12 @@ export default function EcoMissionCard({ mission, livreurProfil, onAcceptSuccess
       );
       return results.filter(Boolean);
     },
-    enabled: !!mission?.id,
+    enabled: !!mission?.id && !Array.isArray(availableCourses),
     staleTime: 10000,
   });
+
+  const courses = Array.isArray(availableCourses) ? availableCourses : fetchedCourses;
+  const isLoading = !Array.isArray(availableCourses) && fetchingCourses;
 
   const routePlan = useMemo(() => parseRoutePlan(mission), [mission]);
   const devise = courses[0]?.devise || "FCFA";

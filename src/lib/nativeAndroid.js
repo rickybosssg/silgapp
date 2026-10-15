@@ -22,16 +22,17 @@ function nativeSource() {
 function normalizePosition(position) {
   if (!position) return null;
   const coords = position.coords || position;
+  if (coords.latitude == null || coords.latitude === '' || coords.longitude == null || coords.longitude === '') return null;
   const latitude = Number(coords.latitude);
   const longitude = Number(coords.longitude);
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
   return {
     latitude,
     longitude,
-    accuracy: Number(coords.accuracy || 0),
+    accuracy: coords.accuracy == null || !Number.isFinite(Number(coords.accuracy)) ? null : Number(coords.accuracy),
     speed: Number(coords.speed || 0),
     heading: Number(coords.heading || 0),
-    timestamp: position.timestamp || Date.now(),
+    timestamp: position.timestamp ?? position.time ?? null,
     source: nativeSource(),
   };
 }
@@ -203,13 +204,13 @@ export function installNativeGeolocationShim() {
     coords: {
       latitude: position.latitude,
       longitude: position.longitude,
-      accuracy: position.accuracy || 0,
+      accuracy: position.accuracy ?? null,
       altitude: null,
       altitudeAccuracy: null,
       heading: position.heading || null,
       speed: position.speed || null,
     },
-    timestamp: position.timestamp || Date.now(),
+    timestamp: position.timestamp ?? position.time ?? null,
   });
 
   const shim = {

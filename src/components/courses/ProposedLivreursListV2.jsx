@@ -144,7 +144,19 @@ export default function ProposedLivreursListV2({ course }) {
   const acceptedId = course.livreur_id || course.accepted_by_livreur_id;
   const dispatchStatus = course?.dispatch_status;
   const isTerminal = course?.statut === "annulee" || course?.statut === "livree";
-  const isDiffusing = dispatchStatus === "disponible_push" || dispatchStatus === "propose" || dispatchStatus === "en_attente";
+  const isExpiredPublication = isExpired && !isTerminal && !acceptedId && dispatchStatus !== "accepte" &&
+    course.client_decision_attendue !== true && (dispatchStatus === "disponible_push" || dispatchStatus === "propose");
+  const isDiffusing = !isExpiredPublication && !isTerminal && !acceptedId && course.client_decision_attendue !== true &&
+    (dispatchStatus === "disponible_push" || dispatchStatus === "propose");
+  const isPendingPublication = !isExpiredPublication && !isTerminal && !acceptedId && !isDiffusing && dispatchStatus !== "accepte";
+  const waitingLabel = course.client_decision_attendue === true
+    ? "Décision client attendue"
+    : course.delivery_mode === "eco" && course.eco_status === "isolated"
+      ? "Regroupement Eco en attente"
+      : "Publication en attente";
+  const dispatchLabel = isTerminal ? "Dispatch arrêté"
+    : acceptedId || dispatchStatus === "accepte" ? "Livreur affecté"
+      : isExpiredPublication ? "Publication expirée" : isDiffusing ? "En diffusion" : waitingLabel;
 
   // ── Assignation manuelle forcée ──
   const handleForceAssign = async (livreur) => {
@@ -184,7 +196,7 @@ export default function ProposedLivreursListV2({ course }) {
       <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-3">
         <p className="text-xs text-emerald-600 font-semibold flex items-center gap-1.5">
           <Users className="w-3.5 h-3.5 animate-pulse" />
-          Diffusion en cours...
+          Chargement du suivi...
         </p>
       </div>
     );
@@ -196,10 +208,10 @@ export default function ProposedLivreursListV2({ course }) {
       <div className="flex items-center justify-between">
         <p className="text-xs font-bold text-emerald-700 uppercase tracking-wider flex items-center gap-1.5">
           <Wifi className="w-3.5 h-3.5" />
-          En diffusion
+          {dispatchLabel}
         </p>
         <span className="text-xs font-bold text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">
-          {eligibleCount} éligibles
+          {eligibleCount} disponibles récents
         </span>
       </div>
 
@@ -234,6 +246,25 @@ export default function ProposedLivreursListV2({ course }) {
           <p className="text-[8px] text-gray-500 font-semibold uppercase leading-tight">Expirés</p>
         </div>
       </div>
+
+      {isExpiredPublication && (
+        <div className="rounded-lg p-3 bg-amber-50 border border-amber-200">
+          <p className="text-xs font-bold text-amber-800">Délai d'acceptation dépassé</p>
+        </div>
+      )}
+
+      {isPendingPublication && (
+        <div className="rounded-lg p-3 bg-amber-50 border border-amber-200 space-y-1">
+          <p className="text-xs font-bold text-amber-800">{waitingLabel}</p>
+          <p className="text-[11px] text-amber-700">
+            {course.client_decision_attendue === true
+              ? "La recherche attend la décision du client."
+              : course.delivery_mode === "eco" && course.eco_status === "isolated"
+                ? "Cette course Eco attend son regroupement."
+                : "La course n'est pas encore publiée dans le fil des livreurs."}
+          </p>
+        </div>
+      )}
 
       {/* ── Timeline diffusion ── */}
       {isDiffusing && !isTerminal && (
@@ -287,8 +318,8 @@ export default function ProposedLivreursListV2({ course }) {
               <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-[11px] font-semibold text-gray-600">Livreurs éligibles</p>
-              <p className="text-[10px] text-gray-400">disponibles avec GPS actif</p>
+              <p className="text-[11px] font-semibold text-gray-600">Livreurs disponibles récents</p>
+              <p className="text-[10px] text-gray-400">activité récente, sans preuve de notification</p>
             </div>
             <span className="text-sm font-bold text-emerald-600 tabular-nums">{eligibleCount}</span>
           </div>

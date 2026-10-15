@@ -1,11 +1,13 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { clearPersistedToken } from "@/lib/authPersistence";
+import { logoutPersistent } from "@/lib/authPersistence";
 import { AlertTriangle, Check, Truck, X, Wallet, ChevronRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { useHeartbeat } from "@/hooks/useHeartbeat";
+import { useCoursesDisponibles } from "@/hooks/useCoursesDisponibles";
+import { isEcoDeliveryCourse } from "@/lib/availableCourseOffers";
 import { useAppVersionSync } from "@/hooks/useAppVersionSync";
 import { useDispatchConfig } from "@/hooks/useDispatchConfig";
 import { useGPSNatif } from "@/hooks/useGPSNatif";
@@ -13,7 +15,7 @@ import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
 import { haversineKm } from "@/lib/priceEstimate";
 
-import { registerPushToken, subscribeToNotifications, consumePendingNotificationData } from "@/lib/notifications";
+import { registerPushToken, subscribeToNotifications, consumePendingNotificationData, subscribeToNotificationOpened } from "@/lib/notifications";
 import { usePushTokenRetry } from "@/hooks/usePushTokenRetry";
 import { requestNativeAppPermissions } from "@/lib/nativePermissions";
 import { startNativeBackgroundHeartbeat } from "@/lib/nativeAndroid";
@@ -240,26 +242,10 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   // ── Compteur de courses disponibles (pilote le point rouge) ──
   // ⚠️ Garde cohérente avec CoursesDisponibles.jsx : statut === "recherche_livreur"
   //    ET dispatch_status === "disponible_push" | "propose"
-  const { data: availableCoursesCount = 0 } = useQuery({
-    queryKey: ["courses-disponibles-count", livreurProfil?.id, livreurProfil?.country_code, isV2Enabled],
-    queryFn: async () => {
-      if (!livreurProfil?.country_code || !isV2Enabled) return 0;
-      const all = await base44.entities.CourseExterne.filter(
-        { dispatch_status: { $in: ["disponible_push", "propose"] }, country_code: livreurProfil.country_code },
-        "-created_date", 50
-      );
-      return (all || []).filter(c =>
-        c.statut === "recherche_livreur" &&
-        (c.dispatch_status === "disponible_push" || c.dispatch_status === "propose") &&
-        !c.livreur_id &&
-        !c.accepted_by_livreur_id
-      ).length;
-    },
-    enabled: !!livreurProfil?.id && !!livreurProfil?.country_code && isV2Enabled,
-    refetchInterval: 10000,
-    staleTime: 0,
-    refetchOnWindowFocus: true,
-  });
+  // Reuse the feed policy for badges and new-offer popups. Active missions
+  // continue to use mesCourses and are not filtered by this new-work policy.
+  const { eligibleCourses: cityEligibleCourses, availableOffersCount: availableCoursesCount } = useCoursesDisponibles(livreurProfil);
+  const cityEligibleCourseIds = useMemo(() => new Set(cityEligibleCourses.filter(course => !isEcoDeliveryCourse(course)).map(course => course.id)), [cityEligibleCourses]);
 
   // Le point rouge s'affiche dès qu'il y a des courses disponibles ET que le livreur
   // n'est pas sur l'onglet "Disponibles"
@@ -271,19 +257,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     }
   }, [availableCoursesCount, activeTab]);
 
-  // ── WebSocket : invalider le badge + la liste "Disponibles" en temps réel ──
-  // Quand une course est mise à jour (annulation → en_attente, acceptation → accepte),
-  // le cache React Query doit être invalidé immédiatement sans attendre le polling.
-  useEffect(() => {
-    if (!livreurProfil?.id) return;
-    const unsubscribe = base44.entities.CourseExterne.subscribe((event) => {
-      if (event.type === "create" || event.type === "update" || event.type === "delete") {
-        queryClient.invalidateQueries({ queryKey: ["courses-disponibles-count"] });
-        queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles"] });
-      }
-    });
-    return unsubscribe;
-  }, [livreurProfil?.id, queryClient]);
+  // useCoursesDisponibles owns realtime invalidation for both the feed and badge.
 
   const { data: countryCommissionRows = [] } = useQuery({
     queryKey: ["country-commission", livreurProfil?.country_code],
@@ -461,6 +435,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
           return;
         }
         if ((n.type === "nouvelle_course" || n.type === "course_assignee") && n.course_id) {
+          queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles", livreurId] });
+          queryClient.invalidateQueries({ queryKey: ["eco-missions-disponibles", livreurId] });
           setNotificationCourseId(n.course_id);
           setActiveTab("courses");
           queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
@@ -505,6 +481,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         return;
       }
       if (data.type !== "nouvelle_course" && data.type !== "course_assignee") return;
+      queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles", livreurId] });
+      queryClient.invalidateQueries({ queryKey: ["eco-missions-disponibles", livreurId] });
       stopUrgentCourseAlert("app-opened");
       if (data.course_id) setNotificationCourseId(data.course_id);
       setActiveTab("courses");
@@ -517,11 +495,11 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       });
       toast.info("Course proposee", { description: "Ouverture de la course en attente..." });
     };
-    window.addEventListener("silgapp:notification-opened", handleNotificationOpened);
+    const unsubscribeOpened = subscribeToNotificationOpened(handleNotificationOpened, livreurEmail);
     // Cold start : vérifier si l'app a été ouverte depuis une notification
     consumePendingNotificationData();
-    return () => window.removeEventListener("silgapp:notification-opened", handleNotificationOpened);
-  }, [queryClient, livreurId]);
+    return unsubscribeOpened;
+  }, [queryClient, livreurId, livreurEmail]);
 
   // ── Relance automatique du token push au retour au premier plan ──
   usePushTokenRetry(livreurId, livreurEmail ? {
@@ -589,6 +567,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       if (!livreurId) return;
       queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
       queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles"] });
+      queryClient.invalidateQueries({ queryKey: ["eco-missions-disponibles", livreurId] });
+      queryClient.invalidateQueries({ queryKey: ["eco-mission-active"] });
       queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
     };
     const handleVisibility = () => {
@@ -598,10 +578,20 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         consumePendingNotificationData();
       }
     };
+    const handlePushReceived = (event) => {
+      const type = event?.detail?.type;
+      if (type === "on_route_proposal") {
+        queryClient.invalidateQueries({ queryKey: ["on-route-proposals", livreurId] });
+      } else if (["nouvelle_course", "course_assignee", "eco_mission_available"].includes(type)) {
+        refreshCourses();
+      }
+    };
     window.addEventListener("focus", refreshCourses);
+    window.addEventListener("silgapp:notification-received", handlePushReceived);
     document.addEventListener("visibilitychange", handleVisibility);
     return () => {
       window.removeEventListener("focus", refreshCourses);
+      window.removeEventListener("silgapp:notification-received", handlePushReceived);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, [queryClient, livreurId]);
@@ -682,23 +672,24 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     const checkCourseProposee = async () => {
       try {
         if (!livreurProfil?.country_code) return;
-        const allCourses = await base44.entities.CourseExterne.filter(
-          { country_code: livreurProfil.country_code },
-          "-created_date", 50
-        );
+        const allCourses = cityEligibleCourses;
         if (cancelled) return;
 
         // ── Récupérer les notifications actives du livreur depuis DispatchNotification ──
         // (remplace l'ancien champ JSON dispatch_notified_ids qui n'est plus mis à jour)
         let notifiedCourseIds = [];
         try {
+          if (allCourses.some(course => course.dispatch_status === "propose")) {
           const myNotifs = await base44.entities.DispatchNotification.filter(
             { livreur_id: livreurId, statut: 'notifie' }, '-date_notification', 50
           );
           notifiedCourseIds = (myNotifs || []).map(n => n.course_id);
+          }
         } catch {}
 
+        if (cancelled) return;
         const found = (allCourses || []).find((course) => {
+          if (!cityEligibleCourseIds.has(course.id)) return false;
           if (course.livreur_id || course.accepted_by_livreur_id) return false;
           if (FINAL_COURSE_STATUSES.has(course.statut)) return false;
           if (course.manual_price_status === "pending_client_validation") return false;
@@ -730,7 +721,11 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [livreurId, livreurProfil?.country_code, isV2Enabled]);
+  }, [livreurId, livreurProfil?.country_code, isV2Enabled, cityEligibleCourseIds, cityEligibleCourses]);
+
+  useEffect(() => {
+    setCourseProposeeDirecte(current => current && !cityEligibleCourseIds.has(current.id) ? null : current);
+  }, [cityEligibleCourseIds]);
 
   const { data: mesCourses = [] } = useQuery({
     queryKey: ["mes-courses-externes", livreurId, livreurEmail, notificationCourseId],
@@ -1547,7 +1542,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     if (!window.confirm("Voulez-vous vraiment vous déconnecter ?")) return;
     if (livreurProfil?.id) {
       saveLivreur(livreurProfil.id, { app_active: false }).catch(() => null);
@@ -1555,7 +1550,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     ['base44_access_token', 'access_token', 'base44_token', 'token'].forEach(k => {
       try { localStorage.removeItem(k); } catch (_) {}
     });
-    { clearPersistedToken(); base44.auth.logout(); };
+    try { await logoutPersistent(); }
+    catch { toast.error("La déconnexion n’a pas pu être enregistrée. Réessayez."); return; }
     setTimeout(() => window.location.reload(), 300);
   };
 
@@ -1923,9 +1919,10 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
                 </p>
                 <button
                   className="mt-3 w-full h-11 rounded-xl bg-red-500 text-white font-black text-sm active:scale-95 transition-all"
-                  onClick={() => {
+                  onClick={async () => {
                     try { localStorage.removeItem("silgapp_livreur_session_id"); } catch {}
-                    { clearPersistedToken(); base44.auth.logout(); };
+                    try { await logoutPersistent(); }
+                    catch { toast.error("La déconnexion n’a pas pu être enregistrée. Réessayez."); return; }
                     setTimeout(() => window.location.reload(), 300);
                   }}
                 >

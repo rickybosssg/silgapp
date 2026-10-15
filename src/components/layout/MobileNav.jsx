@@ -1,9 +1,10 @@
+import { silgappLogo } from "@/lib/iosBranding";
 import React, { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Menu, X, LogOut, Bell, Inbox, ChevronDown, MessageCircle } from "lucide-react";
 import VenusFloatingButton from "@/components/client/VenusFloatingButton";
 import { cn } from "@/lib/utils";
-import { clearPersistedToken } from "@/lib/authPersistence";
+import { logoutPersistent } from "@/lib/authPersistence";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { base44 } from "@/api/base44Client";
@@ -66,11 +67,12 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
     }, 100);
     return () => clearTimeout(timer);
   }, [location.pathname]);
-  const logout = () => {
+  const logout = async () => {
     ['base44_access_token', 'access_token', 'base44_token', 'token'].forEach(k => {
       try { localStorage.removeItem(k); } catch(_) {}
     });
-    { clearPersistedToken(); base44.auth.logout(); };
+    try { await logoutPersistent(); }
+    catch { window.alert("La déconnexion n’a pas pu être enregistrée. Réessayez."); return; }
     setTimeout(() => window.location.reload(), 300);
   };
   const [showMenu, setShowMenu] = useState(false);
@@ -98,7 +100,7 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
       <header className="lg:hidden fixed top-0 left-0 right-0 bg-sidebar/95 backdrop-blur-xl border-b border-white/5 z-40 flex items-center justify-between px-4 shadow-sm safe-area-top" style={{ minHeight: '3.5rem' }}>
         <div className="flex items-center gap-2.5 shrink-0">
           <img
-            src="https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/962cfba1f_IMG-20260819-WA0003.jpg"
+            src={silgappLogo("https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/962cfba1f_IMG-20260819-WA0003.jpg")}
             alt="SILGAPP"
             className="w-8 h-8 rounded-xl object-cover"
           />

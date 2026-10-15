@@ -25,6 +25,10 @@ driver.enterprise_id = null; user = { role: 'admin', admin_type: 'pays', country
 user = { role: 'admin' }; invalidateOperationalCityCache(); invalidateQuartierCache();
 assert.equal((await invoke()).status, 200, 'all OFF preserves idempotent assignment');
 active = true; invalidateOperationalCityCache(); invalidateQuartierCache();
+assert.equal((await invoke()).status, 200, 'assigned work remains accessible without GPS');
+course.livreur_id = null; course.statut = 'recherche_livreur';
 assert.equal((await invoke()).status, 409, 'manual assignment cannot bypass active zone');
-driver.ville = 'Ouagadougou'; assert.equal((await invoke()).status, 200);
+driver.ville = 'Ouagadougou'; assert.equal((await invoke()).status, 409, 'profile alone never authorizes new work');
+course.livreur_id = 'd'; course.statut = 'livreur_en_route';
+assert.equal((await invoke()).status, 200, 'idempotent assignment stays accessible');
 console.log('PASS manual assignment: authenticated admin, tenant/country scope, OFF equivalence and active-zone enforcement (isolated)');

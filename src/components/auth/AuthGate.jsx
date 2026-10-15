@@ -1,13 +1,16 @@
-import React, { useState, useEffect } from "react";
+import { silgappLogo } from "@/lib/iosBranding";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { base44, detectedToken } from "@/api/base44Client";
 import { APP_PUBLIC_URL, BASE44_APP_ID } from "@/lib/app-params";
 import { ArrowRight, Loader2, Lock, Mail, ShieldCheck, Store } from "lucide-react";
 import AppMaintenanceGate from "@/components/admin/AppMaintenanceGate";
 import { registerPushToken } from "@/lib/notifications";
-import { persistToken, clearPersistedToken } from "@/lib/authPersistence";
+import { persistToken, getAuthSessionGeneration, logoutPersistent } from "@/lib/authPersistence";
 import RoleSelection from "@/pages/RoleSelection";
 import BlockedLivreurScreen from "@/components/auth/BlockedLivreurScreen";
+import SocialLoginButtons from "@/components/auth/SocialLoginButtons";
+import { cancelPendingNativeSocialAuth } from "@/lib/nativeSocialAuth";
 
 const AUTH_TOKEN_KEYS = ["base44_access_token", "access_token", "base44_token", "token"];
 
@@ -71,7 +74,7 @@ const clearPasswordResetTokenFromUrl = () => {
   } catch (_) {}
 };
 
-async function loginWithEmailPassword(email, password) {
+async function loginWithEmailPassword(email, password, generation = getAuthSessionGeneration()) {
   const appId = getBase44AppId();
   const response = await fetch(`${APP_PUBLIC_URL}/api/apps/${appId}/auth/login`, {
     method: "POST",
@@ -96,6 +99,9 @@ async function loginWithEmailPassword(email, password) {
   }
 
   const token = payload?.access_token;
+  if (generation !== getAuthSessionGeneration()) {
+    throw new Error("Cette tentative de connexion a été remplacée. Réessayez.");
+  }
   if (!saveAuthToken(token)) {
     throw new Error("Connexion acceptée, mais le token de session est absent.");
   }
@@ -224,15 +230,17 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
     resetToken: initialResetToken,
   });
   const [loginLoading, setLoginLoading] = useState(false);
+  const [socialPending, setSocialPending] = useState(false);
+  const submitting = useRef(false), socialSubmitting = useRef(false);
   const [loginError, setLoginError] = useState("");
   const [loginInfo, setLoginInfo] = useState("");
   const [blockedLivreur, setBlockedLivreur] = useState(null);
   const [showSupportChat, setShowSupportChat] = useState(false);
 
-  const handleConfirmedLogout = () => {
+  const handleConfirmedLogout = async () => {
     if (!window.confirm("Voulez-vous vraiment vous déconnecter ?")) return;
-    clearPersistedToken();
-    base44.auth.logout();
+    try { await logoutPersistent(); }
+    catch { setLoginError("La déconnexion n’a pas pu être enregistrée. Réessayez."); }
   };
 
   useEffect(() => {
@@ -474,7 +482,7 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
     }
 
     check().catch((error) => {
-      console.error("[AuthGate] Echec verification auth:", error);
+      console.error("[AuthGate] Echec verification auth:");
       if (mounted) setState("unauthenticated");
     });
     return () => { mounted = false; };
@@ -482,6 +490,10 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
 
   const handleEmailSubmit = async (event) => {
     event.preventDefault();
+    if (submitting.current || socialSubmitting.current) return;
+    submitting.current = true;
+    cancelPendingNativeSocialAuth();
+    const generation = getAuthSessionGeneration();
     setLoginError("");
     setLoginInfo("");
     setLoginLoading(true);
@@ -504,7 +516,7 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
         return;
       } else if (authMode === "verify") {
         await verifyEmailOtp(email, loginForm.otpCode);
-        await loginWithEmailPassword(email, loginForm.password);
+        await loginWithEmailPassword(email, loginForm.password, generation);
       } else if (authMode === "reset_request") {
         if (!email) {
           throw new Error("Entrez votre adresse email.");
@@ -530,20 +542,22 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
         setLoginInfo("Mot de passe réinitialisé. Vous pouvez maintenant vous connecter.");
         return;
       } else {
-        await loginWithEmailPassword(email, loginForm.password);
+        await loginWithEmailPassword(email, loginForm.password, generation);
       }
 
       setState("loading");
       setAuthRetry((value) => value + 1);
     } catch (error) {
-      console.error("[AuthGate] Echec login email:", error);
+      console.error("[AuthGate] Echec login email:");
       setLoginError(error?.message || "Connexion impossible. Réessayez.");
     } finally {
+      submitting.current = false;
       setLoginLoading(false);
     }
   };
 
   const switchAuthMode = (mode) => {
+    if (submitting.current || socialSubmitting.current) return;
     setAuthMode(mode);
     setLoginError("");
     setLoginInfo("");
@@ -562,7 +576,7 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
       <div className="fixed inset-0 flex items-center justify-center bg-background">
         <div className="text-center space-y-4">
           <img
-            src="https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/962cfba1f_IMG-20260819-WA0003.jpg"
+            src={silgappLogo("https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/962cfba1f_IMG-20260819-WA0003.jpg")}
             alt="SILGAPP"
             className="w-16 h-16 rounded-2xl object-cover mx-auto shadow-lg"
           />
@@ -582,7 +596,7 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
             <div className="relative">
               <div className="mb-5 flex items-center justify-between">
                 <img
-                  src="https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/962cfba1f_IMG-20260819-WA0003.jpg"
+                  src={silgappLogo("https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/962cfba1f_IMG-20260819-WA0003.jpg")}
                   alt="SILGAPP"
                   className="h-14 w-14 rounded-2xl border border-white/20 shadow-lg object-cover"
                 />
@@ -618,6 +632,15 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
           </div>
 
           <div className="space-y-5 px-6 py-6">
+          {authMode === "login" && <SocialLoginButtons disabled={loginLoading} onPendingChange={value => {
+            if (value && submitting.current) return false;
+            socialSubmitting.current = value;
+            setSocialPending(value);
+            return true;
+          }} onError={setLoginError} onAuthenticated={() => {
+            setState("loading");
+            setAuthRetry(value => value + 1);
+          }} />}
           <form onSubmit={handleEmailSubmit} className="space-y-4">
             <label className="block">
               <span className="mb-1.5 block text-xs font-bold text-slate-700 dark:text-slate-200">Adresse e-mail</span>
@@ -717,7 +740,7 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
 
             <button
               type="submit"
-              disabled={loginLoading}
+              disabled={loginLoading || socialPending}
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3.5 font-bold text-white shadow-lg shadow-primary/20 transition hover:bg-primary-dark active:scale-[0.98] disabled:opacity-70 silgapp-relief"
             >
               {loginLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
@@ -802,11 +825,12 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
           </p>
           <p className="text-xs text-muted-foreground">📞 Support : +226 66 92 51 90</p>
           <button
-            onClick={() => { clearPersistedToken(); base44.auth.logout(); }}
+            onClick={() => logoutPersistent().catch(() => setLoginError("La déconnexion n’a pas pu être enregistrée. Réessayez."))}
             className="text-xs text-primary underline"
           >
             Se déconnecter
           </button>
+          {loginError && <p role="alert" className="text-sm text-destructive">{loginError}</p>}
         </div>
       </div>
     );
@@ -829,11 +853,12 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
           </p>
           <p className="text-xs text-muted-foreground">📞 Support : +226 66 92 51 90</p>
           <button
-            onClick={() => { clearPersistedToken(); base44.auth.logout(); }}
+            onClick={() => logoutPersistent().catch(() => setLoginError("La déconnexion n’a pas pu être enregistrée. Réessayez."))}
             className="text-xs text-primary underline"
           >
             Se déconnecter
           </button>
+          {loginError && <p role="alert" className="text-sm text-destructive">{loginError}</p>}
         </div>
       </div>
     );
@@ -876,7 +901,7 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
     <div className="fixed inset-0 flex items-center justify-center bg-background">
       <div className="text-center space-y-4">
         <img
-          src="https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/962cfba1f_IMG-20260819-WA0003.jpg"
+          src={silgappLogo("https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/962cfba1f_IMG-20260819-WA0003.jpg")}
           alt="SILGAPP"
           className="w-16 h-16 rounded-2xl object-cover mx-auto shadow-lg"
         />

@@ -56,7 +56,7 @@ function createMockBase44(courseCity = 'ouagadougou', livreurCity = 'ouagadougou
     ville: livreurCity === 'ouagadougou' ? 'Ouagadougou' : livreurCity === 'bobo' ? 'Bobo-Dioulasso' : null,
     latitude: livreurCity === 'ouagadougou' ? 12.36 : 11.17,
     longitude: livreurCity === 'ouagadougou' ? -1.51 : -4.30,
-    derniere_position_date: new Date().toISOString(),
+    gps_fix_valid: true, gps_fix_date: new Date().toISOString(), gps_accuracy: 20, derniere_position_date: new Date().toISOString(),
     enterprise_id: null,
     type_livreur: 'externe',
     validation: 'valide',
@@ -182,19 +182,19 @@ test('6 — resolveCityFromGPS retourne null si trop loin', async () => {
   invalidateQuartierCache('BF');
 });
 
-test('7 — getDriverOperationalCity utilise ville du profil', async () => {
+test('7 — getDriverOperationalCity refuse la ville du profil sans GPS reconnu', async () => {
   const { getDriverOperationalCity } = await import('../base44/shared/cityResolution.ts');
   const base44 = createMockBase44();
-  const livreur = { country_code: 'BF', ville: 'Ouagadougou', latitude: 0, longitude: 0, derniere_position_date: new Date().toISOString() };
+  const livreur = { country_code: 'BF', ville: 'Ouagadougou', latitude: 0, longitude: 0, gps_fix_valid: true, gps_fix_date: new Date().toISOString(), gps_accuracy: 20, derniere_position_date: new Date().toISOString() };
   const city = await getDriverOperationalCity(base44, livreur);
-  assert.strictEqual(city, 'ouagadougou');
+  assert.strictEqual(city, null);
 });
 
 test('8 — getDriverOperationalCity résout depuis GPS si ville vide', async () => {
   const { getDriverOperationalCity, invalidateQuartierCache } = await import('../base44/shared/cityResolution.ts');
   invalidateQuartierCache('BF');
   const base44 = createMockBase44();
-  const livreur = { country_code: 'BF', ville: null, latitude: 12.37, longitude: -1.52, derniere_position_date: new Date().toISOString() };
+  const livreur = { country_code: 'BF', ville: null, latitude: 12.37, longitude: -1.52, gps_fix_valid: true, gps_fix_date: new Date().toISOString(), gps_accuracy: 20, derniere_position_date: new Date().toISOString() };
   const city = await getDriverOperationalCity(base44, livreur);
   assert.strictEqual(city, 'ouagadougou');
   invalidateQuartierCache('BF');
@@ -204,7 +204,7 @@ test('9 — getDriverOperationalCity retourne null si GPS ancien', async () => {
   const { getDriverOperationalCity } = await import('../base44/shared/cityResolution.ts');
   const base44 = createMockBase44();
   const oldDate = new Date(Date.now() - 20 * 60000).toISOString();
-  const livreur = { country_code: 'BF', ville: null, latitude: 12.37, longitude: -1.52, derniere_position_date: oldDate };
+  const livreur = { country_code: 'BF', ville: null, latitude: 12.37, longitude: -1.52, gps_fix_valid: true, gps_fix_date: oldDate, gps_accuracy: 20, derniere_position_date: oldDate };
   const city = await getDriverOperationalCity(base44, livreur);
   assert.strictEqual(city, null, 'GPS ancien ne doit pas résoudre la ville');
 });
@@ -244,8 +244,10 @@ test('14 — buildLivreurCityFilter : flag ON → filtre ville', async () => {
   const base44 = createMockBase44('ouagadougou', 'ouagadougou', true);
   const course = { country_code: 'BF', ville_depart: 'Ouagadougou', gps_depart_lat: 12.37, gps_depart_lng: -1.52 };
   const filter = await buildLivreurCityFilter(base44, course);
-  assert.ok(filter.ville, 'Doit avoir un filtre ville');
-  assert.ok(filter.ville.$in || filter.ville.$regex, 'Filtre ville présent ($in ou $regex)');
+  assert.strictEqual(filter.ville, undefined, 'Profil exclu de la sélection');
+  assert.strictEqual(filter.gps_operational_city, 'ouagadougou');
+  assert.strictEqual(filter.gps_fix_valid, true);
+  assert.ok(filter.gps_fix_date.$gte && filter.gps_fix_date.$lte, 'Preuve GPS bornée dans le temps');
   invalidateCityFlagCache('BF');
 });
 
@@ -266,7 +268,7 @@ test('16 — verifyCityCompatibility : même ville → compatible', async () => 
   invalidateCityFlagCache('BF');
   const base44 = createMockBase44('ouagadougou', 'ouagadougou', true);
   const course = { country_code: 'BF', ville_depart: 'Ouagadougou', gps_depart_lat: 12.37, gps_depart_lng: -1.52 };
-  const livreur = { country_code: 'BF', ville: 'Ouagadougou', latitude: 12.36, longitude: -1.51, derniere_position_date: new Date().toISOString() };
+  const livreur = { country_code: 'BF', ville: 'Ouagadougou', latitude: 12.36, longitude: -1.51, gps_fix_valid: true, gps_fix_date: new Date().toISOString(), gps_accuracy: 20, derniere_position_date: new Date().toISOString() };
   const result = await verifyCityCompatibility(base44, course, livreur);
   assert.strictEqual(result.compatible, true);
   invalidateCityFlagCache('BF');
@@ -278,7 +280,7 @@ test('17 — verifyCityCompatibility : villes différentes → incompatible', as
   invalidateCityFlagCache('BF');
   const base44 = createMockBase44('ouagadougou', 'bobo', true);
   const course = { country_code: 'BF', ville_depart: 'Ouagadougou', gps_depart_lat: 12.37, gps_depart_lng: -1.52 };
-  const livreur = { country_code: 'BF', ville: 'Bobo-Dioulasso', latitude: 11.17, longitude: -4.30, derniere_position_date: new Date().toISOString() };
+  const livreur = { country_code: 'BF', ville: 'Bobo-Dioulasso', latitude: 11.17, longitude: -4.30, gps_fix_valid: true, gps_fix_date: new Date().toISOString(), gps_accuracy: 20, derniere_position_date: new Date().toISOString() };
   const result = await verifyCityCompatibility(base44, course, livreur);
   assert.strictEqual(result.compatible, false);
   assert.strictEqual(result.reason, 'city_mismatch');
@@ -291,7 +293,7 @@ test('18 — verifyCityCompatibility : flag OFF → toujours compatible', async 
   invalidateCityFlagCache('BF');
   const base44 = createMockBase44('ouagadougou', 'bobo', false);
   const course = { country_code: 'BF', ville_depart: 'Ouagadougou', gps_depart_lat: 12.37, gps_depart_lng: -1.52 };
-  const livreur = { country_code: 'BF', ville: 'Bobo-Dioulasso', latitude: 11.17, longitude: -4.30, derniere_position_date: new Date().toISOString() };
+  const livreur = { country_code: 'BF', ville: 'Bobo-Dioulasso', latitude: 11.17, longitude: -4.30, gps_fix_valid: true, gps_fix_date: new Date().toISOString(), gps_accuracy: 20, derniere_position_date: new Date().toISOString() };
   const result = await verifyCityCompatibility(base44, course, livreur);
   assert.strictEqual(result.compatible, true, 'Flag OFF → toujours compatible');
   invalidateCityFlagCache('BF');
@@ -302,50 +304,35 @@ test('18 — verifyCityCompatibility : flag OFF → toujours compatible', async 
 // ════════════════════════════════════════════════════════════════════════
 
 tests.push({
-  name: '19. Frontend OFF → pas de filtre ville (comportement historique)',
+  name: '19. Frontend OFF conserve la visibilité historique sans GPS',
   fn: async () => {
-    const cityDispatchEnabled = false;
-    const livreurVille = 'Ouagadougou';
-    const filter = { dispatch_status: { $in: ['disponible_push', 'propose'] }, country_code: 'BF' };
-    if (cityDispatchEnabled && livreurVille) {
-      filter.ville_depart = { $regex: livreurVille, $options: 'i' };
-    }
-    assert.strictEqual(filter.ville_depart, undefined, 'Flag OFF → pas de filtre ville_depart');
+    const { canSeeOperationalCourse } = await import('../base44/shared/cityNames.js');
+    assert.strictEqual(canSeeOperationalCourse({ ville_depart: 'Ouagadougou' }, null, [{ nom: 'ouagadougou', actif: false }], []), true);
   },
 });
-
 tests.push({
-  name: '20. Frontend ON → filtre ville appliqué',
+  name: '20. Frontend ON utilise la zone GPS canonique',
   fn: async () => {
-    const cityDispatchEnabled = true;
-    const livreurVille = 'Ouagadougou';
-    const filter = { dispatch_status: { $in: ['disponible_push', 'propose'] }, country_code: 'BF' };
-    if (cityDispatchEnabled && livreurVille) {
-      filter.ville_depart = { $regex: livreurVille, $options: 'i' };
-    }
-    assert.ok(filter.ville_depart, 'Flag ON → filtre ville_depart présent');
-    assert.strictEqual(filter.ville_depart.$regex, 'Ouagadougou', 'Regex correcte');
+    const { canSeeOperationalCourse } = await import('../base44/shared/cityNames.js');
+    const zones = [{ nom: 'ouagadougou', actif: true }, { nom: 'bobo-dioulasso', actif: true }];
+    assert.strictEqual(canSeeOperationalCourse({ ville_depart: 'Ouagadougou' }, 'bobo-dioulasso', zones, []), false);
+    assert.strictEqual(canSeeOperationalCourse({ ville_depart: 'Bobo-Dioulasso' }, 'bobo-dioulasso', zones, []), true);
   },
 });
-
 tests.push({
-  name: '21. Frontend ON mais ville vide → pas de filtre (graceful)',
+  name: '21. Frontend ON sans GPS refuse les nouvelles courses protégées',
   fn: async () => {
-    const cityDispatchEnabled = true;
-    const livreurVille = '';
-    const filter = { dispatch_status: { $in: ['disponible_push', 'propose'] }, country_code: 'BF' };
-    if (cityDispatchEnabled && livreurVille) {
-      filter.ville_depart = { $regex: livreurVille, $options: 'i' };
-    }
-    assert.strictEqual(filter.ville_depart, undefined, 'Ville vide → pas de filtre');
+    const { canSeeOperationalCourse } = await import('../base44/shared/cityNames.js');
+    assert.strictEqual(canSeeOperationalCourse({ ville_depart: 'Ouagadougou' }, null, [{ nom: 'ouagadougou', actif: true }], []), false);
   },
 });
-
 tests.push({
-  name: '22. Frontend ON → missions Éco préservées (pas filtrées par ville)',
+  name: '22. Missions Eco: tous les départs doivent respecter la même politique',
   fn: async () => {
-    const ecoFilter = { country_code: 'BF', enterprise_id: null, status: 'available' };
-    assert.ok(!ecoFilter.ville_depart, 'Missions Éco non filtrées par ville');
+    const { canSeeOperationalCourse } = await import('../base44/shared/cityNames.js');
+    const zones = [{ nom: 'ouagadougou', actif: true }, { nom: 'bobo-dioulasso', actif: true }];
+    assert.strictEqual(['Ouagadougou', 'Ouagadougou'].every(ville_depart => canSeeOperationalCourse({ ville_depart }, 'ouagadougou', zones, [])), true);
+    assert.strictEqual(['Ouagadougou', 'Bobo-Dioulasso'].every(ville_depart => canSeeOperationalCourse({ ville_depart }, 'ouagadougou', zones, [])), false);
   },
 });
 

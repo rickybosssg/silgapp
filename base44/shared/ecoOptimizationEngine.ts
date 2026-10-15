@@ -1538,7 +1538,7 @@ export async function acceptEcoMission(base44: any, missionId: string, livreurId
   // ── [CITY DISPATCH] Vérification de compatibilité ville avant acceptation ──
   // Une mission Éco de Ouagadougou ne peut pas être acceptée par un livreur de Bobo-Dioulasso
   // lorsque le filtrage par ville est activé. Défense en profondeur backend.
-  const { verifyCityCompatibility } = await import('./cityDispatchFilter.ts');
+  const { verifyCityCompatibility, verifyCurrentCityAtClaim } = await import('./cityDispatchFilter.ts');
 
   const courseIds = Array.isArray(mission.course_ids) ? mission.course_ids : [];
   if (courseIds.length !== 2 || new Set(courseIds).size !== 2) return { success: false, reason: 'mission_incomplete' };
@@ -1547,8 +1547,11 @@ export async function acceptEcoMission(base44: any, missionId: string, livreurId
   for (const id of courseIds) {
     const course = await base44.asServiceRole.entities.CourseExterne.get(id).catch(() => null);
     if (!course) return { success: false, reason: 'missing_course', course_id: id };
-    const cityCheck = await verifyCityCompatibility(base44, course, livreur);
-    if (!cityCheck.compatible) return { success: false, reason: 'city_mismatch', course_id: id };
+    // A partial claim already owned by this driver must remain recoverable.
+    if (mission.status === 'available') {
+      const cityCheck = await verifyCityCompatibility(base44, course, livreur);
+      if (!cityCheck.compatible) return { success: false, reason: 'city_mismatch', course_id: id };
+    }
     if (normalizeEnterpriseId(course.enterprise_id) !== normalizeEnterpriseId(mission.enterprise_id)) {
       return { success: false, reason: 'enterprise_mismatch', course_id: id };
     }
@@ -1564,6 +1567,11 @@ export async function acceptEcoMission(base44: any, missionId: string, livreurId
 
   const now = mission.accepted_at || new Date().toISOString();
   if (mission.status === 'available') {
+  for (const course of courses) {
+    if (!(await verifyCurrentCityAtClaim(base44, course, livreur)).compatible) {
+      return { success: false, reason: 'city_mismatch', course_id: course.id };
+    }
+  }
   const claimMission = await base44.asServiceRole.entities.EcoMission.updateMany(
     { id: mission.id, status: 'available' },
     { $set: { status: 'accepting', livreur_id: livreurId, livreur_user_email: livreur.user_email || null, accepted_at: now } },

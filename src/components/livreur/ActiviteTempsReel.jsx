@@ -31,19 +31,19 @@ export default function ActiviteTempsReel({ livreurProfil, mesCourses = [], isEx
   const hasGPS = typeof latitude === "number" && typeof longitude === "number";
 
   // ── Courses disponibles (SOURCE UNIQUE — hook partagé avec CoursesDisponibles) ──
-  const { eligibleCourses, isLoading: loadingCourses } = useCoursesDisponibles(livreurProfil);
+  const { availableOffers = [], availableOffersCount = 0, isLoading: loadingCourses } = useCoursesDisponibles(livreurProfil);
 
   // ── Distance de chaque course disponible (tri par distance croissante) ──
   const coursesWithDistance = useMemo(() => {
-    if (!hasGPS || !eligibleCourses.length) return [];
-    return eligibleCourses
-      .map((c) => ({
-        ...c,
+    if (!hasGPS || !availableOffers.length) return [];
+    return availableOffers
+      .map(offer => offer.courses.map(c => ({ ...c,
         __distance: haversineKm(latitude, longitude, c.gps_depart_lat, c.gps_depart_lng),
-      }))
+      })).filter(c => c.__distance !== null).sort((a, b) => a.__distance - b.__distance)[0])
+      .filter(Boolean)
       .filter((c) => c.__distance !== null)
       .sort((a, b) => a.__distance - b.__distance);
-  }, [eligibleCourses, latitude, longitude, hasGPS]);
+  }, [availableOffers, latitude, longitude, hasGPS]);
 
   const closestCourse = coursesWithDistance[0] || null;
 
@@ -103,14 +103,14 @@ export default function ActiviteTempsReel({ livreurProfil, mesCourses = [], isEx
       return "Recherche en cours — nous te préviendrons dès qu'une mission sera disponible.";
     }
     if (loadingCourses) return "Analyse des courses disponibles…";
-    if (coursesWithDistance.length === 0) {
+    if (availableOffersCount === 0) {
       return "Aucune course pour le moment. Je continue la recherche.";
     }
-    if (coursesWithDistance.length === 1) {
-      return "1 course disponible dans ton rayon.";
+    if (availableOffersCount === 1) {
+      return "1 course disponible.";
     }
-    return `${coursesWithDistance.length} courses disponibles dans ton rayon.`;
-  }, [isExterne, loadingCourses, coursesWithDistance.length]);
+    return `${availableOffersCount} courses disponibles.`;
+  }, [isExterne, loadingCourses, availableOffersCount]);
 
   // ── Rendu ──
   return (
@@ -136,9 +136,9 @@ export default function ActiviteTempsReel({ livreurProfil, mesCourses = [], isEx
               <Loader2 className="w-4 h-4 text-slate-300 animate-spin" />
             ) : (
               <p className={`text-xl font-black leading-none ${
-                coursesWithDistance.length > 0 ? "text-orange-500" : "text-slate-400"
+                availableOffersCount > 0 ? "text-orange-500" : "text-slate-400"
               }`}>
-                {isExterne ? coursesWithDistance.length : "—"}
+                {isExterne ? availableOffersCount : "—"}
               </p>
             )}
             <p className="text-[10px] text-slate-500 mt-1">Courses dispo</p>

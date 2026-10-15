@@ -8,13 +8,13 @@ import { verifyCityCompatibility, buildLivreurCityFilter, buildCourseCityFilterF
 
 const cities = [{ id: 'ouaga', nom: 'ouagadougou', country_code: 'BF', actif: true, communes_rattachees: '["Ouagadougou","Saaba"]' },
   { id: 'bobo', nom: 'bobo-dioulasso', country_code: 'BF', actif: false }];
-const sdk = { asServiceRole: { entities: { OperationalCity: { filter: async () => cities }, Quartier: { filter: async () => [] } } } };
+const sdk = { asServiceRole: { entities: { OperationalCity: { filter: async () => cities }, Quartier: { filter: async () => [{ ville: 'Saaba', latitude: 12.38, longitude: -1.42 }] } } } };
 const reset = () => { invalidateOperationalCityCache(); invalidateQuartierCache(); };
 reset();
 assert.equal(resolveOperationalName('SAABA', cities), 'ouagadougou');
 assert.ok((await getOperationalZoneCityNames(sdk, 'BF', 'ouagadougou')).includes('saaba'), 'commune mapping does not require a GPS quartier');
 const ouagaCourse = { country_code: 'BF', ville_depart: 'Ouagadougou' };
-assert.equal((await verifyCityCompatibility(sdk, ouagaCourse, { country_code: 'BF', ville: 'Saaba' })).compatible, true);
+assert.equal((await verifyCityCompatibility(sdk, ouagaCourse, { country_code: 'BF', ville: 'Bobo-Dioulasso', latitude: 12.38, longitude: -1.42, gps_fix_date: new Date().toISOString(), gps_fix_valid: true, gps_accuracy: 20 })).compatible, true);
 assert.equal((await verifyCityCompatibility(sdk, ouagaCourse, { country_code: 'BF', ville: null })).compatible, false, 'unknown driver cannot bypass active zone');
 assert.equal((await verifyCityCompatibility(sdk, { ...ouagaCourse, ville_depart: 'Bobo-Dioulasso' }, { country_code: 'BF', ville: 'Ouagadougou' })).compatible, true, 'inactive course retains historical eligibility');
 assert.equal(canSeeOperationalCourse(ouagaCourse, 'Bobo-Dioulasso', cities, []), false);

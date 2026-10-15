@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { base44 } from "@/api/base44Client";
+import { logoutPersistent } from "@/lib/authPersistence";
 import { Building2, RefreshCw, UserPlus } from "lucide-react";
 import EnterpriseLayout from "@/components/enterprise/EnterpriseLayout.jsx";
 import EnterpriseDashboard from "@/components/enterprise/EnterpriseDashboard.jsx";
@@ -84,7 +85,7 @@ export default function EntrepriseApp() {
         <div className="text-center space-y-3 max-w-sm">
           <Building2 className="w-12 h-12 text-muted-foreground mx-auto" />
           <p className="text-sm text-muted-foreground">Aucune entreprise rattachée à ce compte.</p>
-          <button onClick={() => base44.auth.logout()} className="px-4 py-2 border rounded-lg text-sm">Se déconnecter</button>
+          <button onClick={async () => { try { await logoutPersistent(); } catch { window.alert("La déconnexion n’a pas pu être enregistrée. Réessayez."); } }} className="px-4 py-2 border rounded-lg text-sm">Se déconnecter</button>
         </div>
       </div>
     );

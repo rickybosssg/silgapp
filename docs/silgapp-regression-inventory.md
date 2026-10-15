@@ -1,5 +1,39 @@
 # SILGAPP Regression Inventory
 
+## Isolated iOS signing preparation — 2026-10-14
+
+- Upload-only workflow reuses the exact verified r2 IPA, without rebuilding or
+  changing product code. The owner configured API secrets manually. An immutable
+  separate upload tag, first-attempt guard, Apple duplicate-build preflight and
+  restricted public receipt artifact protect the transfer. No TestFlight campaign
+  or automatic compliance declaration is added; submission is a separate step.
+
+- Source: verified remote ios d52bf1da. Native iOS metadata, build-preparation files
+  and guarded iOS logo selection change; Android images and business/dispatch/finance
+  implementations stay intact.
+- Preserve the existing native plugins, background location/remote notifications,
+  callbacks, bundle identity and all operational-zone/commission safeguards below.
+- APNs entitlements are development in Debug and production in Release. Existing
+  matching Firebase configuration is a Git-ignored resource, not a fabricated key.
+- Signed CI fails before signing unless owner-confirmed App Store version/build,
+  latest ios source, exact profile/certificate identity and production rights match.
+- Local release/profile safety tests, YAML trigger/artifact checks and Bash syntax
+  checks pass: 17 Python + 6 workflow + 4 branding tests. Typecheck, lint and local
+  web build (native Vite config loader) pass. The authorized first macos-15 run
+  passed web/Pods/signing-asset validation, then failed because an app profile was
+  also imposed on Pods. Signing overrides now apply only to App Release; retry
+  tags preserve the reviewed version/build without moving an existing tag.
+  Retry r1 archived/exported successfully. Its IPA uses Xcode 16.4/iOS SDK 18.5,
+  below Apple's current SDK 26 minimum. Xcode 26.2 selection and SDK guards correct
+  the toolchain; a new immutable-tag attempt is authorized after the SDK defect
+  was established. Product code, version/build and signing secrets remain intact.
+- The owner-approved logo is used only on native iOS; original Android/web URLs
+  and all component logic are preserved. Local iOS 1.0.60/67 follows the owner's
+  06:30 UTC screenshot showing the last visible 1.0.59/66. Recheck concurrent
+  uploads before submission. Eric reports accepting the Apple Developer agreement
+  at 06:37 UTC; this has not been independently rechecked. No publication occurred.
+  See docs/ios-signed-build-preparation.md for scope and separate approvals.
+
 ## Corrections 18 And 19
 
 Base44 origin/main f481f1ec integrated without replacing Codex changes. Active
@@ -417,3 +451,262 @@ unknown-origin broadcast fallback described in this historical section.
   an unauthorized uninstall. New Admin city/map physical validation remains pending.
 - Existing client/driver VENUS overlaps and the compact A06 reliability tile remain
   visible residual UI findings; those components were not redesigned in this merge.
+
+
+## Current GPS eligibility and integrated native candidate (October 14)
+
+Detailed policy, compatibility, costs and validation are recorded in
+`gps-city-social-auth-preparation-2026-10-14.md`.
+
+- Isolated branch codex/release-gps-social-20261014 combines iOS preparation
+  2986923a with GPS changes based on integrated d52bf1da, including main a4c8f6fd.
+  Existing email login and all three iOS AuthGate branding selections remain.
+- Active-origin new work requires a genuine GPS acquisition <=120 seconds,
+  known accuracy <=100 m, valid country-scoped coordinates and a known quartier
+  <=30 km. Profile city and ordinary heartbeats are not GPS acquisition proof.
+  Saaba resolves canonically to Ouagadougou; future fixes are rejected.
+- OperationalCity.actif is the sole activation source. All OFF and inactive
+  origins preserve historical geographic eligibility. Bobo ON / Ouaga OFF is
+  covered explicitly; country and Enterprise isolation remain independent.
+- Heartbeat stores separate acquisition date/validity/index fields. Android Java
+  sends Location.getTime(); native JS preserves timestamp/time and missing accuracy.
+  Invalid new fixes revoke proof; an ordinary heartbeat does not renew it.
+- Feed, badge and new-offer popup share eligibility, ignoring obsolete async results.
+  Unified/batch notifications reread candidates in one batch. Direct new-course
+  push checks scope/GPS. Standard and new Eco claims reread current GPS.
+- Accepted work, existing manual assignment and partial Eco acceptance recovery
+  keep their existing behavior. Busy-driver checks remain unfiltered. Pricing,
+  commissions, idempotency, course CAS, route steps and tracking are preserved.
+- Affected source: currentGpsCity, cityResolution/cityDispatchFilter, heartbeat,
+  Livreur schema, notification paths, dispatchV2/Eco, nativeAndroid,
+  SilgappLocationService, useCoursesDisponibles and LivreurExterneApp.
+- Three optional Livreur fields are prepared, not deployed. Schema application
+  must be targeted/additive, preserve User and all other definitions, and read back.
+  Older mobile clients lacking acquisition timestamps fail closed for active origins;
+  updated clients must precede city activation. No city was activated here.
+- Social preparation delegates browser routing to the installed SDK. Native
+  provider readiness remains disabled until the complete session flow is verified.
+- Integrated checks: 27 regression suites PASS, lint/typecheck PASS, web build PASS.
+  Historical finance/recovery/route/Victory and iOS branding/release-tool suites remain.
+  Typecheck has checkJs false and does not cover all backend JavaScript/Deno/Java.
+- Deno strict comparison: transition 80/80 and changed entry graphs 140/140 existing
+  diagnostics, zero added/removed signatures. All exit 1, not PASS. Correction 20
+  stays deferred. This is local TypeScript verification, not production integration.
+- Android debug compilation PASS, 224 tasks in 7m4s, official package 1.0.132/139.
+  Existing tools/dependencies/debug key used; no device install, release APK/AAB
+  or store publication. Capacitor temporary foreign paths were restored.
+- iOS candidate is 1.0.61/68 with confirmation false. Unsigned simulator workflow
+  is diagnostic only. Final source pin, store numbers, signing/upload configuration
+  and readiness must be reviewed before a future release. Previous 1.0.60/67 stays.
+- Physical GPS/zone switching, FCM, hostile RLS, native OAuth return/persistence
+  and production schema readback remain outstanding. GPS is client-reported;
+  GPS reread plus course CAS is not a multi-entity transaction. Both wrappers
+  embed dist without server.url; mobile feed changes require new releases.
+
+## Native iPhone push registration preparation (October 14)
+
+- Capacitor 5 emits an APNs token on iOS, while the existing backend sends through
+  FCM. AppDelegate now maps APNs into Firebase Messaging, retrieves the FCM string
+  and forwards refreshes through the existing Capacitor registration event. No
+  Firebase dependency, APNs entitlement, signing material or credential is changed.
+- iOS support and permission helpers use the common native plugin. Android-only
+  intent/channel/token APIs stay Android-only. iOS foreground presentation keeps
+  the existing native alert/sound/badge configuration without a duplicate local alert.
+  livreurUrgentAlert also gates its native start/stop bridge on Android, preserving
+  its Android arguments and shared JavaScript cleanup.
+- Client registration passes clientProfil.id through useClientNotifications.
+  The server and direct fallback retain an existing client_id when an update omits
+  it, only for the same normalized email. A token moving accounts cannot inherit
+  the previous account's client_id. Other devices and all four roles are preserved.
+- Native persistence is serialized in one JavaScript runtime and checks the active
+  authenticated email. Delayed old contexts and logged-out profiles cannot write
+  or fall back. New login writes follow an already in-flight request. This is not a
+  distributed cancellation or transaction guarantee for old app versions/requests.
+- Token prefixes are removed from the modified registration diagnostics. No
+  PushTelemetry, production sends, live customer records or new grants are used.
+- Tests: ios-push-registration-regression executes the actual JS and server handler
+  with synthetic adapters and checks the Swift source contract. Twenty-three cases
+  cover iOS/Android, roles, permissions, rotation, account changes, delayed writes,
+  sequential idempotence and absent/null/empty client ids. This is not native runtime,
+  production RLS, concurrent database upsert or physical push reception evidence.
+- Historical 27-suite regressions, project lint and project TypeScript pass. Full
+  project typecheck has checkJs false and lint excludes several backend/lib paths;
+  the targeted adapters execute those changed paths. The changed registration
+  handler passes isolated strict Deno checking (baseline one diagnostic, patched
+  zero); earlier GPS graphs retain their separately documented baseline errors.
+  Web build succeeds with the public SILGAPP app id and native Vite config loader;
+  final validation logs record the result for this diff.
+- Native iOS compilation and controlled device validation must cover these
+  changes. Firebase/APNs configuration and real receipt remain separate checks;
+  source contracts and synthetic tests do not prove delivery.
+
+
+## Local availability projection and native auth preparation (October 14, after 70cd22ff)
+
+- AvailableCourseOffers reconciles records by real course/mission id and version.
+  A valid public Eco mission replaces its constituent individual cards once; true
+  independent Standard ids remain independent. A mission member must be Eco,
+  grouped, linked to that mission, unassigned, nonterminal and dispatch en_attente.
+  Fresh conversions and assignments supersede stale cache entries. The UI does
+  not convert modes, prices, commissions, route steps or server claims.
+- Feed, activity metric and dashboard badge share this projection. Mission members
+  are reread even with all cities OFF, without adding geographic filtering OFF.
+  Course and EcoMission events invalidate both scoped queries. Every standalone
+  Eco card stays labeled Eco and cannot enter the solo Standard acceptance path.
+  Affected files: availableCourseOffers, useCoursesDisponibles, CoursesDisponibles,
+  EcoMissionCard, ActiviteTempsReel and LivreurExterneApp.
+- Tests: available-course-offers-regression 25/25 PASS, including actual hook query
+  and subscription adapters. Historical hook harnesses inject the real selector;
+  their country, tenant, city ON/OFF and GPS assertions are retained. Photos alone
+  do not prove the displayed cards share database ids; production membership and
+  physical refreshed screens remain unverified.
+- Native OAuth client preparation adds nativeSocialAuth/nativeSocialAuthRuntime,
+  the optional SocialLoginButtons bridge and cancellation on email/login logout.
+  AuthGate rereads its existing session/routing after a verified bridge event.
+  iOS declares the silgapp URL scheme; Android receiver remains unchanged.
+- All native readiness flags remain false and runtime configuration remains null.
+  No server handoff, protected native pending store or endpoint is configured.
+  PKCE/state, strict return URLs, one attempt redemption, isolated same-app user
+  verification and cancellation are executed with synthetic adapters only.
+  Native-social-auth-regression 26/26 PASS does not establish cloud atomicity,
+  browser binding, secure cold storage, provider consent or real device login.
+  Existing email routes and iOS branding source equality remain protected.
+- Final current-source checks: 27/27 historical suites, 25 Eco, 26 native-auth and
+  23 push cases PASS. Full lint, project TypeScript and web build PASS. TypeScript
+  still has checkJs false; these are not native/device/backend integration proofs.
+
+## Dispatch delay investigation and truthful Admin status (October 14)
+
+- Production latency requires correlated creation, publication, receipt and
+  rendering evidence. Source checks alone do not establish a production cause.
+- The local V2 publisher writes disponible_push before awaiting the T0 notification
+  batch for all priorities. Standard en_attente is excluded from the driver feed;
+  it must not be exposed merely to bypass a missing publication. Eco isolated and
+  pending client decisions retain their dedicated guards.
+- ProposedLivreursListV2 previously displayed En diffusion unconditionally and
+  treated en_attente as active diffusion. Its presentation now distinguishes
+  waiting publication, Eco grouping, client decision, published, assigned and
+  terminal states. A recent driver count is no longer labeled proof of GPS
+  eligibility or notification receipt. No dispatch engine or assignment changes.
+- Dispatch-publication-visibility-regression 12/12 PASS executes the actual Admin
+  component and publisher with synthetic adapters. It proves source ordering and
+  presentation only. The sender-error case leaves a locally published record in
+  disponible_push; this is not proof of production history or later rewrites.
+- Validate production behavior separately. Do not replay automations or create
+  real deliveries or notifications solely to collect evidence without authorization.
+
+
+## Eco delivery and promo invariants
+- After all latest promo edits, current-source validation passes: 96/96 targeted
+  cases, 27/27 historical suites, lint, TypeScript and web build. Eco now has 25
+  cases including actual feed render. This covers the mixed working tree, not a
+  separately built Eco native package. Device and production-data proof is pending.
+- Capacitor configs embed dist, with no server.url. Android/iOS embedded indexes
+  differ from the latest dist. Web publication alone cannot update installed apps.
+  No backend deployment is needed for Eco. Preserve the final grouped release scope;
+  no partial native build, installation, schema/city write or publication occurred.
+- Separately retained promo edits add both store links to three share buttons and
+  one dynamic formatter; copy still writes the code only. Ten synthetic cases pass.
+  The existing fixed referral amount is extracted unchanged to promoBenefits.js
+  and reused by validerPrimePromo; its other source is exactly identical to 70cd22ff.
+  This backend extraction is outside the Eco-only patch and is not deployed. No
+  per-code reduction setting is invented: the current CodePromo schema has none.
+- Public store listings do not verify App Store Connect build availability or
+  deployment of a local candidate. Native social sign-in remains disabled.
+
+
+## Dashboard refresh performance (October 14, local grouped release)
+
+- Client counter no longer recreates its 5s initial timer on each GPS object.
+  It keeps the existing 120s cadence, reads the latest GPS, and starts after a
+  late first GPS. The 8s course poll also reads current profile/GPS callbacks.
+- Overlapping client status loads share one active read and one latest trailing
+  refresh. Identity/email/country/tenant scope changes invalidate old work without
+  waiting for its HTTP response; unmount discards queued work and old results.
+  Requests already sent are not aborted. Existing query and tenant filters remain.
+- Removed only the driver page's obsolete duplicate feed subscription. The shared
+  useCoursesDisponibles hook retains CourseExterne/EcoMission realtime invalidation,
+  GPS/zone gates, Eco projection and the existing 10s polling fallback.
+- Dashboard-performance-regression executes extracted actual effects/status code
+  with synthetic timers/entities: 10/10 PASS. GPS every 15s over 130s causes 2
+  counter reads instead of 9. One slow load plus 20 triggers causes 8 entity reads
+  instead of 84, retaining the final refresh. This is request-count simulation,
+  not measured device latency, real backend load or production confirmation.
+
+## Local completion checkpoint (October 14, investigation resumed)
+
+- Native OAuth preparation adds nativeSocialAuthTransport.js, the disabled-by-
+  default server contract nativeOAuthHandoff.js, and nativeAuthSecureStore.js with
+  iOS Keychain and Android Keystore source implementations. MainActivity and the
+  Xcode project now register the secure-store source. Runtime configuration remains
+  null and every readiness flag false. No live endpoint, provider credential,
+  production adapter, private key access, native build or installation was used.
+- The transport requires an explicitly verified same-app HTTPS endpoint, strict
+  primitive request/response fields, no cookies/redirects and bounded responses.
+  Server adapters must prove private storage, uniqueness and atomic CAS, trusted
+  browser identity/CSRF binding and authenticated vault context binding. Synthetic
+  CAS concurrency is not proof of Base44 atomicity. An uncertain consume receipt
+  returns no session and is not internally retried; replay behavior depends on
+  whether the underlying consume actually committed. No distributed tombstone is
+  claimed. No deployed provider exchange is configured.
+- The secure pending record contains only the short-lived PKCE transaction fields,
+  never a session token. The JS store fails closed when Capacitor payload logging
+  is enabled; no logging setting was changed. iOS uses app-scoped, nonsynchronizing
+  WhenUnlockedThisDeviceOnly Keychain storage. Android requires API 28+, an unlocked
+  device and an unlocked-device-required AES-GCM key, with ciphertext in no-backup
+  storage. Android 12-14 availability limitations remain documented in its source.
+  Physical lock/unlock, cold-start and native compiler validation remain pending.
+- CREATE in courseEventOrchestrator no longer waits for the redundant outer V2
+  config read: both old branches called the same dispatch function and payload.
+  The engine's own V2 guard, Eco hold, invocation order and error isolation remain.
+  UPDATE is unchanged. CREATE called[] omits its informational dispatchV2 marker;
+  function/error entries remain. No local consumer was found; external consumers
+  are unverified. Watchdog timing, eligibility, prices and finance are unchanged.
+- Dispatch-start-latency-regression executes the real source with synthetic
+  adapters. With an artificial configuration delay, it verifies one fewer read.
+  This is not a measurement or proof of resolved production latency.
+- Additional passing suites: native-social-transport 7 cases, native-auth-secure-
+  store 18, native-oauth-server-contract 32, and native-oauth-handoff-integration 13.
+  The integration runs the actual JS coordinator/transport/service/store together
+  through in-process HTTP responses, with mocked native bridge, vault, browser and
+  CAS storage. It does not validate real Google/Apple consent or native execution.
+- Source, adapter and synthetic integration checks have distinct scopes. Native
+  iOS compilation, physical receipt, production data isolation and a complete
+  provider journey require their own evidence.
+
+## Local continuation checkpoint — 2026-10-15 (not deployed)
+
+- Authentication: email/social mutual exclusion, bounded cancellable account verification, generation fences and ordered Preferences removal prevent stale session restoration. Every logout entry awaits the shared persistence helper. Browser callback diagnostics omit bearer values and native URL forwarding of bearer queries is removed. Historical bearer storage remains localStorage/cookie/Preferences; this is not a secure session migration. Native Google/Apple readiness stays disabled and runtime configuration absent until a supported server exchange and ordinary-user access isolation are verified.
+- Push: native action/registration listeners install before the direct Android FCM-token return; iOS early notification openings queue only in memory for the matching account dashboard, consume once, and clear on account switch. Native compiler and real notification receipt remain unverified.
+- Available offers: grouped Eco missions deduplicate their two constituent courses; activity counters use the same offer projection. Country/tenant/current-GPS rules and accepted missions remain protected. QueryClient-scoped refcounted subscriptions replace duplicate listeners, with cleanup on partial setup failure.
+- Admin: pending publication, published feed, expired acceptance and physical notification receipt are distinct. Dispatch CREATE removes a redundant configuration read; incident cause and real creation/publication/display/sound timing remain unproven.
+- Promo share preserves code, benefit and both store URLs. Actual device share sheet not yet checked.
+- Synthetic storage exercises do not establish global uniqueness, distributed
+  atomicity, provider login or ordinary-user access isolation. Operational reports
+  and device evidence are maintained separately from this public inventory.
+- Final auth failure handling: logout caller wait bounded to 15 seconds with generic AUTH_LOGOUT_UNCONFIRMED; native Preferences queue remains fenced until actual completion. Persistence suite 9 cases covers rejection/hang/late removal. SDK remains authenticated if durable removal fails. Auth bootstrap privacy 7 cases additionally guard raw SDK error/stack logging in AuthGate and base44Client; not a general application logging audit.
+## SILGAPP OFFICIEL continuation, 2026-10-15
+
+- Preserved prepared account/session generation guards, ordered durable logout,
+  auth concurrency, disabled provider UI, promo links, and truthful Admin states.
+- Realtime feed bursts now share one queued refresh per scope, never cancel a
+  running read, retain a trailing refresh, and stop after the last observer leaves.
+  Country-mismatched full events are ignored; sparse/delete events still refresh.
+- Push receipt and foreground return invalidate both available Standard and Eco
+  queries; proposals refresh without waiting for a tap or the fallback poll.
+- Explicit logout clears pending notification navigation, listeners' account
+  consumers and dedupe state. Push diagnostics discard arbitrary payloads, SDK
+  errors, tokens and headers. These are local adapter-tested guarantees only.
+- Restored 139's visibility of coherent missions with three or more members. The
+  pending handoff had introduced an exact-two presentation filter. Initial server
+  acceptance still requires exactly two; that conflict remains documented rather
+  than changing the financial/claim contract. On-route additions are untouched.
+- 45 source/adapter suites pass (42 handoff suites plus V2/Enterprise, disabled
+  exclusive-priority and on-route-modal guards). No production data was changed.
+- Validation: 45 source/adapter suites, project lint, TypeScript and web build
+  pass for the validated application source. Android release compilation also
+  succeeds. These checks do not establish native iOS execution, live push receipt
+  or production dispatch latency. Project checkJs remains false.
+- Existing dependency versions are retained. Apple numbering, signing and upload
+  require a current App Store Connect check and reviewed release configuration.
+  Backend deployment and city activation remain separate operations.

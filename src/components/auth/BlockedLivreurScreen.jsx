@@ -1,7 +1,6 @@
 import React, { useState } from "react";
-import { base44 } from "@/api/base44Client";
 import { Truck, MessageCircle, X } from "lucide-react";
-import { clearPersistedToken } from "@/lib/authPersistence";
+import { logoutPersistent } from "@/lib/authPersistence";
 import SupportChatWindow from "@/components/chat/SupportChatWindow";
 
 /**
@@ -85,7 +84,10 @@ export default function BlockedLivreurScreen({ livreur, state }) {
         </button>
 
         <button
-          onClick={() => { clearPersistedToken(); base44.auth.logout(); }}
+          onClick={async () => {
+            try { await logoutPersistent(); }
+            catch { window.alert("La déconnexion n’a pas pu être enregistrée. Réessayez."); }
+          }}
           className="text-xs text-primary underline"
         >
           Se déconnecter

@@ -137,7 +137,7 @@ test('3. Un livreur à Saaba peut recevoir une course de Ouagadougou (zone activ
     }]]),
     livreurs: new Map([['l1', {
       id: 'l1', country_code: 'BF', ville: 'Saaba',
-      latitude: 12.45, longitude: -1.40, derniere_position_date: new Date().toISOString(),
+      latitude: 12.45, longitude: -1.40, gps_fix_valid: true, gps_fix_date: new Date().toISOString(), gps_accuracy: 20, derniere_position_date: new Date().toISOString(),
     }]]),
   });
 
@@ -162,7 +162,7 @@ test('4. Un livreur à Ouaga peut recevoir une course de Saaba (zone activée)',
     }]]),
     livreurs: new Map([['l1', {
       id: 'l1', country_code: 'BF', ville: 'Ouagadougou',
-      latitude: 12.37, longitude: -1.52, derniere_position_date: new Date().toISOString(),
+      latitude: 12.37, longitude: -1.52, gps_fix_valid: true, gps_fix_date: new Date().toISOString(), gps_accuracy: 20, derniere_position_date: new Date().toISOString(),
     }]]),
   });
 
@@ -187,7 +187,7 @@ test('5. Un livreur à Bobo ne peut pas accepter une course de zone Ouaga activ�
     }]]),
     livreurs: new Map([['l1', {
       id: 'l1', country_code: 'BF', ville: 'Bobo-Dioulasso',
-      latitude: 11.17, longitude: -4.30, derniere_position_date: new Date().toISOString(),
+      latitude: 11.17, longitude: -4.30, gps_fix_valid: true, gps_fix_date: new Date().toISOString(), gps_accuracy: 20, derniere_position_date: new Date().toISOString(),
     }]]),
   });
 
@@ -260,7 +260,7 @@ test('8. Aucune ville activée → comportement historique (pas de filtre)', asy
     }]]),
     livreurs: new Map([['l1', {
       id: 'l1', country_code: 'BF', ville: 'Bobo-Dioulasso',
-      latitude: 11.17, longitude: -4.30, derniere_position_date: new Date().toISOString(),
+      latitude: 11.17, longitude: -4.30, gps_fix_valid: true, gps_fix_date: new Date().toISOString(), gps_accuracy: 20, derniere_position_date: new Date().toISOString(),
     }]]),
   });
 
@@ -289,7 +289,7 @@ test('9. Course en zone activée → livreur autre zone bloqué', async () => {
     }]]),
     livreurs: new Map([['l1', {
       id: 'l1', country_code: 'BF', ville: 'Koudougou',
-      latitude: 12.25, longitude: -2.36, derniere_position_date: new Date().toISOString(),
+      latitude: 12.25, longitude: -2.36, gps_fix_valid: true, gps_fix_date: new Date().toISOString(), gps_accuracy: 20, derniere_position_date: new Date().toISOString(),
     }]]),
   });
 
@@ -314,7 +314,7 @@ test('10. Course en zone non activée → tous les livreurs peuvent accepter', a
     }]]),
     livreurs: new Map([['l1', {
       id: 'l1', country_code: 'BF', ville: 'Ouagadougou',
-      latitude: 12.37, longitude: -1.52, derniere_position_date: new Date().toISOString(),
+      latitude: 12.37, longitude: -1.52, gps_fix_valid: true, gps_fix_date: new Date().toISOString(), gps_accuracy: 20, derniere_position_date: new Date().toISOString(),
     }]]),
   });
 
@@ -340,7 +340,7 @@ test('11. Course en zone non activée → livreur autre zone non activée peut a
     }]]),
     livreurs: new Map([['l1', {
       id: 'l1', country_code: 'BF', ville: 'Bobo-Dioulasso',
-      latitude: 11.17, longitude: -4.30, derniere_position_date: new Date().toISOString(),
+      latitude: 11.17, longitude: -4.30, gps_fix_valid: true, gps_fix_date: new Date().toISOString(), gps_accuracy: 20, derniere_position_date: new Date().toISOString(),
     }]]),
   });
 
@@ -373,10 +373,13 @@ test('12. buildLivreurCityFilter : zone activée → filtre $in avec communes ra
   const course = await mockSdk.asServiceRole.entities.CourseExterne.get('c1');
   const filter = await buildLivreurCityFilter(mockSdk, course);
 
-  assert.ok(filter.ville, 'Filtre ville présent');
-  const allowed = new RegExp(filter.ville.$regex, filter.ville.$options);
-  for (const name of ['Ouagadougou', 'Saaba', 'ouagadougou', ' SAABA ']) assert.ok(allowed.test(name), `Inclut ${name}`);
-  for (const name of ['Bobo-Dioulasso', 'Grand Saaba Nord', 'CI']) assert.ok(!allowed.test(name), `Exclut ${name}`);
+  assert.strictEqual(filter.ville, undefined, 'Pas de critère ville du profil');
+  assert.strictEqual(filter.gps_operational_city, 'ouagadougou');
+  assert.strictEqual(filter.gps_fix_valid, true);
+  assert.ok(filter.gps_fix_date.$gte && filter.gps_fix_date.$lte);
+  const { currentDriverGpsCity } = await import('../base44/shared/currentGpsCity.js');
+  const gps = TEST_QUARTIERS.find(q => q.ville === 'Saaba');
+  assert.strictEqual(currentDriverGpsCity({ country_code: 'BF', latitude: gps.latitude, longitude: gps.longitude, gps_accuracy: 20, gps_fix_date: new Date().toISOString(), gps_fix_valid: true }, [{ nom: 'ouagadougou', communes_rattachees: '["Saaba"]' }], TEST_QUARTIERS), 'ouagadougou');
 });
 
 test('13. buildLivreurCityFilter : zone non activée → pas de filtre', async () => {
@@ -407,7 +410,7 @@ test('14. buildCourseCityFilterForLivreur : exclut courses d\'autres zones activ
     quartiers: TEST_QUARTIERS,
     livreurs: new Map([['l1', {
       id: 'l1', country_code: 'BF', ville: 'Ouagadougou',
-      latitude: 12.37, longitude: -1.52, derniere_position_date: new Date().toISOString(),
+      latitude: 12.37, longitude: -1.52, gps_fix_valid: true, gps_fix_date: new Date().toISOString(), gps_accuracy: 20, derniere_position_date: new Date().toISOString(),
     }]]),
   });
 
@@ -466,7 +469,7 @@ test('19. getDriverOperationalCity : "Saaba" → "ouagadougou"', async () => {
   await clearCaches();
   const mockSdk = createMockBase44({ quartiers: TEST_QUARTIERS });
   const { getDriverOperationalCity } = await import('../base44/shared/operationalZones.ts');
-  const livreur = { id: 'l1', country_code: 'BF', ville: 'Saaba', latitude: 0, longitude: 0 };
+  const livreur = { id: 'l1', country_code: 'BF', ville: 'Saaba', gps_fix_valid: true, gps_fix_date: new Date().toISOString(), gps_accuracy: 20, latitude: TEST_QUARTIERS.find(q => q.ville === 'Saaba').latitude, longitude: TEST_QUARTIERS.find(q => q.ville === 'Saaba').longitude };
   const city = await getDriverOperationalCity(mockSdk, livreur);
   assert.strictEqual(city, 'ouagadougou', 'Saaba → ouagadougou');
 });
@@ -475,7 +478,7 @@ test('20. getDriverOperationalCity : "Ouagadougou" → "ouagadougou"', async () 
   await clearCaches();
   const mockSdk = createMockBase44({ quartiers: TEST_QUARTIERS });
   const { getDriverOperationalCity } = await import('../base44/shared/operationalZones.ts');
-  const livreur = { id: 'l1', country_code: 'BF', ville: 'Ouagadougou', latitude: 0, longitude: 0 };
+  const livreur = { id: 'l1', country_code: 'BF', ville: 'Ouagadougou', gps_fix_valid: true, gps_fix_date: new Date().toISOString(), gps_accuracy: 20, latitude: 12.37, longitude: -1.52 };
   const city = await getDriverOperationalCity(mockSdk, livreur);
   assert.strictEqual(city, 'ouagadougou', 'Ouagadougou → ouagadougou');
 });
@@ -497,7 +500,7 @@ test('21. Ancien APK livreur → backend reste l\'autorité (zone activée bloqu
     }]]),
     livreurs: new Map([['l1', {
       id: 'l1', country_code: 'BF', ville: 'Bobo-Dioulasso',
-      latitude: 11.17, longitude: -4.30, derniere_position_date: new Date().toISOString(),
+      latitude: 11.17, longitude: -4.30, gps_fix_valid: true, gps_fix_date: new Date().toISOString(), gps_accuracy: 20, derniere_position_date: new Date().toISOString(),
     }]]),
   });
 
@@ -509,13 +512,13 @@ test('21. Ancien APK livreur → backend reste l\'autorité (zone activée bloqu
   assert.strictEqual(result.compatible, false, 'Backend bloque même avec ancien APK');
 });
 
-test('22. Ancien APK livreur → ville "Saaba" résolue en "ouagadougou"', async () => {
+test('22. Ancien APK livreur → profil Saaba sans preuve GPS refusé', async () => {
   await clearCaches();
   const mockSdk = createMockBase44({ quartiers: TEST_QUARTIERS });
   const { getDriverOperationalCity } = await import('../base44/shared/operationalZones.ts');
-  const livreur = { id: 'l1', country_code: 'BF', ville: 'Saaba', latitude: 0, longitude: 0 };
+  const livreur = { id: 'l1', country_code: 'BF', ville: 'Saaba', gps_fix_valid: false, gps_fix_date: new Date().toISOString(), gps_accuracy: 20, latitude: TEST_QUARTIERS.find(q => q.ville === 'Saaba').latitude, longitude: TEST_QUARTIERS.find(q => q.ville === 'Saaba').longitude };
   const city = await getDriverOperationalCity(mockSdk, livreur);
-  assert.strictEqual(city, 'ouagadougou', 'Saaba résolu en ouagadougou');
+  assert.strictEqual(city, null, 'Ancien client sans preuve GPS: aucun accès protégé');
 });
 
 // ════════════════════════════════════════════════════════════════════════
@@ -555,7 +558,7 @@ test('24. Désactivation d\'urgence d\'une ville → restrictions cessent', asyn
     }]]),
     livreurs: new Map([['l1', {
       id: 'l1', country_code: 'BF', ville: 'Bobo-Dioulasso',
-      latitude: 11.17, longitude: -4.30, derniere_position_date: new Date().toISOString(),
+      latitude: 11.17, longitude: -4.30, gps_fix_valid: true, gps_fix_date: new Date().toISOString(), gps_accuracy: 20, derniere_position_date: new Date().toISOString(),
     }]]),
   });
   const { verifyCityCompatibility } = await import('../base44/shared/cityDispatchFilter.ts');
@@ -576,7 +579,7 @@ test('24. Désactivation d\'urgence d\'une ville → restrictions cessent', asyn
     }]]),
     livreurs: new Map([['l1', {
       id: 'l1', country_code: 'BF', ville: 'Bobo-Dioulasso',
-      latitude: 11.17, longitude: -4.30, derniere_position_date: new Date().toISOString(),
+      latitude: 11.17, longitude: -4.30, gps_fix_valid: true, gps_fix_date: new Date().toISOString(), gps_accuracy: 20, derniere_position_date: new Date().toISOString(),
     }]]),
   });
   await clearCaches();
@@ -600,7 +603,7 @@ test('25. Toutes les villes OFF → comportement historique', async () => {
     }]]),
     livreurs: new Map([['l1', {
       id: 'l1', country_code: 'BF', ville: 'Bobo-Dioulasso',
-      latitude: 11.17, longitude: -4.30, derniere_position_date: new Date().toISOString(),
+      latitude: 11.17, longitude: -4.30, gps_fix_valid: true, gps_fix_date: new Date().toISOString(), gps_accuracy: 20, derniere_position_date: new Date().toISOString(),
     }]]),
   });
 
@@ -628,7 +631,7 @@ test('26. Ville absente du référentiel → pas de filtre (graceful)', async ()
     }]]),
     livreurs: new Map([['l1', {
       id: 'l1', country_code: 'BF', ville: 'Bobo-Dioulasso',
-      latitude: 11.17, longitude: -4.30, derniere_position_date: new Date().toISOString(),
+      latitude: 11.17, longitude: -4.30, gps_fix_valid: true, gps_fix_date: new Date().toISOString(), gps_accuracy: 20, derniere_position_date: new Date().toISOString(),
     }]]),
   });
 

@@ -14,7 +14,7 @@ import NewMessageModal from "@/components/partenaire/NewMessageModal";
 import OngletCodePromoPartenaire from "@/components/partenaire/OngletCodePromoPartenaire";
 import VenusFloatingButton from "@/components/client/VenusFloatingButton";
 import SilgappLiveStats from "@/components/shared/SilgappLiveStats";
-import { clearPersistedToken } from "@/lib/authPersistence";
+import { logoutPersistent } from "@/lib/authPersistence";
 import { registerPushToken, consumePendingNotificationData } from "@/lib/notifications";
 import { usePushTokenRetry } from "@/hooks/usePushTokenRetry";
 
@@ -280,7 +280,7 @@ export default function PartenaireDashboard() {
               Retour au choix de rôle
             </button>
             <span className="text-border">|</span>
-            <button onClick={() => { clearPersistedToken(); base44.auth.logout(); }} className="text-sm text-muted-foreground underline">Se déconnecter</button>
+            <button onClick={async () => { try { await logoutPersistent(); } catch { window.alert("La déconnexion n’a pas pu être enregistrée. Réessayez."); } }} className="text-sm text-muted-foreground underline">Se déconnecter</button>
           </div>
           {tab === "boutique_form" && (
             <EtablissementForm type="boutique" partenaireId={user.id} userEmail={user.email} isAdmin={user?.role === 'admin'}
@@ -320,14 +320,14 @@ export default function PartenaireDashboard() {
           <div className="flex items-center justify-center gap-3 pt-1">
             <button onClick={async () => {
               await base44.auth.updateMe({ silgapp_role: "" }).catch(() => {});
-              clearPersistedToken();
-              base44.auth.logout();
+              try { await logoutPersistent(); }
+              catch { window.alert("La déconnexion n’a pas pu être enregistrée. Réessayez."); }
             }} className="flex items-center gap-1 text-xs text-primary font-medium hover:text-primary-dark py-2 px-3">
               <ArrowLeft className="w-3.5 h-3.5" />
               Changer de rôle
             </button>
             <span className="text-border">|</span>
-            <button onClick={() => { clearPersistedToken(); base44.auth.logout(); }} className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground/70 py-2 px-3">Se déconnecter</button>
+            <button onClick={async () => { try { await logoutPersistent(); } catch { window.alert("La déconnexion n’a pas pu être enregistrée. Réessayez."); } }} className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground/70 py-2 px-3">Se déconnecter</button>
           </div>
         </div>
       </div>
@@ -347,14 +347,14 @@ export default function PartenaireDashboard() {
           <div className="flex items-center justify-center gap-3 pt-1">
             <button onClick={async () => {
               await base44.auth.updateMe({ silgapp_role: "" }).catch(() => {});
-              clearPersistedToken();
-              base44.auth.logout();
+              try { await logoutPersistent(); }
+              catch { window.alert("La déconnexion n’a pas pu être enregistrée. Réessayez."); }
             }} className="flex items-center gap-1 text-xs text-primary font-medium hover:text-primary-dark py-2 px-3">
               <ArrowLeft className="w-3.5 h-3.5" />
               Changer de rôle
             </button>
             <span className="text-border">|</span>
-            <button onClick={() => { clearPersistedToken(); base44.auth.logout(); }} className="text-xs text-primary underline py-2 px-3">Se déconnecter</button>
+            <button onClick={async () => { try { await logoutPersistent(); } catch { window.alert("La déconnexion n’a pas pu être enregistrée. Réessayez."); } }} className="text-xs text-primary underline py-2 px-3">Se déconnecter</button>
           </div>
         </div>
       </div>
@@ -387,7 +387,7 @@ export default function PartenaireDashboard() {
             </div>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            <button onClick={() => { clearPersistedToken(); base44.auth.logout(); }} className="w-9 h-9 rounded-xl bg-blue-50 text-primary flex items-center justify-center hover:bg-blue-100 transition-colors border border-blue-100">
+            <button onClick={async () => { try { await logoutPersistent(); } catch { window.alert("La déconnexion n’a pas pu être enregistrée. Réessayez."); } }} className="w-9 h-9 rounded-xl bg-blue-50 text-primary flex items-center justify-center hover:bg-blue-100 transition-colors border border-blue-100">
               <LogOut className="w-4 h-4" />
             </button>
           </div>

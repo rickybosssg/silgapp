@@ -1,3 +1,4 @@
+import { PROMO_FIRST_COURSE_AMOUNT_FCFA } from '../../shared/promoBenefits.js';
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 import { chargerTauxCommissionEffectif, hasZeroCommissionLock, zeroCommissionFields } from '../../shared/commissionLock.ts';
 
@@ -260,7 +261,7 @@ export default async function(req) {
     }
 
     // ── 4. MONTANT RÉEL DE LA PRIME ──
-    const PRIME_FIXE = 100; // Montant réel engagé (reduction_client + prime_proprietaire)
+    const PRIME_FIXE = PROMO_FIRST_COURSE_AMOUNT_FCFA; // Montant réel engagé (reduction_client + prime_proprietaire)
     const primeAmount = PRIME_FIXE;
 
     // ── 5. RÉSERVATION ATOMIQUE DU BUDGET ──

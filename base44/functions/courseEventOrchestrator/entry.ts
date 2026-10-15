@@ -120,24 +120,12 @@ Deno.serve(async (req) => {
 
       // 1. Preserve normal dispatch before non-blocking on-route proposals.
 
-      const v2Enabled = await isV2Enabled(base44);
-      if (v2Enabled) {
-        // V2 : dispatchExterneAuto publie et notifie de façon idempotente.
-        await fireInvoke('dispatchExterneAuto', {
+      await fireInvoke('dispatchExterneAuto', {
           action: 'lancer_recherche_auto',
           course_id: courseId,
           event,
           data,
         });
-        called.push('dispatchV2');
-      } else {
-        await fireInvoke('dispatchExterneAuto', {
-          action: 'lancer_recherche_auto',
-          course_id: courseId,
-          event,
-          data,
-        });
-      }
 
       // Ordinary proposals never delay or reserve the Standard dispatch.
       const onRouteResult = await triggerOnRouteProposalsForNewCourse(base44, courseId).catch((error) => {

@@ -76,7 +76,8 @@ assert.match(coursesDisponiblesSource, /Course Eco en attente de regroupement/, 
 assert.match(coursesDisponiblesSource, /durationSeconds:\s*10/, "la sonnerie V2 doit durer dix secondes");
 assert.match(coursesDisponiblesSource, /action:\s*"accepter_course_v2"/, "l'acceptation doit utiliser le verrou V2 compatible avec en_attente");
 assert.match(coursesDisponiblesSource, /persistDismissedCourse\(course\.id\)/, "un refus doit rester masque apres navigation");
-assert.match(coursesDisponiblesSource, /event\.type === "create"/, "une nouvelle course doit rafraichir le fil en temps reel");
+assert.match(useCoursesDisponiblesSource, /base44\.entities\.CourseExterne\.subscribe\(refresh\)/, "une nouvelle course doit rafraichir le fil via le hook partage");
+assert.match(useCoursesDisponiblesSource, /acquireQuerySubscription\(queryClient/, "les composants partagent les abonnements temps reel sans doublon");
 assert.match(dispatchSource, /getLivreursRefuses/, "le backend doit verifier les refus persistants");
 assert.match(dispatchSource, /isDisponiblePush\s*\?\s*isLivreurDisponible/, "le backend doit autoriser un livreur eligible en mode disponible_push");
 assert.match(dispatchSource, /!refusedIds\.includes\(livreur_id\)/, "le backend doit exclure le livreur ayant refuse cette course");

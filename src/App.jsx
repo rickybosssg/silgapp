@@ -10,7 +10,7 @@ import PageNotFound from './lib/PageNotFound';
 import AuthGate from './components/auth/AuthGate.jsx';
 import SelectionReseau from './pages/SelectionReseau.jsx';
 import AppMaintenanceGate from './components/admin/AppMaintenanceGate.jsx';
-import { restoreTokenFromCookie, syncTokenFromPreferences, clearPersistedToken } from '@/lib/authPersistence';
+import { restoreTokenFromCookie, syncTokenFromPreferences } from '@/lib/authPersistence';
 import { trackAppInstall } from '@/lib/trackInstall';
 import IOSAppStoreBanner from './components/IOSAppStoreBanner.jsx';
 

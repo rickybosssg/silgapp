@@ -21,33 +21,24 @@
       avant que createClient() soit appelé.
     -->
     <script>
-      // Diagnostic APK — détecte l'erreur exacte
+      // Keep diagnostics useful without printing URLs, request objects or session data.
       window.addEventListener('error', function(e) {
-        console.error('[DIAGNOSTIC]', e.message, 'at', e.filename, ':', e.lineno, ':', e.colno);
+        var errorType = e.error && e.error.name;
+        if (!/^(Error|TypeError|ReferenceError|SyntaxError|RangeError|URIError|EvalError)$/.test(errorType || '')) errorType = 'Error';
+        console.error('[DIAGNOSTIC] Erreur JavaScript', errorType, e.lineno, e.colno);
         if (e.message && e.message.includes('before initialization')) {
-          console.error('[DIAGNOSTIC] ERREUR INITIALISATION:', e.message);
-          console.error('[DIAGNOSTIC] Stack:', e.error?.stack);
+          console.error('[DIAGNOSTIC] ERREUR INITIALISATION');
         }
       });
       window.addEventListener('unhandledrejection', function(e) {
-        console.error('[DIAGNOSTIC] Promise rejected:', e.reason);
+        var errorType = e.reason && e.reason.name;
+        if (!/^(Error|TypeError|ReferenceError|SyntaxError|RangeError|URIError|EvalError)$/.test(errorType || '')) errorType = 'Error';
+        console.error('[DIAGNOSTIC] Promise rejected', errorType);
       });
       console.log('[DIAGNOSTIC] Script chargé à', new Date().toISOString());
     </script>
-    <script>
-      (function() {
-        try {
-          var isAuthCallback = window.location.pathname === '/auth-callback';
-          var hasToken = window.location.search && window.location.search.indexOf('access_token=') !== -1;
-          var isNativeWebView = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
-          if (isAuthCallback && hasToken && !isNativeWebView) {
-            window.location.replace('silgapp://auth-callback' + window.location.search);
-          }
-        } catch(e) {
-          console.error('[AUTH CALLBACK] Erreur redirection app:', e);
-        }
-      })();
-    </script>
+    <!-- Native social returns use only the separately verified code/state bridge.
+         Never forward the managed web provider's bearer query into an app URL. -->
     <script>
       // ── Restauration du token depuis le cookie (synchrone, avant tout module ES) ──
       // Sur Android WebView, localStorage peut être effacé quand le système récupère
@@ -66,7 +57,7 @@
             }
           }
         } catch(e) {
-          console.error('[TOKEN] Erreur restauration cookie:', e);
+          console.error('[TOKEN] Erreur restauration cookie');
         }
       })();
     </script>
@@ -79,22 +70,22 @@
             console.log('[TOKEN] access_token trouvé dans URL');
             var params = new URLSearchParams(search);
             var token = params.get('access_token');
+            params.delete('access_token');
+            var clean = window.location.pathname + (params.toString() ? '?' + params.toString() : '') + window.location.hash;
+            window.history.replaceState({}, document.title, clean);
             if (token && token.length > 10 && token !== 'null' && token !== 'undefined') {
               console.log('[TOKEN] Token valide, stockage...');
               localStorage.setItem('base44_access_token', token);
               localStorage.setItem('access_token', token);
-              params.delete('access_token');
-              var clean = window.location.pathname + (params.toString() ? '?' + params.toString() : '') + window.location.hash;
-              window.history.replaceState({}, document.title, clean);
               console.log('[TOKEN] Token stocké avec succès');
             } else {
-              console.log('[TOKEN] Token invalide:', token);
+              console.log('[TOKEN] Token invalide');
             }
           } else {
             console.log('[TOKEN] Pas de token dans URL');
           }
         } catch(e) {
-          console.error('[TOKEN] Erreur capture token:', e);
+          console.error('[TOKEN] Erreur capture token');
         }
       })();
     </script>

@@ -1,13 +1,14 @@
 import React, { useState, useCallback } from "react";
 import { Menu, X, LogOut, RefreshCw } from "lucide-react";
-import { base44 } from "@/api/base44Client";
+import { logoutPersistent } from "@/lib/authPersistence";
 import EnterpriseSidebar, { enterpriseNavItems } from "./EnterpriseSidebar";
 
-const doLogout = () => {
+const doLogout = async () => {
   ["base44_access_token", "access_token", "base44_token", "token"].forEach(k => {
     try { localStorage.removeItem(k); } catch (_) {}
   });
-  base44.auth.logout();
+  try { await logoutPersistent(); }
+  catch { window.alert("La déconnexion n’a pas pu être enregistrée. Réessayez."); return; }
   setTimeout(() => window.location.reload(), 300);
 };
 
