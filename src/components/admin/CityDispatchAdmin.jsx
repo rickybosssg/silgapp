@@ -7,9 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { MapPin, Users, Package, Bike, TrendingUp, Activity, Clock, AlertCircle, Globe, Building2 } from 'lucide-react';
 import CityDispatchToggle from './CityDispatchToggle';
 import CityDispatchMap from './CityDispatchMap';
-import CityDispatchLivreurList from './CityDispatchLivreurList';
 import OperationalCityManager from './OperationalCityManager';
-import { normalizeCityName, classifyLivreurGPS } from '@/lib/gpsCityResolver';
 
 const ACTIVE_COURSE_STATUSES = ['recherche_livreur', 'livreur_en_route', 'en_route_expediteur', 'arrive_prise_en_charge', 'colis_recupere', 'en_livraison', 'arrivee'];
 
@@ -27,128 +25,99 @@ export default function CityDispatchAdmin() {
     staleTime: 60000,
   });
 
-  // ── Villes opérationnelles configurées pour le pays (toutes, même inactives) ──
-  const { data: operationalCities = [] } = useQuery({
-    queryKey: ['operational-cities-admin', selectedCountry],
+  // ── Charger les villes pour le pays sélectionné ──
+  const { data: cities = [], isFetching: citiesLoading } = useQuery({
+    queryKey: ['cities-for-country', selectedCountry],
     queryFn: async () => {
       if (!selectedCountry) return [];
-      const list = await base44.entities.OperationalCity.filter(
-        { country_code: selectedCountry }, 'nom_affichage', 100
-      );
-      return list || [];
+      const [livreurs, courses] = await Promise.all([
+        base44.entities.Livreur.filter(
+          { country_code: selectedCountry, ville: { $ne: null } },
+          undefined, 200
+        ),
+        base44.entities.CourseExterne.filter(
+          { country_code: selectedCountry, ville_depart: { $ne: null } },
+          undefined, 200
+        ),
+      ]);
+      const citySet = new Set();
+      for (const l of livreurs || []) {
+        if (l.ville?.trim()) citySet.add(l.ville.trim());
+      }
+      for (const c of courses || []) {
+        if (c.ville_depart?.trim()) citySet.add(c.ville_depart.trim());
+      }
+      return Array.from(citySet).sort();
     },
     enabled: !!selectedCountry,
     staleTime: 30000,
   });
 
-  // ── Tous les livreurs du pays (pas de filtre ville) ──
-  const { data: allLivreurs = [], isLoading: livreursLoading } = useQuery({
-    queryKey: ['all-livreurs-country', selectedCountry],
+  // ── Charger les livreurs et courses pour la carte ──
+  const { data: mapData = { livreurs: [], courses: [] }, isLoading: mapLoading } = useQuery({
+    queryKey: ['city-dispatch-map-data', selectedCountry, selectedCity],
     queryFn: async () => {
-      if (!selectedCountry) return [];
-      const list = await base44.entities.Livreur.filter(
-        { country_code: selectedCountry }, '-last_seen_at', 500
-      );
-      return list || [];
-    },
-    enabled: !!selectedCountry,
-    refetchInterval: 20000,
-    staleTime: 0,
-  });
-
-  // ── Quartiers du pays (référentiel GPS pour résolution ville) ──
-  const { data: quartiers = [] } = useQuery({
-    queryKey: ['quartiers-country-admin', selectedCountry],
-    queryFn: async () => {
-      if (!selectedCountry) return [];
-      const list = await base44.entities.Quartier.filter(
-        { country_code: selectedCountry, actif: true }, 'nom', 500
-      );
-      return (list || []).filter(q => q.latitude && q.longitude);
-    },
-    enabled: !!selectedCountry,
-    staleTime: 600000,
-  });
-
-  // ── Courses actives du pays (filtrées par ville_depart si ville sélectionnée) ──
-  const { data: courses = [] } = useQuery({
-    queryKey: ['city-courses-admin', selectedCountry, selectedCity],
-    queryFn: async () => {
-      if (!selectedCountry) return [];
-      const filter = { country_code: selectedCountry, statut: { $in: ACTIVE_COURSE_STATUSES } };
-      if (selectedCity) filter.ville_depart = { $regex: selectedCity, $options: 'i' };
-      const list = await base44.entities.CourseExterne.filter(filter, '-created_date', 200);
-      return list || [];
-    },
-    enabled: !!selectedCountry,
-    refetchInterval: 20000,
-    staleTime: 0,
-  });
-
-  // ── Classifier chaque livreur par GPS ──
-  const classifications = useMemo(() => {
-    const map = {};
-    const selectedCityNorm = normalizeCityName(selectedCity);
-    for (const l of allLivreurs) {
-      const cls = classifyLivreurGPS(l, quartiers);
-      if (selectedCityNorm) {
-        if (cls.gpsStatus === 'located' && cls.resolvedCity === selectedCityNorm) {
-          cls.displayStatus = 'located';
-          cls.displayLabel = 'Localisé';
-        } else if (cls.gpsStatus === 'located') {
-          cls.displayStatus = 'other_city';
-          cls.displayLabel = `Localisé à ${cls.resolvedCity}`;
-        } else if (cls.gpsStatus === 'out_of_zone') {
-          cls.displayStatus = 'out_of_zone';
-          cls.displayLabel = 'Hors zone';
-        } else if (cls.gpsStatus === 'stale' && cls.resolvedProfileCity === selectedCityNorm) {
-          cls.displayStatus = 'stale';
-          cls.displayLabel = 'Localisation à actualiser';
-        } else {
-          cls.displayStatus = 'other_city';
-          cls.displayLabel = 'Localisation à actualiser';
-        }
-      } else {
-        if (cls.gpsStatus === 'located') {
-          cls.displayStatus = 'located';
-          cls.displayLabel = `Localisé à ${cls.resolvedCity}`;
-        } else if (cls.gpsStatus === 'out_of_zone') {
-          cls.displayStatus = 'out_of_zone';
-          cls.displayLabel = 'Hors zone';
-        } else {
-          cls.displayStatus = 'stale';
-          cls.displayLabel = 'Localisation à actualiser';
-        }
+      if (!selectedCountry) return { livreurs: [], courses: [] };
+      const cityRegex = selectedCity ? { $regex: selectedCity, $options: 'i' } : null;
+      const livreurFilter = { country_code: selectedCountry };
+      const courseFilter = { country_code: selectedCountry, statut: { $in: ACTIVE_COURSE_STATUSES } };
+      if (cityRegex) {
+        livreurFilter.ville = cityRegex;
+        courseFilter.ville_depart = cityRegex;
       }
-      map[l.id] = cls;
-    }
-    return map;
-  }, [allLivreurs, quartiers, selectedCity]);
+      const [livreurs, courses] = await Promise.all([
+        base44.entities.Livreur.filter(livreurFilter, '-last_seen_at', 200),
+        base44.entities.CourseExterne.filter(courseFilter, '-created_date', 200),
+      ]);
+      return { livreurs: livreurs || [], courses: courses || [] };
+    },
+    enabled: !!selectedCountry,
+    refetchInterval: 20000,
+    staleTime: 0,
+  });
 
-  // ── Livreurs filtrés pour affichage (carte + liste) ──
-  const filteredLivreurs = useMemo(() => {
-    if (!selectedCity) return allLivreurs;
-    return allLivreurs.filter(l => {
-      const cls = classifications[l.id];
-      return cls?.displayStatus === 'located' || cls?.displayStatus === 'stale';
-    });
-  }, [allLivreurs, classifications, selectedCity]);
-
-  // ── Statistiques ──
-  const stats = useMemo(() => {
-    const located = filteredLivreurs.filter(l => classifications[l.id]?.displayStatus === 'located');
-    const stale = filteredLivreurs.filter(l => classifications[l.id]?.displayStatus === 'stale');
-    return {
-      totalInscrits: allLivreurs.length,
-      localises: located.length,
-      aActualiser: stale.length,
-      dispo: located.filter(l => l.statut === 'disponible').length,
-      enCourse: located.filter(l => l.statut === 'en_course').length,
-      horsLigne: located.filter(l => l.statut === 'hors_ligne').length,
-      coursesEnRecherche: courses.filter(c => c.dispatch_status === 'disponible_push').length,
-      coursesEnLivraison: courses.filter(c => ['livreur_en_route', 'en_route_expediteur', 'arrive_prise_en_charge', 'colis_recupere', 'en_livraison', 'arrivee'].includes(c.statut)).length,
-    };
-  }, [filteredLivreurs, classifications, allLivreurs, courses]);
+  // ── Statistiques par ville ──
+  const { data: cityStats, isLoading: statsLoading } = useQuery({
+    queryKey: ['city-stats', selectedCountry, selectedCity],
+    queryFn: async () => {
+      if (!selectedCountry || !selectedCity) return null;
+      const cityRegex = { $regex: selectedCity, $options: 'i' };
+      const [livreurs, coursesAll] = await Promise.all([
+        base44.entities.Livreur.filter(
+          { country_code: selectedCountry, ville: cityRegex },
+          '-last_seen_at', 500
+        ),
+        base44.entities.CourseExterne.filter(
+          { country_code: selectedCountry, ville_depart: cityRegex },
+          '-created_date', 500
+        ),
+      ]);
+      const livreursList = livreurs || [];
+      const coursesList = coursesAll || [];
+      const disponible = livreursList.filter(l => l.statut === 'disponible').length;
+      const horsLigne = livreursList.filter(l => l.statut === 'hors_ligne').length;
+      const enCourse = livreursList.filter(l => l.statut === 'en_course').length;
+      const gpsRecent = livreursList.filter(l => {
+        if (!l.derniere_position_date) return false;
+        return (Date.now() - new Date(l.derniere_position_date).getTime()) / 60000 < 10;
+      }).length;
+      const coursesNouvelles = coursesList.filter(c => c.statut === 'nouvelle' || c.statut === 'recherche_livreur').length;
+      const coursesEnRecherche = coursesList.filter(c => c.dispatch_status === 'disponible_push').length;
+      const coursesEnLivraison = coursesList.filter(c => ['livreur_en_route', 'en_route_expediteur', 'arrive_prise_en_charge', 'colis_recupere', 'en_livraison', 'arrivee'].includes(c.statut)).length;
+      const coursesTerminees = coursesList.filter(c => c.statut === 'livree').length;
+      const coursesEnAttente = coursesList.filter(c => c.statut === 'en_attente').length;
+      const missionIds = new Set();
+      for (const c of coursesList) { if (c.eco_mission_id) missionIds.add(c.eco_mission_id); }
+      return {
+        totalLivreurs: livreursList.length, disponible, horsLigne, enCourse, gpsRecent,
+        coursesNouvelles, coursesEnRecherche, coursesEnLivraison, coursesTerminees,
+        coursesEnAttente, ecoMissions: missionIds.size,
+      };
+    },
+    enabled: !!selectedCountry && !!selectedCity,
+    refetchInterval: 15000,
+    staleTime: 0,
+  });
 
   // ── Feature flag status pour le pays sélectionné ──
   const { data: cityFlagEnabled = false } = useQuery({
@@ -164,21 +133,18 @@ export default function CityDispatchAdmin() {
 
   const selectedCountryObj = useMemo(() => countries.find(c => c.code === selectedCountry), [countries, selectedCountry]);
 
-  const statsCards = selectedCity ? [
-    { label: 'Inscrits (pays)', value: stats.totalInscrits, icon: Users, color: 'text-blue-600' },
-    { label: 'Localisés (GPS)', value: stats.localises, icon: MapPin, color: 'text-green-600' },
-    { label: 'À actualiser', value: stats.aActualiser, icon: AlertCircle, color: 'text-amber-600' },
-    { label: 'Disponibles', value: stats.dispo, icon: Bike, color: 'text-green-600' },
-    { label: 'En mission', value: stats.enCourse, icon: Package, color: 'text-orange-600' },
-    { label: 'Hors ligne', value: stats.horsLigne, icon: AlertCircle, color: 'text-gray-500' },
-    { label: 'Courses en recherche', value: stats.coursesEnRecherche, icon: Activity, color: 'text-purple-600' },
-    { label: 'Courses en livraison', value: stats.coursesEnLivraison, icon: TrendingUp, color: 'text-indigo-600' },
-  ] : [
-    { label: 'Total livreurs', value: stats.totalInscrits, icon: Users, color: 'text-blue-600' },
-    { label: 'GPS récent (<10min)', value: stats.localises, icon: MapPin, color: 'text-teal-600' },
-    { label: 'À actualiser', value: stats.aActualiser, icon: AlertCircle, color: 'text-amber-600' },
-    { label: 'Courses en recherche', value: stats.coursesEnRecherche, icon: Activity, color: 'text-purple-600' },
-    { label: 'Courses en livraison', value: stats.coursesEnLivraison, icon: TrendingUp, color: 'text-indigo-600' },
+  const stats = [
+    { label: 'Total livreurs', value: cityStats?.totalLivreurs ?? 0, icon: Users, color: 'text-blue-600' },
+    { label: 'Disponibles', value: cityStats?.disponible ?? 0, icon: Bike, color: 'text-green-600' },
+    { label: 'Hors ligne', value: cityStats?.horsLigne ?? 0, icon: AlertCircle, color: 'text-gray-500' },
+    { label: 'En mission', value: cityStats?.enCourse ?? 0, icon: Package, color: 'text-orange-600' },
+    { label: 'GPS récent (<10min)', value: cityStats?.gpsRecent ?? 0, icon: MapPin, color: 'text-teal-600' },
+    { label: 'Courses nouvelles', value: cityStats?.coursesNouvelles ?? 0, icon: Clock, color: 'text-blue-500' },
+    { label: 'En recherche livreur', value: cityStats?.coursesEnRecherche ?? 0, icon: Activity, color: 'text-purple-600' },
+    { label: 'En livraison', value: cityStats?.coursesEnLivraison ?? 0, icon: Bike, color: 'text-indigo-600' },
+    { label: 'Terminées', value: cityStats?.coursesTerminees ?? 0, icon: TrendingUp, color: 'text-green-700' },
+    { label: 'En attente', value: cityStats?.coursesEnAttente ?? 0, icon: Clock, color: 'text-amber-600' },
+    { label: 'Missions Éco', value: cityStats?.ecoMissions ?? 0, icon: Package, color: 'text-emerald-600' },
   ];
 
   return (
@@ -237,15 +203,13 @@ export default function CityDispatchAdmin() {
           </SelectContent>
         </Select>
 
-        <Select value={selectedCity} onValueChange={setSelectedCity} disabled={!selectedCountry || operationalCities.length === 0}>
+        <Select value={selectedCity} onValueChange={setSelectedCity} disabled={!selectedCountry || cities.length === 0}>
           <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder={operationalCities.length === 0 ? "Aucune ville configurée" : "Sélectionner une ville"} />
+            <SelectValue placeholder={citiesLoading ? "Chargement..." : "Sélectionner une ville"} />
           </SelectTrigger>
           <SelectContent>
-            {operationalCities.map(c => (
-              <SelectItem key={c.id} value={c.nom}>
-                {c.nom_affichage} {c.actif ? '✅' : '⚪'}
-              </SelectItem>
+            {cities.map(city => (
+              <SelectItem key={city} value={city}>{city}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -259,15 +223,14 @@ export default function CityDispatchAdmin() {
 
       {/* Section 3 : Carte interactive */}
       {selectedCountry ? (
-        livreursLoading ? (
+        mapLoading ? (
           <Card className="p-8 text-center text-muted-foreground">Chargement de la carte...</Card>
         ) : (
           <CityDispatchMap
-            livreurs={filteredLivreurs}
-            courses={courses}
+            livreurs={mapData.livreurs}
+            courses={mapData.courses}
             country={selectedCountryObj}
             selectedCity={selectedCity}
-            classifications={classifications}
           />
         )
       ) : (
@@ -276,10 +239,20 @@ export default function CityDispatchAdmin() {
         </Card>
       )}
 
-      {/* Section 4 : Statistiques détaillées */}
-      {selectedCountry ? (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {statsCards.map((stat, i) => {
+      {/* Section 4 : Statistiques détaillées par ville */}
+      {!selectedCity ? (
+        selectedCountry ? (
+          <Card className="p-4 text-center text-muted-foreground text-sm">
+            {cities.length === 0
+              ? "Aucune ville trouvée. Les villes sont détectées automatiquement quand les livreurs envoient leur GPS."
+              : "Sélectionnez une ville pour voir les statistiques détaillées."}
+          </Card>
+        ) : null
+      ) : statsLoading ? (
+        <Card className="p-8 text-center text-muted-foreground">Chargement des statistiques...</Card>
+      ) : (
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+          {stats.map((stat, i) => {
             const Icon = stat.icon;
             return (
               <Card key={i} className="p-3 flex flex-col items-center text-center">
@@ -290,26 +263,7 @@ export default function CityDispatchAdmin() {
             );
           })}
         </div>
-      ) : null}
-
-      {/* Section 5 : Liste des livreurs par localisation GPS */}
-      {selectedCountry ? (
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <Users className="w-4 h-4 text-primary" />
-            <h3 className="text-sm font-semibold text-foreground">
-              Livreurs {selectedCity ? `— ${selectedCity}` : '— Vue globale'}
-            </h3>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Positionnement par dernier GPS fiable (récent &lt; 10min, précision &lt; 100m). La ville de profil est affichée à titre informatif.
-          </p>
-          <CityDispatchLivreurList
-            livreurs={filteredLivreurs}
-            classifications={classifications}
-          />
-        </div>
-      ) : null}
+      )}
     </div>
   );
 }
