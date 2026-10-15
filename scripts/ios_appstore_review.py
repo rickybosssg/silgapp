@@ -12,7 +12,7 @@ import urllib.request
 from ios_appstore_upload import APP_ID, BUNDLE_ID, VERSION, BUILD, IPA_SHA256, KEY_ID, ISSUER_ID, access_token
 
 APPLE_BUILD_ID = "ce976436-d543-467b-a1cb-fca796815a81"
-REVIEW_TAG = "refs/tags/ios-review-v1.0.61-b68"
+REVIEW_TAG = "refs/tags/ios-review-v1.0.61-b68-r2"
 SUBMITTED_STATES = {"WAITING_FOR_REVIEW", "IN_REVIEW", "PENDING_DEVELOPER_RELEASE",
                     "PENDING_APPLE_RELEASE", "READY_FOR_SALE", "READY_FOR_DISTRIBUTION"}
 NOTES = {

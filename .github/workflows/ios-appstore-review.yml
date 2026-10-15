@@ -1,7 +1,7 @@
 name: Submit existing SILGAPP iOS 1.0.61 build 68 for Apple review
 on:
   push:
-    tags: ['ios-review-v1.0.61-b68']
+    tags: ['ios-review-v1.0.61-b68-r2']
 permissions:
   contents: read
   actions: read
