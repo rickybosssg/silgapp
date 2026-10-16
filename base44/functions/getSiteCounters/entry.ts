@@ -4,47 +4,16 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 // getSiteCounters — Compteurs publics pour le site vitrine SILGAPP
 // ═══════════════════════════════════════════════════════════════════════════
 //
-// FONCTION PUBLIQUE — aucune authentification requise.
-// Retourne uniquement des compteurs agrégés (aucune donnée personnelle).
+// MÉTHODOLOGIE v3.0 — Réutilisation des compteurs des tableaux de bord :
+//   clients_registered       → clients_silgapp (getSilgappLiveStats)
+//   drivers_registered       → total_livreurs (getStatsGlobales)
+//   shops_registered         → total_boutiques (getStatsGlobales)
+//   restaurants_registered   → total_restaurants (getStatsGlobales)
+//   deliveries_completed     → courses_total (getSilgappLiveStats)
 //
-// MÉTHODOLOGIE v3.0 — Réutilisation des compteurs existants des tableaux de bord :
-//
-//   clients_registered :
-//     → Réutilise « clients_silgapp » de getSilgappLiveStats
-//     → Définition : ClientExterne possédant un user_email (compte réel)
-//     → C'est le compteur « inscrits », PAS « actifs » ni « disponibles »
-//
-//   drivers_registered :
-//     → Réutilise « total_livreurs » de getStatsGlobales
-//     → Définition : count de tous les enregistrements Livreur
-//     → C'est le compteur « inscrits », PAS « validés » ni « en ligne »
-//
-//   shops_registered :
-//     → Réutilise « total_boutiques » de getStatsGlobales
-//     → Définition : count de tous les enregistrements Boutique
-//
-//   restaurants_registered :
-//     → Réutilise « total_restaurants » de getStatsGlobales
-//     → Définition : count de tous les enregistrements Restaurant
-//
-//   deliveries_completed_all_time :
-//     → Réutilise « courses_total » de getSilgappLiveStats
-//     → Définition : CourseExterne avec statut = 'livree' (cumul toutes périodes)
-//     → NB : ne compte QUE CourseExterne, comme le font les tableaux de bord.
-//        L'entité Course (réseau interne) n'est pas incluse, car aucun
-//        compteur existant ne l'agrège avec CourseExterne.
-//
-// PÉRIMÈTRE : réseau SILGAPP entier (tous pays confondus, tous réseaux).
-//   Les tableaux de bord filtrent par pays ; le site agrège tous les pays.
-//   Aucun filtrage par entreprise — le total agrégé ne révèle pas de données
-//   personnelles d'une entreprise spécifique.
-//
-// SÉCURITÉ :
-//   - Aucune donnée personnelle renvoyée (uniquement des compteurs).
-//   - Aucune donnée métier modifiée ou supprimée.
-//   - Les compteurs existants de l'application ne sont pas modifiés.
-//
-// Cache : 10 minutes (AppConfig), stale-on-error.
+// Cache : AppConfig 10 min (invalidé si methodology_version change).
+// CDN : no-store (jamais mis en cache par le CDN — chaque requête atteint
+//   la fonction, qui sert le cache AppConfig sans recalcul).
 // ═══════════════════════════════════════════════════════════════════════════
 
 const CACHE_TTL_MS = 10 * 60 * 1000;
@@ -69,12 +38,23 @@ const EMPTY_COUNTS = {
   deliveries_completed_all_time: null,
 };
 
+// ── Helper : réponse JSON avec Cache-Control: no-store (jamais caché par le CDN) ──
+function jsonResponse(data: any, status = 200): Response {
+  return Response.json(data, {
+    status,
+    headers: {
+      'Cache-Control': 'no-store, max-age=0',
+      'Pragma': 'no-cache',
+    },
+  });
+}
+
 export default async function(req: Request): Promise<Response> {
   try {
     const base44 = createClientFromRequest(req);
     const sr = base44.asServiceRole;
 
-    // ── 1. Vérifier le cache ──
+    // ── 1. Vérifier le cache AppConfig ──
     const cacheRecords = await sr.entities.AppConfig.filter({ cle: CACHE_KEY });
     const cached = cacheRecords?.[0];
     let cachedData: any = null;
@@ -83,8 +63,9 @@ export default async function(req: Request): Promise<Response> {
       try {
         cachedData = JSON.parse(cached.valeur);
         const age = Date.now() - new Date(cachedData.updated_at).getTime();
-        if (age < CACHE_TTL_MS) {
-          return Response.json(cachedData);
+        // Invalider le cache si la méthodologie a changé ou si le TTL est dépassé
+        if (age < CACHE_TTL_MS && cachedData.methodology_version === METHODOLOGY_VERSION) {
+          return jsonResponse(cachedData);
         }
       } catch {}
     }
@@ -94,8 +75,9 @@ export default async function(req: Request): Promise<Response> {
     const lockAcquired = await tryAcquireLock(sr, lockId);
 
     if (!lockAcquired) {
-      if (cachedData) {
-        return Response.json({ ...cachedData, stale: true });
+      // Un autre worker calcule — servir le cache stale si disponible et valide
+      if (cachedData && cachedData.methodology_version === METHODOLOGY_VERSION) {
+        return jsonResponse({ ...cachedData, stale: true });
       }
     }
 
@@ -105,17 +87,17 @@ export default async function(req: Request): Promise<Response> {
       counts = await calculateCounters(sr);
     } catch (error) {
       if (lockAcquired) await releaseLock(sr);
-      if (cachedData) {
-        return Response.json({ ...cachedData, stale: true });
+      if (cachedData && cachedData.methodology_version === METHODOLOGY_VERSION) {
+        return jsonResponse({ ...cachedData, stale: true });
       }
-      return Response.json({
+      return jsonResponse({
         version: 1,
         updated_at: new Date().toISOString(),
         methodology_version: METHODOLOGY_VERSION,
         counts: EMPTY_COUNTS,
         source_counters: SOURCE_COUNTERS,
         stale: true,
-      }, { status: 503 });
+      }, 503);
     }
 
     // ── 4. Sauvegarder le cache ──
@@ -130,16 +112,16 @@ export default async function(req: Request): Promise<Response> {
     await saveCache(sr, result, cached);
     if (lockAcquired) await releaseLock(sr);
 
-    return Response.json(result);
+    return jsonResponse(result);
   } catch (error) {
-    return Response.json({
+    return jsonResponse({
       version: 1,
       updated_at: new Date().toISOString(),
       methodology_version: METHODOLOGY_VERSION,
       counts: EMPTY_COUNTS,
       source_counters: SOURCE_COUNTERS,
       stale: true,
-    }, { status: 503 });
+    }, 503);
   }
 }
 
@@ -205,8 +187,6 @@ async function saveCache(sr: any, data: any, existing: any): Promise<void> {
 // ═══════════════════════════════════════════════════════════════════════════
 
 async function calculateCounters(sr: any): Promise<any> {
-  // ── Toutes les requêtes en parallèle (count() = 1 appel par compteur) ──
-  // Mêmes définitions que les tableaux de bord, sans filtre pays (agrégé réseau).
   const [clients, drivers, shops, restaurants, deliveries] = await Promise.all([
     // clients_silgapp (getSilgappLiveStats) : ClientExterne avec user_email
     sr.entities.ClientExterne.count({ user_email: { $nin: [null, ''] } }),
