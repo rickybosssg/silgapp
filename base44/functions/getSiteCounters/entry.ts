@@ -29,7 +29,7 @@ const CACHE_TTL_MS = 10 * 60 * 1000;
 const LOCK_TTL_MS = 30 * 1000;
 const CACHE_KEY = 'site_counters_cache_v1';
 const LOCK_KEY = 'site_counters_lock_v1';
-const METHODOLOGY_VERSION = '1.0';
+const METHODOLOGY_VERSION = '1.1';
 
 // Critères d'exclusion tests/démos (fiables : les vrais utilisateurs n'ont pas
 // "test" ou "demo" dans leur nom, ni des numéros répétitifs/séquentiels).
