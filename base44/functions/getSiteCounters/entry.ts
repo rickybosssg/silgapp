@@ -7,24 +7,42 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 // FONCTION PUBLIQUE — aucune authentification requise.
 // Retourne uniquement des compteurs agrégés (aucune donnée personnelle).
 //
-// MÉTHODOLOGIE v2.0 :
-//   - Comptage par identifiant d'enregistrement unique (id), pas par téléphone.
-//     Un téléphone partagé ne prouve pas un doublon — ne pas dédupliquer par téléphone.
-//   - Aucune exclusion par motifs de noms (test/demo/exemple) — non fiable.
-//   - null pour tout compteur non vérifiable sans indicateur explicite de test.
-//   - Notes de vérification pour chaque compteur indiquant ce qui manque.
+// MÉTHODOLOGIE v3.0 — Réutilisation des compteurs existants des tableaux de bord :
 //
-// CE QUI MANQUE POUR VÉRIFIER CHAQUE COMPTEUR :
-//   - clients_registered : aucun champ is_test sur ClientExterne
-//   - drivers_registered : aucun champ is_test sur Livreur
-//   - shops_registered   : aucun champ is_test sur Boutique, doublons non vérifiés
-//   - restaurants_registered : idem
-//   - deliveries_completed_all_time : aucun champ is_test sur Course/CourseExterne,
-//     chevauchements entre les deux entités non vérifiables
+//   clients_registered :
+//     → Réutilise « clients_silgapp » de getSilgappLiveStats
+//     → Définition : ClientExterne possédant un user_email (compte réel)
+//     → C'est le compteur « inscrits », PAS « actifs » ni « disponibles »
+//
+//   drivers_registered :
+//     → Réutilise « total_livreurs » de getStatsGlobales
+//     → Définition : count de tous les enregistrements Livreur
+//     → C'est le compteur « inscrits », PAS « validés » ni « en ligne »
+//
+//   shops_registered :
+//     → Réutilise « total_boutiques » de getStatsGlobales
+//     → Définition : count de tous les enregistrements Boutique
+//
+//   restaurants_registered :
+//     → Réutilise « total_restaurants » de getStatsGlobales
+//     → Définition : count de tous les enregistrements Restaurant
+//
+//   deliveries_completed_all_time :
+//     → Réutilise « courses_total » de getSilgappLiveStats
+//     → Définition : CourseExterne avec statut = 'livree' (cumul toutes périodes)
+//     → NB : ne compte QUE CourseExterne, comme le font les tableaux de bord.
+//        L'entité Course (réseau interne) n'est pas incluse, car aucun
+//        compteur existant ne l'agrège avec CourseExterne.
+//
+// PÉRIMÈTRE : réseau SILGAPP entier (tous pays confondus, tous réseaux).
+//   Les tableaux de bord filtrent par pays ; le site agrège tous les pays.
+//   Aucun filtrage par entreprise — le total agrégé ne révèle pas de données
+//   personnelles d'une entreprise spécifique.
 //
 // SÉCURITÉ :
-//   - Aucune donnée personnelle renvoyée.
+//   - Aucune donnée personnelle renvoyée (uniquement des compteurs).
 //   - Aucune donnée métier modifiée ou supprimée.
+//   - Les compteurs existants de l'application ne sont pas modifiés.
 //
 // Cache : 10 minutes (AppConfig), stale-on-error.
 // ═══════════════════════════════════════════════════════════════════════════
@@ -33,14 +51,14 @@ const CACHE_TTL_MS = 10 * 60 * 1000;
 const LOCK_TTL_MS = 30 * 1000;
 const CACHE_KEY = 'site_counters_cache_v1';
 const LOCK_KEY = 'site_counters_lock_v1';
-const METHODOLOGY_VERSION = '2.0';
+const METHODOLOGY_VERSION = '3.0';
 
-const VERIFICATION_NOTES = {
-  clients_registered: 'Non vérifié : aucun champ is_test sur ClientExterne. L\'exclusion par motifs de noms (test/demo/exemple) n\'est pas fiable. Comptage par id (enregistrements) sans déduplication par téléphone — un téléphone partagé ne prouve pas un doublon.',
-  drivers_registered: 'Non vérifié : aucun champ is_test sur Livreur. Même problème que clients.',
-  shops_registered: 'Non vérifié : aucun champ is_test sur Boutique. Doublons d\'établissements (même nom, même adresse) non vérifiés. L\'identifiant partenaire_id identifie le propriétaire, pas l\'établissement.',
-  restaurants_registered: 'Non vérifié : aucun champ is_test sur Restaurant. Même problème que boutiques.',
-  deliveries_completed_all_time: 'Non vérifié : aucun champ is_test sur Course et CourseExterne. Chevauchements entre les deux entités non vérifiables (pas d\'identifiant commun). Une date de livraison renseignée ne prouve ni l\'absence de tests ni l\'absence de doublons inter-entités.',
+const SOURCE_COUNTERS = {
+  clients_registered: 'clients_silgapp (getSilgappLiveStats) — ClientExterne avec user_email',
+  drivers_registered: 'total_livreurs (getStatsGlobales) — count de tous les enregistrements Livreur',
+  shops_registered: 'total_boutiques (getStatsGlobales) — count de tous les enregistrements Boutique',
+  restaurants_registered: 'total_restaurants (getStatsGlobales) — count de tous les enregistrements Restaurant',
+  deliveries_completed_all_time: 'courses_total (getSilgappLiveStats) — CourseExterne avec statut=livree',
 };
 
 const EMPTY_COUNTS = {
@@ -95,7 +113,7 @@ export default async function(req: Request): Promise<Response> {
         updated_at: new Date().toISOString(),
         methodology_version: METHODOLOGY_VERSION,
         counts: EMPTY_COUNTS,
-        verification_notes: VERIFICATION_NOTES,
+        source_counters: SOURCE_COUNTERS,
         stale: true,
       }, { status: 503 });
     }
@@ -106,7 +124,7 @@ export default async function(req: Request): Promise<Response> {
       updated_at: new Date().toISOString(),
       methodology_version: METHODOLOGY_VERSION,
       counts,
-      verification_notes: VERIFICATION_NOTES,
+      source_counters: SOURCE_COUNTERS,
     };
 
     await saveCache(sr, result, cached);
@@ -119,7 +137,7 @@ export default async function(req: Request): Promise<Response> {
       updated_at: new Date().toISOString(),
       methodology_version: METHODOLOGY_VERSION,
       counts: EMPTY_COUNTS,
-      verification_notes: VERIFICATION_NOTES,
+      source_counters: SOURCE_COUNTERS,
       stale: true,
     }, { status: 503 });
   }
@@ -183,31 +201,30 @@ async function saveCache(sr: any, data: any, existing: any): Promise<void> {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// CALCUL DES COMPTEURS
-// ═══════════════════════════════════════════════════════════════════════════
-//
-// Tous les compteurs retournent null car aucun ne peut être vérifié :
-//
-// 1. Pas de champ is_test explicite sur ClientExterne, Livreur, Boutique,
-//    Restaurant, Course ou CourseExterne. L'exclusion par motifs de noms
-//    (test/demo/exemple) n'est pas fiable et a été supprimée.
-//
-// 2. Pour les livraisons : pas d'identifiant commun entre Course et CourseExterne
-//    permettant de détecter les chevauchements. Les deux entités ont des schémas
-//    différents et pas de clé de corrélation.
-//
-// 3. Pour les boutiques/restaurants : pas de détection de doublons (même nom +
-//    même adresse) possible sans charger tous les enregistrements.
-//
-// Aucune donnée métier n'est modifiée ou supprimée.
+// CALCUL DES COMPTEURS — Réutilisation des définitions des tableaux de bord
 // ═══════════════════════════════════════════════════════════════════════════
 
 async function calculateCounters(sr: any): Promise<any> {
+  // ── Toutes les requêtes en parallèle (count() = 1 appel par compteur) ──
+  // Mêmes définitions que les tableaux de bord, sans filtre pays (agrégé réseau).
+  const [clients, drivers, shops, restaurants, deliveries] = await Promise.all([
+    // clients_silgapp (getSilgappLiveStats) : ClientExterne avec user_email
+    sr.entities.ClientExterne.count({ user_email: { $nin: [null, ''] } }),
+    // total_livreurs (getStatsGlobales) : count de tous les Livreur
+    sr.entities.Livreur.count({}),
+    // total_boutiques (getStatsGlobales) : count de tous les Boutique
+    sr.entities.Boutique.count({}),
+    // total_restaurants (getStatsGlobales) : count de tous les Restaurant
+    sr.entities.Restaurant.count({}),
+    // courses_total (getSilgappLiveStats) : CourseExterne avec statut=livree
+    sr.entities.CourseExterne.count({ statut: 'livree' }),
+  ]);
+
   return {
-    clients_registered: null,
-    drivers_registered: null,
-    shops_registered: null,
-    restaurants_registered: null,
-    deliveries_completed_all_time: null,
+    clients_registered: clients,
+    drivers_registered: drivers,
+    shops_registered: shops,
+    restaurants_registered: restaurants,
+    deliveries_completed_all_time: deliveries,
   };
 }
