@@ -7,34 +7,41 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 // FONCTION PUBLIQUE — aucune authentification requise.
 // Retourne uniquement des compteurs agrégés (aucune donnée personnelle).
 //
-// Compteurs fournis :
-//   - clients_registered       : ClientExterne (inscrits, hors tests)
-//   - drivers_registered       : Livreur (inscrits, hors tests)
-//   - shops_registered         : Boutique (inscrits, hors tests)
-//   - restaurants_registered   : Restaurant (inscrits, hors tests)
-//   - deliveries_completed_all_time : CourseExterne + Course (statut=livree)
+// MÉTHODOLOGIE v2.0 :
+//   - Comptage par identifiant d'enregistrement unique (id), pas par téléphone.
+//     Un téléphone partagé ne prouve pas un doublon — ne pas dédupliquer par téléphone.
+//   - Aucune exclusion par motifs de noms (test/demo/exemple) — non fiable.
+//   - null pour tout compteur non vérifiable sans indicateur explicite de test.
+//   - Notes de vérification pour chaque compteur indiquant ce qui manque.
 //
-// Sécurité :
-//   - Aucun paramètre accepté (pas de filtrage possible).
-//   - Aucune donnée personnelle renvoyée (noms, téléphones, emails, GPS).
-//   - Pas de breakdown par entreprise, ville ou catégorie.
-//   - Les tables métier ne sont pas exposées (count() côté service role).
+// CE QUI MANQUE POUR VÉRIFIER CHAQUE COMPTEUR :
+//   - clients_registered : aucun champ is_test sur ClientExterne
+//   - drivers_registered : aucun champ is_test sur Livreur
+//   - shops_registered   : aucun champ is_test sur Boutique, doublons non vérifiés
+//   - restaurants_registered : idem
+//   - deliveries_completed_all_time : aucun champ is_test sur Course/CourseExterne,
+//     chevauchements entre les deux entités non vérifiables
 //
-// Cache : 10 minutes (AppConfig), stale-on-error (dernier résultat conservé
-//         avec sa date d'origine si le recalcul échoue).
-// Verrou : 30 secondes (anti-recalcul simultané).
+// SÉCURITÉ :
+//   - Aucune donnée personnelle renvoyée.
+//   - Aucune donnée métier modifiée ou supprimée.
+//
+// Cache : 10 minutes (AppConfig), stale-on-error.
 // ═══════════════════════════════════════════════════════════════════════════
 
 const CACHE_TTL_MS = 10 * 60 * 1000;
 const LOCK_TTL_MS = 30 * 1000;
 const CACHE_KEY = 'site_counters_cache_v1';
 const LOCK_KEY = 'site_counters_lock_v1';
-const METHODOLOGY_VERSION = '1.1';
+const METHODOLOGY_VERSION = '2.0';
 
-// Critères d'exclusion tests/démos (fiables : les vrais utilisateurs n'ont pas
-// "test" ou "demo" dans leur nom, ni des numéros répétitifs/séquentiels).
-const TEST_NAME_PATTERN = 'test|demo|exemple';
-const TEST_PHONE_PATTERN = '^0{6,}|^1{6,}|^9{6,}|^123456';
+const VERIFICATION_NOTES = {
+  clients_registered: 'Non vérifié : aucun champ is_test sur ClientExterne. L\'exclusion par motifs de noms (test/demo/exemple) n\'est pas fiable. Comptage par id (enregistrements) sans déduplication par téléphone — un téléphone partagé ne prouve pas un doublon.',
+  drivers_registered: 'Non vérifié : aucun champ is_test sur Livreur. Même problème que clients.',
+  shops_registered: 'Non vérifié : aucun champ is_test sur Boutique. Doublons d\'établissements (même nom, même adresse) non vérifiés. L\'identifiant partenaire_id identifie le propriétaire, pas l\'établissement.',
+  restaurants_registered: 'Non vérifié : aucun champ is_test sur Restaurant. Même problème que boutiques.',
+  deliveries_completed_all_time: 'Non vérifié : aucun champ is_test sur Course et CourseExterne. Chevauchements entre les deux entités non vérifiables (pas d\'identifiant commun). Une date de livraison renseignée ne prouve ni l\'absence de tests ni l\'absence de doublons inter-entités.',
+};
 
 const EMPTY_COUNTS = {
   clients_registered: null,
@@ -69,7 +76,6 @@ export default async function(req: Request): Promise<Response> {
     const lockAcquired = await tryAcquireLock(sr, lockId);
 
     if (!lockAcquired) {
-      // Un autre recalcul est en cours — retourner le cache stale
       if (cachedData) {
         return Response.json({ ...cachedData, stale: true });
       }
@@ -89,6 +95,7 @@ export default async function(req: Request): Promise<Response> {
         updated_at: new Date().toISOString(),
         methodology_version: METHODOLOGY_VERSION,
         counts: EMPTY_COUNTS,
+        verification_notes: VERIFICATION_NOTES,
         stale: true,
       }, { status: 503 });
     }
@@ -99,6 +106,7 @@ export default async function(req: Request): Promise<Response> {
       updated_at: new Date().toISOString(),
       methodology_version: METHODOLOGY_VERSION,
       counts,
+      verification_notes: VERIFICATION_NOTES,
     };
 
     await saveCache(sr, result, cached);
@@ -111,6 +119,7 @@ export default async function(req: Request): Promise<Response> {
       updated_at: new Date().toISOString(),
       methodology_version: METHODOLOGY_VERSION,
       counts: EMPTY_COUNTS,
+      verification_notes: VERIFICATION_NOTES,
       stale: true,
     }, { status: 503 });
   }
@@ -128,7 +137,7 @@ async function tryAcquireLock(sr: any, lockId: string): Promise<boolean> {
     const expiry = lock?.lock_expires_at ? new Date(lock.lock_expires_at) : null;
 
     if (lock && expiry && expiry > now) {
-      return false; // verrou actif
+      return false;
     }
 
     const expiresAt = new Date(now.getTime() + LOCK_TTL_MS).toISOString();
@@ -176,105 +185,29 @@ async function saveCache(sr: any, data: any, existing: any): Promise<void> {
 // ═══════════════════════════════════════════════════════════════════════════
 // CALCUL DES COMPTEURS
 // ═══════════════════════════════════════════════════════════════════════════
+//
+// Tous les compteurs retournent null car aucun ne peut être vérifié :
+//
+// 1. Pas de champ is_test explicite sur ClientExterne, Livreur, Boutique,
+//    Restaurant, Course ou CourseExterne. L'exclusion par motifs de noms
+//    (test/demo/exemple) n'est pas fiable et a été supprimée.
+//
+// 2. Pour les livraisons : pas d'identifiant commun entre Course et CourseExterne
+//    permettant de détecter les chevauchements. Les deux entités ont des schémas
+//    différents et pas de clé de corrélation.
+//
+// 3. Pour les boutiques/restaurants : pas de détection de doublons (même nom +
+//    même adresse) possible sans charger tous les enregistrements.
+//
+// Aucune donnée métier n'est modifiée ou supprimée.
+// ═══════════════════════════════════════════════════════════════════════════
 
 async function calculateCounters(sr: any): Promise<any> {
-  // ── Batch 1 : téléphones uniques pour clients et drivers (4 appels) ──
-  // On utilise distinct() pour dédupliquer par téléphone : chaque compte est
-  // compté une seule fois, même s'il a plusieurs enregistrements.
-  const batch1 = await Promise.allSettled([
-    // Clients — téléphones uniques (tous avec données minimales)
-    sr.entities.ClientExterne.filter(
-      { nom: { $nin: [null, ''] }, telephone: { $nin: [null, ''] } },
-      { distinct: 'telephone_normalized', limit: 10000 }
-    ),
-    // Clients — téléphones uniques des tests/démos à exclure
-    sr.entities.ClientExterne.filter(
-      {
-        nom: { $nin: [null, ''] },
-        telephone: { $nin: [null, ''] },
-        $or: [
-          { nom: { $regex: TEST_NAME_PATTERN, $options: 'i' } },
-          { telephone: { $regex: TEST_PHONE_PATTERN, $options: 'i' } },
-        ],
-      },
-      { distinct: 'telephone_normalized', limit: 10000 }
-    ),
-    // Drivers — téléphones uniques (tous avec données minimales)
-    sr.entities.Livreur.filter(
-      { nom: { $nin: [null, ''] }, telephone: { $nin: [null, ''] } },
-      { distinct: 'telephone', limit: 10000 }
-    ),
-    // Drivers — téléphones uniques des tests/démos à exclure
-    sr.entities.Livreur.filter(
-      {
-        nom: { $nin: [null, ''] },
-        telephone: { $nin: [null, ''] },
-        $or: [
-          { nom: { $regex: TEST_NAME_PATTERN, $options: 'i' } },
-          { telephone: { $regex: TEST_PHONE_PATTERN, $options: 'i' } },
-        ],
-      },
-      { distinct: 'telephone', limit: 10000 }
-    ),
-  ]);
-
-  // ── Batch 2 : count() pour shops, restaurants, livraisons (6 appels) ──
-  const batch2 = await Promise.allSettled([
-    sr.entities.Boutique.count({ nom: { $nin: [null, ''] } }),
-    sr.entities.Boutique.count({ nom: { $regex: TEST_NAME_PATTERN, $options: 'i' } }),
-    sr.entities.Restaurant.count({ nom: { $nin: [null, ''] } }),
-    sr.entities.Restaurant.count({ nom: { $regex: TEST_NAME_PATTERN, $options: 'i' } }),
-    sr.entities.CourseExterne.count({ statut: 'livree', heure_livraison: { $nin: [null, ''] } }),
-    sr.entities.Course.count({ statut: 'livree', heure_livraison: { $nin: [null, ''] } }),
-  ]);
-
-  // ── Clients : téléphones uniques hors tests ──
-  let clients_registered = null;
-  if (batch1[0].status === 'fulfilled') {
-    const allPhones = new Set(batch1[0].value?.items || []);
-    if (batch1[1].status === 'fulfilled') {
-      const testPhones = batch1[1].value?.items || [];
-      for (const p of testPhones) allPhones.delete(p);
-    }
-    clients_registered = allPhones.size;
-  }
-
-  // ── Drivers : téléphones uniques hors tests ──
-  let drivers_registered = null;
-  if (batch1[2].status === 'fulfilled') {
-    const allPhones = new Set(batch1[2].value?.items || []);
-    if (batch1[3].status === 'fulfilled') {
-      const testPhones = batch1[3].value?.items || [];
-      for (const p of testPhones) allPhones.delete(p);
-    }
-    drivers_registered = allPhones.size;
-  }
-
-  // ── Shops ──
-  const shopsTotal = batch2[0].status === 'fulfilled' ? batch2[0].value : null;
-  const shopsTest = batch2[1].status === 'fulfilled' ? batch2[1].value : null;
-  const shops_registered = (shopsTotal !== null && shopsTest !== null)
-    ? Math.max(0, shopsTotal - shopsTest) : null;
-
-  // ── Restaurants ──
-  const restTotal = batch2[2].status === 'fulfilled' ? batch2[2].value : null;
-  const restTest = batch2[3].status === 'fulfilled' ? batch2[3].value : null;
-  const restaurants_registered = (restTotal !== null && restTest !== null)
-    ? Math.max(0, restTotal - restTest) : null;
-
-  // ── Livraisons ──
-  // Uniquement si l'historique est vérifiable (les deux entités sont lisibles).
-  // Si l'une échoue, on retourne null (jamais de faux zéro).
-  const coursesExt = batch2[4].status === 'fulfilled' ? batch2[4].value : null;
-  const coursesInt = batch2[5].status === 'fulfilled' ? batch2[5].value : null;
-  const deliveries_completed_all_time = (coursesExt !== null && coursesInt !== null)
-    ? coursesExt + coursesInt : null;
-
   return {
-    clients_registered,
-    drivers_registered,
-    shops_registered,
-    restaurants_registered,
-    deliveries_completed_all_time,
+    clients_registered: null,
+    drivers_registered: null,
+    shops_registered: null,
+    restaurants_registered: null,
+    deliveries_completed_all_time: null,
   };
 }
