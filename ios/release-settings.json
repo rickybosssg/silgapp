@@ -1,27 +1,27 @@
 {
   "source_branch": "ios",
-  "source_commit": "e7125f37dafb2632b64a2199ce61ff2a85e5e4e6",
+  "source_commit": "f422837fa909fd0459f5ff690cb96bae90c6d185",
   "bundle_id": "com.base6a0ec08f3af5e1d1284254c1.app",
   "team_id": "X7N95F8KTJ",
-  "app_store_connect_confirmed": false,
+  "app_store_connect_confirmed": true,
   "latest_app_store_version": "1.0.61",
   "latest_app_store_build": "68",
   "marketing_version": "1.0.62",
   "build_number": "69",
   "app_store_connect_evidence": {
     "source": "app_store_connect_api_read_only",
-    "checked_at_utc": "2026-10-16T08:02:23.996112+00:00",
+    "checked_at_utc": "2026-10-16T08:12:42.493130+00:00",
     "app_store_app_id": "6782046749",
     "version": "1.0.61",
     "highest_uploaded_build": "68",
     "review_state": "READY_FOR_DISTRIBUTION",
     "all_pages_checked": true,
     "proposed_version_absent_at_check": true,
-    "scope": "Complete versions/build collection inspected; candidate numbering requires recheck before authorized build."
+    "scope": "Complete version/build collection recheck before authorized build completed; only signed archive/export authorized. Recheck before Apple upload or submission."
   },
   "app_store_connect_recheck_required_before_submission": true,
   "profile_name": "SILGAPP_APPSTORE_2026_10_14",
   "profile_uuid": "90843184-68cd-4f34-a648-4f31057ee6cc",
   "certificate_sha256": "89243A26883BE151928016B722D054718B373AC13F298762CAF14296ECDC974B",
-  "candidate_status": "Source synchronization and one signed archive/export authorized. Apple upload, review submission and store release require separate authorization."
+  "candidate_status": "One signed archive/export authorized for the pinned published source. Apple upload, review submission and store release require separate authorization."
 }
