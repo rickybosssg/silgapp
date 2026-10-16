@@ -1,22 +1,27 @@
 {
   "source_branch": "ios",
-  "source_commit": "d52bf1da9c2e8b794175f5d8e633b613f20fed5a",
+  "source_commit": "e7125f37dafb2632b64a2199ce61ff2a85e5e4e6",
   "bundle_id": "com.base6a0ec08f3af5e1d1284254c1.app",
   "team_id": "X7N95F8KTJ",
   "app_store_connect_confirmed": false,
-  "latest_app_store_version": "1.0.60",
-  "latest_app_store_build": "67",
-  "marketing_version": "1.0.61",
-  "build_number": "68",
+  "latest_app_store_version": "1.0.61",
+  "latest_app_store_build": "68",
+  "marketing_version": "1.0.62",
+  "build_number": "69",
   "app_store_connect_evidence": {
-    "source": "owner-confirmed previous submission and statically verified IPA",
+    "source": "app_store_connect_api_read_only",
+    "checked_at_utc": "2026-10-16T08:02:23.996112+00:00",
     "app_store_app_id": "6782046749",
-    "screen": "Previously submitted iOS 1.0.60 build 67, Waiting for Review",
-    "scope": "last confirmed submitted build only; recheck latest before candidate signing/upload"
+    "version": "1.0.61",
+    "highest_uploaded_build": "68",
+    "review_state": "READY_FOR_DISTRIBUTION",
+    "all_pages_checked": true,
+    "proposed_version_absent_at_check": true,
+    "scope": "Complete versions/build collection inspected; candidate numbering requires recheck before authorized build."
   },
   "app_store_connect_recheck_required_before_submission": true,
   "profile_name": "SILGAPP_APPSTORE_2026_10_14",
   "profile_uuid": "90843184-68cd-4f34-a648-4f31057ee6cc",
   "certificate_sha256": "89243A26883BE151928016B722D054718B373AC13F298762CAF14296ECDC974B",
-  "candidate_status": "GPS integrated; native OAuth return and device tests pending; signing/upload blocked until release recheck"
+  "candidate_status": "Source synchronization and one signed archive/export authorized. Apple upload, review submission and store release require separate authorization."
 }

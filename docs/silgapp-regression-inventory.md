@@ -710,3 +710,29 @@ Detailed policy, compatibility, costs and validation are recorded in
 - Existing dependency versions are retained. Apple numbering, signing and upload
   require a current App Store Connect check and reviewed release configuration.
   Backend deployment and city activation remain separate operations.
+
+## Local iOS WhatsApp website-link candidate - 2026-10-16
+
+- Prepared from the released iOS 1.0.61/build 68 baseline and the reviewed
+  SILGAPP OFFICIEL message delta. Only four text additions change application
+  behavior: sender/recipient tracking messages and named/unnamed driver pickup.
+- The requested website URL occurs once per affected message. Dynamic names,
+  prices/currencies, tracking/store links, recipient selection, delivery and
+  displacement branches remain intact. Website counters are outside this app.
+- PASS: 47 regression suites, including 32 actual-source WhatsApp/price cases,
+  native push/account protections, city/dispatch/Eco/finance isolation, release
+  safety, logo and workflow checks. Full lint, no-emit types, local web build and
+  exact source/native/signing preservation checks pass. These are local checks;
+  no new device notification or WhatsApp delivery test is claimed.
+- Updated release fixtures for proposed 1.0.62/build 69 while preserving the
+  unconfirmed-build rejection. Branding comparisons normalize both the approved
+  baseline and current source, retaining original image URLs and all assertions.
+- Apple read-only check at 2026-10-16 08:02 UTC found current 1.0.61/build 68,
+  highest uploaded build 68, and no 1.0.62/build 69 across the full collections.
+  Source synchronization and one signed archive/export are authorized. The
+  signing configuration must pin the published source. Apple upload, review
+  submission and store release remain separate operations.
+- Native signing identity, entitlements, Firebase/APNs bridge, secure session
+  preparations and disabled native Google/Apple gates are preserved. No Android
+  version change, backend change or real course/message is part of this change.
+  No TestFlight upload, review submission or store publication is authorized.

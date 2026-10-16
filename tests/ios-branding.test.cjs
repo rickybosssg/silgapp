@@ -49,7 +49,10 @@ test('shared components preserve source logic with iOS branding and the approved
     'src/pages/RoleSelection.jsx', 'src/pages/TelechargerSILGAPP.jsx', 'src/components/SplashScreen.jsx'];
   let imageCount = 0;
   for (const file of files) {
-    const baseline = normalize(execFileSync(git, ['--no-optional-locks', '-C', root, 'show', `${sourceCommit}:${file}`], { encoding: 'utf8' }));
+    let baseline = normalize(execFileSync(git, ['--no-optional-locks', '-C', root, 'show', `${sourceCommit}:${file}`], { encoding: 'utf8' }));
+    // A later approved baseline already contains branding; compare original URLs on both sides.
+    baseline = baseline.replace('import { silgappLogo } from "@/lib/iosBranding";\n', '');
+    baseline = baseline.replace(/src=\{silgappLogo\(("[^"]+")\)\}/g, (_, url) => `src=${url}`);
     let current = normalize(fs.readFileSync(path.join(root, file), 'utf8'));
     current = current.replace('import { silgappLogo } from "@/lib/iosBranding";\n', '');
     current = current.replace(/src=\{silgappLogo\(("[^"]+")\)\}/g, (_, url) => {

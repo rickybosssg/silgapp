@@ -822,8 +822,8 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                   : colisRecupere
                     ? `Bonjour, je suis votre livreur SILGAPP. Je suis en route pour vous livrer votre colis. ${prixLabel}`
                     : (livreurNomFormate
-                      ? `Bonjour, je suis ${livreurNomFormate}, votre livreur SILGAPP. Je suis en route pour récupérer votre colis. ${prixLabel} Merci de m'envoyer la localisation du lieu de récupération.`
-                      : `Bonjour, je suis votre livreur SILGAPP. Je suis en route pour récupérer votre colis. ${prixLabel} Merci de m'envoyer la localisation du lieu de récupération.`)
+                      ? `Bonjour, je suis ${livreurNomFormate}, votre livreur SILGAPP. Je suis en route pour récupérer votre colis. ${prixLabel} Merci de m'envoyer la localisation du lieu de récupération.\n\nDécouvrez notre site web :\nhttps://silgapp-vitrine.mythicteal5.chatgpt.site`
+                      : `Bonjour, je suis votre livreur SILGAPP. Je suis en route pour récupérer votre colis. ${prixLabel} Merci de m'envoyer la localisation du lieu de récupération.\n\nDécouvrez notre site web :\nhttps://silgapp-vitrine.mythicteal5.chatgpt.site`)
               );
               const lien = `https://wa.me/${num}?text=${msg}`;
               const popup = window.open(lien, "_blank", "noopener,noreferrer");

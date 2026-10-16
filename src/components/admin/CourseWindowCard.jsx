@@ -89,6 +89,9 @@ export default function CourseWindowCard({ courseId, formData, onClose }) {
     `Android : ${SILGAPP_PLAYSTORE}`,
     `iOS : ${SILGAPP_APPLE}`,
     ``,
+    `Découvrez notre site web :`,
+    `https://silgapp-vitrine.mythicteal5.chatgpt.site`,
+    ``,
     `Merci de votre confiance !`,
   ].join("\n");
 
@@ -105,6 +108,9 @@ export default function CourseWindowCard({ courseId, formData, onClose }) {
     `*Telechargez l'app SILGAPP :*`,
     `Android : ${SILGAPP_PLAYSTORE}`,
     `iOS : ${SILGAPP_APPLE}`,
+    ``,
+    `Découvrez notre site web :`,
+    `https://silgapp-vitrine.mythicteal5.chatgpt.site`,
     ``,
     `Merci !`,
   ].filter(Boolean).join("\n");
