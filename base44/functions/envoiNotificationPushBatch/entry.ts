@@ -65,7 +65,10 @@ Deno.serve(async (req) => {
     // ── 2. Récupérer tous les livreurs en une seule requête ──
     const uniqueIds = [...new Set(livreur_ids.map(String).filter(Boolean))];
     const livreurs = await base44.asServiceRole.entities.Livreur.filter(
-      { id: { $in: uniqueIds }, actif: true }
+      // [CORRECTION BLOCAGE ADMIN] actif retiré : un livreur bloqué
+      // administrativement (actif=false) doit recevoir le push de dispatch.
+      // L'acceptation reste bloquée par accepterCourseV2 (actif === true).
+      { id: { $in: uniqueIds } }
     ).catch(() => []);
 
     if (!livreurs || livreurs.length === 0) {
