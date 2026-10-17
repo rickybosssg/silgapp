@@ -1,4 +1,5 @@
 import { invokeLLMTracked } from './integrationCreditTracker.ts';
+import { sortByCityScope } from './venusCityKnowledge.ts';
 
 /**
  * Moteur d'Apprentissage VENUS — Centre d'Apprentissage
@@ -34,7 +35,6 @@ export async function rechercherConnaissancesValidees(
     // Une connaissance spécifique à la ville de l'utilisateur remplace
     // une connaissance générale du pays. Les entrées globales (ALL) sont
     // utilisées si aucune entrée plus spécifique n'existe.
-    const { sortByCityScope } = await import('./venusCityKnowledge.ts');
     const scoped = sortByCityScope(all, ville || '', countryCode);
     const filtered = scoped.filter((k: any) =>
       !k.langue || k.langue === langue

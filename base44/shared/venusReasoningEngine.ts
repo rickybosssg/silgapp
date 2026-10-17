@@ -23,6 +23,7 @@
 import { rechercherConnaissancesValidees } from './venusLearningEngine.ts';
 import { rechercherDocumentsRag } from './venusRagEngine.ts';
 import { construireContexteVenus } from './venusI18nEngine.ts';
+import { sortByCityScope } from './venusCityKnowledge.ts';
 import {
   detecterIntentionRapide,
   executerOutilsPourIntention,
@@ -73,9 +74,8 @@ export async function rechercherReglesMetier(base44: any, countryCode: string, v
     );
     // ── Filtrage VILLE > PAYS > GLOBAL ──
     // Une règle spécifique à la ville de l'utilisateur remplace une règle
-    // générale du pays. Le Super Admin peut thus désactiver une règle dans
+    // générale du pays. Le Super Admin peut ainsi désactiver une règle dans
     // une ville sans affecter les autres.
-    const { sortByCityScope } = await import('./venusCityKnowledge.ts');
     return sortByCityScope(activeRules, ville || '', countryCode);
   } catch (e) {
     console.warn('[ReasoningEngine] Erreur chargement règles métier:', e.message);

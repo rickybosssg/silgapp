@@ -188,11 +188,6 @@ Deno.serve(async (req) => {
       });
     }
     const countryConfig = await chargerConfigPays(base44, countryCode);
-    // ── Ville SILGAPP de l'utilisateur ──
-    // Priorité : 1) ville en mémoire courte (contexte de conversation)
-    //            2) ville du profil client/livreur
-    //            3) ville principale du pays (fallback)
-    const villeUtilisateur = (conversation?.memoire_courte?.ville || conversation?.ville || countryConfig.ville_principale || '').trim();
     const tarifs = {
       nom: countryConfig.nom,
       ville: countryConfig.ville_principale,
@@ -751,6 +746,11 @@ Deno.serve(async (req) => {
         venusLog(`[WebhookVenus] ⏱️ Contexte chargé en parallèle: ${Date.now() - tCtxStart}ms`);
 
         // ── Appeler le moteur de raisonnement ──
+        // ── Ville SILGAPP de l'utilisateur ──
+        // Priorité : 1) ville en mémoire courte (contexte de conversation)
+        //            2) ville du profil client/livreur
+        //            3) ville principale du pays (fallback)
+        const villeUtilisateur = (conversation?.memoire_courte?.ville || conversation?.ville || countryConfig?.ville_principale || '').trim();
         reasoningResult = await raisonnerVenus(base44, {
           messageClient: messageEffectif,
           memoireCourte: pendingCourse || {},
