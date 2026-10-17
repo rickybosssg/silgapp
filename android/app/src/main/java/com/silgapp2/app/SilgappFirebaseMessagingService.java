@@ -354,6 +354,9 @@ public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
         lastStartedAlertAtMs = now;
         alertHandler = new Handler(Looper.getMainLooper());
         alertEndAtMs = now + Math.max(durationMs, 5000L);
+        // The official SILGAPP sound plays once and is force-stopped after the
+        // V2 duration. It must never loop or overlap another trigger.
+        playNotificationSound(context, false);
 
         alertRunnable = new Runnable() {
             @Override
@@ -363,7 +366,6 @@ public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
                     return;
                 }
                 vibrate(context);
-                playNotificationSound(context, true);
                 alertHandler.postDelayed(this, Math.max(intervalMs, 3000L));
             }
         };

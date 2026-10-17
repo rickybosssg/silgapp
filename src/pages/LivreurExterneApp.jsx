@@ -504,13 +504,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         return;
       }
       if (data.type !== "nouvelle_course" && data.type !== "course_assignee") return;
-      // ── CORRECTION FOREGROUND ──
-      // Ne pas couper l'alerte native pour les reçus push (source "firebase_foreground"
-      // ou "native-tapped" = onMessageReceived, pas un tap utilisateur).
-      // L'alerte (son + vibration) continue. Elle sera coupée à l'acceptation/refus.
-      if (data.source !== "firebase_foreground" && data.source !== "native-tapped" && data.source !== "push-received") {
-        stopUrgentCourseAlert("app-opened");
-      }
+      stopUrgentCourseAlert("app-opened");
       if (data.course_id) setNotificationCourseId(data.course_id);
       setActiveTab("courses");
       queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
