@@ -1044,7 +1044,9 @@ ${scenarioStr}
 
 ═══ CONTEXTE CLIENT ═══
 Téléphone: ${input.telephone} | Nom: ${input.profileName || input.telephone}
-Pays: ${input.countryCode} (${input.tarifs.nom}) | Tarifs: ${input.tarifs.prix_km} ${input.tarifs.devise}/km, min ${input.tarifs.minimum} ${input.tarifs.devise}
+Pays: ${input.countryCode} (${input.tarifs.nom})
+Ville de l'utilisateur: ${input.ville || 'NON CONNUE'}
+Tarifs pays: ${input.tarifs.prix_km} ${input.tarifs.devise}/km, min ${input.tarifs.minimum} ${input.tarifs.devise}
 
 ═══ MÉMOIRE COURTE ═══
 ${memoireCourteStr}
@@ -1072,6 +1074,12 @@ ${input.outils_resultats ? formaterOutilsPourPrompt(input.outils_resultats) : 'A
 - Utilise UNIQUEMENT les données ci-dessus. N'INVENTE JAMAIS un statut, prix, nom de livreur ou référence.
 - Si un outil retourne NON TROUVÉ, dis-le clairement.
 - Une course livrée/annulée (est_active=false) n'est JAMAIS active.
+
+════ VILLE — RÈGLES CRITIQUES ═══
+- Si la ville de l'utilisateur est "NON CONNUE" et que la réponse dépend d'une information locale (disponibilité d'un service, SILGAPP Éco, tarifs, zones couvertes, livreurs, fonctionnalités activées localement, règles opérationnelles propres à une ville), demande "Dans quelle ville souhaitez-vous utiliser SILGAPP ?" (action=poser_question) AVANT de répondre.
+- Une information GLOBAL ou PAYS peut être utilisée sans connaître la ville UNIQUEMENT si elle est réellement valable pour toutes les villes concernées.
+- Ne JAMAIS supposer qu'une fonctionnalité disponible dans une ville est disponible dans une autre.
+- Ne JAMAIS inventer la ville de l'utilisateur.
 
 ${audioNote}
 
