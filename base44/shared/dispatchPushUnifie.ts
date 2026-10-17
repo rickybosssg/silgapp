@@ -178,12 +178,6 @@ export async function notifierLivreursUnifie(base44: any, course: any, candidats
     course_id: String(course.id),
     click_action: ANDROID_CLICK_ACTION,
     dispatch_version: '2',
-    // ── Champs d'alerte harmonisés avec envoiNotificationPushBatch ──
-    // Le code Java (DISPATCH_V2_ALERT_DURATION_MS = 10000) ignore ces valeurs
-    // et utilise toujours 10s pour la durée. L'intervalle par défaut est 5s.
-    // Présents pour cohérence inter-chemins et robustesse future.
-    alert_duration_seconds: '10',
-    alert_interval_seconds: '5',
   };
 
   const tokenUpdates: any[] = [];

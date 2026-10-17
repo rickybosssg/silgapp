@@ -81,15 +81,7 @@ function dispatchNotificationOpened(data = {}, source = "push") {
     savePushDebug("duplicate-open-skipped", { source, data });
     return;
   }
-  // ── CORRECTION FOREGROUND ──
-  // Ne PAS couper l'alerte native pour les reçus push (source "firebase_foreground"
-  // vient de onMessageReceived, pas d'un tap utilisateur). L'alerte (son + vibration)
-  // doit continuer à jouer. Elle sera coupée quand l'utilisateur interagit avec le
-  // modal course (accepter/refuser) ou au timeout (10s).
-  const isUserAction = source === "native-intent" || source === "native-launch" || source === "app-opened";
-  if (isUserAction) {
-    stopUrgentCourseAlert("notification-opened");
-  }
+  stopUrgentCourseAlert("notification-opened");
   const detail = { ...(data || {}), source };
   try {
     localStorage.setItem("silgapp_last_opened_notification", JSON.stringify({
