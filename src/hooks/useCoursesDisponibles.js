@@ -46,13 +46,14 @@ export function useCoursesDisponibles(livreurProfil) {
     livreurProfil?.manual_hors_ligne !== true &&
     livreurProfil?.admin_hors_ligne !== true;
 
-  // ── Visibilité du fil : tous les livreurs validés/actifs du pays voient les courses ──
-  // Exclus : admin_hors_ligne, validation != valide, actif=false, autre pays
+  // ── Visibilité du fil : tous les livreurs validés du pays voient les courses ──
+  // [CORRECTION BLOCAGE ADMIN] actif et admin_hors_ligne retirés : un livreur
+  // bloqué administrativement (actif=false) continue à voir les courses dans
+  // Disponibles pour rester informé. L'acceptation reste bloquée par
+  // livreurDisponible (actif === true && admin_hors_ligne !== true).
   const livreurPeutVoirFil =
     livreurProfil?.type_livreur === "externe" &&
-    livreurProfil?.validation === "valide" &&
-    livreurProfil?.actif === true &&
-    livreurProfil?.admin_hors_ligne !== true;
+    livreurProfil?.validation === "valide";
 
   // ── Raison de blocage d'acceptation (null si le livreur peut accepter) ──
   const raisonBlocage = !livreurPeutVoirFil

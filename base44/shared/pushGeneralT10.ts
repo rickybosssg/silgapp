@@ -442,7 +442,9 @@ async function getLivreursDestinataires(base44, countryCode) {
     const livreurs = await base44.asServiceRole.entities.Livreur.filter({
       country_code: countryCode,
       type_livreur: 'externe',
-      actif: true,
+      // [CORRECTION BLOCAGE ADMIN] actif retiré du push général T+10 : un livreur
+      // bloqué administrativement (actif=false) continue à recevoir le rappel.
+      // L'acceptation reste bloquée par accepterCourseV2 (actif === true).
       validation: 'valide',
       bloque_encours: false,
     }, undefined, 1000);

@@ -183,8 +183,12 @@ export async function findBestOnRouteDriver(
     // Récupérer le livreur
     const livreur = await base44.asServiceRole.entities.Livreur.get(livreurId).catch(() => null);
     if (!livreur) continue;
-    if (livreur.validation !== 'valide' || livreur.actif !== true) continue;
-    if (livreur.manual_hors_ligne === true || livreur.admin_hors_ligne === true) continue;
+    // [CORRECTION BLOCAGE ADMIN] actif et admin_hors_ligne retirés de l'éligibilité
+    // aux propositions sur trajet : un livreur bloqué administrativement continue
+    // à recevoir les propositions (notification) mais ne peut pas les accepter
+    // (respondToOnRouteProposal vérifie livreur.actif !== true).
+    if (livreur.validation !== 'valide') continue;
+    if (livreur.manual_hors_ligne === true) continue;
     if (livreur.bloque_encours === true) continue;
     if (normalizeEnterpriseId(livreur.enterprise_id) !== courseEnterpriseId) continue;
 

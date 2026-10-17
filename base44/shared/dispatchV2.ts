@@ -90,7 +90,9 @@ async function notifierLivreursEligiblesV2(base44: any, course: any, options: an
     base44.asServiceRole.entities.Livreur.filter({
       type_livreur: 'externe',
       validation: 'valide',
-      actif: true,
+      // [CORRECTION BLOCAGE ADMIN] actif retiré du ciblage push : un livreur bloqué
+      // administrativement (actif=false) continue à recevoir les notifications push.
+      // L'acceptation reste bloquée par accepterCourseV2 (livreur.actif === true).
       statut: { $in: ['disponible', 'hors_ligne'] },
       country_code: course.country_code,
       bloque_encours: false,
@@ -666,7 +668,9 @@ export async function secoursDispatchV2(base44: any, course: any, nbLivreurs: nu
   const livreurs = await base44.asServiceRole.entities.Livreur.filter({
     type_livreur: 'externe',
     validation: 'valide',
-    actif: true,
+    // [CORRECTION BLOCAGE ADMIN] actif retiré du ciblage push secours (même règle
+    // que le dispatch initial). Le livreur bloqué reçoit le push mais ne peut
+    // pas accepter (accepterCourseV2 vérifie livreur.actif === true).
     statut: { $in: ['disponible', 'hors_ligne'] },
     country_code: course.country_code,
     bloque_encours: false,
