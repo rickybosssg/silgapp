@@ -109,11 +109,11 @@ export default function KnowledgeBaseTab({ presetQuestion, presetOpen }) {
           </SelectContent>
         </Select>
         <Select value={filterPays} onValueChange={setFilterPays}>
-          <SelectTrigger className="w-[100px]"><SelectValue placeholder="Pays" /></SelectTrigger>
+          <SelectTrigger className="w-[100px]"><Filter className="w-3.5 h-3.5 mr-1" /><SelectValue placeholder="Pays" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Tous pays</SelectItem>
             <SelectItem value="ALL">Global (ALL)</SelectItem>
-            {PAYS_CODES?.map?.(p => <SelectItem key={p.code} value={p.code}>{p.label || p.code}</SelectItem>) || <SelectItem value="BF">BF</SelectItem>}
+            {PAYS_CODES.filter(p => p !== 'ALL').map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
           </SelectContent>
         </Select>
         <Input value={filterVille === 'all' ? '' : filterVille} onChange={e => setFilterVille(e.target.value || 'all')} placeholder="Ville..." className="w-[120px]" />
