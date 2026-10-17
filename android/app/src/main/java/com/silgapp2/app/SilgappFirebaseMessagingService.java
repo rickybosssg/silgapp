@@ -354,9 +354,12 @@ public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
         lastStartedAlertAtMs = now;
         alertHandler = new Handler(Looper.getMainLooper());
         alertEndAtMs = now + Math.max(durationMs, 5000L);
-        // The official SILGAPP sound plays once and is force-stopped after the
-        // V2 duration. It must never loop or overlap another trigger.
-        playNotificationSound(context, false);
+        // ── CORRECTION ──
+        // Le son et la vibration sont maintenant gérés par le canal de notification
+        // (IMPORTANCE_MAX + son silgapp_alert + pattern vibration).
+        // Le MediaPlayer USAGE_ALARM échouait en Doze (écran verrouillé).
+        // Le Vibrator custom provoquait une double vibration avec le canal.
+        // On garde uniquement le suivi de durée pour l'auto-arrêt du gorille.
 
         alertRunnable = new Runnable() {
             @Override
@@ -365,7 +368,7 @@ public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
                     stopUrgentCourseAlert(false);
                     return;
                 }
-                vibrate(context);
+                // Pas de vibration custom — le canal gère la vibration
                 alertHandler.postDelayed(this, Math.max(intervalMs, 3000L));
             }
         };
@@ -431,9 +434,9 @@ public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
             .setAutoCancel(false)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
-            .setSilent(true)
-            .setVibrate(null)
-            .setSound(null)
+            // ── CORRECTION : retirer setSilent(true) ──
+            // Le canal gère le son + vibration. setSilent(true) supprimait
+            // l'affichage heads-up sur écran verrouillé.
             .setContentIntent(fullScreenPendingIntent)
             .setFullScreenIntent(fullScreenPendingIntent, true)
             .setShowWhen(true)
@@ -500,11 +503,21 @@ public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
             NotificationManager.IMPORTANCE_MAX
         );
         channel.setDescription("Notifications de courses urgentes SILGAPP");
-        channel.enableVibration(false);
+        // ── CORRECTION ÉCRAN VERROUILLÉ ──
+        // Son + vibration via le canal (fonctionne en Doze, écran verrouillé,
+        // arrière-plan). Le MediaPlayer USAGE_ALARM échouait en Doze.
+        channel.enableVibration(true);
+        channel.setVibrationPattern(new long[]{0, 500, 200, 500, 200, 800});
         channel.enableLights(true);
         channel.setLockscreenVisibility(NotificationCompat.VISIBILITY_PUBLIC);
         channel.setBypassDnd(true);
-        channel.setSound(null, null);
+        // Son personnalisé silgapp_alert depuis res/raw
+        Uri soundUri = Uri.parse("android.resource://" + context.getPackageName() + "/raw/silgapp_alert");
+        AudioAttributes audioAttrs = new AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+            .build();
+        channel.setSound(soundUri, audioAttrs);
         manager.createNotificationChannel(channel);
     }
 
