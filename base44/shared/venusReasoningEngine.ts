@@ -65,13 +65,18 @@ export async function rechercherScenariosValidees(base44: any, countryCode: stri
  * Recherche les règles métier validées pour un pays donné (Source 0 — Priorité absolue).
  * Une seule règle peut s'appliquer à des centaines de conversations similaires.
  */
-export async function rechercherReglesMetier(base44: any, countryCode: string): Promise<any[]> {
+export async function rechercherReglesMetier(base44: any, countryCode: string, ville?: string): Promise<any[]> {
   try {
     const all = await base44.asServiceRole.entities.VenusBusinessRule.list('-created_date', 200);
-    return (all || []).filter((r: any) =>
-      (r.statut === 'valide' || r.statut === 'active') &&
-      (r.pays === 'ALL' || r.pays === countryCode || !r.pays)
+    const activeRules = (all || []).filter((r: any) =>
+      r.statut === 'valide' || r.statut === 'active'
     );
+    // ── Filtrage VILLE > PAYS > GLOBAL ──
+    // Une règle spécifique à la ville de l'utilisateur remplace une règle
+    // générale du pays. Le Super Admin peut thus désactiver une règle dans
+    // une ville sans affecter les autres.
+    const { sortByCityScope } = await import('./venusCityKnowledge.ts');
+    return sortByCityScope(activeRules, ville || '', countryCode);
   } catch (e) {
     console.warn('[ReasoningEngine] Erreur chargement règles métier:', e.message);
     return [];
@@ -87,6 +92,7 @@ interface ReasoningInput {
   historiqueRecent: any[];
   courseActive?: any;
   countryCode: string;
+  ville?: string;
   tarifs: any;
   telephone: string;
   profileName: string;
@@ -945,11 +951,11 @@ export async function raisonnerVenus(base44: any, input: ReasoningInput): Promis
   // Avant: 5 appels DB séquentiels (~700-1600ms). Maintenant: 1 vague parallèle (~200-400ms).
   const tLoadStart = Date.now();
   const [knowledgeRes, ragRes, ctxRes, scenarioRes, rulesRes] = await Promise.allSettled([
-    rechercherConnaissancesValidees(base44, input.countryCode),
-    rechercherDocumentsRag(base44, input.messageClient, { pays: input.countryCode, limit: 5, conversation_id: input.telephone }),
+    rechercherConnaissancesValidees(base44, input.countryCode, 'fr', input.ville),
+    rechercherDocumentsRag(base44, input.messageClient, { pays: input.countryCode, limit: 5, conversation_id: input.telephone, ville: input.ville }),
     construireContexteVenus(base44, input.telephone, input.messageClient),
     rechercherScenariosValidees(base44, input.countryCode),
-    rechercherReglesMetier(base44, input.countryCode),
+    rechercherReglesMetier(base44, input.countryCode, input.ville),
   ]);
   console.log(`[ReasoningEngine] ⏱️ Sources chargées en parallèle: ${Date.now() - tLoadStart}ms`);
 

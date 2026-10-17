@@ -413,7 +413,7 @@ export function scoreChunk(chunk: any, queryKeywords: string[]): number {
 export async function rechercherDocumentsRag(
   base44: any,
   query: string,
-  options: { pays?: string; categorie?: string; limit?: number; conversation_id?: string } = {}
+  options: { pays?: string; categorie?: string; limit?: number; conversation_id?: string; ville?: string } = {}
 ): Promise<{
   resultats: any[];
   temps_ms: number;
@@ -421,7 +421,7 @@ export async function rechercherDocumentsRag(
   a_reussi: boolean;
 }> {
   const startTime = Date.now();
-  const { pays, categorie, limit = 5, conversation_id } = options;
+  const { pays, categorie, limit = 5, conversation_id, ville } = options;
 
   // Étape 1 : Extraire et étendre les mots-clés
   const rawKeywords = extraireMotsClesFromQuery(query);

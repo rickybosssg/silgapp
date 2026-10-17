@@ -188,6 +188,11 @@ Deno.serve(async (req) => {
       });
     }
     const countryConfig = await chargerConfigPays(base44, countryCode);
+    // ── Ville SILGAPP de l'utilisateur ──
+    // Priorité : 1) ville en mémoire courte (contexte de conversation)
+    //            2) ville du profil client/livreur
+    //            3) ville principale du pays (fallback)
+    const villeUtilisateur = (conversation?.memoire_courte?.ville || conversation?.ville || countryConfig.ville_principale || '').trim();
     const tarifs = {
       nom: countryConfig.nom,
       ville: countryConfig.ville_principale,
@@ -750,7 +755,7 @@ Deno.serve(async (req) => {
           messageClient: messageEffectif,
           memoireCourte: pendingCourse || {},
           memoireLongue, historiqueRecent, courseActive,
-          countryCode, tarifs, telephone, profileName, isAudioTranscription,
+          countryCode, ville: villeUtilisateur, tarifs, telephone, profileName, isAudioTranscription,
           force_confirmation: forceConfirmationAudio,
         });
 
