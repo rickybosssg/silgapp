@@ -207,10 +207,16 @@ export function useCoursesDisponibles(livreurProfil) {
   });
 
   // ── Courses dismissées localement (localStorage, TTL 30 min) ──
+  // [FIX] L'initialisation DOIT filtrer par TTL (30 min). Sans cela, une course
+  // dismissée il y a des heures reste filtrée indéfiniment — le livreur ne la
+  // voit jamais revenir dans son fil "Disponibles", même après expiration du refus.
   const [refusedIds, setRefusedIds] = useState(() => {
     try {
       const stored = localStorage.getItem(DISMISSED_COURSES_KEY);
-      return stored ? Object.keys(JSON.parse(stored)) : [];
+      if (!stored) return [];
+      const parsed = JSON.parse(stored);
+      const now = Date.now();
+      return Object.keys(parsed).filter(courseId => now - Number(parsed[courseId]) < 30 * 60 * 1000);
     } catch { return []; }
   });
 
