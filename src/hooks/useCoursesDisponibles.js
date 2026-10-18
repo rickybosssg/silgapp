@@ -207,16 +207,30 @@ export function useCoursesDisponibles(livreurProfil) {
   });
 
   // ── Courses dismissées localement (localStorage, TTL 30 min) ──
-  // [FIX] L'initialisation DOIT filtrer par TTL (30 min). Sans cela, une course
-  // dismissée il y a des heures reste filtrée indéfiniment — le livreur ne la
-  // voit jamais revenir dans son fil "Disponibles", même après expiration du refus.
+  // [FIX] L'initialisation filtre par TTL (30 min) ET purge le localStorage
+  // des entrées expirées pour éviter l'accumulation de vieux course_id qui
+  // gonflent le JSON indéfiniment. Seules les entrées encore valides (<30 min)
+  // sont conservées.
   const [refusedIds, setRefusedIds] = useState(() => {
     try {
       const stored = localStorage.getItem(DISMISSED_COURSES_KEY);
       if (!stored) return [];
       const parsed = JSON.parse(stored);
       const now = Date.now();
-      return Object.keys(parsed).filter(courseId => now - Number(parsed[courseId]) < 30 * 60 * 1000);
+      const TTL_MS = 30 * 60 * 1000;
+      const valid = {};
+      const validIds = [];
+      for (const courseId of Object.keys(parsed)) {
+        if (now - Number(parsed[courseId]) < TTL_MS) {
+          valid[courseId] = parsed[courseId];
+          validIds.push(courseId);
+        }
+      }
+      // Purge : réécrire le localStorage uniquement s'il y a eu des entrées expirées.
+      if (Object.keys(valid).length !== Object.keys(parsed).length) {
+        localStorage.setItem(DISMISSED_COURSES_KEY, JSON.stringify(valid));
+      }
+      return validIds;
     } catch { return []; }
   });
 
