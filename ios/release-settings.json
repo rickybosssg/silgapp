@@ -1,9 +1,9 @@
 {
   "source_branch": "ios",
-  "source_commit": "f422837fa909fd0459f5ff690cb96bae90c6d185",
+  "source_commit": "9d274f4d78596d325e0b0e3939886e5be2c3a984",
   "bundle_id": "com.base6a0ec08f3af5e1d1284254c1.app",
   "team_id": "X7N95F8KTJ",
-  "app_store_connect_confirmed": false,
+  "app_store_connect_confirmed": true,
   "latest_app_store_version": "1.0.62",
   "latest_app_store_build": "69",
   "marketing_version": "1.0.63",
@@ -23,6 +23,6 @@
   "profile_name": "SILGAPP_APPSTORE_2026_10_14",
   "profile_uuid": "90843184-68cd-4f34-a648-4f31057ee6cc",
   "certificate_sha256": "89243A26883BE151928016B722D054718B373AC13F298762CAF14296ECDC974B",
-  "candidate_status": "2026-10-19: iOS client-only source reviewed; candidate 1.0.63/70 checked in App Store Connect. Final source pin required before signing. Apple submission and automatic release authorized subject to build and metadata validation.",
+  "candidate_status": "Reviewed iOS client source pinned; authenticated Apple numbering checked 2026-10-19. Signed archive/export authorized. Upload and automatic release after Apple review require successful artifact verification and unchanged legal declarations.",
   "preparation_date": "2026-10-19"
 }
