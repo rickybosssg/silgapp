@@ -1,5 +1,5 @@
-import { haversineKm } from './geoUtils.ts';
-import { normalizeCityName, resolveOperationalName } from './cityNames.js';
+import { normalizeCityName, resolveGpsOperationalCity } from './cityNames.js';
+export { resolveGpsOperationalCity } from './cityNames.js';
 
 // Reuse the existing heartbeat city-change limits. The previous 10-minute
 // profile fallback is deliberately not an authorization source for new work.
@@ -22,30 +22,6 @@ export function currentGpsFix(driver, now = Date.now()) {
       typeof accuracy !== 'number' || !Number.isFinite(accuracy) || accuracy < 0 || accuracy > CITY_GPS_MAX_ACCURACY_M ||
       !Number.isFinite(time) || time > now || now - time > CITY_GPS_MAX_AGE_MS) return null;
   return { latitude: Number(lat), longitude: Number(lng), time, accuracy };
-}
-
-export function resolveGpsOperationalCity(lat, lng, countryCode, cities, quartiers, maxDistanceKm = CITY_GPS_MAX_QUARTIER_DISTANCE_KM) {
-  if (lat == null || lat === '' || lng == null || lng === '' ||
-      !Number.isFinite(Number(lat)) || Math.abs(Number(lat)) > 90 ||
-      !Number.isFinite(Number(lng)) || Math.abs(Number(lng)) > 180) return null;
-  const country = String(countryCode || '').toUpperCase();
-  if (!country) return null;
-  const scopedCities = cities.filter(c => !c.country_code || String(c.country_code).toUpperCase() === country);
-  const scopedQuartiers = quartiers.filter(q => !q.country_code || String(q.country_code).toUpperCase() === country);
-  let nearest = null, distance = Infinity;
-  for (const q of scopedQuartiers) {
-    if (q.actif === false || (q.country_code && String(q.country_code).toUpperCase() !== country)) continue;
-    if (q.latitude == null || q.latitude === '' || q.longitude == null || q.longitude === '' ||
-        !Number.isFinite(Number(q.latitude)) || Math.abs(Number(q.latitude)) > 90 ||
-        !Number.isFinite(Number(q.longitude)) || Math.abs(Number(q.longitude)) > 180) continue;
-    if (!normalizeCityName(q.ville_operationnelle) && !normalizeCityName(q.ville)) continue;
-    const km = haversineKm(Number(lat), Number(lng), Number(q.latitude), Number(q.longitude));
-    if (km !== null && km < distance) { distance = km; nearest = q; }
-  }
-  if (!nearest || distance > maxDistanceKm) return null;
-  // Explicit aliases (including Saaba) also apply when a quartier has no
-  // ville_operationnelle. A quartier name never invents a city.
-  return resolveOperationalName(nearest.ville_operationnelle || nearest.ville, scopedCities, scopedQuartiers);
 }
 
 export function currentDriverGpsCity(driver, cities, quartiers, now = Date.now()) {

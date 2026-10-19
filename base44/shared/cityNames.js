@@ -1,3 +1,5 @@
+import { haversineKm } from './geoUtils.ts';
+
 // Pure canonical names shared by query filters and the available-feed UI.
 export function normalizeCityName(name) {
   if (typeof name !== 'string') return null;
@@ -39,9 +41,37 @@ export function resolveOperationalName(name, cities = [], quartiers = []) {
 
 export function canSeeOperationalCourse(course, driverCity, cities, quartiers) {
   if (!cities.some(c => c.actif === true)) return true;
-  const zone = resolveOperationalName(course.ville_depart, cities, quartiers);
+  // Match backend getCourseDepartureCity: stored name first, then departure GPS.
+  // A genuinely unresolved origin remains hidden whenever any zone is active.
+  const zone = resolveOperationalName(course.ville_depart, cities, quartiers) ||
+    resolveGpsOperationalCity(course.gps_depart_lat, course.gps_depart_lng, course.country_code, cities, quartiers);
   if (!zone) return false;
   return !cities.some(c => c.actif === true && normalizeCityName(c.nom) === zone) ||
     zone === resolveOperationalName(driverCity, cities, quartiers);
+}
+
+
+export function resolveGpsOperationalCity(lat, lng, countryCode, cities, quartiers, maxDistanceKm = 30) {
+  if (lat == null || lat === '' || lng == null || lng === '' ||
+      !Number.isFinite(Number(lat)) || Math.abs(Number(lat)) > 90 ||
+      !Number.isFinite(Number(lng)) || Math.abs(Number(lng)) > 180) return null;
+  const country = String(countryCode || '').toUpperCase();
+  if (!country) return null;
+  const scopedCities = cities.filter(c => !c.country_code || String(c.country_code).toUpperCase() === country);
+  const scopedQuartiers = quartiers.filter(q => !q.country_code || String(q.country_code).toUpperCase() === country);
+  let nearest = null, distance = Infinity;
+  for (const q of scopedQuartiers) {
+    if (q.actif === false || (q.country_code && String(q.country_code).toUpperCase() !== country)) continue;
+    if (q.latitude == null || q.latitude === '' || q.longitude == null || q.longitude === '' ||
+        !Number.isFinite(Number(q.latitude)) || Math.abs(Number(q.latitude)) > 90 ||
+        !Number.isFinite(Number(q.longitude)) || Math.abs(Number(q.longitude)) > 180) continue;
+    if (!normalizeCityName(q.ville_operationnelle) && !normalizeCityName(q.ville)) continue;
+    const km = haversineKm(Number(lat), Number(lng), Number(q.latitude), Number(q.longitude));
+    if (km !== null && km < distance) { distance = km; nearest = q; }
+  }
+  if (!nearest || distance > maxDistanceKm) return null;
+  // Explicit aliases (including Saaba) also apply when a quartier has no
+  // ville_operationnelle. A quartier name never invents a city.
+  return resolveOperationalName(nearest.ville_operationnelle || nearest.ville, scopedCities, scopedQuartiers);
 }
 

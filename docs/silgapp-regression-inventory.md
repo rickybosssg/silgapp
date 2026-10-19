@@ -736,3 +736,12 @@ Detailed policy, compatibility, costs and validation are recorded in
   preparations and disabled native Google/Apple gates are preserved. No Android
   version change, backend change or real course/message is part of this change.
   No TestFlight upload, review submission or store publication is authorized.
+
+## iOS client corrections - 2026-10-19
+
+- Candidate iOS 1.0.63/build70 remains guarded pending a fresh App Store Connect numbering check.
+- iOS local notifications bypass unsupported Android channels and retain tap routing in extra. APNs registration failures expose a generic message. Existing remote foreground presentation and Android paths are preserved.
+- The available-course hook resolves missing origin cities using the shared pure GPS/canonical-city helper and the supported neighbourhood sort/limit. The two files under base44/shared are imported into the client bundle; no backend entry point or dispatch targeting is changed or deployed.
+- Keep the existing WhatsApp, account, tenant, country, Eco and server acceptance protections. Native signing, upload, App Review and physical-device notification validation remain separate steps.
+
+- Reconciled client validation: 49 historical and focused suites, ESLint, project TypeScript and web build pass. Authenticated Apple UI shows released 1.0.62/build69 and no candidate 1.0.63/70 in the complete upload history. Source pin remains a separate prerequisite for signing.

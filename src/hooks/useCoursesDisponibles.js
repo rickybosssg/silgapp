@@ -106,7 +106,7 @@ export function useCoursesDisponibles(livreurProfil) {
     queryFn: async () => {
       const cities = await base44.entities.OperationalCity.filter({ country_code: countryCode }, undefined, 100);
       const quartiers = cities.some(c => c.actif === true)
-        ? await base44.entities.Quartier.filter({ country_code: countryCode, actif: true }, undefined, 1000) : [];
+        ? await base44.entities.Quartier.filter({ country_code: countryCode, actif: true }, 'nom', 500) : [];
       // Invalid or overlapping aliases are a query error, not a render-time crash.
       if (cities.some(c => c.actif === true)) {
         for (const city of cities) {

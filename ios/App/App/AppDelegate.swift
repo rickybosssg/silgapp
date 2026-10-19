@@ -45,8 +45,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate, MessagingDelegate {
     }
 
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
-        NotificationCenter.default.post(name: .capacitorDidFailToRegisterForRemoteNotifications, object: error)
-        print("[SILGAPP] Échec enregistrement notifications remote: \(error.localizedDescription)")
+        let registrationError = NSError(domain: "SILGAPP.Push", code: 2,
+            userInfo: [NSLocalizedDescriptionKey: "Remote notification registration is temporarily unavailable"])
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: .capacitorDidFailToRegisterForRemoteNotifications, object: registrationError)
+        }
     }
 
     func applicationWillResignActive(_ application: UIApplication) {

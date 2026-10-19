@@ -516,6 +516,22 @@ async function showNativeNotification(titre, message, options = {}) {
   const LocalNotifications = getCapacitorPlugin("LocalNotifications", "@capacitor/local-notifications");
   if (!LocalNotifications) return;
 
+  // iOS has no Android notification channels. Preserve tap routing in extra.
+  if (Capacitor.getPlatform() === "ios") {
+    try {
+      await LocalNotifications.schedule({ notifications: [{
+        title: titre,
+        body: message,
+        id: Math.floor(Date.now() % 2147483647),
+        sound: options.sound || "default",
+        extra: options.data || {},
+      }] });
+    } catch (_) {
+      console.warn("Erreur LocalNotifications iOS");
+    }
+    return;
+  }
+
   // Vibration native Capacitor
   if (isImportant(options)) {
     const Haptics = getCapacitorPlugin("Haptics", "@capacitor/haptics");

@@ -444,3 +444,30 @@ test('urgent native bridge runs only on Android while preserving start and stop 
     }
   }
 });
+
+test('iOS local notification schedules without Android channels and preserves tap routing in extra', async () => {
+  const f = fixture('ios'); const scheduled = [], opened = [];
+  f.native.schedule = async payload => { scheduled.push(payload); };
+  await f.register();
+  f.auth.subscribeToNotificationOpened(event => opened.push(event.detail), CLIENT.email);
+  const data = { notification_id: 'ios-local-fixture', type: 'nouveau_message', conversation_id: 'fixture-conversation' };
+  f.auth.showLocalNotification('Fixture', 'Body', { data }); await flush();
+  assert.equal(f.androidCalls(), 0); assert.equal(scheduled.length, 1);
+  assert.equal(scheduled[0].notifications[0].sound, 'default');
+  assert.deepEqual(scheduled[0].notifications[0].extra, data);
+  await f.events.get('localNotificationActionPerformed')({ actionId: 'tap', notification: { extra: data } });
+  assert.equal(opened.length, 1); assert.equal(opened[0].conversation_id, data.conversation_id);
+});
+
+test('iOS local scheduling rejection stays contained and does not fall through to Android', async () => {
+  const f = fixture('ios'); f.native.schedule = async () => { throw Error('fixture-only'); };
+  f.auth.showLocalNotification('Fixture', 'Body', {}); await flush();
+  assert.equal(f.androidCalls(), 0);
+  assert.equal(JSON.stringify(f.logs).includes('fixture-only'), false);
+});
+
+test('iOS APNs registration failure does not log or forward raw native errors', () => {
+  const swift=read('ios/App/App/AppDelegate.swift');
+  assert.doesNotMatch(swift, /error\.localizedDescription|object: error\)/);
+  assert.match(swift, /code: 2/);
+});
