@@ -18,8 +18,8 @@ spec.loader.exec_module(upload)
 
 class UploadTests(unittest.TestCase):
     def fixture_ipa(self, directory, **changes):
-        info = dict(CFBundleIdentifier=upload.BUNDLE_ID, CFBundleShortVersionString="1.0.60",
-                    CFBundleVersion="67", DTSDKName="iphoneos26.2", DTXcode="2620")
+        info = dict(CFBundleIdentifier=upload.BUNDLE_ID, CFBundleShortVersionString=upload.VERSION,
+                    CFBundleVersion=upload.BUILD, DTSDKName="iphoneos26.2", DTXcode="2620")
         info.update(changes)
         path = Path(directory) / "fixture.ipa"
         with zipfile.ZipFile(path, "w") as archive:
@@ -31,7 +31,7 @@ class UploadTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory, patch.object(upload, "LOGO_SHA256", hashlib.sha256(b"synthetic logo").hexdigest()):
             path, digest = self.fixture_ipa(directory)
             self.assertEqual(upload.verify_ipa(path, digest), "Payload/App.app")
-            with self.assertRaisesRegex(ValueError, "exact verified r2"):
+            with self.assertRaisesRegex(ValueError, "exact verified build 70"):
                 upload.verify_ipa(path)
             for changes in ({"CFBundleVersion": "66"}, {"CFBundleShortVersionString": "1.0.59"},
                             {"CFBundleIdentifier": "another.app"}, {"DTSDKName": "iphoneos18.5"}, {"DTXcode": "1640"}):
@@ -47,14 +47,15 @@ class UploadTests(unittest.TestCase):
 
     def test_existing_or_malformed_apple_build_response_blocks_upload(self):
         upload.require_absent({"data": []})
-        for payload in ({"data": [{"id": "already-uploaded"}]}, {}, {"data": None}):
+        for payload in ({"data": [{"id": "already-uploaded"}]}, {}, {"data": None},
+                        {"data": [], "links": {"next": "more"}}):
             with self.subTest(payload=payload), self.assertRaises(ValueError):
                 upload.require_absent(payload)
 
     def test_receipt_requires_correct_apple_version_and_build(self):
-        payload = {"data": [{"id": "build-id", "attributes": {"version": "67", "processingState": "VALID"},
+        payload = {"data": [{"id": "build-id", "attributes": {"version": upload.BUILD, "processingState": "VALID"},
                     "relationships": {"preReleaseVersion": {"data": {"id": "version-id"}}}}],
-                   "included": [{"type": "preReleaseVersions", "id": "version-id", "attributes": {"version": "1.0.60"}}]}
+                   "included": [{"type": "preReleaseVersions", "id": "version-id", "attributes": {"version": upload.VERSION}}]}
         self.assertEqual(upload.public_build(payload)["processing_state"], "VALID")
         payload["included"][0]["attributes"]["version"] = "1.0.59"
         with self.assertRaises(ValueError):
@@ -81,9 +82,24 @@ class UploadTests(unittest.TestCase):
 
     def test_local_or_manual_rerun_cannot_upload(self):
         with patch.object(upload.os, "environ", {}), patch("sys.argv", ["upload", "--ipa", "unopened.ipa", "--receipt", "unwritten.json"]):
-            with patch("sys.stdout", new_callable=io.StringIO) as output:
+            with patch("sys.stdout", new_callable=io.StringIO) as output, patch.object(Path, "write_text"):
                 self.assertEqual(upload.main(), 2)
             self.assertIn("first authorized immutable-tag", output.getvalue())
+
+    def test_live_apple_state_must_match_owner_review_without_changing_existing_reviews(self):
+        current = {"id": "current", "attributes": {"versionString": "1.0.62",
+                   "appStoreState": "READY_FOR_DISTRIBUTION", "releaseType": "MANUAL"}}
+        payload = {"data": [current]}
+        self.assertEqual(upload.require_reviewed_apple_state(payload)[0]["version"], "1.0.62")
+        for state in ("WAITING_FOR_REVIEW", "IN_REVIEW", "PENDING_DEVELOPER_RELEASE", "READY_FOR_REVIEW"):
+            other = {"id": "other", "attributes": {"versionString": "1.0.63", "appStoreState": state}}
+            with self.subTest(state=state), self.assertRaisesRegex(ValueError, "review will be changed"):
+                upload.require_reviewed_apple_state({"data": [current, other]})
+        newer = {"id": "newer", "attributes": {"versionString": "1.0.64", "appStoreState": "PREPARE_FOR_SUBMISSION"}}
+        for invalid in ({}, {"data": []}, {"data": [current], "links": {"next": "more"}},
+                        {"data": [current, newer]}):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                upload.require_reviewed_apple_state(invalid)
 
 
 if __name__ == "__main__":

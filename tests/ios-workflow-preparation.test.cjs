@@ -66,9 +66,9 @@ test('all embedded workflow shell blocks pass a syntax-only Bash check', () => {
   }
 });
 
-test('upload uses only exact r2 artifact and an immutable separate tag, with a public receipt artifact', () => {
+test('upload uses only verified build 70 and an immutable separate tag, with a public receipt artifact', () => {
   const workflow = yaml.load(read('.github/workflows/ios-appstore-upload.yml'));
-  assert.deepEqual(workflow.on.push.tags, ['ios-upload-v1.0.60-b67-r2']);
+  assert.deepEqual(workflow.on.push.tags, ['ios-upload-v1.0.63-b70']);
   assert.equal(workflow.on.workflow_dispatch, undefined);
   assert.deepEqual(workflow.permissions, { contents: 'read', actions: 'read' });
   assert.equal(workflow.concurrency['cancel-in-progress'], false);
@@ -76,7 +76,7 @@ test('upload uses only exact r2 artifact and an immutable separate tag, with a p
   assert.equal(job.if, 'github.run_attempt == 1');
   assert.equal(job['runs-on'], 'macos-15');
   const download = job.steps.find(step => step.uses === 'actions/download-artifact@v4');
-  assert.equal(download.with['run-id'], 38528393904);
+  assert.equal(download.with['run-id'], 39248647300);
   assert.equal(download.with.name, 'SILGAPP-signed-ipa');
   const artifact = job.steps.find(step => step.uses === 'actions/upload-artifact@v4');
   assert.equal(artifact.with.path, '${{ runner.temp }}/ios-appstore-upload-receipt.json');
