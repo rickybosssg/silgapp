@@ -2,6 +2,10 @@
   "name": "CourseExterne",
   "type": "object",
   "properties": {
+    "commande_vocale_express": {
+      "type": "boolean",
+      "description": "True si la course a ete creee via le parcours de commande vocale express (transcription audio). Optionnel \u2014 aucun impact sur le dispatch, les commissions ou les permissions."
+    },
     "country_code": {
       "type": "string",
       "description": "Code pays ISO 2 lettres (ex: BF, CI, TG). Dynamique : aucun pays cod\u00e9 en dur."
