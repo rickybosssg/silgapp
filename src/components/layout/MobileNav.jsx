@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Menu, X, LogOut, Bell, ChevronDown, Check, MessageCircle } from "lucide-react";
+import { Menu, X, LogOut, Bell, ChevronDown, MessageCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { clearPersistedToken } from "@/lib/authPersistence";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,7 @@ import { navItems as allNavItems } from "@/components/layout/Sidebar";
 import { useAdminContext } from "@/hooks/useAdminContext.js";
 import { usePaysActifs } from "@/components/international/CountrySelector.jsx";
 import { useQuery } from "@tanstack/react-query";
+import { isAudioSettingsAdmin } from "@/lib/audioContract.js";
 
 // Bottom tab bar : items communs aux deux réseaux
 const bottomTabPaths = ["/", "/carte", "/courses", "/livreurs"];
@@ -73,9 +74,9 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
     setTimeout(() => window.location.reload(), 300);
   };
   const [showMenu, setShowMenu] = useState(false);
-  const [countryOpen, setCountryOpen] = useState(false);
   const { isPays, countryCode: adminCountryCode, selectedCountry, setSelectedCountry } = useAdminContext();
   const effectiveCountry = isPays ? adminCountryCode : selectedCountry;
+  const canManageExpress = isAudioSettingsAdmin(user);
   const showCountryPicker = reseau === "externe" && !isPays;
   const { pays: paysListe = [] } = usePaysActifs();
 
@@ -146,7 +147,7 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
               </span>
             </Link>
           )}
-          <Button variant="ghost" size="icon" onClick={() => setShowMenu(true)} className="text-slate-400">
+          <Button aria-label="Ouvrir le menu" variant="ghost" size="icon" onClick={() => setShowMenu(true)} className="text-slate-400">
             <Menu className="w-5 h-5" />
           </Button>
         </div>
@@ -170,7 +171,7 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
                   </div>
                 )}
               </div>
-              <Button variant="ghost" size="icon" onClick={() => setShowMenu(false)}>
+              <Button aria-label="Fermer le menu" variant="ghost" size="icon" onClick={() => setShowMenu(false)}>
                 <X className="w-5 h-5" />
               </Button>
             </div>
@@ -179,29 +180,28 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
             {showCountryPicker && (
               <div className="px-3 py-2 border-b border-white/5">
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-base pointer-events-none z-10">
-                    {effectiveCountry ? paysListe.find(p => p.code === effectiveCountry)?.emoji_flag || "🌍" : "🌍"}
-                  </span>
                   <select
+                    aria-label="Pays des données administrateur"
                     value={effectiveCountry || ""}
                     onChange={(e) => setSelectedCountry(e.target.value)}
-                    className="w-full appearance-none bg-white/5 text-slate-200 text-sm font-medium rounded-xl pl-10 pr-8 py-2.5 border border-white/5 focus:outline-none focus:ring-1 focus:ring-sidebar-primary/40 cursor-pointer"
+                    style={{ backgroundColor: '#ffffff', color: '#111827', colorScheme: 'light' }}
+                    className="w-full min-w-0 min-h-11 appearance-none bg-white text-gray-900 text-sm font-medium rounded-lg pl-3 pr-8 py-2.5 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-sidebar-primary cursor-pointer"
                   >
-                    <option value="" className="bg-sidebar-accent text-slate-400">Choisir un pays</option>
+                    <option value="" style={{ backgroundColor: '#ffffff', color: '#111827' }}>Choisir un pays</option>
                     {paysListe.map((p) => (
-                      <option key={p.code} value={p.code} className="bg-sidebar-accent text-slate-200">
+                      <option key={p.code} value={p.code} style={{ backgroundColor: '#ffffff', color: '#111827' }}>
                         {p.emoji_flag} {p.nom}
                       </option>
                     ))}
                   </select>
-                  <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <ChevronDown className="w-4 h-4 text-gray-600 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 </div>
               </div>
             )}
 
             {/* Nav items */}
             <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-0.5">
-              {allNavItems.map((item) => {
+              {allNavItems.filter(item => !item.superAdminOnly || canManageExpress).map((item) => {
                 const isActive = location.pathname === item.path;
                 const Icon = item.icon;
                 return (
