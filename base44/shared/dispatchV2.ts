@@ -265,8 +265,9 @@ export async function publierCourseDansFil(base44: any, course: any) {
     return { success: false, eco_isolated: true, reason: 'eco_isolated_pending_grouping' };
   }
 
-  await base44.asServiceRole.entities.CourseExterne.updateMany(
-    { id: course.id, statut: { $nin: ['annulee', 'livree', 'terminee'] }, annulation_user_id: { $in: [null, ''] }, dispatch_status: { $nin: ['disponible_push', 'accepte', 'propose', 'redispatch'] }, client_decision_attendue: { $ne: true } },
+  const expressInitial = course.commande_vocale_express === true;
+  const publication = await base44.asServiceRole.entities.CourseExterne.updateMany(
+    { id: course.id, statut: expressInitial ? { $in: ['nouvelle', 'recherche_livreur'] } : { $nin: ['annulee', 'livree', 'terminee'] }, annulation_user_id: { $in: [null, ''] }, dispatch_status: expressInitial ? 'en_attente' : { $nin: ['disponible_push', 'accepte', 'propose', 'redispatch'] }, client_decision_attendue: { $ne: true }, ...(expressInitial ? { livreur_id: { $in: [null, ''] }, accepted_by_livreur_id: { $in: [null, ''] } } : {}) },
     { $set: {
       statut: 'recherche_livreur',
       dispatch_status: 'disponible_push',
@@ -279,6 +280,12 @@ export async function publierCourseDansFil(base44: any, course: any) {
       accepted_by_livreur_id: '',
     }}
   );
+
+  // Express creation and the entity orchestrator can arrive in the same ms.
+  // Only the CAS winner sends T=0; timestamps do not establish ownership.
+  if (expressInitial && Number(publication?.updated) !== 1) {
+    return { success: true, skipped: true, reason: 'express_publication_already_claimed_or_ineligible' };
+  }
 
   // Re-fetch pour vérifier si ON a gagné la publication (heure_sollicitation = notre now)
   // ou si un autre appel a déjà publié avant nous.

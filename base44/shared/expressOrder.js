@@ -144,7 +144,8 @@ export function createExpressSubmission(invoke, makeId = () => crypto.randomUUID
     try {
       const result = await invoke("creerCourseClient", { request_id: requestId, express_draft: draft });
       const body = result?.data ?? result;
-      if (body?.erreur || body?.error || body?.success === false || body?.ok === false) throw new Error("Création refusée ou non confirmée. Conservez la commande et vérifiez son état.");
+      const refused = value => value?.erreur || value?.error || value?.success === false || value?.ok === false;
+      if (refused(result) || refused(body) || body?.success !== true) throw new Error("Création refusée ou non confirmée. Conservez la commande et vérifiez son état.");
       const course = body?.course;
       if (!course?.id) throw new Error("Création non confirmée. Réessayez sans changer la commande.");
       completed = true;

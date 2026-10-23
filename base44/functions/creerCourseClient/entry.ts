@@ -4,6 +4,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
 import { buildExpressCourse } from '../../shared/expressOrder.js';
 import { resolveExpressClient, EXPRESS_PROFILE_MESSAGES } from '../../shared/expressClientContext.js';
 import { prepareEcoCreationFields } from '../../shared/ecoOptimizationEngine.ts';
+import { finishExpressCreation } from '../../shared/expressImmediateDispatch.js';
 
 const CREATION_MUTEX_KEY = 'COURSE_CREATION_MUTEX';
 const LOCK_TTL_MS = 15_000;
@@ -206,7 +207,7 @@ export default async function(req: Request): Promise<Response> {
   try {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
-    if (!user) return Response.json({ error: 'Non autorisé' }, { status: 401 });
+    if (!user) return Response.json({ error: 'Non autorisé', express_dispatch_contract: 'express-immediate-v1' }, { status: 401 });
 
     const body = await req.json();
     const { is_duplicate, request_id } = body;
@@ -242,6 +243,11 @@ export default async function(req: Request): Promise<Response> {
       if (mutex.existing) {
         if (mutex.owner && mutex.mutex?.id) {
           await releaseCreationMutex(base44, mutex.mutex.id, mutex.owner);
+        }
+        if (body.express_draft) {
+          const { publierCourseDansFil, isV2Enabled } = await import('../../shared/dispatchV2.ts');
+          return Response.json({ ...await finishExpressCreation(base44, mutex.existing, async (api: any, current: any) =>
+            await isV2Enabled(api) ? publierCourseDansFil(api, current) : { success: false, reason: 'v2_disabled' }), idempotent: true });
         }
         return Response.json({ success: true, course: mutex.existing, idempotent: true });
       }
@@ -341,6 +347,17 @@ export default async function(req: Request): Promise<Response> {
 
       // [CORRECTION PIN/QR] Message automatique des codes supprimé — les PIN/QR ne sont plus utilisés.
 
+      if (body.express_draft) {
+        // The durable receipt is written. Do not hold the global creation mutex
+        // while publication/notifications run or block unrelated classic orders.
+        if (mutex?.owner && mutex?.mutex?.id) {
+          await releaseCreationMutex(base44, mutex.mutex.id, mutex.owner);
+          mutex.owner = null;
+        }
+        const { publierCourseDansFil, isV2Enabled } = await import('../../shared/dispatchV2.ts');
+        return Response.json(await finishExpressCreation(base44, course, async (api: any, current: any) =>
+          await isV2Enabled(api) ? publierCourseDansFil(api, current) : { success: false, reason: 'v2_disabled' }));
+      }
       return Response.json({ success: true, course });
     } finally {
       if (mutex?.owner && mutex?.mutex?.id) {
@@ -351,6 +368,6 @@ export default async function(req: Request): Promise<Response> {
     }
   } catch (error) {
     console.error('[creerCourseClient] Erreur:', error);
-    return Response.json({ error: error.message }, { status: 500 });
+    return Response.json({ error: error.message, express_dispatch_contract: 'express-immediate-v1' }, { status: 500 });
   }
 }

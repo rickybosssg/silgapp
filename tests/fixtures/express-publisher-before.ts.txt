@@ -1,0 +1,761 @@
+// ═══════════════════════════════════════════════════════════════════════════
+// 📌 DISPATCH V2 — VERSION STABLE FIGÉE (2026-08-11)
+// ═══════════════════════════════════════════════════════════════════════════
+// ⚠️  NE PAS MODIFIER SANS VALIDATION EXPLICITE DU RESPONSABLE PRODUIT.
+//
+// Ce moteur a été audité, testé et validé. Toute modification — même mineure —
+// doit être signalée et validée avant application. Les optimisations automatiques
+// ou refactorisations sont interdites sur ce fichier.
+//
+// Fonctionnement validé (à conserver) :
+//   1. Course publiée dans le fil « Disponibles » (dispatch_status = disponible_push).
+//   2. Tous les livreurs éligibles et libres voient la course, prioritaires ou non.
+//   3. À T=0, les prioritaires (priorite_dispatch > 0) reçoivent le push en premier,
+//      puis tous les non-prioritaires éligibles reçoivent également un push.
+//   4. Notifications envoyées via envoiNotificationPushBatch (1 appel pour N livreurs).
+//   5. Un non-prioritaire peut accepter immédiatement une course visible dans son fil.
+//   6. Un livreur en course ne reçoit pas le push et ne peut pas accepter une 2e course.
+//   7. Acceptation protégée par verrou atomique (updateMany conditionnel) — 1 seul gagnant.
+//   8. Après acceptation, la course disparaît du fil des autres (livreur_id + WebSocket).
+//   9. T+5 min sans acceptation → push batch Top 3 non-prioritaires encore éligibles.
+//  10. T+10 min sans acceptation → push batch Top 5 non-prioritaires encore éligibles.
+//  11. T+15 min → aucun nouveau push ; la course reste en disponible_push indéfiniment.
+//
+// V1 (dispatchEngine.ts) reste intact pour rollback. Feature flags et pilote
+// (DISPATCH_V2_ENABLED, DISPATCH_V2_PILOT_*) inchangés.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── Dispatch V2 : Fil de courses disponibles + secours ciblé ────────────────
+// Nouveau système derrière le feature flag DISPATCH_V2_ENABLED.
+// V1 (vagues) reste intact et utilisé quand le flag est désactivé.
+// VERSION: 2026-08-11 — Version stable figée. Ne pas modifier sans validation.
+
+import { waitUntil } from 'base44:runtime';
+import { isTerminalCourse, updateActiveCourse } from './courseTerminalGuard.ts';
+import { STATUTS_ACTIFS_COURSE, STATUTS_TERMINAUX_COURSE, calculerDistance, chargerConfigPays } from './dispatchConstants.ts';
+import { dispatchLog, reponseDejaPrise, generateToken, generatePIN, journaliserDispatch } from './dispatchUtils.ts';
+import { enregistrerNotification, enregistrerNotificationsBulk, enregistrerInboxNotificationsBulk, getLivreursNotifies, getLivreursRefuses, marquerAccepte } from './dispatchNotifications.ts';
+import { notifierLivreursUnifie } from './dispatchPushUnifie.ts';
+import { chargerConfigDispatch } from './dispatchConfig.ts';
+import { resolveCourseParticipantUserIds } from './conversationSecurity.ts';
+// [CORRECTION PIN/QR] ensureCourseCodeMessage supprimé — les PIN/QR ne sont plus utilisés.
+// import { ensureCourseCodeMessage, buildCodeMessageContent } from './courseCodeMessage.ts';
+import { figerCommissionAcceptation, evaluerAvantageCommission } from './commissionAvantage.ts';
+import { champsLockCommission, verifierCoherenceLock } from './commissionLock.ts';
+import { normalizeEnterpriseId } from './enterpriseFinance.ts';
+import { buildLivreurCityFilter, buildCourseCityFilterFromCourse, verifyCityCompatibility } from './cityDispatchFilter.ts';
+
+// ── Version du bundle (pour vérifier que la production charge la dernière version) ──
+export const DISPATCH_V2_BUNDLE_VERSION = '2026-09-25-v2-only-unique-moteur';
+
+// ── Feature flag cache (TTL 2 min) ──
+let V2_FLAG_CACHE: { enabled: boolean; expires: number } | null = null;
+const V2_FLAG_TTL_MS = 2 * 60 * 1000;
+
+export async function isV2Enabled(base44: any): Promise<boolean> {
+  if (V2_FLAG_CACHE && Date.now() < V2_FLAG_CACHE.expires) return V2_FLAG_CACHE.enabled;
+  try {
+    const configs = await base44.asServiceRole.entities.AppConfig.filter({ cle: 'DISPATCH_V2_ENABLED' });
+    const enabled = configs?.[0] ? configs[0].valeur !== 'false' : true;
+    if (!configs?.[0]) {
+      await base44.asServiceRole.entities.AppConfig.create({
+        cle: 'DISPATCH_V2_ENABLED',
+        valeur: 'true',
+        description: 'Dispatch V2 actif par défaut - fil de courses disponibles',
+      }).catch(() => null);
+    }
+    V2_FLAG_CACHE = { enabled, expires: Date.now() + V2_FLAG_TTL_MS };
+    return enabled;
+  } catch {
+    return true;
+  }
+}
+
+async function notifierLivreursEligiblesV2(base44: any, course: any, options: any = {}) {
+  const current = await base44.asServiceRole.entities.CourseExterne.get(course.id);
+  if (!current || isTerminalCourse(current) || current.dispatch_status !== 'disponible_push' || current.client_decision_attendue === true) return { pushed: 0, blocked: true };
+  course = current;
+  const { priorityOnly = false, skipAlreadyPublishedCheck = false } = options;
+  if (!course?.id || !course?.country_code) return { notified: 0 };
+
+  // [ENTERPRISE] Filtre enterprise_id : course Enterprise → livreurs même entreprise uniquement.
+  // Course publique (enterprise_id null/absent) → livreurs publics uniquement.
+  // normalizeEnterpriseId(null) === normalizeEnterpriseId(null) = true (canonique).
+  const courseEnterpriseId = normalizeEnterpriseId(course.enterprise_id);
+
+  // 📦 LECTURE UNIFIÉE : 1 Livreur.filter + 1 DispatchNotification.filter
+  // (remplace getLivreursNotifies + getLivreursRefuses → économise 1 read redondant)
+  // [CITY_DISPATCH] Filtre ville ajouté si le feature flag est activé pour ce pays.
+  const cityFilter = await buildLivreurCityFilter(base44, course);
+  // ❌ PAS DE .catch(() => []) sur Livreur.filter — si la lecture échoue (auth, rate limit,
+  // timeout), l'erreur doit se propager à withAuthRetry pour retry. Un .catch(() => [])
+  // avale silencieusement l'erreur et retourne 0 livreur → 0 push → course invisible.
+  const [livreurs, allDnRecords] = await Promise.all([
+    base44.asServiceRole.entities.Livreur.filter({
+      type_livreur: 'externe',
+      validation: 'valide',
+      // [CORRECTION BLOCAGE ADMIN] actif retiré du ciblage push : un livreur bloqué
+      // administrativement (actif=false) continue à recevoir les notifications push.
+      // L'acceptation reste bloquée par accepterCourseV2 (livreur.actif === true).
+      statut: { $in: ['disponible', 'hors_ligne'] },
+      country_code: course.country_code,
+      bloque_encours: false,
+      manual_hors_ligne: { $ne: true },
+      ...(courseEnterpriseId
+        ? { enterprise_id: courseEnterpriseId }
+        : { enterprise_id: null }),
+      ...cityFilter,
+    }, '-last_seen_at', 500),
+    base44.asServiceRole.entities.DispatchNotification.filter(
+      { course_id: course.id }, '-date_notification', 500
+    ),
+  ]);
+
+
+  // Split DN records en mémoire (évite 2 reads séparés pour notifiés vs refusés)
+  const dejaNotifies = (allDnRecords || []).filter((n: any) => n.statut !== 'refuse').map((n: any) => n.livreur_id);
+  const refuses = (allDnRecords || []).filter((n: any) => n.statut === 'refuse').map((n: any) => n.livreur_id);
+
+  // 🛡️ Anti-race-condition : si la course a déjà des notifications, c'est qu'elle
+  // a déjà été publiée dans le fil. Ne pas re-notifier (évite les 82 doublons).
+  // Sauf si skipAlreadyPublishedCheck=true (appel délibéré pour la 2e vague).
+  if (!skipAlreadyPublishedCheck && dejaNotifies && dejaNotifies.length > 0) {
+    dispatchLog(`[V2] ⏭️ Course ${course.id} déjà publiée (${dejaNotifies.length} notifs existantes) — skip re-notification`);
+    return { notified: 0, already_published: true };
+  }
+
+  const exclus = new Set([...(dejaNotifies || []), ...(refuses || [])]);
+  let candidats = (livreurs || []).filter((livreur: any) => livreur.user_email && !exclus.has(livreur.id));
+
+  // 🚫 Exclure les livreurs déjà en course (même définition que aCourseActive)
+  const courseCityFilterForEnCourse = await buildCourseCityFilterFromCourse(base44, course);
+  const livreursEnCourse = await getLivreursEnCourse(base44, course.country_code, courseEnterpriseId, courseCityFilterForEnCourse);
+  candidats = candidats.filter((l: any) => !livreursEnCourse.has(l.id));
+
+  // 🎯 Priorité : si priorityOnly=true, ne notifier que les livreurs prioritaires (priorite_dispatch > 0)
+  if (priorityOnly) {
+    candidats = candidats.filter((l: any) => Number(l.priorite_dispatch || 0) > 0);
+  }
+
+  // 📤 NOTIFICATION UNIFIÉE — remplace 3 appels séparés par 1 seule fonction
+  console.log(`[V2] 📊 notifierLivreursEligiblesV2 — candidats=${candidats.length} livreurs=${(livreurs||[]).length} dejaNotifies=${dejaNotifies.length} refuses=${refuses.length} enCourse=${livreursEnCourse.size} course=${course.id}`);
+  if (candidats.length === 0) {
+    console.warn(`[V2] ⚠️ 0 candidat après filtrage — livreurs=${(livreurs||[]).length} dejaNotifies=${dejaNotifies.length} refuses=${refuses.length} enCourse=${livreursEnCourse.size}`);
+  }
+  const batchResult = await notifierLivreursUnifie(base44, course, candidats, allDnRecords);
+  console.log(`[V2] 📢 Push unifié T=0: ${batchResult.push_sent} token(s) envoyé(s) pour ${batchResult.notified} livreur(s) — course ${course.id} reason=${batchResult.reason || 'none'}`);
+  dispatchLog(`[V2] 📢 Push unifié T=0: ${batchResult.push_sent} token(s) envoyé(s) pour ${batchResult.notified} livreur(s) — course ${course.id}`);
+  return { notified: batchResult.notified, push_sent: batchResult.push_sent, push_failed: batchResult.push_failed };
+}
+
+// ── Helper : liste des livreurs en course (même définition que aCourseActive) ──
+async function getLivreursEnCourse(base44: any, countryCode: string, courseEnterpriseId: string | null = null, courseCityFilter: Record<string, any> = {}): Promise<Set<string>> {
+  if (!countryCode) return new Set();
+  const [courses, coursesAccepted] = await Promise.all([
+    base44.asServiceRole.entities.CourseExterne.filter(
+      { country_code: countryCode, livreur_id: { $ne: null }, ...(courseEnterpriseId ? { enterprise_id: courseEnterpriseId } : { enterprise_id: null }), ...courseCityFilter }, '-created_date', 200
+    ).catch(() => []),
+    base44.asServiceRole.entities.CourseExterne.filter(
+      { country_code: countryCode, accepted_by_livreur_id: { $ne: null }, ...(courseEnterpriseId ? { enterprise_id: courseEnterpriseId } : { enterprise_id: null }), ...courseCityFilter }, '-created_date', 200
+    ).catch(() => []),
+  ]);
+  const ids = new Set<string>();
+  for (const c of [...(courses || []), ...(coursesAccepted || [])]) {
+    if (c.livreur_id && (STATUTS_ACTIFS_COURSE.includes(c.statut) || (c.dispatch_status === 'accepte' && !STATUTS_TERMINAUX_COURSE.includes(c.statut)))) {
+      ids.add(c.livreur_id);
+    }
+    if (c.accepted_by_livreur_id && (STATUTS_ACTIFS_COURSE.includes(c.statut) || (c.dispatch_status === 'accepte' && !STATUTS_TERMINAUX_COURSE.includes(c.statut)))) {
+      ids.add(c.accepted_by_livreur_id);
+    }
+  }
+  return ids;
+}
+
+// ── Pilote par livreur (cache TTL 60s) ──
+let PILOT_CACHE: { ids: string[]; enabled: boolean; expires: number } | null = null;
+const PILOT_TTL_MS = 60 * 1000;
+
+export async function isPilotLivreur(base44: any, livreurId: string): Promise<boolean> {
+  if (!livreurId) return false;
+  if (PILOT_CACHE && Date.now() < PILOT_CACHE.expires) {
+    return PILOT_CACHE.enabled && PILOT_CACHE.ids.includes(livreurId);
+  }
+  try {
+    const configs = await base44.asServiceRole.entities.AppConfig.filter(
+      { cle: { $in: ['DISPATCH_V2_PILOT_ENABLED', 'DISPATCH_V2_PILOT_LIVREUR_IDS'] } }
+    );
+    const enabled = configs.find((c: any) => c.cle === 'DISPATCH_V2_PILOT_ENABLED')?.valeur === 'true';
+    const idsStr = configs.find((c: any) => c.cle === 'DISPATCH_V2_PILOT_LIVREUR_IDS')?.valeur || '';
+    const ids = idsStr.split(',').map((s: string) => s.trim()).filter(Boolean);
+    PILOT_CACHE = { ids, enabled, expires: Date.now() + PILOT_TTL_MS };
+    return enabled && ids.includes(livreurId);
+  } catch {
+    return false;
+  }
+}
+
+// ── Publier une course dans le fil (V2) ──
+// La course est visible immédiatement dans le fil « Disponibles » de TOUS les
+// livreurs éligibles. Seuls les prioritaires (priorite_dispatch > 0) reçoivent
+// une notification push à T=0. Les non-prioritaires peuvent voir et accepter la
+// course depuis leur fil. Si personne n'a accepté après ~5 min, le watchdog
+// déclenche les phases de secours (secoursDispatchV2) qui envoient un push
+// ciblé aux meilleurs non-prioritaires restants.
+export async function publierCourseDansFil(base44: any, course: any) {
+  if (!course?.id) return { error: 'no_course_id' };
+
+  // ── Re-fetch systématique pour éviter les lectures obsolètes (race condition) ──
+  // L'objet course passé en paramètre peut être stale (lu avant que les champs
+  // Éco ne soient écrits par prepareEcoCreationFields). On re-lit toujours la
+  // course depuis la base avant d'évaluer les guards.
+  const freshCourse = await base44.asServiceRole.entities.CourseExterne.get(course.id).catch(() => null);
+  if (!freshCourse || isTerminalCourse(freshCourse)) return { success: false, blocked: true, reason: 'terminal_course' };
+  course = freshCourse;
+
+  // 🔖 Log de version bundle — pour vérifier que la production charge la dernière version
+  dispatchLog(`[V2] 🔖 publierCourseDansFil — bundle version: ${DISPATCH_V2_BUNDLE_VERSION} — course ${course.id}`);
+
+  // [ENTERPRISE_SUSPENSION] Bloquer le dispatch si l'entreprise est suspendue.
+  // Les courses déjà acceptées (en cours) ne passent pas par cette fonction.
+  const suspendCheckEntId = normalizeEnterpriseId(course.enterprise_id);
+  if (suspendCheckEntId) {
+    const entList = await base44.asServiceRole.entities.Enterprise.filter({
+      enterprise_financier_id: suspendCheckEntId,
+    }).catch(() => []);
+    const ent = entList?.[0];
+    if (ent && (ent.actif === false || ent.statut !== 'actif')) {
+      dispatchLog(`[V2] 🚫 Enterprise ${suspendCheckEntId} suspendue — dispatch bloqué pour course ${course.id}`);
+      return { success: false, enterprise_suspended: true, error: 'Entreprise suspendue' };
+    }
+  }
+
+  // 🛡️ GARDE IDEMPOTENTE ATOMIQUE ANTI-CASCADE
+  // Utilise updateMany conditionnel : ne met à jour QUE si dispatch_status n'est pas
+  // déjà 'disponible_push'. Cela empêche la cascade CREATE → UPDATE de l'orchestrateur
+  // de re-publier : publierCourseDansFil met statut='recherche_livreur', ce qui déclenche
+  // l'UPDATE event → l'orchestrateur rappelle publierCourseDansFil. Avec une garde basée
+  // sur l'objet course passé en paramètre, une race condition peut survenir si le 2e appel
+  // lit la course avant que le 1er ait commité. La garde atomique (updateMany conditionnel)
+  // élimine cette race condition.
+  const nowIso = new Date().toISOString();
+  // 🛡️ GARDE ÉLARGIE : ne pas republier si la course est déjà publiée (disponible_push),
+  // déjà acceptée (accepte) ou en négociation de prix (propose).
+  // Fix 2026-08-17 : race condition où publierCourseDansFil était rappelé par
+  // l'orchestrateur APRÈS une acceptation, effaçant livreur_id et remettant la
+  // course dans le fil → double acceptation par un second livreur.
+  // 🛡️ GARDE ANTI-DISPATCH : ne jamais publier une course en attente de décision client
+  // (après annulation par le livreur). Le client doit choisir entre relancer ou terminer.
+  if (course.client_decision_attendue === true) {
+    dispatchLog(`[V2] 🚫 Course ${course.id} en attente de décision client — dispatch BLOQUÉ`);
+    return { success: false, blocked: true, reason: 'client_decision_attendue' };
+  }
+
+  // [ECO] Une course Éco isolée ne doit JAMAIS être publiée dans le fil des livreurs.
+  // Elle reste en attente de regroupement. Si aucun regroupement n'est trouvé dans le
+  // délai configuré, le watchdog (convertDueEcoCourses) la convertit en Standard.
+  // Publier une course isolée permettrait à un livreur de l'accepter individuellement,
+  // ce qui contredit le principe du regroupement Éco.
+  if (course.eco_status === 'isolated' && course.delivery_mode === 'eco') {
+    dispatchLog(`[V2] 🌿 Course Éco isolée ${course.id} — publication bloquée, en attente de regroupement`);
+    // Tenter un regroupement immédiat
+    await base44.asServiceRole.functions.invoke('ecoOptimizationOrchestrator', {
+      action: 'process_course_created',
+      course_id: course.id,
+    }).catch(() => null);
+    return { success: false, eco_isolated: true, reason: 'eco_isolated_pending_grouping' };
+  }
+
+  await base44.asServiceRole.entities.CourseExterne.updateMany(
+    { id: course.id, statut: { $nin: ['annulee', 'livree', 'terminee'] }, annulation_user_id: { $in: [null, ''] }, dispatch_status: { $nin: ['disponible_push', 'accepte', 'propose', 'redispatch'] }, client_decision_attendue: { $ne: true } },
+    { $set: {
+      statut: 'recherche_livreur',
+      dispatch_status: 'disponible_push',
+      heure_sollicitation: nowIso,
+      timeout_expires_at: null,
+      dispatch_wave: 0,
+      dispatch_next_wave_at: null,
+      dispatch_v2_secours_phase: 0,
+      livreur_id: '',
+      accepted_by_livreur_id: '',
+    }}
+  );
+
+  // Re-fetch pour vérifier si ON a gagné la publication (heure_sollicitation = notre now)
+  // ou si un autre appel a déjà publié avant nous.
+  const coursePubliee = await base44.asServiceRole.entities.CourseExterne.get(course.id);
+  if (!coursePubliee) return { error: 'Course introuvable' };
+  if (isTerminalCourse(coursePubliee) || coursePubliee.dispatch_status !== 'disponible_push') return { success: false, blocked: true, reason: 'terminal_or_obsolete_publication' };
+
+  if (coursePubliee.heure_sollicitation !== nowIso) {
+    // ── RE-NOTIFICATION DE SECOURS ──
+    // La course a déjà été publiée par un premier appel, mais le premier appel a pu
+    // échouer silencieusement à l'étape de notification (Livreur.filter en erreur,
+    // NotificationToken.filter en erreur, bulkCreate en erreur). Si la course a 0
+    // DispatchNotification, on re-tente la notification au lieu de skipper.
+    const existingDnCount = await base44.asServiceRole.entities.DispatchNotification.filter(
+      { course_id: course.id }, undefined, 1
+    ).catch(() => []);
+
+    if (!existingDnCount || existingDnCount.length === 0) {
+      dispatchLog(`[V2] ⚠️ Course ${course.id} déjà publiée mais 0 DispatchNotification — re-tente notification de secours`);
+      journaliserDispatch(base44, {
+        course_id: course.id,
+        evenement: 'publier_fil_v2_renotify',
+        raison_passage: `already_published_but_0_notifs — re-notification de secours`,
+      });
+      const renotifyResult = await notifierLivreursEligiblesV2(base44, coursePubliee, {
+        priorityOnly: false,
+        skipAlreadyPublishedCheck: true,
+      });
+      return { success: true, published: true, renotified: true, batch: renotifyResult };
+    }
+
+    dispatchLog(`[V2] ⏭️ Course ${course.id} déjà publiée (heure_sollicitation=${coursePubliee.heure_sollicitation}) — skip republication`);
+    journaliserDispatch(base44, {
+      course_id: course.id,
+      evenement: 'publier_fil_v2_skip',
+      raison_passage: `already_published — heure_sollicitation=${coursePubliee.heure_sollicitation} vs now=${nowIso}`,
+    });
+    return { success: true, already_published: true, skipped: true };
+  }
+
+  journaliserDispatch(base44, {
+    course_id: course.id,
+    evenement: 'publier_fil_v2_execute',
+    raison_passage: `guard passed — heure_sollicitation=${nowIso}`,
+  });
+
+  // 🎯 T=0 : UN SEUL push batch à TOUS les livreurs éligibles (prioritaires + non-prioritaires)
+  // Simplification 2026-08-14 : plus de distinction temporelle, plus de T+20s, plus de secours.
+  // La course reste dans le fil indéfiniment jusqu'à acceptation ou annulation.
+  const batchResult = await notifierLivreursEligiblesV2(base44, coursePubliee, {
+    priorityOnly: false,
+    skipAlreadyPublishedCheck: true,
+  });
+  const afterBatch = await base44.asServiceRole.entities.CourseExterne.get(course.id);
+  if (!afterBatch || isTerminalCourse(afterBatch)) return { success: false, blocked: true, reason: 'cancelled_during_publication' };
+
+  dispatchLog(`[V2] 📢 Course ${course.id} publiée dans le fil (disponible_push) — ${batchResult.notified} livreur(s) notifié(s) à T=0 (batch unique)`);
+  return { success: true, published: true, batch: batchResult };
+}
+
+// ── Vérifier si un livreur a une course active (3 niveaux) ──
+export async function aCourseActive(base44: any, livreurId: string, countryCode: string, excludeCourseId: string | null = null): Promise<boolean> {
+  if (!livreurId || !countryCode) return false;
+
+  const [courses, coursesAccepted] = await Promise.all([
+    base44.asServiceRole.entities.CourseExterne.filter(
+      { country_code: countryCode, livreur_id: livreurId }, '-created_date', 20
+    ).catch(() => []),
+    base44.asServiceRole.entities.CourseExterne.filter(
+      { country_code: countryCode, accepted_by_livreur_id: livreurId }, '-created_date', 20
+    ).catch(() => []),
+  ]);
+
+  const toutes = [...(courses || []), ...(coursesAccepted || [])];
+  return toutes.some((c: any) =>
+    c.id !== excludeCourseId && (
+      STATUTS_ACTIFS_COURSE.includes(c.statut) ||
+      (c.dispatch_status === 'accepte' && !STATUTS_TERMINAUX_COURSE.includes(c.statut))
+    )
+  );
+}
+
+// ── Acceptation V2 : updateMany conditionnel → verify → update single (WebSocket) ──
+export async function accepterCourseV2(base44: any, courseId: string, livreurId: string, options: any = {}) {
+  const { pricing_mode, manual_price, override_pricing_mode } = options;
+
+  // 1. Get course
+  const course = await base44.asServiceRole.entities.CourseExterne.get(courseId);
+  if (!course) return { error: 'Course introuvable' };
+
+  // 2. Check course still available (disponible_push V2, propose V1)
+  // ⚠️ en_attente est EXCLU — c'est le statut utilisé par annulerCourseExterne
+  // quand un livreur annule. Si on l'autorise ici, un autre livreur peut
+  // accepter une course que le livreur précédent a annulée.
+  // L'admin doit utiliser l'assignation manuelle (AssignLivreurDialog) pour
+  // réaffecter une course en attente.
+  if (course.dispatch_status !== 'disponible_push' && course.dispatch_status !== 'propose') {
+    return reponseDejaPrise('not_available', course);
+  }
+  // 2b. Refuser les courses en statut terminal (annulee / livree)
+  if (STATUTS_TERMINAUX_COURSE.includes(course.statut)) {
+    return { success: false, accepted: false, reason: 'course_terminal', error: 'Cette course n\'est plus disponible (terminée ou annulée).' };
+  }
+  if (course.livreur_id || course.accepted_by_livreur_id) {
+    return reponseDejaPrise('already_taken', course);
+  }
+
+  // 3. Get livreur + verify country
+  // ── [SÉCURITÉ] Vérification d'identité obligatoire avant toute logique de dispatch ──
+  // Le livreur_id provient du frontend. On vérifie qu'il appartient à l'utilisateur authentifié.
+  // Ce guard s'exécute AVANT les vérifications d'éligibilité, de scoring et de commission.
+  // Il ne modifie pas la logique de Dispatch V2 — c'est un middleware de sécurité.
+  const { verifyLivreurIdentity } = await import('./livreurIdentityGuard.ts');
+  const identityCheck = await verifyLivreurIdentity(base44, livreurId);
+  if (!identityCheck.verified) {
+    return { success: false, accepted: false, reason: 'identity_mismatch', error: identityCheck.error || 'Vérification d\'identité échouée' };
+  }
+  const livreur = identityCheck.livreur;
+
+  const livreurEligible =
+    livreur.type_livreur === 'externe' &&
+    livreur.validation === 'valide' &&
+    livreur.actif === true &&
+    livreur.statut === 'disponible' &&
+    livreur.bloque_encours !== true &&
+    livreur.manual_hors_ligne !== true &&
+    livreur.admin_hors_ligne !== true;
+  if (!livreurEligible) {
+    return { success: false, accepted: false, reason: 'livreur_indisponible', error: 'Livreur non disponible pour cette course.' };
+  }
+
+  const courseCountry = (course.country_code || '').trim().toUpperCase();
+  const livreurCountry = (livreur.country_code || '').trim().toUpperCase();
+  if (!courseCountry || !livreurCountry || courseCountry !== livreurCountry) {
+    return { success: false, error: 'country_mismatch' };
+  }
+
+  // [ENTERPRISE] Vérification backend obligatoire : course.enterprise_id === livreur.enterprise_id
+  // Comparaison canonique via normalizeEnterpriseId (null === null = match pour le réseau public).
+  // Empêche un livreur Enterprise B d'accepter une course Enterprise A, et inversement.
+  // Empêche un livreur Enterprise d'accepter une course publique, et inversement.
+  const courseEnterpriseId = normalizeEnterpriseId(course.enterprise_id);
+  const livreurEnterpriseId = normalizeEnterpriseId(livreur.enterprise_id);
+  if (courseEnterpriseId !== livreurEnterpriseId) {
+    return {
+      success: false, accepted: false, reason: 'enterprise_mismatch',
+      error: 'Cette course appartient à un autre périmètre.',
+    };
+  }
+
+  // [CITY_DISPATCH] Vérification de compatibilité de ville (défense en profondeur).
+  // Si le feature flag est activé pour ce pays et que la ville du livreur ≠ ville de la course,
+  // l'acceptation est bloquée côté backend. Empêche un livreur d'une autre ville
+  // d'accepter une course via un appel backend direct.
+  const cityCheck = await verifyCityCompatibility(base44, course, livreur);
+  if (!cityCheck.compatible) {
+    return {
+      success: false, accepted: false, reason: 'city_mismatch',
+      error: 'Cette course appartient à une autre ville opérationnelle.',
+    };
+  }
+
+  // [ENTERPRISE_SUSPENSION] Bloquer l'acceptation si l'entreprise est suspendue.
+  if (courseEnterpriseId) {
+    const entList = await base44.asServiceRole.entities.Enterprise.filter({
+      enterprise_financier_id: courseEnterpriseId,
+    }).catch(() => []);
+    const ent = entList?.[0];
+    if (ent && (ent.actif === false || ent.statut !== 'actif')) {
+      return {
+        success: false, accepted: false, reason: 'enterprise_suspended',
+        error: 'Votre entreprise est temporairement suspendue. Veuillez contacter SILGAPP.',
+      };
+    }
+  }
+
+  // 4. Check bloque_encours
+  if (livreur.bloque_encours) {
+    return { success: false, accepted: false, reason: 'bloque_encours', error: 'Plafond d\'encours atteint.' };
+  }
+
+  // 5. RÈGLE ABSOLUE : pas de course active
+  const hasActive = await aCourseActive(base44, livreurId, course.country_code, courseId);
+  if (hasActive) {
+    return { success: false, accepted: false, reason: 'deja_en_course', error: 'Vous avez déjà une course en cours.' };
+  }
+
+  // 6. Check timeout
+  if (course.timeout_expires_at && new Date(course.timeout_expires_at) < new Date()) {
+    return { success: false, error: 'Course expirée', expired: true };
+  }
+
+  // 7. Prix minimum — dynamique selon le pays (bloquant si non configuré)
+  const countryConfig = await chargerConfigPays(base44, course.country_code);
+  const PRIX_MIN = countryConfig?.prix_minimum ?? null;
+  if (PRIX_MIN === null) {
+    return { success: false, error: `Prix minimum non configuré pour le pays ${course.country_code}`, blocked_reason: 'missing_country_prix_minimum' };
+  }
+  const isManual = pricing_mode === 'manual' && manual_price && Number(manual_price) >= PRIX_MIN;
+
+  // 8. Tokens/PINs — préserver existants uniquement (ne pas générer pour nouvelles courses)
+  // Les nouvelles courses (sans QR/PIN à la création) ne reçoivent pas de tokens au dispatch.
+  // Les anciennes courses et les courses partenaire/pharmacie conservent leurs tokens.
+  const pickupToken = course.pickup_qr_token || null;
+  const deliveryToken = course.delivery_qr_token || null;
+  const pickupPIN = course.pickup_code_4_digits || null;
+  const deliveryPIN = course.delivery_code_4_digits || null;
+
+  // 9. Atomic lock via updateMany conditionnel
+  const updateData: any = {
+    dispatch_status: isManual ? 'propose' : 'accepte',
+    statut: isManual ? 'recherche_livreur' : 'livreur_en_route',
+    heure_acceptation: isManual ? null : new Date().toISOString(),
+    livreur_id: livreurId,
+    livreur_nom: `${livreur.prenom || ''} ${livreur.nom || ''}`.trim(),
+    livreur_photo_url: livreur.photo_url || '',
+    livreur_telephone: livreur.telephone,
+    livreur_vehicule: livreur.vehicule || livreur.type_vehicule || 'moto',
+    livreur_note_moyenne: livreur.note_moyenne || 0,
+    livreur_nombre_avis: livreur.nombre_avis || 0,
+    livreur_user_email: livreur.user_email || null,
+    accepted_by_livreur_id: livreurId,
+    accepted_at: isManual ? null : new Date().toISOString(),
+    ...(pickupToken ? { pickup_qr_token: pickupToken } : {}),
+    ...(pickupPIN ? { pickup_code_4_digits: pickupPIN } : {}),
+    ...(deliveryToken ? { delivery_qr_token: deliveryToken } : {}),
+    ...(deliveryPIN ? { delivery_code_4_digits: deliveryPIN } : {}),
+    ...(override_pricing_mode === 'automatic' ? { pricing_mode: 'automatic' } : {}),
+  };
+
+  if (isManual) {
+    updateData.pricing_mode = 'manual';
+    updateData.manual_price = Number(manual_price);
+    updateData.manual_price_status = 'pending_client_validation';
+    updateData.proposed_by_livreur_id = livreurId;
+    const dispatchConfig = await chargerConfigDispatch(base44);
+    updateData.timeout_expires_at = new Date(Date.now() + dispatchConfig.manualPriceTimeoutSec * 1000).toISOString();
+  }
+
+  // Correction financière autorisée : avantage vérifié AVANT toute attribution.
+  // Le lock public est écrit dans le même CAS que l'acceptation. Aucun fallback sur erreur.
+  let avantageAcceptation = null;
+  if (!isManual && !normalizeEnterpriseId(course.enterprise_id)) {
+    try {
+      avantageAcceptation = await evaluerAvantageCommission(base44, livreurId, course.country_code, new Date(updateData.heure_acceptation));
+      Object.assign(updateData, champsLockCommission(avantageAcceptation, updateData.heure_acceptation));
+    } catch (error) {
+      return { success: false, accepted: false, retryable: true, reason: 'commission_lookup_error', error: error?.message };
+    }
+  }
+
+  // Le statut constitue le verrou atomique. Ne pas filtrer livreur_id avec une
+  // chaine vide : Base44 stocke aussi l'absence de livreur avec null, ce qui
+  // empêchait toute acceptation de ces courses.
+  await base44.asServiceRole.entities.CourseExterne.updateMany(
+    { id: courseId, statut: { $nin: ['annulee', 'livree', 'terminee'] }, annulation_user_id: { $in: [null, ''] }, client_decision_attendue: { $ne: true }, dispatch_status: { $in: ['propose', 'disponible_push'] } },
+    { $set: updateData }
+  );
+
+  // 10. Verify winner
+  const courseVerifie = await base44.asServiceRole.entities.CourseExterne.get(courseId);
+  const isMyCourse = !isTerminalCourse(courseVerifie) && (String(courseVerifie.livreur_id) === String(livreurId) ||
+                     String(courseVerifie.accepted_by_livreur_id) === String(livreurId));
+
+  if (!isMyCourse) {
+    dispatchLog(`[V2] 🏁 Race condition perdue — livreur ${livreurId} n'a pas obtenu la course ${courseId}`);
+    journaliserDispatch(base44, {
+      course_id: courseId,
+      country_code: course.country_code,
+      vague: 0,
+      evenement: 'race_condition_perdue',
+      livreur_acceptant_id: livreurId,
+      livreur_acceptant_nom: `${livreur.prenom || ''} ${livreur.nom || ''}`.trim(),
+      raison_passage: `Perdu par ${livreurId} — gagnant: ${courseVerifie.livreur_id || courseVerifie.accepted_by_livreur_id || '?'}`,
+    });
+    return reponseDejaPrise('race_condition_lost', courseVerifie);
+  }
+
+  // 10b. Le lock public est déjà atomique ; contrôler sa cohérence complète.
+  if (avantageAcceptation) {
+    verifierCoherenceLock(courseVerifie, avantageAcceptation);
+  }
+  // Enterprise : préserver le chemin de verrouillage du ledger privé.
+  if (!isManual && normalizeEnterpriseId(courseVerifie.enterprise_id) && courseVerifie.heure_acceptation && courseVerifie.country_code) {
+    await figerCommissionAcceptation(
+      base44, courseId, livreurId, courseVerifie.country_code, courseVerifie.heure_acceptation
+    ).catch((err: any) => {
+      console.error('[V2] figerCommissionAcceptation error (non-blocking):', err?.message);
+    });
+
+    // 10c. Vérification post-lock : le verrouillage doit être effectif.
+    //     figerCommissionAcceptation peut échouer silencieusement (retourne null
+    //     en cas d'erreur interne). Le .catch() ci-dessus ne se déclenche pas car
+    //     la promesse ne rejette jamais. On vérifie donc la DB après l'appel.
+    //     Le livreur a déjà gagné la course — on ne rejette PAS l'acceptation.
+    //     On crée une alerte critique exploitable pour intervention manuelle.
+    const coursePostLock = await base44.asServiceRole.entities.CourseExterne.get(courseId);
+    if (!coursePostLock?.commission_locked_at ||
+        coursePostLock.commission_taux_normal == null ||
+        coursePostLock.commission_taux_applique == null ||
+        !coursePostLock.commission_mode) {
+      console.error(`[V2][COMMISSION_LOCK_FAILED] Course ${courseId} acceptée par ${livreurId} (country=${courseVerifie.country_code}) mais commission non verrouillée — intervention requise`);
+      base44.asServiceRole.entities.Notification.create({
+        titre: '🚨 Commission non verrouillée à l\'acceptation',
+        message: `Course ${courseId} acceptée par livreur ${livreurId} (pays=${courseVerifie.country_code}, heure=${courseVerifie.heure_acceptation}) mais commission_locked_at est null. Intervention requise pour vérifier le taux applicable.`,
+        type: 'alerte_critique_dispatch',
+        course_id: courseId,
+        lue: false,
+        deduplication_key: `COMMISSION_LOCK_FAILED_${courseId}`,
+      }).catch(() => {});
+    }
+  }
+
+  // 11. V2 : Trigger WebSocket via update single (déclenche la disparition du fil)
+  const acceptedNow = await base44.asServiceRole.entities.CourseExterne.get(courseId);
+  if (isTerminalCourse(acceptedNow)) return reponseDejaPrise('terminal_course', acceptedNow);
+  await updateActiveCourse(base44, acceptedNow, {
+    notes: `${acceptedNow.notes || ''} | Acceptée par ${livreurId} à ${new Date().toISOString()}`,
+  });
+  const acceptedAfterNotes = await base44.asServiceRole.entities.CourseExterne.get(courseId);
+  if (isTerminalCourse(acceptedAfterNotes)) return reponseDejaPrise('terminal_course', acceptedAfterNotes);
+
+  // 12. Update livreur status
+  if (!isManual) {
+    await base44.asServiceRole.entities.Livreur.update(livreurId, { statut: 'en_course' });
+    await marquerAccepte(base44, courseId, livreurId);
+
+    // [CORRECTION PIN/QR] Message code récupération + push notification PIN supprimés.
+    // Les PIN/QR ne sont plus utilisés dans SILGAPP (Standard, Éco, Entreprise).
+    // Le prix reste disponible dans les écrans de la course.
+
+    // 14. Suivi WhatsApp
+    base44.asServiceRole.functions.invoke('envoyerSuiviWhatsApp', {
+      course_id: courseId,
+      evenement: 'livreur_assigne',
+    }).catch((err: any) => console.error('[V2] ❌ Suivi WhatsApp:', err.message));
+
+    // 15. Journaliser
+    let tempsAcceptationSec: number | null = null;
+    if (course.heure_sollicitation) {
+      tempsAcceptationSec = Math.round((Date.now() - new Date(course.heure_sollicitation).getTime()) / 1000);
+    }
+    journaliserDispatch(base44, {
+      course_id: courseId,
+      country_code: course.country_code,
+      vague: 0,
+      evenement: 'acceptation_v2',
+      livreur_acceptant_id: livreurId,
+      livreur_acceptant_nom: `${livreur.prenom || ''} ${livreur.nom || ''}`.trim(),
+      temps_avant_acceptation_sec: tempsAcceptationSec,
+    });
+
+    return { success: true, accepted: true, course_id: courseId, livreur_id: livreurId };
+  }
+
+  // Mode manuel : notifier le client
+  return { success: true, accepted: true, pending_client_validation: true, course_id: courseId, livreur_id: livreurId };
+}
+
+// ── Score calculation pour le secours ──
+export function calculerScore(livreur: any, course: any): number {
+  let score = 0;
+
+  // Distance (35%)
+  if (livreur.latitude && livreur.longitude && course.gps_depart_lat) {
+    const dist = calculerDistance(course.gps_depart_lat, course.gps_depart_lng, livreur.latitude, livreur.longitude);
+    score += (dist !== null ? Math.max(0, 100 - dist * 10) : 50) * 0.35;
+  } else {
+    score += 50 * 0.35;
+  }
+
+  // GPS freshness (20%) — ne JAMAIS exclure les prioritaires
+  const gpsAge = livreur.derniere_position_date
+    ? (Date.now() - new Date(livreur.derniere_position_date).getTime()) / 60000
+    : null;
+  const gpsScore = gpsAge === null ? 0 : gpsAge < 5 ? 100 : gpsAge < 30 ? 50 : gpsAge < 120 ? 10 : 0;
+  score += gpsScore * 0.20;
+
+  // Priority (15%)
+  score += (livreur.priorite_dispatch || 0) * 10 * 0.15;
+
+  // Availability (30%)
+  score += (livreur.statut === 'disponible' ? 100 : 0) * 0.30;
+
+  return Math.round(score);
+}
+
+// ── Secours : push ciblé au top N livreurs ──
+// Pour le rappel T+5min, passer excludeAlreadyNotified=false afin de re-notifier
+// les livreurs déjà notifiés à T=0 mais toujours libres et éligibles.
+export async function secoursDispatchV2(base44: any, course: any, nbLivreurs: number, options: { excludeAlreadyNotified?: boolean } = {}) {
+  const current = course?.id ? await base44.asServiceRole.entities.CourseExterne.get(course.id) : null;
+  if (!current || isTerminalCourse(current) || current.dispatch_status !== 'disponible_push') return { pushed: 0, reason: 'terminal_or_obsolete_course' };
+  course = current;
+  const { excludeAlreadyNotified = true } = options;
+  if (!course?.id || !course.country_code) return { pushed: 0 };
+
+  // 1. Get eligible livreurs
+  const courseEnterpriseId = normalizeEnterpriseId(course.enterprise_id);
+  // [CITY_DISPATCH] Filtre ville pour le secours V2
+  const cityFilter = await buildLivreurCityFilter(base44, course);
+  const livreurs = await base44.asServiceRole.entities.Livreur.filter({
+    type_livreur: 'externe',
+    validation: 'valide',
+    // [CORRECTION BLOCAGE ADMIN] actif retiré du ciblage push secours (même règle
+    // que le dispatch initial). Le livreur bloqué reçoit le push mais ne peut
+    // pas accepter (accepterCourseV2 vérifie livreur.actif === true).
+    statut: { $in: ['disponible', 'hors_ligne'] },
+    country_code: course.country_code,
+    bloque_encours: false,
+    manual_hors_ligne: { $ne: true },
+    ...(courseEnterpriseId
+      ? { enterprise_id: courseEnterpriseId }
+      : { enterprise_id: null }),
+    ...cityFilter,
+  }, '-last_seen_at', 50);
+
+  if (!livreurs || livreurs.length === 0) return { pushed: 0 };
+
+  // 2. Exclude livreurs in course (fresh check)
+  const coursesActives = await base44.asServiceRole.entities.CourseExterne.filter(
+    { country_code: course.country_code }, '-created_date', 200
+  ).catch(() => []);
+
+  const livreursEnCourse = new Set(
+    (coursesActives || [])
+      .filter((c: any) => STATUTS_ACTIFS_COURSE.includes(c.statut) && c.livreur_id)
+      .map((c: any) => c.livreur_id)
+  );
+
+  // 3. Exclude refused + (optionally) already notified
+  const refused = await getLivreursRefuses(base44, course.id);
+  let dejaNotifies: string[] = [];
+  if (excludeAlreadyNotified) {
+    dejaNotifies = await getLivreursNotifies(base44, course.id);
+  }
+
+  // 4. Score + sort + slice top N
+  const candidats = livreurs
+    .filter((l: any) => !livreursEnCourse.has(l.id) && !refused.includes(l.id) && !dejaNotifies.includes(l.id))
+    .map((l: any) => ({ ...l, score: calculerScore(l, course) }))
+    .sort((a: any, b: any) => b.score - a.score)
+    .slice(0, nbLivreurs);
+
+  // 5. Push batch ciblé : 1 seule invocation backend pour tous les candidats sélectionnés
+  if (candidats.length > 0) {
+    const beforeSend = await base44.asServiceRole.entities.CourseExterne.get(course.id);
+    if (!beforeSend || isTerminalCourse(beforeSend) || beforeSend.dispatch_status !== 'disponible_push') return { pushed: 0, reason: 'terminal_or_obsolete_course' };
+    const batchResult = await base44.asServiceRole.functions.invoke('envoiNotificationPushBatch', {
+      course_id: course.id,
+      livreur_ids: candidats.map((l: any) => l.id),
+      titre: '📦 Course disponible près de vous',
+      message: `${course.quartier_depart || course.adresse_depart || ''} → ${course.quartier_arrivee || course.adresse_arrivee || '?'}`,
+      type: 'nouvelle_course',
+      dispatch_version: '2',
+    }).catch((err: any) => {
+      dispatchLog(`[V2] ⚠️ Batch push secours error: ${err?.message}`);
+      return null;
+    });
+
+    const sent = batchResult?.succes || 0;
+    dispatchLog(`[V2] 🚨 Secours batch: ${sent} token(s) envoyé(s) pour ${candidats.length} livreur(s) - course ${course.id} (top ${nbLivreurs})`);
+  } else {
+    dispatchLog(`[V2] 🚨 Secours: 0 candidat pour course ${course.id} (top ${nbLivreurs})`);
+  }
+
+  journaliserDispatch(base44, {
+    course_id: course.id,
+    country_code: course.country_code,
+    vague: 0,
+    evenement: 'secours_v2',
+    raison_passage: `top_${nbLivreurs}`,
+    nombre_nouveaux_notifies: candidats.length,
+    livreurs_selectionnes: candidats.map((l: any) => ({
+      id: l.id, nom: `${l.prenom || ''} ${l.nom || ''}`.trim(), score: l.score,
+    })),
+  });
+
+  return { pushed: candidats.length, livreurs: candidats.map((l: any) => l.id) };
+}

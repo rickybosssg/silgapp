@@ -30,10 +30,10 @@ function harness(props={}) {
 const user={email:'client@example.invalid'};
 const q1={id:'q1',nom:'Karpala',ville:'Test',actif:true,country_code:'BF',latitude:10,longitude:1};
 const q2={...q1,id:'q2',nom:'Tanghin',latitude:11};
-function api(invoke=async()=>({course:{id:'mock-course'}})) {const client={id:'client-test',user_email:user.email,country_code:'BF'};return {auth:{me:async()=>user},entities:{ClientExterne:{get:async()=>client,filter:async()=>[client]},Quartier:{filter:async()=>[q1,q2]}},functions:{invoke}};}
+function api(invoke=async()=>({success:true, course:{id:'mock-course'}})) {const client={id:'client-test',user_email:user.email,country_code:'BF'};return {auth:{me:async()=>user},entities:{ClientExterne:{get:async()=>client,filter:async()=>[client]},Quartier:{filter:async()=>[q1,q2]}},functions:{invoke}};}
 const fill=h=>{let f=h.fields();f[0].props.onChange('Karpala');f=h.fields();f[1].props.onChange('Tanghin');f=h.fields();f[2].props.onChange({target:{value:'1000'}});};
 test('three fields, manual fallback, review then one final confirmation under double click',async()=>{
- const calls=[];const h=harness({api:api(async(name,payload)=>{calls.push({name,payload});return {course:{id:'mock'}};})});h.open();h.render();await tick();
+ const calls=[];const h=harness({api:api(async(name,payload)=>{calls.push({name,payload});return {success:true, course:{id:'mock'}};})});h.open();h.render();await tick();
  assert.equal(h.fields().length,3);assert.equal(h.micStarts(),0);assert.ok(h.fields().slice(0,2).every(f=>f.props.countryCode==='BF'&&f.props.quartierOnly));
  fill(h);await h.button('Vérifier ma commande').props.onClick();assert.equal(calls.length,0);assert.match(h.text(h.render()),/approximative/);
  const confirm=h.button('Confirmer ma commande').props.onClick;await Promise.all([confirm(),confirm()]);assert.equal(calls.length,1);assert.equal(calls[0].payload.express_draft.prix,1000);h.unmount();
@@ -54,11 +54,11 @@ test('late transcription after cancellation cannot overwrite a new manual order'
  h.open();h.button('Annuler').props.onClick();assert.equal(h.fields().length,0);h.unmount();
 });
 test('uncertain creation retries preserve request_id and prevent edits/new draft',async()=>{
- const ids=[];const h=harness({api:api(async(_,payload)=>{ids.push(payload.request_id);if(ids.length===1)throw Error('network');return {course:{id:'same'}};})});h.open();h.render();await tick();fill(h);await h.button('Vérifier ma commande').props.onClick();await h.button('Confirmer ma commande').props.onClick();
+ const ids=[];const h=harness({api:api(async(_,payload)=>{ids.push(payload.request_id);if(ids.length===1)throw Error('network');return {success:true, course:{id:'same'}};})});h.open();h.render();await tick();fill(h);await h.button('Vérifier ma commande').props.onClick();await h.button('Confirmer ma commande').props.onClick();
  assert.match(h.text(h.render()),/même identifiant/);assert.equal(h.fields().length,0);await h.button('Confirmer ma commande').props.onClick();assert.equal(ids[0],ids[1]);h.unmount();
 });
 test('autocomplete selection uses exact quartier IDs despite duplicate names; foreign selection rejected',async()=>{
- const calls=[];const h=harness({api:api(async(_,payload)=>{calls.push(payload);return {course:{id:'mock'}};})});h.open();h.render();await tick();
+ const calls=[];const h=harness({api:api(async(_,payload)=>{calls.push(payload);return {success:true, course:{id:'mock'}};})});h.open();h.render();await tick();
  h.fields()[0].props.onChange('ignored',{type:'quartier',id:'q1',label:'Karpala',ville:'Test'});h.fields()[1].props.onChange('ignored',{type:'quartier',id:'q2',label:'Tanghin',ville:'Test'});h.fields()[2].props.onChange({target:{value:'1500'}});
  await h.button('Vérifier ma commande').props.onClick();await h.button('Confirmer ma commande').props.onClick();assert.equal(calls[0].express_draft.depart_id,'q1');assert.equal(calls[0].express_draft.arrivee_id,'q2');h.unmount();
  const bad=harness({api:api()});bad.open();bad.render();await tick();fill(bad);bad.fields()[0].props.onChange('foreign',{type:'quartier',id:'foreign',label:'Karpala'});await bad.button('Vérifier ma commande').props.onClick();assert.match(bad.text(bad.render()),/indisponible/);bad.unmount();
@@ -95,7 +95,7 @@ test('missing country exposes normal profile completion, not a fabricated BF def
 });
 
 test('review accepts grouped manual price, preserves profile/quartier IDs and returns created course for tracking',async()=>{
- const calls=[];let created;const h=harness({api:api(async(_,payload)=>{calls.push(payload);return {data:{course:{id:'actual-backend-id'}}};}),onCreated:course=>{created=course;}});
+ const calls=[];let created;const h=harness({api:api(async(_,payload)=>{calls.push(payload);return {data:{success:true, course:{id:'actual-backend-id'}}};}),onCreated:course=>{created=course;}});
  h.open();h.render();await tick();fill(h);h.fields()[2].props.onChange({target:{value:'1 000'}});
  await h.button('Vérifier ma commande').props.onClick();assert.equal(calls.length,0);
  await h.button('Confirmer ma commande').props.onClick();assert.equal(calls[0].express_draft.client_profile_id,'client-test');assert.equal(calls[0].express_draft.country_code,'BF');assert.equal(calls[0].express_draft.prix,1000);assert.equal(created.id,'actual-backend-id');h.unmount();
@@ -292,7 +292,7 @@ test('written express refuses invalid amounts and keeps all fields after validat
 });
 
 test('written express rejects a foreign-city selection and retains confirmation ID after uncertain response',async()=>{
- const ids=[];const sdk=writtenApi(async(_,payload)=>{ids.push(payload.request_id);if(ids.length===1)throw Error('offline');return {course:{id:'isolated'}};});
+ const ids=[];const sdk=writtenApi(async(_,payload)=>{ids.push(payload.request_id);if(ids.length===1)throw Error('offline');return {success:true, course:{id:'isolated'}};});
  sdk.entities.Quartier.filter=async()=>[q1,q2,{...q2,id:'other-city',nom:'Elsewhere',ville:'Other'}];
  const h=harness({api:sdk,textOnly:true,audioDisabled:true});h.open();h.render();await tick();fill(h);
  h.fields()[1].props.onChange('Elsewhere',{type:'quartier',id:'other-city',label:'Elsewhere',ville:'Other'});

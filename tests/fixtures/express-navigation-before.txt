@@ -1,0 +1,1 @@
+course => navigate("/client/suivi", { state: { course_id: course.id } })

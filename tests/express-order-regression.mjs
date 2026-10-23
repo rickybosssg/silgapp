@@ -72,13 +72,13 @@ test('double confirmation et réponse perdue réutilisent request_id', async () 
   assert.equal(calls.length, 0);
   const first=submit({ prix:1000 });
   assert.equal(await submit({ prix:1000 }), null);
-  response.resolve({ data: { course: { id:'course-test' } } });
+  response.resolve({ data: { success:true, course: { id:'course-test' } } });
   assert.equal((await first).id, 'course-test');
   assert.equal(await submit({ prix:1000 }), null);
   assert.equal(calls.length, 1);
   assert.equal(calls[0].name, 'creerCourseClient');
   const retries=[];
-  const retry=createExpressSubmission(async (_, payload) => { retries.push(payload); if(retries.length===1)throw Error('network'); return { course:{id:'same-course'} }; }, () => 'stable-id');
+  const retry=createExpressSubmission(async (_, payload) => { retries.push(payload); if(retries.length===1)throw Error('network'); return { success:true, course:{id:'same-course'} }; }, () => 'stable-id');
   await assert.rejects(retry({ prix:1000 }));
   await retry({ prix:1000 });
   assert.equal(retries[0].request_id,retries[1].request_id);

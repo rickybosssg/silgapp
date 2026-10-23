@@ -1,0 +1,356 @@
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
+// [CORRECTION PIN/QR] ensureCourseCodeMessage supprimé — les PIN/QR ne sont plus utilisés.
+// import { ensureCourseCodeMessage } from '../../shared/courseCodeMessage.ts';
+import { buildExpressCourse } from '../../shared/expressOrder.js';
+import { resolveExpressClient, EXPRESS_PROFILE_MESSAGES } from '../../shared/expressClientContext.js';
+import { prepareEcoCreationFields } from '../../shared/ecoOptimizationEngine.ts';
+
+const CREATION_MUTEX_KEY = 'COURSE_CREATION_MUTEX';
+const LOCK_TTL_MS = 15_000;
+const LOCK_WAIT_MS = 12_000;
+const MAX_RECENT_RECEIPTS = 100;
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+type CreationReceipt = {
+  key: string;
+  request_id: string;
+  course_id: string;
+  completed_at: string;
+};
+
+function receiptKey(requestId: string) {
+  return requestId;
+}
+
+function parseReceipts(rawValue: unknown): CreationReceipt[] {
+  if (typeof rawValue !== 'string' || !rawValue.trim().startsWith('[')) return [];
+  try {
+    const parsed = JSON.parse(rawValue);
+    return Array.isArray(parsed) ? parsed.filter((item) => item?.key && item?.course_id) : [];
+  } catch {
+    return [];
+  }
+}
+
+async function findReceiptCourse(base44: any, mutex: any, requestId: string, userEmail: string) {
+  const key = receiptKey(requestId);
+  const receipt = parseReceipts(mutex?.valeur).find((item) => item.key === key);
+  if (!receipt) return null;
+
+  try {
+    const course = await base44.asServiceRole.entities.CourseExterne.get(receipt.course_id);
+    if (course?.request_id === requestId && course?.client_user_email === userEmail) return course;
+  } catch {
+    // Le recu peut pointer vers une ancienne donnee QA supprimee.
+  }
+  return null;
+}
+
+async function findExistingCourse(base44: any, requestId: string, userEmail: string) {
+  const existing = await base44.asServiceRole.entities.CourseExterne.filter(
+    { request_id: requestId, client_user_email: userEmail },
+    'created_date',
+    2
+  );
+  return existing?.[0] || null;
+}
+
+async function acquireCreationMutex(base44: any, requestId: string, userEmail: string) {
+  const configs = await base44.asServiceRole.entities.AppConfig.filter(
+    { cle: CREATION_MUTEX_KEY },
+    'created_date',
+    2
+  );
+
+  // Le mutex est provisionne avant le deploiement de cette fonction. Echouer
+  // ferme est preferable a creer une course sans garantie d'idempotence.
+  if (!configs || configs.length !== 1) {
+    throw new Error('COURSE_CREATION_MUTEX_NOT_PROVISIONED');
+  }
+
+  const mutex = configs[0];
+  const owner = crypto.randomUUID();
+  const deadline = Date.now() + LOCK_WAIT_MS;
+
+  while (Date.now() < deadline) {
+    const currentMutex = await base44.asServiceRole.entities.AppConfig.get(mutex.id);
+    const receiptCourse = await findReceiptCourse(base44, currentMutex, requestId, userEmail);
+    if (receiptCourse) return { existing: receiptCourse, mutex, owner: null };
+
+    const existing = await findExistingCourse(base44, requestId, userEmail);
+    if (existing) return { existing, mutex, owner: null };
+
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + LOCK_TTL_MS).toISOString();
+
+    // updateMany realise le compare-and-set dans la base. Un seul appel peut
+    // remplacer un mutex libre ou expire par son propre jeton proprietaire.
+    const claimResult = await base44.asServiceRole.entities.AppConfig.updateMany(
+      {
+        id: mutex.id,
+        $or: [
+          { lock_owner: '' },
+          { lock_owner: null },
+          { lock_owner: { $exists: false } },
+          { lock_expires_at: { $lt: now.toISOString() } },
+        ],
+      },
+      {
+        $set: {
+          lock_owner: owner,
+          lock_request_id: requestId,
+          lock_expires_at: expiresAt,
+        },
+      }
+    );
+
+    if (Number(claimResult?.updated || 0) === 1) {
+      const claimedMutex = await base44.asServiceRole.entities.AppConfig.get(mutex.id);
+      if (claimedMutex?.lock_owner !== owner) {
+        throw new Error('COURSE_CREATION_MUTEX_OWNERSHIP_LOST');
+      }
+
+      // Une creation precedente peut avoir ete finalisee juste avant notre prise
+      // du verrou, alors que l'index de recherche CourseExterne n'est pas encore
+      // coherent. Le recu lu par ID ferme cette fenetre de visibilite.
+      const completedCourse = await findReceiptCourse(base44, claimedMutex, requestId, userEmail);
+      if (completedCourse) return { existing: completedCourse, mutex, owner };
+
+      return { existing: null, mutex, owner };
+    }
+
+    await sleep(75 + Math.floor(Math.random() * 75));
+  }
+
+  const existing = await findExistingCourse(base44, requestId, userEmail);
+  if (existing) return { existing, mutex, owner: null };
+  throw new Error('COURSE_CREATION_MUTEX_TIMEOUT');
+}
+
+async function persistCreationReceipt(
+  base44: any,
+  mutexId: string,
+  owner: string,
+  requestId: string,
+  courseId: string
+) {
+  const mutex = await base44.asServiceRole.entities.AppConfig.get(mutexId);
+  if (mutex?.lock_owner !== owner) throw new Error('COURSE_CREATION_MUTEX_OWNERSHIP_LOST');
+
+  const key = receiptKey(requestId);
+  const receipt: CreationReceipt = {
+    key,
+    request_id: requestId,
+    course_id: courseId,
+    completed_at: new Date().toISOString(),
+  };
+  const receipts = [receipt, ...parseReceipts(mutex.valeur).filter((item) => item.key !== key)]
+    .slice(0, MAX_RECENT_RECEIPTS);
+
+  const result = await base44.asServiceRole.entities.AppConfig.updateMany(
+    { id: mutexId, lock_owner: owner },
+    { $set: { valeur: JSON.stringify(receipts) } }
+  );
+  if (Number(result?.updated || 0) !== 1) {
+    throw new Error('COURSE_CREATION_RECEIPT_NOT_PERSISTED');
+  }
+}
+
+async function releaseCreationMutex(base44: any, mutexId: string, owner: string) {
+  await base44.asServiceRole.entities.AppConfig.updateMany(
+    { id: mutexId, lock_owner: owner },
+    {
+      $set: {
+        lock_owner: '',
+        lock_request_id: '',
+        lock_expires_at: new Date(0).toISOString(),
+      },
+    }
+  );
+}
+
+// ── Champs sensibles que le frontend ne doit JAMAIS définir ──
+const FORBIDDEN_FIELDS = [
+  'statut', 'dispatch_status', 'livreur_id', 'livreur_nom', 'livreur_telephone',
+  'livreur_photo_url', 'livreur_vehicule', 'livreur_note_moyenne', 'livreur_nombre_avis',
+  'prix_final', 'commission_silga', 'montant_livreur', 'statut_paiement_livreur',
+  'client_user_email', 'livreur_user_email',
+  'enterprise_id', 'enterprise_commission_rate_locked', 'enterprise_commission_locked_at',
+  'enterprise_commission_amount', 'enterprise_encours_comptabilise_at', 'enterprise_encours_comptabilise_montant',
+  'dispatch_notified_ids', 'dispatch_wave_notified_ids', 'dispatch_refused_ids',
+  'dispatch_locked_until', 'dispatch_cycle_count', 'dispatch_wave',
+  'dispatch_v2_secours_phase', 'dispatch_wave_started_at', 'dispatch_next_wave_at',
+  'heure_acceptation', 'heure_prise_en_charge', 'heure_arrivee',
+  'heure_recuperation', 'heure_livraison', 'heure_contact_client', 'heure_sollicitation',
+  'timeout_expires_at',
+  'note_livreur', 'commentaire_livreur', 'note_date',
+  'destinataire_feedback', 'destinataire_feedback_date',
+  'pickup_confirmed_by', 'delivery_confirmed_by',
+  'pickup_confirmed_at', 'delivery_confirmed_at',
+  'manual_price', 'manual_price_status', 'proposed_by_livreur_id',
+  'client_price_validated_at', 'client_price_refused_at',
+  'crm_stats_synced', 'encours_comptabilise_at', 'encours_comptabilise_montant',
+  'delivery_mode', 'eco_status', 'eco_mission_id', 'eco_created_at',
+  'eco_convert_after_at', 'eco_converted_at', 'eco_conversion_reason',
+  'eco_candidate_score',
+  'latitude_prise_en_charge', 'longitude_prise_en_charge',
+  'latitude_arrivee_dest', 'longitude_arrivee_dest',
+  'latitude_recuperation', 'longitude_recuperation',
+  'latitude_livraison', 'longitude_livraison',
+  'latitude_arrivee_livraison', 'longitude_arrivee_livraison',
+  'colis_livre_at',
+];
+
+export default async function(req: Request): Promise<Response> {
+  try {
+    const base44 = createClientFromRequest(req);
+    const user = await base44.auth.me();
+    if (!user) return Response.json({ error: 'Non autorisé' }, { status: 401 });
+
+    const body = await req.json();
+    const { is_duplicate, request_id } = body;
+    let course_data = body.course_data;
+    if (body.express_draft) {
+      const draft = body.express_draft;
+      if (draft.confirmed !== true || typeof request_id !== 'string' || !request_id.trim()) {
+        return Response.json({ error: 'Confirmation et request_id requis' }, { status: 400 });
+      }
+      try {
+        const { client } = await resolveExpressClient({ user, entity: base44.entities.ClientExterne, profileId: draft.client_profile_id, expectedCountry: draft.country_code });
+        const [depart, arrivee] = await Promise.all([
+          base44.entities.Quartier.get(draft.depart_id),
+          base44.entities.Quartier.get(draft.arrivee_id),
+        ]);
+        course_data = buildExpressCourse({ user, client, depart, arrivee, prix: draft.prix });
+      } catch (error) {
+        const profileError = EXPRESS_PROFILE_MESSAGES[error.code];
+        return Response.json({ error: profileError || error.message }, { status: profileError && error.code !== 'CLIENT_FEES_BLOCKED' ? 403 : 400 });
+      }
+    } else if (course_data?.commande_vocale_express) {
+      return Response.json({ error: 'express_draft requis' }, { status: 400 });
+    }
+    const normalizedRequestId = typeof request_id === 'string' ? request_id.trim() : '';
+
+    if (!course_data || typeof course_data !== 'object') {
+      return Response.json({ error: 'course_data requis' }, { status: 400 });
+    }
+
+    let mutex: any = null;
+    if (normalizedRequestId) {
+      mutex = await acquireCreationMutex(base44, normalizedRequestId, user.email);
+      if (mutex.existing) {
+        if (mutex.owner && mutex.mutex?.id) {
+          await releaseCreationMutex(base44, mutex.mutex.id, mutex.owner);
+        }
+        return Response.json({ success: true, course: mutex.existing, idempotent: true });
+      }
+    }
+
+    try {
+
+    // ── Nettoyer les champs sensibles ──
+    const requestedDeliveryMode = course_data.delivery_mode;
+    const cleanData = { ...course_data };
+    for (const field of FORBIDDEN_FIELDS) {
+      delete cleanData[field];
+    }
+
+    // ── Résoudre client_user_email côté backend ──
+    cleanData.client_user_email = user.email;
+
+    // ── Normaliser country_code (uppercase, trim) ──
+    if (cleanData.country_code) {
+      cleanData.country_code = String(cleanData.country_code).trim().toUpperCase();
+    }
+
+    // ── Forcer le statut initial et dispatch_status après nettoyage ──
+    // statut et dispatch_status sont dans FORBIDDEN_FIELDS (le frontend ne peut pas les définir),
+    // mais ils DOIVENT être initialisés côté backend après le nettoyage.
+    // Sans ça, dispatch_status reste null (pas de default dans le schema) et la course
+    // n'est pas prise en charge par le dispatch automatique.
+    cleanData.statut = 'nouvelle';
+    cleanData.dispatch_status = 'en_attente';
+
+    const ecoFields = await prepareEcoCreationFields(base44, {
+      ...cleanData,
+      delivery_mode: requestedDeliveryMode,
+      enterprise_id: null,
+    });
+    Object.assign(cleanData, ecoFields);
+
+    // [CITY_DISPATCH] Attribution automatique de la ville de départ.
+    // Si le feature flag est activé pour ce pays et que ville_depart est vide,
+    // résoudre la ville depuis les coordonnées GPS de départ.
+    // Aucune API externe — utilise le cache des quartiers (TTL 10 min).
+    try {
+      const { isCityDispatchEnabled, resolveCityFromGPS, normalizeCityName } = await import('../../shared/cityResolution.ts');
+      const cityEnabled = await isCityDispatchEnabled(base44, cleanData.country_code);
+      if (cityEnabled && !normalizeCityName(cleanData.ville_depart)) {
+        const lat = Number(cleanData.gps_depart_lat);
+        const lng = Number(cleanData.gps_depart_lng);
+        if (Number.isFinite(lat) && Number.isFinite(lng)) {
+          const resolvedCity = await resolveCityFromGPS(base44, lat, lng, cleanData.country_code);
+          if (resolvedCity) {
+            cleanData.ville_depart = resolvedCity;
+          }
+        }
+      }
+    } catch (cityError: any) {
+      // Non-bloquant : la résolution de ville est une optimisation.
+      console.error('[creerCourseClient] ⚠️ City resolution failed:', cityError?.message || String(cityError));
+    }
+
+    // ── S'assurer que les champs multi-colis sont préservés ──
+    // is_multi_colis, nb_colis, nb_colis_livres, nb_colis_annules ne sont pas sensibles
+    // et doivent être conservés tels quels depuis le frontend.
+    // (aucune action nécessaire — ils ne sont pas dans FORBIDDEN_FIELDS)
+
+    // ── Pour les duplications, ne pas copier les QR codes ──
+    if (is_duplicate) {
+      delete cleanData.id;
+      delete cleanData.created_date;
+      delete cleanData.updated_date;
+      delete cleanData.created_by_id;
+      // Régénérer QR codes pour la copie
+      delete cleanData.pickup_qr_token;
+      delete cleanData.delivery_qr_token;
+      delete cleanData.pickup_code_4_digits;
+      delete cleanData.delivery_code_4_digits;
+      delete cleanData.tracking_token;
+      delete cleanData.tracking_link;
+    }
+
+    // ── Sauvegarder request_id pour l'idempotence future ──
+    if (normalizedRequestId) {
+      cleanData.request_id = normalizedRequestId;
+    }
+
+      // ── Créer la course ──
+      const course = await base44.asServiceRole.entities.CourseExterne.create(cleanData);
+
+      if (normalizedRequestId && mutex?.owner && mutex?.mutex?.id) {
+        await persistCreationReceipt(
+          base44,
+          mutex.mutex.id,
+          mutex.owner,
+          normalizedRequestId,
+          course.id
+        );
+      }
+
+      // [CORRECTION PIN/QR] Message automatique des codes supprimé — les PIN/QR ne sont plus utilisés.
+
+      return Response.json({ success: true, course });
+    } finally {
+      if (mutex?.owner && mutex?.mutex?.id) {
+        await releaseCreationMutex(base44, mutex.mutex.id, mutex.owner).catch((error: any) => {
+          console.error('[creerCourseClient] Erreur liberation mutex:', error?.message || String(error));
+        });
+      }
+    }
+  } catch (error) {
+    console.error('[creerCourseClient] Erreur:', error);
+    return Response.json({ error: error.message }, { status: 500 });
+  }
+}

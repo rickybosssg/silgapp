@@ -5,6 +5,7 @@ import { base44 } from "@/api/base44Client";
 import { createScopedRefreshQueue } from "@/lib/scopedRefreshQueue";
 import { logoutPersistent } from "@/lib/authPersistence";
 import { useNavigate } from "react-router-dom";
+import { openCreatedExpressCourse, reconcileCreatedExpressCourse } from '@/lib/expressTracking';
 import { extractLocalPhone } from "@/lib/phoneUtils";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -118,6 +119,14 @@ export default function ClientExterneApp() {
   const [showRecherche, setShowRecherche] = useState(false);
   const [showSuiviFullscreen, setShowSuiviFullscreen] = useState(false);
   const [suiviCourseId, setSuiviCourseId] = useState(null);
+  const openedExpressCourse = useRef(null);
+  const pendingExpressCourse = useRef(null);
+  const handleExpressCreated = course => openCreatedExpressCourse(course, {
+    opened: openedExpressCourse,
+    invalidatePending: () => { statusRequest.current++; },
+    setCourses: value => { pendingExpressCourse.current = course; setCoursesActives(value); },
+    select: setSuiviCourseId, research: setShowRecherche, tracking: setShowSuiviFullscreen,
+  });
   const [showAcceptanceAnim, setShowAcceptanceAnim] = useState(false);
   const [showMultiCourseSelector, setShowMultiCourseSelector] = useState(false);
   const lastRechercheCourseId = useRef(null);
@@ -235,9 +244,9 @@ export default function ClientExterneApp() {
   // ── ÉTAT DÉRIVÉ POUR LES PUBLICITÉS — détection des moments d'affichage ──
   // Course en recherche de livreur (nouvelle ou recherche_livreur, sans livreur assigné)
   const courseEnRecherche = useMemo(() =>
-    coursesActives.find(c =>
+    [...coursesActives].sort((a, b) => Number(b.id === suiviCourseId) - Number(a.id === suiviCourseId)).find(c =>
       ["nouvelle", "recherche_livreur"].includes(c.statut) && !c.livreur_id
-    ), [coursesActives]);
+    ), [coursesActives, suiviCourseId]);
 
   // Course avec livreur assigné (en cours de livraison)
   const courseAssignee = useMemo(() =>
@@ -884,7 +893,10 @@ export default function ClientExterneApp() {
       [...actives, ...activesDestinataire, ...activesExpediteur]
         .filter(c => (c.enterprise_id || null) === (profil.enterprise_id || null))
         .forEach(c => map.set(c.id, c));
-      const toutes = [...map.values()].sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
+      const reconciled = await reconcileCreatedExpressCourse([...map.values()], pendingExpressCourse,
+        id => base44.entities.CourseExterne.get(id), profil);
+      if (!isCurrent()) return;
+      const toutes = reconciled.sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
 
       // ── Enrichir avec GPS temps réel du livreur (_livreur) ──
       // Évite le polling Livreur.get() redondant dans SuiviCourseFullscreen
@@ -1305,7 +1317,7 @@ export default function ClientExterneApp() {
 
               {/* ── ACTIONS PRINCIPALES — 3 actions prioritaires ── */}
               <div className="space-y-3">
-                <ExpressVoiceOrder clientProfil={clientProfil} onOpenChange={setExpressOpen} onCompleteProfile={() => setShowProfilModal(true)} onCreated={course => navigate("/client/suivi", { state: { course_id: course.id } })} />
+                <ExpressVoiceOrder clientProfil={clientProfil} onOpenChange={setExpressOpen} onCompleteProfile={() => setShowProfilModal(true)} onCreated={handleExpressCreated} />
                 {/* 1. COMMANDER — action principale */}
                 <button
                   className={`w-full flex items-center gap-4 rounded-2xl p-5 active:scale-[0.98] transition-all text-left ${forteDemande ? "bg-[#DC2626] shadow-[0_12px_30px_rgba(220,38,38,0.25)]" : "bg-[#007aff] shadow-[0_12px_30px_rgba(0,122,255,0.25)]"}`}

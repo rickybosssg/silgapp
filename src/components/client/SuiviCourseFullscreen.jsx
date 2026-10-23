@@ -11,6 +11,7 @@ import { base44 } from "@/api/base44Client";
 import { useETACourse } from "@/hooks/useETACourse";
 import { CARTO_TILE_URL, CARTO_TILE_CONFIG } from "@/lib/cartTiles";
 import { getCourseStatusLabel } from "@/lib/courseStatuses";
+import { isExpressAwaitingDispatch } from "@/lib/expressTracking";
 
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -133,7 +134,7 @@ export default function SuiviCourseFullscreen({ course, position, onClose, onCal
   const ecoWaiting = !terminal && course.delivery_mode === "eco" && !course.livreur_id;
   const statusLabel = ecoWaiting
     ? (course.eco_mission_id ? "Mission Éco constituée — recherche de livreur" : "Course Éco — En attente de regroupement")
-    : getCourseStatusLabel(course.statut);
+    : isExpressAwaitingDispatch(course) ? "Commande enregistrée — en attente de diffusion" : getCourseStatusLabel(course.statut);
 
   // ── Position livreur depuis course._livreur (enrichi par ClientExterneApp.checkStatus) ──
   // Polling Livreur.get() redondant supprimé — la position vient du polling de courses.
