@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { updateActiveCourse } from '../../shared/courseTerminalGuard.ts';
 import { recalculerSoldeLivreur } from '../../shared/recalculerSoldeLivreur.ts';
 import { chargerTauxCommissionEffectif, zeroCommissionFields } from '../../shared/commissionLock.ts';
 
@@ -219,14 +220,14 @@ export default async function(req) {
             c.statut === "livreur_en_route" && !c.livreur_id
         );
         for (const course of coursesIncoherentes) {
-            await asService.entities.CourseExterne.update(course.id, {
+            if (!await updateActiveCourse(base44, course, {
                 statut: "recherche_livreur",
                 dispatch_status: "redispatch",
                 heure_acceptation: null,
                 accepted_by_livreur_id: "",
                 accepted_at: null,
                 notes: (course.notes || "") + " | [AUTO] Statut livreur_en_route sans livreur — corrigé",
-            });
+            })) continue;
             corrections.push({
                 type: "statut_en_route_sans_livreur",
                 course_id: course.id,

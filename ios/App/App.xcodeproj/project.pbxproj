@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		AACE20261023000000000001 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = AACE20261023000000000002 /* PrivacyInfo.xcprivacy */; };
 		C0D3A0712026101400000001 /* SilgappAuthSecureStorePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D3A0712026101400000002 /* SilgappAuthSecureStorePlugin.swift */; };
 		C0D3A0712026101400000003 /* SilgappAuthSecureStorePlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = C0D3A0712026101400000004 /* SilgappAuthSecureStorePlugin.m */; };
 		C0D3E0012026101400000001 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = C0D3E0012026101400000002 /* GoogleService-Info.plist */; };
@@ -21,6 +22,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		AACE20261023000000000002 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		C0D3A0712026101400000002 /* SilgappAuthSecureStorePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SilgappAuthSecureStorePlugin.swift; sourceTree = "<group>"; };
 		C0D3A0712026101400000004 /* SilgappAuthSecureStorePlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = SilgappAuthSecureStorePlugin.m; sourceTree = "<group>"; };
 		C0D3E0012026101400000002 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
@@ -84,6 +86,7 @@
 				C0D3E0012026101400000003 /* App.entitlements */,
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
+				AACE20261023000000000002 /* PrivacyInfo.xcprivacy */,
 				C0D3A0712026101400000002 /* SilgappAuthSecureStorePlugin.swift */,
 				C0D3A0712026101400000004 /* SilgappAuthSecureStorePlugin.m */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
@@ -173,6 +176,7 @@
 				504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */,
 				50B271D11FEDC1A000F3C39B /* public in Resources */,
 				504EC30F1FED79650016851F /* Assets.xcassets in Resources */,
+				AACE20261023000000000001 /* PrivacyInfo.xcprivacy in Resources */,
 				50379B232058CBB4000EE86E /* capacitor.config.json in Resources */,
 				504EC30D1FED79650016851F /* Main.storyboard in Resources */,
 				2FAD9763203C412B000D30F8 /* config.xml in Resources */,

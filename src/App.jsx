@@ -47,6 +47,7 @@ const ClientsExternesPage = lazy(() => import('./pages/ClientsExternesPage.jsx')
 const PublicSuiviCourse = lazy(() => import('./pages/PublicSuiviCourse.jsx'));
 const GestionPays = lazy(() => import('./pages/GestionPays.jsx'));
 const AdminGlobal = lazy(() => import('./pages/AdminGlobal.jsx'));
+const CommandeExpressAdmin = lazy(() => import('./pages/CommandeExpressAdmin.jsx'));
 const DashboardPays = lazy(() => import('./pages/DashboardPays.jsx'));
 const Maintenance = lazy(() => import('./pages/Maintenance.jsx'));
 const TwilioSandboxMonitor = lazy(() => import('./pages/TwilioSandboxMonitor.jsx'));
@@ -444,7 +445,7 @@ function AppContent() {
               <Route path="/admin/frais-annulation" element={<AnimatedRoutes><FraisAnnulationAdmin /></AnimatedRoutes>} />
               <Route path="/admin/venus-rapports" element={<AnimatedRoutes><VenusRapportsPage /></AnimatedRoutes>} />
               <Route path="/admin/zones-chaudes" element={<AnimatedRoutes><ZonesChaudesAdmin /></AnimatedRoutes>} />
-              <Route path="/admin/nouvelle-course" element={<AdminCourseForm />} />
+              <Route path="/admin/nouvelle-course" element={<AdminCourseForm showCourseWindows={false} />} />
               <Route path="/admin/externe" element={<AnimatedRoutes><DashboardAdminExterne /></AnimatedRoutes>} />
               <Route path="/maintenance" element={<AnimatedRoutes><Maintenance /></AnimatedRoutes>} />
               <Route path="/diagnostic-push-complet" element={<AnimatedRoutes><DiagnosticPushComplet /></AnimatedRoutes>} />
@@ -452,6 +453,7 @@ function AppContent() {
           )}
           <Route path="/notifications" element={<AnimatedRoutes><Notifications /></AnimatedRoutes>} />
           <Route path="/admin/test-notifications" element={<AnimatedRoutes><TestNotifications /></AnimatedRoutes>} />
+          <Route path="/admin/commande-express" element={<AnimatedRoutes><CommandeExpressAdmin /></AnimatedRoutes>} />
           <Route path="/diagnostic-push-complet" element={<AnimatedRoutes><DiagnosticPushComplet /></AnimatedRoutes>} />
           <Route path="/admin/test-dispatch-livreur" element={<AnimatedRoutes><TestDispatchLivreur /></AnimatedRoutes>} />
           <Route path="/admin/centre-notifications" element={<AnimatedRoutes><CentreNotifications /></AnimatedRoutes>} />

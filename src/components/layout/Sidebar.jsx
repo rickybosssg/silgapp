@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { logoutPersistent } from "@/lib/authPersistence";
 import { 
-  LayoutDashboard, MapPin, Plus, Truck, BarChart3, Bell,
+  LayoutDashboard, MapPin, Plus, Truck, BarChart3, Bell, Mic,
   Package, TrendingUp, ChevronLeft, ChevronRight, LogOut, Wallet, Shield, Globe, Settings, MessageCircle, Users, Megaphone, ChevronDown, Check, UserCheck, ShieldAlert, Store, UtensilsCrossed, Pill, PieChart, Sparkles, Brain, FlaskConical, Cpu, Crown, Zap, Coins, Radio, Trophy, Activity, Ticket, Building2, Rocket
 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { useQuery } from "@tanstack/react-query";
 import { useAdminContext } from "@/hooks/useAdminContext.js";
 import { usePaysActifs } from "@/components/international/CountrySelector.jsx";
+import { isAudioSettingsAdmin } from "../../../base44/shared/audioContract.js";
 
 const doLogout = async () => {
   ['base44_access_token', 'access_token', 'base44_token', 'token'].forEach(k => {
@@ -36,6 +37,7 @@ export const navItems = [
   { path: "/admin/statistiques", label: "Statistiques", icon: PieChart },
   { path: "/admin/comptabilite", label: "Comptabilité", icon: Wallet },
   { path: "/admin/global", label: "Admin Global", icon: Globe },
+  { path: "/admin/commande-express", label: "Commande express", icon: Mic, superAdminOnly: true },
   { path: "/admin/tarification", label: "Tarification", icon: Coins },
   { path: "/admin/pass-zero-commission", label: "Pass Zéro Commission", icon: Ticket },
   { path: "/admin/gestion-pays", label: "Gestion des pays", icon: Settings },
@@ -84,7 +86,8 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, part
   const [collapsed, setCollapsed] = useState(false);
   const [countryOpen, setCountryOpen] = useState(false);
   const location = useLocation();
-  const { isPays, countryCode: adminCountryCode, selectedCountry, setSelectedCountry } = useAdminContext();
+  const { isPays, countryCode: adminCountryCode, selectedCountry, setSelectedCountry, user } = useAdminContext();
+  const canManageExpress = isAudioSettingsAdmin(user);
   const effectiveCountry = isPays ? adminCountryCode : selectedCountry;
   const showCountryPicker = reseau === "externe" && !isPays;
   const { pays: paysListe } = usePaysActifs();
@@ -143,7 +146,7 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, part
 
       {/* Navigation */}
       <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto">
-        {navItems.map((item) => {
+        {navItems.filter(item => !item.superAdminOnly || canManageExpress).map((item) => {
           const isActive = location.pathname === item.path;
           const Icon = item.icon;
           return (

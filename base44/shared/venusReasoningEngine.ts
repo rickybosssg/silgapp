@@ -23,6 +23,7 @@
 import { rechercherConnaissancesValidees } from './venusLearningEngine.ts';
 import { rechercherDocumentsRag } from './venusRagEngine.ts';
 import { construireContexteVenus } from './venusI18nEngine.ts';
+import { sortByCityScope } from './venusCityKnowledge.ts';
 import {
   detecterIntentionRapide,
   executerOutilsPourIntention,
@@ -65,13 +66,17 @@ export async function rechercherScenariosValidees(base44: any, countryCode: stri
  * Recherche les règles métier validées pour un pays donné (Source 0 — Priorité absolue).
  * Une seule règle peut s'appliquer à des centaines de conversations similaires.
  */
-export async function rechercherReglesMetier(base44: any, countryCode: string): Promise<any[]> {
+export async function rechercherReglesMetier(base44: any, countryCode: string, ville?: string): Promise<any[]> {
   try {
     const all = await base44.asServiceRole.entities.VenusBusinessRule.list('-created_date', 200);
-    return (all || []).filter((r: any) =>
-      (r.statut === 'valide' || r.statut === 'active') &&
-      (r.pays === 'ALL' || r.pays === countryCode || !r.pays)
+    const activeRules = (all || []).filter((r: any) =>
+      r.statut === 'valide' || r.statut === 'active'
     );
+    // ── Filtrage VILLE > PAYS > GLOBAL ──
+    // Une règle spécifique à la ville de l'utilisateur remplace une règle
+    // générale du pays. Le Super Admin peut ainsi désactiver une règle dans
+    // une ville sans affecter les autres.
+    return sortByCityScope(activeRules, ville || '', countryCode);
   } catch (e) {
     console.warn('[ReasoningEngine] Erreur chargement règles métier:', e.message);
     return [];
@@ -87,6 +92,7 @@ interface ReasoningInput {
   historiqueRecent: any[];
   courseActive?: any;
   countryCode: string;
+  ville?: string;
   tarifs: any;
   telephone: string;
   profileName: string;
@@ -945,11 +951,11 @@ export async function raisonnerVenus(base44: any, input: ReasoningInput): Promis
   // Avant: 5 appels DB séquentiels (~700-1600ms). Maintenant: 1 vague parallèle (~200-400ms).
   const tLoadStart = Date.now();
   const [knowledgeRes, ragRes, ctxRes, scenarioRes, rulesRes] = await Promise.allSettled([
-    rechercherConnaissancesValidees(base44, input.countryCode),
-    rechercherDocumentsRag(base44, input.messageClient, { pays: input.countryCode, limit: 5, conversation_id: input.telephone }),
+    rechercherConnaissancesValidees(base44, input.countryCode, 'fr', input.ville),
+    rechercherDocumentsRag(base44, input.messageClient, { pays: input.countryCode, limit: 5, conversation_id: input.telephone, ville: input.ville }),
     construireContexteVenus(base44, input.telephone, input.messageClient),
     rechercherScenariosValidees(base44, input.countryCode),
-    rechercherReglesMetier(base44, input.countryCode),
+    rechercherReglesMetier(base44, input.countryCode, input.ville),
   ]);
   console.log(`[ReasoningEngine] ⏱️ Sources chargées en parallèle: ${Date.now() - tLoadStart}ms`);
 
@@ -1038,7 +1044,9 @@ ${scenarioStr}
 
 ═══ CONTEXTE CLIENT ═══
 Téléphone: ${input.telephone} | Nom: ${input.profileName || input.telephone}
-Pays: ${input.countryCode} (${input.tarifs.nom}) | Tarifs: ${input.tarifs.prix_km} ${input.tarifs.devise}/km, min ${input.tarifs.minimum} ${input.tarifs.devise}
+Pays: ${input.countryCode} (${input.tarifs.nom})
+Ville de l'utilisateur: ${input.ville || 'NON CONNUE'}
+Tarifs pays: ${input.tarifs.prix_km} ${input.tarifs.devise}/km, min ${input.tarifs.minimum} ${input.tarifs.devise}
 
 ═══ MÉMOIRE COURTE ═══
 ${memoireCourteStr}
@@ -1066,6 +1074,12 @@ ${input.outils_resultats ? formaterOutilsPourPrompt(input.outils_resultats) : 'A
 - Utilise UNIQUEMENT les données ci-dessus. N'INVENTE JAMAIS un statut, prix, nom de livreur ou référence.
 - Si un outil retourne NON TROUVÉ, dis-le clairement.
 - Une course livrée/annulée (est_active=false) n'est JAMAIS active.
+
+════ VILLE — RÈGLES CRITIQUES ═══
+- Si la ville de l'utilisateur est "NON CONNUE" et que la réponse dépend d'une information locale (disponibilité d'un service, SILGAPP Éco, tarifs, zones couvertes, livreurs, fonctionnalités activées localement, règles opérationnelles propres à une ville), demande "Dans quelle ville souhaitez-vous utiliser SILGAPP ?" (action=poser_question) AVANT de répondre.
+- Une information GLOBAL ou PAYS peut être utilisée sans connaître la ville UNIQUEMENT si elle est réellement valable pour toutes les villes concernées.
+- Ne JAMAIS supposer qu'une fonctionnalité disponible dans une ville est disponible dans une autre.
+- Ne JAMAIS inventer la ville de l'utilisateur.
 
 ${audioNote}
 

@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
+import { isTerminalCourse, updateActiveCourse } from '../../shared/courseTerminalGuard.ts';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TRANSITION STATUT ADMIN — Transitions de statut contrôlées par l'admin
@@ -53,8 +54,9 @@ export default async function(req: Request): Promise<Response> {
     }
 
     // ── Récupérer la course ──
-    const course = await base44.asServiceRole.entities.CourseExterne.get(course_id);
+    let course = await base44.asServiceRole.entities.CourseExterne.get(course_id);
     if (!course) return Response.json({ error: 'Course introuvable' }, { status: 404 });
+    if (isTerminalCourse(course)) return Response.json({ success: false, error: 'Une course terminée ne peut pas être réactivée.' }, { status: 409 });
 
     // ── Idempotence ──
     if (course.statut === statut_cible) {
@@ -81,21 +83,22 @@ export default async function(req: Request): Promise<Response> {
       //    client_decision_attendue bloque le dispatch AUTOMATIQUE (watchdog,
       //    orchestrator) mais ne doit pas bloquer une action admin explicite. ──
       if (course.client_decision_attendue === true) {
-        await base44.asServiceRole.entities.CourseExterne.update(course_id, {
+        if (!await updateActiveCourse(base44, course, {
           client_decision_attendue: false,
           client_decision_action: 'chercher_autre_livreur',
           client_decision_at: new Date().toISOString(),
-        }).catch(() => null);
+        })) return Response.json({ success: false, error: 'Course modifiée simultanément.' }, { status: 409 });
+        course = await base44.asServiceRole.entities.CourseExterne.get(course_id);
         console.log(`[TRANSITION_ADMIN] Admin ${user.email} a levé client_decision_attendue pour course ${course_id} — redispatch forcé`);
       }
 
       // ── Course Éco isolée → réintégrer au moteur Éco ──
       if (course.delivery_mode === 'eco' && course.eco_status === 'isolated') {
         // S'assurer que dispatch_status = en_attente (pas disponible_push)
-        await base44.asServiceRole.entities.CourseExterne.update(course_id, {
+        if (!await updateActiveCourse(base44, course, {
           statut: 'recherche_livreur',
           dispatch_status: 'en_attente',
-        }).catch(() => null);
+        })) return Response.json({ success: false, error: 'Course modifiée simultanément.' }, { status: 409 });
 
         // Tenter un regroupement immédiat
         await base44.asServiceRole.functions.invoke('ecoOptimizationOrchestrator', {
@@ -179,7 +182,8 @@ export default async function(req: Request): Promise<Response> {
     }
 
     // ── Mettre à jour la course ──
-    const updated = await base44.asServiceRole.entities.CourseExterne.update(course_id, updateData);
+    if (!await updateActiveCourse(base44, course, updateData)) return Response.json({ success: false, error: 'Course modifiée simultanément.' }, { status: 409 });
+    const updated = await base44.asServiceRole.entities.CourseExterne.get(course_id);
 
     console.log(`[TRANSITION_ADMIN] Course ${course_id} → ${statut_cible} par ${user.email}`);
 

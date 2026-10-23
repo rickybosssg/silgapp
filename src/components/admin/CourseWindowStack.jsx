@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { createPortal } from "react-dom";
 import { useAdminCourseWindows } from "@/context/AdminCourseWindowsContext";
 import CourseWindowCard from "./CourseWindowCard";
 import { Layers, X, ChevronRight } from "lucide-react";
@@ -8,9 +9,9 @@ export default function CourseWindowStack() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [desktopCollapsed, setDesktopCollapsed] = useState(false);
 
-  if (windows.length === 0) return null;
+  if (windows.length === 0 || typeof document === 'undefined') return null;
 
-  return (
+  return createPortal(
     <>
       {/* Desktop: fixed right panel */}
       {desktopCollapsed ? (
@@ -49,8 +50,13 @@ export default function CourseWindowStack() {
       {/* Mobile: floating button + overlay */}
       <div className="lg:hidden">
         <button
+          type="button"
+          aria-label="Ouvrir les informations des courses"
+          aria-expanded={mobileOpen}
+          data-testid="admin-course-window-toggle"
           onClick={() => setMobileOpen(true)}
-          className="fixed bottom-20 right-4 z-40 w-14 h-14 rounded-full bg-primary text-white shadow-xl flex items-center justify-center active:scale-95 transition-transform"
+          style={{ bottom: 'calc(5rem + env(safe-area-inset-bottom, 0px))' }}
+          className="fixed left-4 z-40 w-14 h-14 rounded-full bg-primary text-white shadow-xl flex items-center justify-center active:scale-95 transition-transform"
         >
           <Layers className="w-6 h-6" />
           <span className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center border-2 border-white">
@@ -59,7 +65,7 @@ export default function CourseWindowStack() {
         </button>
 
         {mobileOpen && (
-          <div className="fixed inset-0 z-50 bg-black/50 flex justify-end" onClick={() => setMobileOpen(false)}>
+          <div className="fixed inset-0 z-[70] bg-black/50 flex justify-end" onClick={() => setMobileOpen(false)}>
             <div
               className="w-full max-w-sm bg-slate-50 h-full overflow-y-auto"
               onClick={e => e.stopPropagation()}
@@ -69,7 +75,7 @@ export default function CourseWindowStack() {
                   <Layers className="w-4 h-4 text-primary" />
                   <span className="text-sm font-bold text-gray-700">Courses actives ({windows.length})</span>
                 </div>
-                <button onClick={() => setMobileOpen(false)} className="p-1.5 rounded-lg hover:bg-gray-200">
+                <button type="button" aria-label="Fermer les informations des courses" onClick={() => setMobileOpen(false)} className="p-1.5 rounded-lg hover:bg-gray-200">
                   <X className="w-5 h-5 text-gray-500" />
                 </button>
               </div>
@@ -87,6 +93,6 @@ export default function CourseWindowStack() {
           </div>
         )}
       </div>
-    </>
+    </>, document.body
   );
 }

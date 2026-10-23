@@ -746,11 +746,18 @@ Deno.serve(async (req) => {
         venusLog(`[WebhookVenus] ⏱️ Contexte chargé en parallèle: ${Date.now() - tCtxStart}ms`);
 
         // ── Appeler le moteur de raisonnement ──
+        // ── Ville SILGAPP de l'utilisateur ──
+        // RÈGLE DE SÉCURITÉ : NE JAMAIS utiliser la ville principale du pays comme fallback.
+        // Priorité : 1) ville en mémoire courte (contexte de conversation)
+        //            2) ville du profil client/livreur (conversation.ville)
+        //            3) ville explicitement mentionnée dans le message — détectée par le LLM
+        //            4) AUCUN FALLBACK — ville vide, le prompt demande la ville
+        const villeUtilisateur = (conversation?.memoire_courte?.ville || conversation?.ville || '').trim();
         reasoningResult = await raisonnerVenus(base44, {
           messageClient: messageEffectif,
           memoireCourte: pendingCourse || {},
           memoireLongue, historiqueRecent, courseActive,
-          countryCode, tarifs, telephone, profileName, isAudioTranscription,
+          countryCode, ville: villeUtilisateur, tarifs, telephone, profileName, isAudioTranscription,
           force_confirmation: forceConfirmationAudio,
         });
 

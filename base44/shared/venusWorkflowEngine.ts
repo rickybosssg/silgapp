@@ -18,6 +18,7 @@
  */
 
 import { WORKFLOW_DEFINITIONS, INTENTION_TO_WORKFLOW } from './venusWorkflowDefinitions.ts';
+import { updateActiveCourse } from './courseTerminalGuard.ts';
 
 // ── Types ──
 export interface WorkflowContext {
@@ -602,7 +603,8 @@ async function actionCreerCourse(base44: any, donnees: Record<string, any>, ctx:
 
 async function actionLancerDispatch(base44: any, donnees: Record<string, any>): Promise<any> {
   if (!donnees._course_id) return { success: false, message: 'Pas de course à dispatcher' };
-  await base44.asServiceRole.entities.CourseExterne.update(donnees._course_id, { dispatch_status: 'en_attente', statut: 'recherche_livreur' });
+  const snapshot = await base44.asServiceRole.entities.CourseExterne.get(donnees._course_id);
+  if (!await updateActiveCourse(base44, snapshot, { dispatch_status: 'en_attente', statut: 'recherche_livreur' })) return { success: false, message: 'Course modifiee ou annulee, dispatch non relance' };
   try {
     base44.asServiceRole.functions.invoke('dispatchExterneAuto', { action: 'lancer_recherche_auto', course_id: donnees._course_id }).catch(() => {});
   } catch {}

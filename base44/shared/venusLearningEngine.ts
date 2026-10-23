@@ -1,4 +1,5 @@
 import { invokeLLMTracked } from './integrationCreditTracker.ts';
+import { sortByCityScope } from './venusCityKnowledge.ts';
 
 /**
  * Moteur d'Apprentissage VENUS — Centre d'Apprentissage
@@ -18,24 +19,27 @@ export const SEUIL_CONFIANCE = 80;
  * Récupère toutes les connaissances validées pour un pays et une langue donnés.
  * Triées par priorité (critique → basse) puis par date de modification.
  */
-export async function rechercherConnaissancesValidees(base44: any, countryCode: string, langue: string = 'fr') {
+export async function rechercherConnaissancesValidees(
+  base44: any,
+  countryCode: string,
+  langue: string = 'fr',
+  ville?: string
+) {
   try {
     const all = await base44.asServiceRole.entities.VenusKnowledge.filter(
       { statut: 'valide' },
       '-updated_date',
       100
     );
-    const filtered = all.filter((k: any) =>
-      (!k.pays || k.pays === 'ALL' || k.pays === countryCode) &&
-      (!k.langue || k.langue === langue)
+    // ── Filtrage VILLE > PAYS > GLOBAL ──
+    // Une connaissance spécifique à la ville de l'utilisateur remplace
+    // une connaissance générale du pays. Les entrées globales (ALL) sont
+    // utilisées si aucune entrée plus spécifique n'existe.
+    const scoped = sortByCityScope(all, ville || '', countryCode);
+    const filtered = scoped.filter((k: any) =>
+      !k.langue || k.langue === langue
     );
-    // Trier par priorité: critique > haute > normale > basse
-    const prioriteOrder: any = { critique: 0, haute: 1, normale: 2, basse: 3 };
-    return filtered.sort((a: any, b: any) => {
-      const pa = prioriteOrder[a.priorite] ?? 2;
-      const pb = prioriteOrder[b.priorite] ?? 2;
-      return pa - pb;
-    });
+    return filtered;
   } catch (e) {
     console.error('[venusLearning] Erreur recherche connaissances:', e.message);
     return [];

@@ -1,0 +1,15 @@
+{
+  "name": "AudioTranscriptionControl",
+  "type": "object",
+  "properties": {
+    "cle": { "type": "string" },
+    "provider": { "type": "string", "enum": ["base44", "openai"], "default": "base44" },
+    "enabled": { "type": "boolean", "default": false },
+    "pilot_user_id": { "type": "string", "default": "" },
+    "pilot_until": { "type": "string", "default": "" },
+    "receipts": { "type": "string", "default": "[]" },
+    "lock_owner": { "type": "string", "default": "" }
+  },
+  "required": ["cle", "provider", "enabled", "receipts", "lock_owner"],
+  "rls": { "read": false, "create": false, "update": false, "delete": false }
+}

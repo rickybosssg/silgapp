@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
+import { updateActiveCourse } from '../../shared/courseTerminalGuard.ts';
 import { figerCommissionAcceptation } from '../../shared/commissionAvantage.ts';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -99,7 +100,8 @@ export default async function(req: Request): Promise<Response> {
     };
 
     // ── Mettre à jour la course ──
-    const updated = await base44.asServiceRole.entities.CourseExterne.update(course_id, updateData);
+    if (!await updateActiveCourse(base44, course, updateData)) return Response.json({ success: false, error: 'Course modifiée ou annulée pendant l’affectation.' }, { status: 409 });
+    const updated = await base44.asServiceRole.entities.CourseExterne.get(course_id);
 
     // ── Mettre le livreur en course ──
     await base44.asServiceRole.entities.Livreur.update(livreur_id, {

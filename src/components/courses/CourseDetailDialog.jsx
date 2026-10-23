@@ -16,6 +16,7 @@ import ChatWindow from "@/components/chat/ChatWindow";
 import CoursePriceEditor from "./CoursePriceEditor";
 import { UserPlus } from "lucide-react";
 import { base44 } from "@/api/base44Client";
+import { cancelCourseWithConfirmation, preserveConfirmedCancellation } from '@/lib/courseCancellationState';
 import { genererReferenceCourse } from "@/lib/courseReference";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -72,7 +73,8 @@ export default function CourseDetailDialog({ course: courseProp, open, onClose, 
     queryFn: async () => {
       if (!courseProp?.id) return null;
       const entity = reseau === "externe" ? base44.entities.CourseExterne : base44.entities.Course;
-      return await entity.get(courseProp.id);
+      const fresh = await entity.get(courseProp.id);
+      return reseau === 'externe' ? preserveConfirmedCancellation(fresh) : fresh;
     },
     enabled: open && !!courseProp?.id,
     staleTime: 0,
@@ -93,11 +95,10 @@ export default function CourseDetailDialog({ course: courseProp, open, onClose, 
       }
       if (data.statut === "annulee" && reseau === "externe") {
         // Utiliser la fonction backend dédiée pour les courses externes
-        const result = await base44.functions.invoke("annulerCourseExterne", { course_id: id, source: "admin" });
-        if (!result?.data?.success) {
-          throw new Error(result?.data?.error || "Échec annulation");
-        }
-        return result.data;
+        const fresh = await cancelCourseWithConfirmation(base44, { course_id: id, source: 'admin' });
+        await queryClient.cancelQueries({ queryKey: ['course-detail', id, reseau] });
+        queryClient.setQueryData(['course-detail', id, reseau], fresh);
+        return fresh;
       }
       // ── "livree" = finalisation métier officielle via terminerCourseAdmin ──
       // Pas un simple update : calcule commission, libère le livreur, comptabilise.

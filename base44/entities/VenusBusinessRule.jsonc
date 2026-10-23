@@ -68,7 +68,12 @@
     },
     "pays": {
       "type": "string",
-      "default": "ALL"
+      "default": "ALL",
+      "description": "Code pays (BF, CI, ...) ou ALL pour tous les pays. Hi\u00e9rarchie: VILLE > PAYS > ALL."
+    },
+    "ville": {
+      "type": "string",
+      "description": "Ville concern\u00e9e (vide = toutes les villes du pays). Une r\u00e8gle sp\u00e9cifique \u00e0 une ville remplace une r\u00e8gle g\u00e9n\u00e9rale du m\u00eame pays. Normalis\u00e9e en minuscules sans accents."
     },
     "langue": {
       "type": "string",

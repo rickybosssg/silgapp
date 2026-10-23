@@ -34,11 +34,11 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>SILGAPP utilise la camera pour scanner les QR codes de recuperation et de livraison.</string>
+	<string>SILGAPP utilise la camera lorsque vous choisissez de prendre une photo pour votre profil ou vos documents de livreur.</string>
 	<key>NSContactsUsageDescription</key>
 	<string>SILGAPP utilise vos contacts pour remplir rapidement les informations du destinataire.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>SILGAPP utilise votre position meme en arriere-plan pour suivre precisement les clients et les livreurs pendant une course.</string>
+	<string>SILGAPP utilise la position des livreurs en arriere-plan pendant leurs courses pour permettre le suivi de la livraison.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>SILGAPP utilise votre position pour creer, suivre et livrer les courses avec precision.</string>
 	<key>NSMicrophoneUsageDescription</key>

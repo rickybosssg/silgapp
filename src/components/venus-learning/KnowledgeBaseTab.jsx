@@ -6,13 +6,15 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Search, Pencil, Trash2, Copy, Download, Upload, Filter, RefreshCw, CheckCircle, Clock, AlertTriangle } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
-import { CATEGORIES, STATUT_LABELS, PRIORITE_LABELS, exportToCSV, logAudit, getCategoryLabel } from '@/lib/venusLearning';
+import { CATEGORIES, PAYS_CODES, STATUT_LABELS, PRIORITE_LABELS, exportToCSV, logAudit, getCategoryLabel } from '@/lib/venusLearning';
 import KnowledgeFormDialog from './KnowledgeFormDialog';
 
 export default function KnowledgeBaseTab({ presetQuestion, presetOpen }) {
   const [search, setSearch] = useState('');
   const [filterCat, setFilterCat] = useState('all');
   const [filterStatut, setFilterStatut] = useState('all');
+  const [filterVille, setFilterVille] = useState('all');
+  const [filterPays, setFilterPays] = useState('all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editEntry, setEditEntry] = useState(null);
   const [dialogPreset, setDialogPreset] = useState(null);
@@ -31,7 +33,9 @@ export default function KnowledgeBaseTab({ presetQuestion, presetOpen }) {
       (e.reponse_officielle || '').toLowerCase().includes(search.toLowerCase());
     const matchCat = filterCat === 'all' || e.categorie === filterCat;
     const matchStatut = filterStatut === 'all' || e.statut === filterStatut;
-    return matchSearch && matchCat && matchStatut;
+    const matchVille = filterVille === 'all' || (e.ville || '').toLowerCase() === filterVille.toLowerCase();
+    const matchPays = filterPays === 'all' || (e.pays || 'ALL') === filterPays;
+    return matchSearch && matchCat && matchStatut && matchVille && matchPays;
   });
 
   const handleDelete = async (entry) => {
@@ -104,6 +108,15 @@ export default function KnowledgeBaseTab({ presetQuestion, presetOpen }) {
             {Object.entries(STATUT_LABELS).map(([k, v]) => <SelectItem key={k} value={k}>{v.label}</SelectItem>)}
           </SelectContent>
         </Select>
+        <Select value={filterPays} onValueChange={setFilterPays}>
+          <SelectTrigger className="w-[100px]"><Filter className="w-3.5 h-3.5 mr-1" /><SelectValue placeholder="Pays" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tous pays</SelectItem>
+            <SelectItem value="ALL">Global (ALL)</SelectItem>
+            {PAYS_CODES.filter(p => p !== 'ALL').map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Input value={filterVille === 'all' ? '' : filterVille} onChange={e => setFilterVille(e.target.value || 'all')} placeholder="Ville..." className="w-[120px]" />
         <Button size="sm" variant="outline" onClick={() => exportToCSV(filtered)}><Download className="w-4 h-4 mr-1" />Exporter</Button>
         <label className="cursor-pointer">
           <Button size="sm" variant="outline" asChild><span><Upload className="w-4 h-4 mr-1" />Importer</span></Button>
@@ -141,6 +154,7 @@ export default function KnowledgeBaseTab({ presetQuestion, presetOpen }) {
                   <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${prio.color}`}>{prio.label}</span>
                   {entry.categorie && <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">{getCategoryLabel(entry.categorie)}</span>}
                   {entry.pays && entry.pays !== 'ALL' && <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">{entry.pays}</span>}
+                  {entry.ville && <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">{entry.ville}</span>}
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-400">v{entry.version || 1}</span>
                   {entry.statut === 'valide' && (
                     entry.rag_indexe ? (

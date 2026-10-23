@@ -1,0 +1,62 @@
+// Historical regression fixture only. Never imported by production.
+const handleConfirmer = async () => {
+    if (!motif) { toast.error("Veuillez sélectionner un motif"); return; }
+    if (motif === "autre" && !motifDetail.trim()) { toast.error("Veuillez préciser le motif"); return; }
+    setLoading(true);
+    try {
+      const motifLabel = MOTIFS.find(m => m.id === motif)?.label || motif;
+      const motifText = motif === "autre" ? `${motifLabel}: ${motifDetail.trim()}` : motifLabel;
+
+      // ── Appel backend unique : gère libération livreur, notification, frais, etc. ──
+      const res = await base44.functions.invoke("annulerCourseExterne", {
+        course_id: course.id,
+        motif: motifText,
+        motif_detail: motifDetail.trim(),
+        source: "client",
+      });
+
+      if (res?.success === false) {
+        toast.error(res?.error || "Impossible d'annuler la course");
+        return;
+      }
+
+      // ── Frais d'annulation côté client (si situation payante) ──
+      if (situation?.type === "payant" && clientId) {
+        await base44.entities.FraisAnnulation.create({
+          country_code: course.country_code || "",
+          course_id: course.id,
+          client_id: clientId,
+          client_nom: course.client_nom || "",
+          client_telephone: course.client_telephone || "",
+          livreur_id: course.livreur_id || "",
+          livreur_nom: course.livreur_nom || "",
+          montant: 250,
+          statut_paiement: "impaye",
+          raison: "Annulation après acceptation livreur",
+          date_annulation: new Date().toISOString(),
+        }).catch(() => null);
+
+        // Vérifier si le client dépasse le seuil de blocage (2000 FCFA)
+        const allFrais = await base44.entities.FraisAnnulation.filter({ client_id: clientId, statut_paiement: "impaye" });
+        const totalImpaye = (allFrais || []).reduce((s, f) => s + (f.montant || 0), 0);
+        if (totalImpaye >= 2000) {
+          await base44.entities.ClientExterne.update(clientId, { bloque_frais_annulation: true });
+          toast.error(`Compte bloqué : ${totalImpaye.toLocaleString()} FCFA de frais impayés. Régularisez via Payer SILGAPP.`);
+        }
+      }
+
+      if (situation?.type === "payant") {
+        toast.warning(`Course annulée — Frais d'annulation de ${situation.montant} ${course.devise || "FCFA"} ajoutés à votre compte.`);
+      } else {
+        toast.success("Course annulée gratuitement.");
+      }
+      if (navigator.vibrate) navigator.vibrate(200);
+      onClose();
+      onSuccess?.();
+    } catch (err) {
+      console.error("Erreur annulation:", err);
+      toast.error("Erreur lors de l'annulation");
+    } finally {
+      setLoading(false);
+    }
+  };

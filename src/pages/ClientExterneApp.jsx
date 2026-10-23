@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { preserveConfirmedCancellation, isKnownCancelledCourse } from '@/lib/courseCancellationState';
 import { motion } from "framer-motion";
 import { base44 } from "@/api/base44Client";
 import { createScopedRefreshQueue } from "@/lib/scopedRefreshQueue";
@@ -43,6 +44,7 @@ import SuiviCourseFullscreen from "@/components/client/SuiviCourseFullscreen";
 import EcranFinCourse from "@/components/client/EcranFinCourse";
 import AnnulerCourseDialog from "@/components/client/AnnulerCourseDialog";
 import MultiCourseSelector from "@/components/client/MultiCourseSelector";
+import ExpressVoiceOrder from "@/components/client/ConnectedExpressVoiceOrder";
 import QuickOrderPanel from "@/components/client/QuickOrderPanel";
 import QuickOrderProPanel from "@/components/client/QuickOrderProPanel";
 import { COURSE_STATUSES, isTerminalStatus } from "@/lib/courseStatuses";
@@ -82,9 +84,15 @@ export default function ClientExterneApp() {
   const navigate = useNavigate();
   const [onboardingDone, setOnboardingDone] = useState(false);
   const [showProfilModal, setShowProfilModal] = useState(false);
+  const [expressOpen, setExpressOpen] = useState(false);
   const [position, setPosition] = useState(null);
   const [clientProfil, setClientProfil] = useState(null);
-  const [coursesActives, setCoursesActives] = useState([]);
+  const [coursesActives, setCoursesActivesRaw] = useState([]);
+  const statusRequest = useRef(0);
+  const setCoursesActives = useCallback(value => setCoursesActivesRaw(previous => {
+    const next = typeof value === 'function' ? value(previous) : value;
+    return next.map(preserveConfirmedCancellation).filter(course => course.statut !== 'annulee');
+  }), []);
   const [livreursProches, setLivreursProches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState([]);
@@ -682,6 +690,10 @@ export default function ClientExterneApp() {
     if (!clientProfil?.id) return;
     const unsubscribe = base44.entities.CourseExterne.subscribe((event) => {
       const profil = clientProfilRef.current;
+      if (event?.data?.statut === 'annulee') {
+        preserveConfirmedCancellation(event.data);
+        setCoursesActives(previous => previous.filter(course => course.id !== event.data.id));
+      }
       const pos = positionRef.current;
       if (profil) {
         checkStatusRef.current?.(pos, profil);
@@ -830,6 +842,7 @@ export default function ClientExterneApp() {
   };
 
   const checkStatus = (pos, profil) => statusRefreshRef.current.run(statusScope, async (isCurrent) => {
+    const request = ++statusRequest.current;
     try {
       const currentUserId = userIdRef.current;
       if (!currentUserId || !profil?.id || !isCurrent()) return;
@@ -897,7 +910,8 @@ export default function ClientExterneApp() {
           };
         });
       }
-      setCoursesActives(coursesEnrichies);
+      if (request !== statusRequest.current || currentUserId !== userIdRef.current) return;
+      setCoursesActives(coursesEnrichies.filter(course => !isKnownCancelledCourse(course.id)));
 
       // Nettoyer les notifications obsolètes (courses supprimées ou terminées)
       const currentUserEmail = profil.user_email;
@@ -1291,6 +1305,7 @@ export default function ClientExterneApp() {
 
               {/* ── ACTIONS PRINCIPALES — 3 actions prioritaires ── */}
               <div className="space-y-3">
+                <ExpressVoiceOrder clientProfil={clientProfil} onOpenChange={setExpressOpen} onCompleteProfile={() => setShowProfilModal(true)} onCreated={course => navigate("/client/suivi", { state: { course_id: course.id } })} />
                 {/* 1. COMMANDER — action principale */}
                 <button
                   className={`w-full flex items-center gap-4 rounded-2xl p-5 active:scale-[0.98] transition-all text-left ${forteDemande ? "bg-[#DC2626] shadow-[0_12px_30px_rgba(220,38,38,0.25)]" : "bg-[#007aff] shadow-[0_12px_30px_rgba(0,122,255,0.25)]"}`}
@@ -1520,7 +1535,7 @@ export default function ClientExterneApp() {
       )}
 
 
-      <VenusFloatingButton />
+      <VenusFloatingButton hidden={expressOpen} />
 
       {/* ── COURSE ANNULÉE AUTO — proposer relance ou terminer ── */}
       {courseAnnuleeRelance && (

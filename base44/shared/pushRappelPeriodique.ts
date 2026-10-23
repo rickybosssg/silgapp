@@ -160,13 +160,13 @@ async function getLivreursDestinataires(base44: any, countryCode: string) {
     const livreurs = await base44.asServiceRole.entities.Livreur.filter({
       country_code: countryCode,
       type_livreur: 'externe',
-      actif: true,
+      // [CORRECTION BLOCAGE ADMIN] actif retiré du rappel périodique : un livreur
+      // bloqué administrativement (actif=false) continue à recevoir le rappel.
+      // L'acceptation reste bloquée par accepterCourseV2 (actif === true).
       validation: 'valide',
       bloque_encours: false,
     }, undefined, 1000);
 
-    // [CORRECTION 11] admin_hors_ligne retiré : un livreur bloqué par l'Admin
-    // continue à recevoir le push "Nouvelle course" sans pouvoir accepter.
     const eligible = (livreurs || []).filter((l: any) => l.manual_hors_ligne !== true);
     if (eligible.length === 0) return [];
 

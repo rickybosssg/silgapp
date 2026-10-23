@@ -15,6 +15,8 @@ import { getCourseContactForPhase, normalizePhoneForWhatsapp } from "@/lib/cours
 import { getPrixAffichable, getDeviseAffichable } from "@/utils/getPrixAffichable";
 import { confirmDelivery, functionBody } from "@/lib/deliveryConfirmation";
 import { captureDeliveryGps } from "@/lib/deliveryGps";
+import DriverWithdrawalDialog from './DriverWithdrawalDialog';
+import {DRIVER_PRE_PICKUP_STATUSES,driverHasCustody} from '../../../base44/shared/driverWithdrawalPolicy.js';
 
 const ACTIVE_STATUSES = new Set([
   "livreur_en_route", "client_contacte", "en_route_expediteur",
@@ -34,6 +36,7 @@ const ACTIVE_STATUSES = new Set([
 export default function EcoMissionDashboard({ mission, livreurProfil, onAllDelivered, onDeliveryConfirmed }) {
   const queryClient = useQueryClient();
   const [actionPending, setActionPending] = useState(false);
+  const [withdrawalCourse, setWithdrawalCourse] = useState(null);
   const livreurId = livreurProfil?.id;
 
   // ── Fetch les courses de la mission (refetch automatique toutes les 5s) ──
@@ -279,10 +282,12 @@ export default function EcoMissionDashboard({ mission, livreurProfil, onAllDeliv
               {prix > 0 && (
                 <p className="text-[11px] font-bold text-slate-600">{prix.toLocaleString()} {course.devise || "FCFA"}</p>
               )}
+              {course.livreur_id === livreurId && DRIVER_PRE_PICKUP_STATUSES.includes(course.statut) && !driverHasCustody(course) && <button type="button" disabled={actionPending} onClick={() => setWithdrawalCourse(course)} className="min-h-11 w-full rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-700 disabled:opacity-50">Se retirer de cette course</button>}
             </div>
           );
         })}
       </div>
+      <DriverWithdrawalDialog open={!!withdrawalCourse} course={withdrawalCourse} onClose={() => setWithdrawalCourse(null)} />
     </div>
   );
 }

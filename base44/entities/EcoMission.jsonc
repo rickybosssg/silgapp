@@ -2,6 +2,7 @@
   "name": "EcoMission",
   "type": "object",
   "properties": {
+    "withdrawal_audit_json": {"type":"string","description":"Audit idempotent des retraits livreur, distinct des etapes operationnelles restantes."},
     "country_code": {
       "type": "string",
       "description": "Pays de la mission Eco. V1: toutes les courses d'une mission ont le meme pays."

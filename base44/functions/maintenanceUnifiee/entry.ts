@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { updateActiveCourse } from '../../shared/courseTerminalGuard.ts';
 
 /**
  * Module de maintenance unifié — consolide les 6 fonctions de correction/nettoyage
@@ -61,7 +62,7 @@ Deno.serve(async (req) => {
       );
       let corriges = 0;
       for (const c of bloques) {
-        await sr.entities.CourseExterne.update(c.id, { dispatch_status: 'redispatch', dispatch_wave: (c.dispatch_wave || 0) + 1 });
+        if (!await updateActiveCourse(base44, c, { dispatch_status: 'redispatch', dispatch_wave: (c.dispatch_wave || 0) + 1 })) continue;
         corriges++;
       }
       return { module: 'correction_courses_bloquees', success: true, corriges, detail: `${corriges} course(s) remise(s) en redispatch` };

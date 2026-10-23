@@ -62,7 +62,7 @@ const TYPE_OPTIONS = [
 ];
 
 // ── Main form component ──
-export default function AdminCourseForm() {
+export default function AdminCourseForm({ showCourseWindows = true }) {
   const { selectedCountry: adminCountryCode } = useAdminContext();
   const { addWindow } = useAdminCourseWindows();
 
@@ -1012,7 +1012,7 @@ export default function AdminCourseForm() {
       </div>
 
       {/* Panneau des courses actives — affiche le statut en temps réel après validation */}
-      <CourseWindowStack />
+      {showCourseWindows && <CourseWindowStack />}
 
       {/* Modals de sélection GPS */}
       <MapPickerModal

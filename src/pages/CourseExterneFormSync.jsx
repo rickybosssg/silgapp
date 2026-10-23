@@ -124,7 +124,7 @@ export default function CourseExterneFormSync() {
         expediteur_gps_available: false,
         expediteur_gps_lat: null,
         expediteur_gps_lng: null,
-        prix_propose: 0,
+        prix_propose: Number.isFinite(prefillCourse.prix_propose_client) && prefillCourse.prix_propose_client > 0 ? prefillCourse.prix_propose_client : 0,
       }
     : (draft || {
         type_course: typeCourse,

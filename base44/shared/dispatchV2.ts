@@ -31,6 +31,7 @@
 // VERSION: 2026-08-11 — Version stable figée. Ne pas modifier sans validation.
 
 import { waitUntil } from 'base44:runtime';
+import { isTerminalCourse, updateActiveCourse } from './courseTerminalGuard.ts';
 import { STATUTS_ACTIFS_COURSE, STATUTS_TERMINAUX_COURSE, calculerDistance, chargerConfigPays } from './dispatchConstants.ts';
 import { dispatchLog, reponseDejaPrise, generateToken, generatePIN, journaliserDispatch } from './dispatchUtils.ts';
 import { enregistrerNotification, enregistrerNotificationsBulk, enregistrerInboxNotificationsBulk, getLivreursNotifies, getLivreursRefuses, marquerAccepte } from './dispatchNotifications.ts';
@@ -71,6 +72,9 @@ export async function isV2Enabled(base44: any): Promise<boolean> {
 }
 
 async function notifierLivreursEligiblesV2(base44: any, course: any, options: any = {}) {
+  const current = await base44.asServiceRole.entities.CourseExterne.get(course.id);
+  if (!current || isTerminalCourse(current) || current.dispatch_status !== 'disponible_push' || current.client_decision_attendue === true) return { pushed: 0, blocked: true };
+  course = current;
   const { priorityOnly = false, skipAlreadyPublishedCheck = false } = options;
   if (!course?.id || !course?.country_code) return { notified: 0 };
 
@@ -90,7 +94,9 @@ async function notifierLivreursEligiblesV2(base44: any, course: any, options: an
     base44.asServiceRole.entities.Livreur.filter({
       type_livreur: 'externe',
       validation: 'valide',
-      actif: true,
+      // [CORRECTION BLOCAGE ADMIN] actif retiré du ciblage push : un livreur bloqué
+      // administrativement (actif=false) continue à recevoir les notifications push.
+      // L'acceptation reste bloquée par accepterCourseV2 (livreur.actif === true).
       statut: { $in: ['disponible', 'hors_ligne'] },
       country_code: course.country_code,
       bloque_encours: false,
@@ -203,7 +209,8 @@ export async function publierCourseDansFil(base44: any, course: any) {
   // Éco ne soient écrits par prepareEcoCreationFields). On re-lit toujours la
   // course depuis la base avant d'évaluer les guards.
   const freshCourse = await base44.asServiceRole.entities.CourseExterne.get(course.id).catch(() => null);
-  if (freshCourse) course = freshCourse;
+  if (!freshCourse || isTerminalCourse(freshCourse)) return { success: false, blocked: true, reason: 'terminal_course' };
+  course = freshCourse;
 
   // 🔖 Log de version bundle — pour vérifier que la production charge la dernière version
   dispatchLog(`[V2] 🔖 publierCourseDansFil — bundle version: ${DISPATCH_V2_BUNDLE_VERSION} — course ${course.id}`);
@@ -259,7 +266,7 @@ export async function publierCourseDansFil(base44: any, course: any) {
   }
 
   await base44.asServiceRole.entities.CourseExterne.updateMany(
-    { id: course.id, dispatch_status: { $nin: ['disponible_push', 'accepte', 'propose', 'redispatch'] }, client_decision_attendue: { $ne: true } },
+    { id: course.id, statut: { $nin: ['annulee', 'livree', 'terminee'] }, annulation_user_id: { $in: [null, ''] }, dispatch_status: { $nin: ['disponible_push', 'accepte', 'propose', 'redispatch'] }, client_decision_attendue: { $ne: true } },
     { $set: {
       statut: 'recherche_livreur',
       dispatch_status: 'disponible_push',
@@ -277,6 +284,7 @@ export async function publierCourseDansFil(base44: any, course: any) {
   // ou si un autre appel a déjà publié avant nous.
   const coursePubliee = await base44.asServiceRole.entities.CourseExterne.get(course.id);
   if (!coursePubliee) return { error: 'Course introuvable' };
+  if (isTerminalCourse(coursePubliee) || coursePubliee.dispatch_status !== 'disponible_push') return { success: false, blocked: true, reason: 'terminal_or_obsolete_publication' };
 
   if (coursePubliee.heure_sollicitation !== nowIso) {
     // ── RE-NOTIFICATION DE SECOURS ──
@@ -324,6 +332,8 @@ export async function publierCourseDansFil(base44: any, course: any) {
     priorityOnly: false,
     skipAlreadyPublishedCheck: true,
   });
+  const afterBatch = await base44.asServiceRole.entities.CourseExterne.get(course.id);
+  if (!afterBatch || isTerminalCourse(afterBatch)) return { success: false, blocked: true, reason: 'cancelled_during_publication' };
 
   dispatchLog(`[V2] 📢 Course ${course.id} publiée dans le fil (disponible_push) — ${batchResult.notified} livreur(s) notifié(s) à T=0 (batch unique)`);
   return { success: true, published: true, batch: batchResult };
@@ -529,14 +539,14 @@ export async function accepterCourseV2(base44: any, courseId: string, livreurId:
   // chaine vide : Base44 stocke aussi l'absence de livreur avec null, ce qui
   // empêchait toute acceptation de ces courses.
   await base44.asServiceRole.entities.CourseExterne.updateMany(
-    { id: courseId, dispatch_status: { $in: ['propose', 'disponible_push'] } },
+    { id: courseId, statut: { $nin: ['annulee', 'livree', 'terminee'] }, annulation_user_id: { $in: [null, ''] }, client_decision_attendue: { $ne: true }, dispatch_status: { $in: ['propose', 'disponible_push'] } },
     { $set: updateData }
   );
 
   // 10. Verify winner
   const courseVerifie = await base44.asServiceRole.entities.CourseExterne.get(courseId);
-  const isMyCourse = String(courseVerifie.livreur_id) === String(livreurId) ||
-                     String(courseVerifie.accepted_by_livreur_id) === String(livreurId);
+  const isMyCourse = !isTerminalCourse(courseVerifie) && (String(courseVerifie.livreur_id) === String(livreurId) ||
+                     String(courseVerifie.accepted_by_livreur_id) === String(livreurId));
 
   if (!isMyCourse) {
     dispatchLog(`[V2] 🏁 Race condition perdue — livreur ${livreurId} n'a pas obtenu la course ${courseId}`);
@@ -588,9 +598,13 @@ export async function accepterCourseV2(base44: any, courseId: string, livreurId:
   }
 
   // 11. V2 : Trigger WebSocket via update single (déclenche la disparition du fil)
-  await base44.asServiceRole.entities.CourseExterne.update(courseId, {
-    notes: `Acceptée par ${livreurId} à ${new Date().toISOString()}`,
+  const acceptedNow = await base44.asServiceRole.entities.CourseExterne.get(courseId);
+  if (isTerminalCourse(acceptedNow)) return reponseDejaPrise('terminal_course', acceptedNow);
+  await updateActiveCourse(base44, acceptedNow, {
+    notes: `${acceptedNow.notes || ''} | Acceptée par ${livreurId} à ${new Date().toISOString()}`,
   });
+  const acceptedAfterNotes = await base44.asServiceRole.entities.CourseExterne.get(courseId);
+  if (isTerminalCourse(acceptedAfterNotes)) return reponseDejaPrise('terminal_course', acceptedAfterNotes);
 
   // 12. Update livreur status
   if (!isManual) {
@@ -661,6 +675,9 @@ export function calculerScore(livreur: any, course: any): number {
 // Pour le rappel T+5min, passer excludeAlreadyNotified=false afin de re-notifier
 // les livreurs déjà notifiés à T=0 mais toujours libres et éligibles.
 export async function secoursDispatchV2(base44: any, course: any, nbLivreurs: number, options: { excludeAlreadyNotified?: boolean } = {}) {
+  const current = course?.id ? await base44.asServiceRole.entities.CourseExterne.get(course.id) : null;
+  if (!current || isTerminalCourse(current) || current.dispatch_status !== 'disponible_push') return { pushed: 0, reason: 'terminal_or_obsolete_course' };
+  course = current;
   const { excludeAlreadyNotified = true } = options;
   if (!course?.id || !course.country_code) return { pushed: 0 };
 
@@ -671,7 +688,9 @@ export async function secoursDispatchV2(base44: any, course: any, nbLivreurs: nu
   const livreurs = await base44.asServiceRole.entities.Livreur.filter({
     type_livreur: 'externe',
     validation: 'valide',
-    actif: true,
+    // [CORRECTION BLOCAGE ADMIN] actif retiré du ciblage push secours (même règle
+    // que le dispatch initial). Le livreur bloqué reçoit le push mais ne peut
+    // pas accepter (accepterCourseV2 vérifie livreur.actif === true).
     statut: { $in: ['disponible', 'hors_ligne'] },
     country_code: course.country_code,
     bloque_encours: false,
@@ -711,6 +730,8 @@ export async function secoursDispatchV2(base44: any, course: any, nbLivreurs: nu
 
   // 5. Push batch ciblé : 1 seule invocation backend pour tous les candidats sélectionnés
   if (candidats.length > 0) {
+    const beforeSend = await base44.asServiceRole.entities.CourseExterne.get(course.id);
+    if (!beforeSend || isTerminalCourse(beforeSend) || beforeSend.dispatch_status !== 'disponible_push') return { pushed: 0, reason: 'terminal_or_obsolete_course' };
     const batchResult = await base44.asServiceRole.functions.invoke('envoiNotificationPushBatch', {
       course_id: course.id,
       livreur_ids: candidats.map((l: any) => l.id),

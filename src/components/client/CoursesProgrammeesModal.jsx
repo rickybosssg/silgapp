@@ -6,6 +6,7 @@ import { X, Clock, Package, Calendar, Trash2, Loader2, Bell } from "lucide-react
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";
+import { cancelCourseWithConfirmation, isKnownCancelledCourse } from '@/lib/courseCancellationState';
 
 export default function CoursesProgrammeesModal({ clientProfil, onClose }) {
   const queryClient = useQueryClient();
@@ -20,7 +21,7 @@ export default function CoursesProgrammeesModal({ clientProfil, onClose }) {
         "-created_date",
         50
       );
-      return courses || [];
+      return (courses || []).filter(course => !isKnownCancelledCourse(course.id));
     },
     enabled: !!clientProfil?.id,
     refetchInterval: 30000,
@@ -31,7 +32,7 @@ export default function CoursesProgrammeesModal({ clientProfil, onClose }) {
   const handleCancel = async (courseId) => {
     setCancellingId(courseId);
     try {
-      await base44.functions.invoke("annulerCourseExterne", {
+      await cancelCourseWithConfirmation(base44, {
         course_id: courseId,
         motif: "client_change_avis",
         source: "client",

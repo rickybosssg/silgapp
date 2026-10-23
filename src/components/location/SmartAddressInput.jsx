@@ -20,19 +20,22 @@ export default function SmartAddressInput({
   countryCode,
   value = "",
   onChange,
-  onSelect,
-  label,
+  onSelect = undefined,
+  label = undefined,
   placeholder = "Commencez à saisir un quartier, une adresse ou une structure...",
   required = false,
-  hint,
+  hint = undefined,
   className = "",
   inputClassName = "",
   labelClassName = "",
   autoFocus = false,
-  children,
+  children = undefined,
   enableAddLieu = false,
-  onLieuAdded,
+  onLieuAdded = undefined,
   iconClassName = "text-gray-400",
+  disabled = false,
+  quartierOnly = false,
+  quartierIds = undefined,
 }) {
   const listboxId = useId();
   const containerRef = useRef(null);
@@ -45,6 +48,11 @@ export default function SmartAddressInput({
   // change suite à la sélection, déclenchant le cache + setOpen(true).
   const justSelectedRef = useRef(false);
   const [showAddLieu, setShowAddLieu] = useState(false);
+  // Express orders use the same catalogue, ranking and country scope as Commander.
+  // Optional restriction leaves the classic address picker unchanged.
+  const visibleSuggestions = quartierOnly
+    ? suggestions.filter(item => item.type === "quartier" && item.countryCode === countryCode && (!quartierIds || quartierIds.includes(item.id)))
+    : suggestions;
 
   useEffect(() => {
     // Si la valeur vient d'être définie par une sélection, ne pas rouvrir la liste.
@@ -101,16 +109,16 @@ export default function SmartAddressInput({
   };
 
   const onKeyDown = (event) => {
-    if (!open || suggestions.length === 0) return;
+    if (!open || visibleSuggestions.length === 0 || disabled) return;
     if (event.key === "ArrowDown") {
       event.preventDefault();
-      setActiveIndex((current) => Math.min(current + 1, suggestions.length - 1));
+      setActiveIndex((current) => Math.min(current + 1, visibleSuggestions.length - 1));
     } else if (event.key === "ArrowUp") {
       event.preventDefault();
       setActiveIndex((current) => Math.max(current - 1, 0));
     } else if (event.key === "Enter" && activeIndex >= 0) {
       event.preventDefault();
-      choose(suggestions[activeIndex]);
+      choose(visibleSuggestions[activeIndex]);
     } else if (event.key === "Escape") {
       setOpen(false);
     }
@@ -129,6 +137,8 @@ export default function SmartAddressInput({
         <Search className={`pointer-events-none absolute left-3.5 top-1/2 z-10 h-4 w-4 -translate-y-1/2 ${iconClassName}`} />
         <input
           value={value}
+          disabled={disabled}
+          aria-label={label || placeholder}
           onChange={(event) => {
             onChange?.(event.target.value, null);
             setOpen(true);
@@ -154,14 +164,14 @@ export default function SmartAddressInput({
 
       {hint && <p className="pl-1 text-xs text-gray-500">{hint}</p>}
 
-      {open && value.trim().length >= 2 && (
+      {!disabled && open && value.trim().length >= 2 && (
         <div
           id={listboxId}
           role="listbox"
           className="absolute z-[80] mt-1 max-h-80 w-full overflow-y-auto rounded-2xl border border-gray-200 bg-white p-1.5 shadow-2xl"
         >
-          {suggestions.length > 0 ? (
-            suggestions.map((item, index) => {
+          {visibleSuggestions.length > 0 ? (
+            visibleSuggestions.map((item, index) => {
               const meta = TYPE_META[item.type] || TYPE_META.adresse;
               const Icon = meta.icon;
               return (

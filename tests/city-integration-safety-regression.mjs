@@ -1,4 +1,5 @@
 import { selectAvailableCourseOffers } from '../src/lib/availableCourseOffers.js';
+import { preserveConfirmedCancellation } from '../src/lib/courseCancellationState.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import ts from 'typescript';
@@ -69,10 +70,10 @@ for (const enabled of [false, true]) {
     EcoMission: { filter: async () => [mission] },
   } };
   const compiledHook = ts.transpile(hook.replace(/^import .*;\r?\n/gm, '').replace('export function', 'function'), { target: ts.ScriptTarget.ES2022 });
-  const useFeed = new Function('useEffect', 'useMemo', 'useState', 'useQuery', 'useQueryClient', 'base44', 'cityNamesPattern', 'operationalCityAliases', 'resolveOperationalName', 'canSeeOperationalCourse', 'currentDriverGpsCity', 'gpsFixTime', 'CITY_GPS_MAX_AGE_MS', 'selectAvailableCourseOffers', `${compiledHook};return useCoursesDisponibles;`)(
+  const useFeed = new Function('useEffect', 'useMemo', 'useState', 'useQuery', 'useQueryClient', 'base44', 'cityNamesPattern', 'operationalCityAliases', 'resolveOperationalName', 'canSeeOperationalCourse', 'currentDriverGpsCity', 'gpsFixTime', 'CITY_GPS_MAX_AGE_MS', 'selectAvailableCourseOffers', 'preserveConfirmedCancellation', `${compiledHook};return useCoursesDisponibles;`)(
     () => {}, fn => fn(), initial => [typeof initial === 'function' ? initial() : initial, () => {}],
     query => { queries.set(query.queryKey[0], query); return query.queryKey[0] === 'operational-zone-policy' ? { data: { cities: [{ nom: 'ouagadougou', actif: enabled }, { nom: 'bobo-dioulasso', actif: enabled }], quartiers: [{ ville: 'Ouagadougou', latitude: 12.37, longitude: -1.52 }] } } : query.queryKey[0] === 'driver-current-gps' ? { data: driver } : {}; },
-    () => ({}), uiSdk, cityNamesPattern, operationalCityAliases, resolveOperationalName, canSeeOperationalCourse, currentDriverGpsCity, gpsFixTime, CITY_GPS_MAX_AGE_MS, selectAvailableCourseOffers);
+    () => ({}), uiSdk, cityNamesPattern, operationalCityAliases, resolveOperationalName, canSeeOperationalCourse, currentDriverGpsCity, gpsFixTime, CITY_GPS_MAX_AGE_MS, selectAvailableCourseOffers, preserveConfirmedCancellation);
   useFeed(driver);
   await queries.get('courses-externes-disponibles').queryFn();
   assert.equal(Boolean(reads[0].ville_depart), enabled);

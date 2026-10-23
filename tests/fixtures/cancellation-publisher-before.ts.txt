@@ -1,0 +1,134 @@
+// Historical regression fixture only. Never imported by production.
+export async function publierCourseDansFil(base44: any, course: any) {
+  if (!course?.id) return { error: 'no_course_id' };
+
+  // ── Re-fetch systématique pour éviter les lectures obsolètes (race condition) ──
+  // L'objet course passé en paramètre peut être stale (lu avant que les champs
+  // Éco ne soient écrits par prepareEcoCreationFields). On re-lit toujours la
+  // course depuis la base avant d'évaluer les guards.
+  const freshCourse = await base44.asServiceRole.entities.CourseExterne.get(course.id).catch(() => null);
+  if (freshCourse) course = freshCourse;
+
+  // 🔖 Log de version bundle — pour vérifier que la production charge la dernière version
+  dispatchLog(`[V2] 🔖 publierCourseDansFil — bundle version: ${DISPATCH_V2_BUNDLE_VERSION} — course ${course.id}`);
+
+  // [ENTERPRISE_SUSPENSION] Bloquer le dispatch si l'entreprise est suspendue.
+  // Les courses déjà acceptées (en cours) ne passent pas par cette fonction.
+  const suspendCheckEntId = normalizeEnterpriseId(course.enterprise_id);
+  if (suspendCheckEntId) {
+    const entList = await base44.asServiceRole.entities.Enterprise.filter({
+      enterprise_financier_id: suspendCheckEntId,
+    }).catch(() => []);
+    const ent = entList?.[0];
+    if (ent && (ent.actif === false || ent.statut !== 'actif')) {
+      dispatchLog(`[V2] 🚫 Enterprise ${suspendCheckEntId} suspendue — dispatch bloqué pour course ${course.id}`);
+      return { success: false, enterprise_suspended: true, error: 'Entreprise suspendue' };
+    }
+  }
+
+  // 🛡️ GARDE IDEMPOTENTE ATOMIQUE ANTI-CASCADE
+  // Utilise updateMany conditionnel : ne met à jour QUE si dispatch_status n'est pas
+  // déjà 'disponible_push'. Cela empêche la cascade CREATE → UPDATE de l'orchestrateur
+  // de re-publier : publierCourseDansFil met statut='recherche_livreur', ce qui déclenche
+  // l'UPDATE event → l'orchestrateur rappelle publierCourseDansFil. Avec une garde basée
+  // sur l'objet course passé en paramètre, une race condition peut survenir si le 2e appel
+  // lit la course avant que le 1er ait commité. La garde atomique (updateMany conditionnel)
+  // élimine cette race condition.
+  const nowIso = new Date().toISOString();
+  // 🛡️ GARDE ÉLARGIE : ne pas republier si la course est déjà publiée (disponible_push),
+  // déjà acceptée (accepte) ou en négociation de prix (propose).
+  // Fix 2026-08-17 : race condition où publierCourseDansFil était rappelé par
+  // l'orchestrateur APRÈS une acceptation, effaçant livreur_id et remettant la
+  // course dans le fil → double acceptation par un second livreur.
+  // 🛡️ GARDE ANTI-DISPATCH : ne jamais publier une course en attente de décision client
+  // (après annulation par le livreur). Le client doit choisir entre relancer ou terminer.
+  if (course.client_decision_attendue === true) {
+    dispatchLog(`[V2] 🚫 Course ${course.id} en attente de décision client — dispatch BLOQUÉ`);
+    return { success: false, blocked: true, reason: 'client_decision_attendue' };
+  }
+
+  // [ECO] Une course Éco isolée ne doit JAMAIS être publiée dans le fil des livreurs.
+  // Elle reste en attente de regroupement. Si aucun regroupement n'est trouvé dans le
+  // délai configuré, le watchdog (convertDueEcoCourses) la convertit en Standard.
+  // Publier une course isolée permettrait à un livreur de l'accepter individuellement,
+  // ce qui contredit le principe du regroupement Éco.
+  if (course.eco_status === 'isolated' && course.delivery_mode === 'eco') {
+    dispatchLog(`[V2] 🌿 Course Éco isolée ${course.id} — publication bloquée, en attente de regroupement`);
+    // Tenter un regroupement immédiat
+    await base44.asServiceRole.functions.invoke('ecoOptimizationOrchestrator', {
+      action: 'process_course_created',
+      course_id: course.id,
+    }).catch(() => null);
+    return { success: false, eco_isolated: true, reason: 'eco_isolated_pending_grouping' };
+  }
+
+  await base44.asServiceRole.entities.CourseExterne.updateMany(
+    { id: course.id, dispatch_status: { $nin: ['disponible_push', 'accepte', 'propose', 'redispatch'] }, client_decision_attendue: { $ne: true } },
+    { $set: {
+      statut: 'recherche_livreur',
+      dispatch_status: 'disponible_push',
+      heure_sollicitation: nowIso,
+      timeout_expires_at: null,
+      dispatch_wave: 0,
+      dispatch_next_wave_at: null,
+      dispatch_v2_secours_phase: 0,
+      livreur_id: '',
+      accepted_by_livreur_id: '',
+    }}
+  );
+
+  // Re-fetch pour vérifier si ON a gagné la publication (heure_sollicitation = notre now)
+  // ou si un autre appel a déjà publié avant nous.
+  const coursePubliee = await base44.asServiceRole.entities.CourseExterne.get(course.id);
+  if (!coursePubliee) return { error: 'Course introuvable' };
+
+  if (coursePubliee.heure_sollicitation !== nowIso) {
+    // ── RE-NOTIFICATION DE SECOURS ──
+    // La course a déjà été publiée par un premier appel, mais le premier appel a pu
+    // échouer silencieusement à l'étape de notification (Livreur.filter en erreur,
+    // NotificationToken.filter en erreur, bulkCreate en erreur). Si la course a 0
+    // DispatchNotification, on re-tente la notification au lieu de skipper.
+    const existingDnCount = await base44.asServiceRole.entities.DispatchNotification.filter(
+      { course_id: course.id }, undefined, 1
+    ).catch(() => []);
+
+    if (!existingDnCount || existingDnCount.length === 0) {
+      dispatchLog(`[V2] ⚠️ Course ${course.id} déjà publiée mais 0 DispatchNotification — re-tente notification de secours`);
+      journaliserDispatch(base44, {
+        course_id: course.id,
+        evenement: 'publier_fil_v2_renotify',
+        raison_passage: `already_published_but_0_notifs — re-notification de secours`,
+      });
+      const renotifyResult = await notifierLivreursEligiblesV2(base44, coursePubliee, {
+        priorityOnly: false,
+        skipAlreadyPublishedCheck: true,
+      });
+      return { success: true, published: true, renotified: true, batch: renotifyResult };
+    }
+
+    dispatchLog(`[V2] ⏭️ Course ${course.id} déjà publiée (heure_sollicitation=${coursePubliee.heure_sollicitation}) — skip republication`);
+    journaliserDispatch(base44, {
+      course_id: course.id,
+      evenement: 'publier_fil_v2_skip',
+      raison_passage: `already_published — heure_sollicitation=${coursePubliee.heure_sollicitation} vs now=${nowIso}`,
+    });
+    return { success: true, already_published: true, skipped: true };
+  }
+
+  journaliserDispatch(base44, {
+    course_id: course.id,
+    evenement: 'publier_fil_v2_execute',
+    raison_passage: `guard passed — heure_sollicitation=${nowIso}`,
+  });
+
+  // 🎯 T=0 : UN SEUL push batch à TOUS les livreurs éligibles (prioritaires + non-prioritaires)
+  // Simplification 2026-08-14 : plus de distinction temporelle, plus de T+20s, plus de secours.
+  // La course reste dans le fil indéfiniment jusqu'à acceptation ou annulation.
+  const batchResult = await notifierLivreursEligiblesV2(base44, coursePubliee, {
+    priorityOnly: false,
+    skipAlreadyPublishedCheck: true,
+  });
+
+  dispatchLog(`[V2] 📢 Course ${course.id} publiée dans le fil (disponible_push) — ${batchResult.notified} livreur(s) notifié(s) à T=0 (batch unique)`);
+  return { success: true, published: true, batch: batchResult };
+};

@@ -39,6 +39,10 @@ jobs:
           printf '%s' "$FIREBASE_CONFIG_BASE64" | base64 --decode > ios/App/App/GoogleService-Info.plist
           python3 scripts/ios_release.py firebase --path ios/App/App/GoogleService-Info.plist
       - name: Install and build web application
+        env:
+          VITE_BASE44_APP_ID: 6a0ec08f3af5e1d1284254c1
+          VITE_BASE44_APP_BASE_URL: https://silga-dispatch-go.base44.app
+          VITE_BASE44_FUNCTIONS_VERSION: prod
         run: |
           npm ci
           npm run build
@@ -53,7 +57,55 @@ jobs:
         run: |
           xcodebuild -workspace App.xcworkspace -scheme App -configuration Debug \
             -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/silgapp-simulator" \
             CODE_SIGNING_ALLOWED=NO build
+      - name: Capture native logged-out iPhone screen without review credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcrun simctl list devices available --json > "$RUNNER_TEMP/silgapp-devices.json"
+          DEVICE_ID="$(python3 - "$RUNNER_TEMP/silgapp-devices.json" <<'PY'
+          import json, sys
+          devices = json.load(open(sys.argv[1]))['devices']
+          choices = [(runtime, device) for runtime, rows in devices.items()
+                     if 'iOS-26' in runtime for device in rows
+                     if device.get('isAvailable') and device['name'].startswith('iPhone')]
+          if not choices:
+              raise SystemExit('No existing iOS 26 iPhone simulator is available')
+          choices.sort(key=lambda item: (item[0], 'Pro Max' in item[1]['name'], item[1]['name']), reverse=True)
+          print(choices[0][1]['udid'])
+          PY
+          )"
+          xcrun simctl boot "$DEVICE_ID"
+          xcrun simctl bootstatus "$DEVICE_ID" -b
+          APP_PATH="$RUNNER_TEMP/silgapp-simulator/Build/Products/Debug-iphonesimulator/App.app"
+          test -d "$APP_PATH"
+          mkdir -p "$RUNNER_TEMP/silgapp-native-captures"
+          xcrun simctl install "$DEVICE_ID" "$APP_PATH"
+          xcrun simctl launch "$DEVICE_ID" com.base6a0ec08f3af5e1d1284254c1.app
+          sleep 12
+          xcrun simctl io "$DEVICE_ID" screenshot "$RUNNER_TEMP/silgapp-native-captures/iphone-logged-out.png"
+          sleep 8
+          xcrun simctl io "$DEVICE_ID" screenshot "$RUNNER_TEMP/silgapp-native-captures/iphone-logged-out-later.png"
+          python3 - "$APP_PATH/Info.plist" "$RUNNER_TEMP/silgapp-native-captures/provenance.json" <<'PY'
+          import json, os, plistlib, sys
+          with open(sys.argv[1], 'rb') as handle:
+              info = plistlib.load(handle)
+          result = {'source_commit': os.environ['GITHUB_SHA'], 'native_simulator': True,
+                    'distribution_build': False, 'review_credentials_used': False,
+                    'bundle_id': info['CFBundleIdentifier'], 'sdk': info.get('DTSDKName'),
+                    'scope': 'Actual native logged-out UI only; no account, course, payment or test push action'}
+          with open(sys.argv[2], 'w') as handle:
+              json.dump(result, handle, indent=2)
+          PY
+          xcrun simctl shutdown "$DEVICE_ID"
+      - name: Keep only native logged-out screenshots and provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: SILGAPP-native-simulator-captures
+          path: ${{ runner.temp }}/silgapp-native-captures/
+          if-no-files-found: error
+          retention-days: 1
       - name: Remove restored local configuration
         if: always()
         run: rm -f ios/App/App/GoogleService-Info.plist

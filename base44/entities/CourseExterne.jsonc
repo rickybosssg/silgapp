@@ -2,6 +2,28 @@
   "name": "CourseExterne",
   "type": "object",
   "properties": {
+    "livreur_retrait_user_id": {"type":"string"},
+    "livreur_retrait_livreur_id": {"type":"string"},
+    "livreur_retrait_operation_id": {"type":"string"},
+    "livreur_retrait_at": {"type":"string","format":"date-time"},
+    "livreur_retrait_mission_id": {"type":"string"},
+    "annulation_user_id": {
+      "type": "string",
+      "description": "Identifiant authentifie de l'auteur de l'annulation terminale. Ne pas effacer lors des retries de dispatch."
+    },
+    "annulation_source": {
+      "type": "string",
+      "description": "Origine client/admin de l'annulation terminale, conservee pour audit."
+    },
+    "annulation_event_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Emission de l'evenement temps reel apres confirmation atomique de l'annulation."
+    },
+    "commande_vocale_express": {
+      "type": "boolean",
+      "description": "Commande express confirmée : contact client initial, positions approximatives des quartiers, sans cible GPS live de contact."
+    },
     "country_code": {
       "type": "string",
       "description": "Code pays ISO 2 lettres (ex: BF, CI, TG). Dynamique : aucun pays cod\u00e9 en dur."

@@ -280,6 +280,14 @@ export default function KnowledgeFormDialog({ open, onClose, editEntry, presetQu
                 <SelectContent>{PAYS_CODES.map(p => <SelectItem key={p} value={p}>{p === 'ALL' ? 'Tous les pays' : p}</SelectItem>)}</SelectContent>
               </Select>
             </div>
+            <div>
+              <Label>Ville (spécifique)</Label>
+              <Input
+                value={form.ville || ''}
+                onChange={e => setField('ville', e.target.value)}
+                placeholder="Vide = toutes les villes du pays"
+              />
+            </div>
             <div className="md:col-span-2">
               <Label>Mots-clés (séparés par des virgules)</Label>
               <Input value={form.mots_cles} onChange={e => setField('mots_cles', e.target.value)} placeholder="mot1, mot2, mot3..." />

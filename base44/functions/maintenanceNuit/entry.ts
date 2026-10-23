@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { updateActiveCourse } from '../../shared/courseTerminalGuard.ts';
 import { haversineKm } from "../../shared/geoUtils.ts";
 import { chargerTauxCommissionEffectif, zeroCommissionFields } from '../../shared/commissionLock.ts';
 
@@ -201,7 +202,7 @@ async function scanStatutsIncoherents(base44, bugs, corrections, recommandations
         detail: `Course ${c.id?.slice(-6)}: pickup confirmé mais statut="${c.statut}"`,
         auto_fixable: true
       });
-      await base44.asServiceRole.entities.CourseExterne.update(c.id, { statut: "colis_recupere" }).catch(() => null);
+      if (!await updateActiveCourse(base44, c, { statut: 'colis_recupere' }).catch(() => false)) continue;
       corrections.push({
         type: "statut_corrige",
         id: c.id,
@@ -218,7 +219,7 @@ async function scanStatutsIncoherents(base44, bugs, corrections, recommandations
         detail: `Course ${c.id?.slice(-6)}: delivery confirmé mais statut="${c.statut}"`,
         auto_fixable: true
       });
-      await base44.asServiceRole.entities.CourseExterne.update(c.id, { statut: "livree" }).catch(() => null);
+      if (!await updateActiveCourse(base44, c, { statut: 'livree' }).catch(() => false)) continue;
       corrections.push({
         type: "statut_corrige",
         id: c.id,
@@ -235,7 +236,7 @@ async function scanStatutsIncoherents(base44, bugs, corrections, recommandations
         detail: `Course ${c.id?.slice(-6)}: livreur assigné mais statut="${c.statut}"`,
         auto_fixable: true
       });
-      await base44.asServiceRole.entities.CourseExterne.update(c.id, { statut: "livreur_en_route" }).catch(() => null);
+      if (!await updateActiveCourse(base44, c, { statut: 'livreur_en_route' }).catch(() => false)) continue;
       corrections.push({
         type: "statut_corrige",
         id: c.id,

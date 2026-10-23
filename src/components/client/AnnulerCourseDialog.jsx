@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -16,6 +16,7 @@ import {
 import { toast } from "sonner";
 import { base44 } from "@/api/base44Client";
 import { haversineKm } from "@/lib/priceEstimate";
+import { cancelCourseWithConfirmation } from '@/lib/courseCancellationState';
 
 const MOTIFS = [
   { id: "trompe", label: "Je me suis trompé", icon: "" },
@@ -28,6 +29,7 @@ const MOTIFS = [
 // step: "info" | "motif"
 // situation: { type: "gratuit" | "payant" | "impossible", raison? }
 export default function AnnulerCourseDialog({ course, open, onClose, onSuccess, clientId }) {
+  const cancellationLock = useRef(false);
   const [step, setStep] = useState("info");
   const [motif, setMotif] = useState(null);
   const [motifDetail, setMotifDetail] = useState("");
@@ -112,25 +114,21 @@ export default function AnnulerCourseDialog({ course, open, onClose, onSuccess, 
   };
 
   const handleConfirmer = async () => {
+    if (cancellationLock.current) return;
     if (!motif) { toast.error("Veuillez sélectionner un motif"); return; }
     if (motif === "autre" && !motifDetail.trim()) { toast.error("Veuillez préciser le motif"); return; }
-    setLoading(true);
+    cancellationLock.current = true; setLoading(true);
     try {
       const motifLabel = MOTIFS.find(m => m.id === motif)?.label || motif;
       const motifText = motif === "autre" ? `${motifLabel}: ${motifDetail.trim()}` : motifLabel;
 
       // ── Appel backend unique : gère libération livreur, notification, frais, etc. ──
-      const res = await base44.functions.invoke("annulerCourseExterne", {
+      await cancelCourseWithConfirmation(base44, {
         course_id: course.id,
         motif: motifText,
         motif_detail: motifDetail.trim(),
         source: "client",
       });
-
-      if (res?.success === false) {
-        toast.error(res?.error || "Impossible d'annuler la course");
-        return;
-      }
 
       // ── Frais d'annulation côté client (si situation payante) ──
       if (situation?.type === "payant" && clientId) {
@@ -169,6 +167,7 @@ export default function AnnulerCourseDialog({ course, open, onClose, onSuccess, 
       console.error("Erreur annulation:", err);
       toast.error("Erreur lors de l'annulation");
     } finally {
+      cancellationLock.current = false;
       setLoading(false);
     }
   };

@@ -11,6 +11,7 @@ import { isToday } from "date-fns";
 import { usePaysActifs } from "@/components/international/CountrySelector.jsx";
 import AdminPaysDialog from "@/components/admin/AdminPaysDialog.jsx";
 import DemoAccessManager from "@/components/admin/DemoAccessManager.jsx";
+import AudioTranscriptionSettings from "@/components/admin/AudioTranscriptionSettings.jsx";
 
 export default function AdminGlobal() {
   const queryClient = useQueryClient();
@@ -136,6 +137,7 @@ export default function AdminGlobal() {
 
   return (
     <div className="p-4 lg:p-6 space-y-5 max-w-7xl mx-auto">
+      <AudioTranscriptionSettings />
 
       {/* ── HERO HEADER ──────────────────────────────── */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-primary-dark via-primary to-primary-dark p-5 shadow-xl silgapp-relief-surface">

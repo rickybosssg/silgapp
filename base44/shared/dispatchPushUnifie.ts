@@ -25,6 +25,7 @@ import {
   selectLatestNativeTokens,
   ANDROID_CHANNEL_ID, ANDROID_CLICK_ACTION, APP_URL,
 } from './fcmUtils.ts';
+import { isTerminalCourse, expireCancelledCourseOffers } from './courseTerminalGuard.ts';
 
 const CHUNK_SIZE = 25;
 import { filterCurrentCityCandidates } from './cityDispatchFilter.ts';
@@ -100,6 +101,8 @@ export async function notifierLivreursUnifie(base44: any, course: any, candidats
   }
 
   // ── 3. Bulk create DispatchNotifications (statut='notifie') — 1 appel ──
+  const fresh = await base44.asServiceRole.entities.CourseExterne.get(course.id);
+  if (!fresh || isTerminalCourse(fresh) || fresh.dispatch_status !== 'disponible_push') return { notified: 0, push_sent: 0, push_failed: 0, reason: 'terminal_or_obsolete_course' };
   const nowIso = new Date().toISOString();
   const dnRecords = toNotify.map(({ livreur }) => ({
     course_id: course.id,
@@ -123,6 +126,11 @@ export async function notifierLivreursUnifie(base44: any, course: any, candidats
     };
   }
   console.log('[PushUnifie] ✅ DispatchNotification créées=' + (Array.isArray(dnCreated) ? dnCreated.length : 0));
+  const afterOffers = await base44.asServiceRole.entities.CourseExterne.get(course.id);
+  if (!afterOffers || isTerminalCourse(afterOffers)) {
+    await expireCancelledCourseOffers(base44, course.id).catch(() => {});
+    return { notified: 0, push_sent: 0, push_failed: 0, reason: 'cancelled_during_offers' };
+  }
 
   // ── 4. Bulk create inbox Notifications (avec dedup_key — l'inbox officielle) ──
   // 1 filter (dedup keys existantes) + 1 bulkCreate = 2 appels
@@ -189,6 +197,11 @@ export async function notifierLivreursUnifie(base44: any, course: any, candidats
 
   // Parallélisation : chunks de 25 envois FCM simultanés via Promise.allSettled
   for (let i = 0; i < toNotify.length; i += CHUNK_SIZE) {
+    const beforeChunk = await base44.asServiceRole.entities.CourseExterne.get(course.id);
+    if (!beforeChunk || isTerminalCourse(beforeChunk)) {
+      await expireCancelledCourseOffers(base44, course.id).catch(() => {});
+      return { notified: 0, push_sent: succes, push_failed: echecs, reason: 'cancelled_during_push' };
+    }
     const chunk = toNotify.slice(i, i + CHUNK_SIZE);
     await Promise.allSettled(chunk.map(async ({ livreur, tokens }) => {
       const dataPayload = { ...dataPayloadBase, livreur_id: String(livreur.id) };

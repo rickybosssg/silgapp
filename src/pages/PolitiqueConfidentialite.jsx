@@ -126,8 +126,9 @@ export default function PolitiqueConfidentialite() {
             <li>Envoyer des alertes WhatsApp pour les courses urgentes</li>
           </ul>
           <p className="text-sm text-gray-600 mt-3">
-            <strong>SILGAPP n'accède pas à votre carnet de contacts.</strong> Les numéros sont
-            saisis manuellement par l'utilisateur dans les formulaires de course.
+            Les numéros peuvent être saisis manuellement. Si vous choisissez d'importer un contact,
+            SILGAPP demande l'accès au répertoire de l'appareil et lit les noms et numéros
+            pour vous permettre de sélectionner les coordonnées du destinataire.
           </p>
         </Section>
 

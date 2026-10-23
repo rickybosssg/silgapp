@@ -505,6 +505,8 @@ export async function processEcoCourseCreated(base44: any, courseId: string) {
   const claim = await base44.asServiceRole.entities.CourseExterne.updateMany(
     {
       id: { $in: courses.map((c) => c.id) },
+      statut: { $nin: TERMINAL_STATUSES },
+      annulation_user_id: { $in: [null, ''] },
       delivery_mode: 'eco',
       eco_status: 'isolated',
       eco_mission_id: null,
@@ -601,6 +603,8 @@ export async function convertDueEcoCourses(base44: any, countryCode?: string, li
       {
         id: course.id,
         delivery_mode: 'eco',
+        statut: { $nin: TERMINAL_STATUSES },
+        annulation_user_id: { $in: [null, ''] },
         eco_status: 'isolated',
         eco_mission_id: null,
         dispatch_status: 'en_attente',

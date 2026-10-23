@@ -1,6 +1,8 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
 // [CORRECTION PIN/QR] ensureCourseCodeMessage supprimé — les PIN/QR ne sont plus utilisés.
 // import { ensureCourseCodeMessage } from '../../shared/courseCodeMessage.ts';
+import { buildExpressCourse } from '../../shared/expressOrder.js';
+import { resolveExpressClient, EXPRESS_PROFILE_MESSAGES } from '../../shared/expressClientContext.js';
 import { prepareEcoCreationFields } from '../../shared/ecoOptimizationEngine.ts';
 
 const CREATION_MUTEX_KEY = 'COURSE_CREATION_MUTEX';
@@ -207,7 +209,27 @@ export default async function(req: Request): Promise<Response> {
     if (!user) return Response.json({ error: 'Non autorisé' }, { status: 401 });
 
     const body = await req.json();
-    const { course_data, is_duplicate, request_id } = body;
+    const { is_duplicate, request_id } = body;
+    let course_data = body.course_data;
+    if (body.express_draft) {
+      const draft = body.express_draft;
+      if (draft.confirmed !== true || typeof request_id !== 'string' || !request_id.trim()) {
+        return Response.json({ error: 'Confirmation et request_id requis' }, { status: 400 });
+      }
+      try {
+        const { client } = await resolveExpressClient({ user, entity: base44.entities.ClientExterne, profileId: draft.client_profile_id, expectedCountry: draft.country_code });
+        const [depart, arrivee] = await Promise.all([
+          base44.entities.Quartier.get(draft.depart_id),
+          base44.entities.Quartier.get(draft.arrivee_id),
+        ]);
+        course_data = buildExpressCourse({ user, client, depart, arrivee, prix: draft.prix });
+      } catch (error) {
+        const profileError = EXPRESS_PROFILE_MESSAGES[error.code];
+        return Response.json({ error: profileError || error.message }, { status: profileError && error.code !== 'CLIENT_FEES_BLOCKED' ? 403 : 400 });
+      }
+    } else if (course_data?.commande_vocale_express) {
+      return Response.json({ error: 'express_draft requis' }, { status: 400 });
+    }
     const normalizedRequestId = typeof request_id === 'string' ? request_id.trim() : '';
 
     if (!course_data || typeof course_data !== 'object') {

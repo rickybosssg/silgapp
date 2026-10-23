@@ -14,14 +14,18 @@ export async function claimCourseForLivreur(
     {
       id: courseId,
       dispatch_status: { $in: statuses },
+      statut: { $nin: ['annulee', 'livree', 'terminee'] },
+      annulation_user_id: { $in: [null, ''] },
+      client_decision_attendue: { $ne: true },
     },
     { $set: updateData },
   );
 
   const fresh = await base44.asServiceRole.entities.CourseExterne.get(courseId);
   const claimed =
-    String(fresh?.livreur_id || '') === String(livreurId) ||
-    String(fresh?.accepted_by_livreur_id || '') === String(livreurId);
+    !['annulee', 'livree', 'terminee'].includes(fresh?.statut) && !fresh?.annulation_user_id &&
+    (String(fresh?.livreur_id || '') === String(livreurId) ||
+    String(fresh?.accepted_by_livreur_id || '') === String(livreurId));
 
   return {
     claimed,

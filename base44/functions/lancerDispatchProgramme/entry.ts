@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { updateActiveCourse } from '../../shared/courseTerminalGuard.ts';
 
 Deno.serve(async (req) => {
   try {
@@ -21,10 +22,10 @@ Deno.serve(async (req) => {
     for (const course of aLancer) {
       try {
         // Passer en recherche_livreur et lancer le dispatch
-        await base44.asServiceRole.entities.CourseExterne.update(course.id, {
+        if (!await updateActiveCourse(base44, course, {
           statut: "recherche_livreur",
           dispatch_status: "en_attente",
-        });
+        })) { resultats.push({ id: course.id, success: false, reason: 'course_changed_or_cancelled' }); continue; }
 
         await base44.asServiceRole.functions.invoke("dispatchExterneAuto", {
           action: "lancer_recherche_auto",

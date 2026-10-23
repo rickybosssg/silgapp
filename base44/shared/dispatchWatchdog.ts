@@ -14,6 +14,7 @@
 
 import { STATUTS_ACTIFS_COURSE, STATUTS_ACTIFS_VERIF } from './dispatchConstants.ts';
 import { journaliserDispatch } from './dispatchUtils.ts';
+import { updateActiveCourse } from './courseTerminalGuard.ts';
 import { getLivreursNotifies, getLivreursRefuses } from './dispatchNotifications.ts';
 import { chargerConfigDispatch, chargerConfigVaguesGPS } from './dispatchConfig.ts';
 import { isV2Enabled, secoursDispatchV2, calculerScore, publierCourseDansFil } from './dispatchV2.ts';
@@ -204,20 +205,20 @@ export async function runWatchdog(base44, body = {}) {
 
     if (course.livreur_id) {
       // Verrou expiré avec livreur_id (prix manuel sans réponse, ou acceptation expirée)
-      await base44.asServiceRole.entities.CourseExterne.update(course.id, {
+      if (!await updateActiveCourse(base44, course, {
         statut: 'recherche_livreur',
         dispatch_status: 'en_attente',
         livreur_id: '', livreur_nom: '', livreur_telephone: '',
         heure_acceptation: null, accepted_by_livreur_id: '', accepted_at: null,
         pricing_mode: 'automatic', manual_price: null, manual_price_status: null,
         proposed_by_livreur_id: '', timeout_expires_at: null,
-      });
+      })) continue;
     } else {
       // Vague expirée sans verrou → V2 : publier dans le fil
-      await base44.asServiceRole.entities.CourseExterne.update(course.id, {
+      if (!await updateActiveCourse(base44, course, {
         statut: 'recherche_livreur',
         dispatch_status: 'en_attente',
-      });
+      })) continue;
     }
 
     try {
@@ -238,10 +239,10 @@ export async function runWatchdog(base44, body = {}) {
     anomalies.push({ course_id: course.id, type: 'livreur_id_incoherent', severity: 'elevee', description: `livreur_id=${course.livreur_id} mais dispatch_status=${course.dispatch_status}, statut=${course.statut}` });
 
     if (course.statut === 'recherche_livreur' || course.dispatch_status === 'redispatch') {
-      await base44.asServiceRole.entities.CourseExterne.update(course.id, {
+      if (!await updateActiveCourse(base44, course, {
         livreur_id: '', livreur_nom: '', livreur_telephone: '',
         accepted_by_livreur_id: '', accepted_at: null,
-      });
+      })) continue;
       corrections.push({ course_id: course.id, action: 'clear_incoherent_livreur_id' });
     }
   }
@@ -305,20 +306,20 @@ export async function runWatchdog(base44, body = {}) {
       anomalies.push({ course_id: course.id, type: 'cycle_epuise_vers_disponible', severity: 'moyenne', description: `Cycle épuisé → course disponible pour tous les livreurs` });
 
       const pushDeadline = new Date(now.getTime() + DISPONIBLE_PUSH_TIMEOUT_MS).toISOString();
-      await base44.asServiceRole.entities.CourseExterne.update(course.id, {
+      if (!await updateActiveCourse(base44, course, {
         dispatch_status: 'disponible_push',
         timeout_expires_at: pushDeadline,
-      });
+      })) continue;
       corrections.push({ course_id: course.id, action: 'cycle_epuise_vers_disponible_push' });
     } else {
       // Transition: disponible_push → en_attente
       anomalies.push({ course_id: course.id, type: 'disponible_push_expire', severity: 'moyenne', description: `Course disponible sans acceptation — mise en attente` });
 
-      await base44.asServiceRole.entities.CourseExterne.update(course.id, {
+      if (!await updateActiveCourse(base44, course, {
         statut: 'en_attente',
         dispatch_status: 'en_attente',
         notes: (course.notes || '') + ' | [EN ATTENTE] Course disponible sans acceptation pendant 30 min',
-      });
+      })) continue;
       corrections.push({ course_id: course.id, action: 'disponible_push_en_attente' });
     }
   }
@@ -396,9 +397,9 @@ export async function runWatchdog(base44, body = {}) {
         // T+5min (configurable) : push batch de rappel aux meilleurs livreurs encore éligibles
         // secoursDispatchV2 exclut déjà les livreurs en course, refusés et déjà notifiés.
         const result = await secoursDispatchV2(base44, course, cachedConfig.dispatch.secoursV2NbLivreurs, { excludeAlreadyNotified: false });
-        await base44.asServiceRole.entities.CourseExterne.update(course.id, {
+        if (!await updateActiveCourse(base44, course, {
           dispatch_v2_secours_phase: 1,
-        });
+        })) continue;
         corrections.push({ course_id: course.id, action: 'secours_v2_rappel_t5min', pushed: result.pushed });
       }
     }
@@ -431,15 +432,13 @@ export async function runWatchdog(base44, body = {}) {
         const livreurs = await base44.asServiceRole.entities.Livreur.filter({
           type_livreur: 'externe',
           validation: 'valide',
-          actif: true,
+          // [CORRECTION BLOCAGE ADMIN] actif retiré du rappel T+20 : un livreur
+          // bloqué administrativement (actif=false) continue à recevoir le push.
+          // L'acceptation reste bloquée par accepterCourseV2 (actif === true).
           statut: { $in: ['disponible', 'hors_ligne'] },
           country_code: course.country_code,
           bloque_encours: false,
           manual_hors_ligne: { $ne: true },
-          // [CORRECTION 11] admin_hors_ligne retiré du ciblage FCM secours :
-          // un livreur bloqué par l'Admin continue à recevoir le push.
-          // [CORRECTION 12] statut élargi à 'hors_ligne' : un livreur bloqué par
-          // l'Admin (statut='hors_ligne') doit recevoir le rappel T+20.
         }, '-last_seen_at', 50);
 
         // Exclure les livreurs en course (fresh check)
@@ -505,9 +504,9 @@ export async function runWatchdog(base44, body = {}) {
         }
 
         // Marquer idempotent — qu'il y ait eu des candidats ou non, le rappel est considéré envoyé
-        await base44.asServiceRole.entities.CourseExterne.update(course.id, {
+        if (!await updateActiveCourse(base44, course, {
           push_rappel_t20_envoye: true,
-        });
+        })) continue;
       }
     }
   }

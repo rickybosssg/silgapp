@@ -23,6 +23,10 @@ import { getCountryConfig, normalizePhone } from "@/lib/phoneUtils";
 export function getCourseContactForPhase(course, phase = "recuperation") {
   if (!course) return { telephone: "", nom: "", role: "" };
 
+  if (course.commande_vocale_express === true) {
+    return { telephone: course.contact_createur_course || course.client_telephone || "", nom: course.client_nom || "Client", role: "Client" };
+  }
+
   const isAdminCourse = course.source === "admin" || course.pricing_mode === "admin_manuel";
   const isDeplacement = course.type_course === "deplacement";
 

@@ -33,7 +33,8 @@ export async function trouverLivreursCandidats(base44, course, exclusions = [], 
   const tousLivreurs = await base44.asServiceRole.entities.Livreur.filter({
     type_livreur: 'externe',
     validation: 'valide',
-    actif: true,
+    // [CORRECTION BLOCAGE ADMIN] actif retiré du ciblage V1 : un livreur bloqué
+    // administrativement (actif=false) continue à recevoir les notifications.
     statut: 'disponible',
     country_code: course.country_code,
     bloque_encours: false,

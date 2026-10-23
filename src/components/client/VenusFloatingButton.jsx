@@ -12,7 +12,7 @@ import { useQuery } from "@tanstack/react-query";
 
 const VENUS_AVATAR_URL = "https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/17cf522aa_file_0000000034b871f7bf133c0de0c9eb62.png";
 
-export default function VenusFloatingButton({ forcedCountryCode = null, embedded = false }) {
+export default function VenusFloatingButton({ forcedCountryCode = null, embedded = false, hidden = false }) {
   const [showChat, setShowChat] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
@@ -145,6 +145,8 @@ export default function VenusFloatingButton({ forcedCountryCode = null, embedded
       <motion.button
         data-venus-floating="true"
         ref={buttonRef}
+        aria-hidden={hidden}
+        tabIndex={hidden ? -1 : 0}
         drag={!embedded}
         dragMomentum={false}
         dragElastic={0}
@@ -161,6 +163,8 @@ export default function VenusFloatingButton({ forcedCountryCode = null, embedded
         title="VENUS"
         className={embedded ? "relative shrink-0 flex items-center justify-center w-9 h-9 rounded-full overflow-hidden border border-white" : "fixed z-[60] flex items-center justify-center w-16 h-16 rounded-full shadow-2xl overflow-hidden border-4 border-white cursor-grab active:cursor-grabbing"}
         style={{
+          visibility: hidden ? "hidden" : "visible",
+          pointerEvents: hidden ? "none" : "auto",
           background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
           boxShadow: isDragging
             ? "0 12px 40px rgba(102, 126, 234, 0.5)"

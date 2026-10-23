@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { logoutPersistent } from "@/lib/authPersistence";
+import { preserveConfirmedCancellation, isKnownCancelledCourse } from '@/lib/courseCancellationState';
 import { AlertTriangle, Check, Truck, X, Wallet, ChevronRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
@@ -31,6 +32,7 @@ import LivreurStatsBanner from "@/components/livreur/LivreurStatsBanner";
 import ActiviteTempsReel from "@/components/livreur/ActiviteTempsReel";
 import CourseEnAttenteModalExterne from "@/components/livreur/CourseEnAttenteModalExterne";
 import CourseActiveCard from "@/components/livreur/CourseActiveCard";
+import {isConfirmedDriverWithdrawal} from '@/lib/driverWithdrawalClient';
 import LivreurHistorique from "@/components/livreur/LivreurHistorique";
 import LivreurExterneOnboarding from "@/components/livreur/LivreurExterneOnboarding";
 import NotificationStatusBanner from "@/components/livreur/NotificationStatusBanner";
@@ -608,6 +610,14 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         return;
       }
       const c = event?.data || {};
+      if (c.statut === 'annulee') {
+        preserveConfirmedCancellation(c);
+        const keys = ['mes-courses-externes', 'courses-externes-disponibles'];
+        for (const key of keys) queryClient.cancelQueries({ queryKey: [key] }).then(() => {
+          queryClient.setQueriesData({ queryKey: [key] }, previous => Array.isArray(previous) ? previous.map(preserveConfirmedCancellation) : previous);
+          queryClient.invalidateQueries({ queryKey: [key] });
+        }).catch(() => {});
+      }
       const concernsLivreur =
         String(c.livreur_id || "") === String(livreurId) ||
         String(c.accepted_by_livreur_id || "") === String(livreurId) ||
@@ -937,6 +947,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   // ─── Courses actives ──────────────────────────────────────────────────────
   const coursesActives = useMemo(
     () => mesCourses.filter(c => {
+      if (isKnownCancelledCourse(c.id)) return false;
       if (!isCourseAcceptedByLivreur(c, livreurProfil?.id)) return false;
 
       // GARDE ABSOLUE : une course livrée avec heure_livraison ne doit JAMAIS
@@ -946,6 +957,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
       // GARDE ABSOLUE : course annulée = jamais active
       if (c.statut === "annulee") return false;
+      if (isConfirmedDriverWithdrawal(c, livreurProfil?.id)) return false;
 
       // Statuts explicitement actifs
       // Inclut les statuts du workflow administratif (client_contacte, en_route_expediteur)
@@ -1416,21 +1428,24 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   const remettreDisponibleSiAutorise = async () => {
     if (!livreurProfil?.id || livreurProfil?.statut === "hors_ligne") return;
     const fresh = await base44.entities.Livreur.get(livreurProfil.id).catch(() => null);
+    if (!fresh || fresh.manual_hors_ligne || fresh.admin_hors_ligne) return;
     if (fresh?.bloque_encours) {
       queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
       toast.error("Votre plafond d'encours SILGAPP a ete atteint. Veuillez effectuer votre depot.");
       return;
     }
+    // Never free a driver while an independent accepted course still exists.
+    const remaining = await base44.entities.CourseExterne.filter({livreur_id:livreurProfil.id,statut:{$in:[...ACTIVE_LIVREUR_COURSE_STATUSES]}}, '-created_date', 1).catch(() => null);
+    if (!remaining || remaining.length) { queryClient.invalidateQueries({queryKey:['livreur-externe-profil']}); return; }
     statutMutation.mutate("disponible");
   };
 
   const handleColisLivre = async (course, montantSaisi) => {
-    // Annulation déplacement : libérer le livreur sans calcul de prix
+    // Server is authoritative for driver availability after cancellation.
     if (course.statut === "annulee") {
       queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
       queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
-      await remettreDisponibleSiAutorise();
-      toast.success("Déplacement annulé");
+      toast.success("Course annulée");
       return;
     }
 

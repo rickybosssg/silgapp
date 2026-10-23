@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { cityNamesPattern, operationalCityAliases, resolveOperationalName, canSeeOperationalCourse } from "../../base44/shared/cityNames.js";
 import { currentDriverGpsCity, gpsFixTime, CITY_GPS_MAX_AGE_MS } from "../../base44/shared/currentGpsCity.js";
+import { preserveConfirmedCancellation } from '@/lib/courseCancellationState';
 
 /**
  * useCoursesDisponibles — SOURCE UNIQUE DE VÉRITÉ pour les courses disponibles
@@ -214,7 +215,7 @@ export function useCoursesDisponibles(livreurProfil) {
       const ids = [...new Set(missions.flatMap(m => m.course_ids || []))];
       if (!ids.length) return [];
       const records = await base44.entities.CourseExterne.filter({ id: { $in: ids }, country_code: countryCode, enterprise_id: null }, undefined, ids.length);
-      const byId = new Map((records || []).map(c => [c.id, c]));
+      const byId = new Map((records || []).map(preserveConfirmedCancellation).map(c => [c.id, c]));
       return missions.filter(m => m.course_ids?.length && m.course_ids.every(id => {
         const c = byId.get(id);
         return c && canSeeOperationalCourse(c, driverZone, zonePolicy.cities, zonePolicy.quartiers);

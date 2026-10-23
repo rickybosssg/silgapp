@@ -491,8 +491,8 @@ export function showLocalNotification(titre, message, options = {}) {
 
   const notification = new Notification(titre, {
     body: message,
-    icon: options.icon || "/favicon.ico",
-    badge: options.badge || "/favicon.ico",
+    icon: options.icon || "/silgapp-notification-blue.png",
+    badge: options.badge || "/silgapp-notification-blue.png",
     tag: options.tag || "silga-notification",
     requireInteraction: options.requireInteraction || false,
     data: options.data || {},

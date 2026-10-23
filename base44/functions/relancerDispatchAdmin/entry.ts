@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
+import { updateActiveCourse } from '../../shared/courseTerminalGuard.ts';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // RELANCER DISPATCH ADMIN — Reset propre du dispatch par l'admin
@@ -76,7 +77,7 @@ export default async function(req: Request): Promise<Response> {
     }
 
     // ── Mettre à jour la course ──
-    await base44.asServiceRole.entities.CourseExterne.update(course_id, resetData);
+    if (!await updateActiveCourse(base44, course, resetData)) return Response.json({ success: false, error: 'Course modifiée ou annulée pendant la relance.' }, { status: 409 });
 
     // ═══════════════════════════════════════════════════════════════════════
     // NETTOYAGE CIBLÉ DES ANCIENNES DISPATCHNOTIFICATION

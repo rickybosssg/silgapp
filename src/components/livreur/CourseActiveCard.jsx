@@ -9,10 +9,12 @@ import { base44 } from "@/api/base44Client";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { getCourseLocationTarget } from "@/lib/courseLocationTarget";
 import NavigationGPS from "./NavigationGPS";
 import { normalizeCommissionPct, resolveStoredOrDynamicSplit, splitAmountByCommission } from "@/lib/commissionUtils";
 import ChatWindow from "@/components/chat/ChatWindow";
 import AnnulationExplicationChat from "./AnnulationExplicationChat";
+import DriverWithdrawalDialog from "./DriverWithdrawalDialog";
 import { getPrixAffichable, getDeviseAffichable } from "@/utils/getPrixAffichable";
 
 import { getCourseContactForPhase, normalizePhoneForWhatsapp } from "@/lib/courseContact";
@@ -156,8 +158,6 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   const [motifAnnulationDetail, setMotifAnnulationDetail] = useState("");
   // Messagerie d'explication apres annulation
   const [showAnnulationChat, setShowAnnulationChat] = useState(false);
-  // Ref du modal d'annulation pour scroll auto vers les boutons (iOS keyboard fix)
-  const annulationModalRef = useRef(null);
 
   // ── Pré-remplir le prix avec la proposition admin si disponible ──
   useEffect(() => {
@@ -425,51 +425,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
     }
   };
 
-  // Annulation livreur (unifiée colis + déplacement)
-  const handleAnnulerCourseLivreur = async () => {
-    if (!motifAnnulationLivreur) {
-      toast.error("Veuillez sélectionner un motif");
-      return;
-    }
-    if (motifAnnulationLivreur === "autre" && !motifAnnulationDetail.trim()) {
-      toast.error("Veuillez décrire le motif de l'annulation");
-      return;
-    }
-    setShowAnnulerCourse(false);
-
-    // Optimistic UI : retirer immédiatement la course de l'affichage
-    updateOptimisticStatut("annulee", {
-      statut: "annulee",
-    });
-
-    try {
-      const res = await base44.functions.invoke("annulerCourseExterne", {
-        course_id: course.id,
-        motif: motifAnnulationLivreur,
-        motif_detail: motifAnnulationDetail.trim(),
-        source: "livreur",
-      });
-
-      if (res?.success) {
-        toast.success(res.course_redispatch
-          ? "Course remise en dispatch — nouveau livreur recherché"
-          : "Course annulée");
-        // Libérer le livreur localement
-        onColisLivre({ ...course, statut: "annulee" }, null);
-        // 💬 Ouvrir la messagerie d'explication vers l'admin
-        setShowAnnulationChat(true);
-      } else {
-        toast.error(res?.error || "Erreur lors de l'annulation");
-        setOptimisticStatut(null);
-      }
-    } catch (error) {
-      toast.error("Erreur réseau lors de l'annulation");
-      setOptimisticStatut(null);
-    }
-
-    queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
-    queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
-  };
+  // Withdrawal uses the shared per-course dialog; it is not a delivery event.
 
   const handleMultiColisRecuperes = async () => {
     if (multiPickupPending) return;
@@ -502,7 +458,8 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
       toast.success("Tous les colis sont recuperes");
     } catch (error) {
       console.error("Erreur recuperation multi-colis:", error);
-      toast.error("Erreur lors de la recuperation des colis");
+      const errMsg = error?.data?.error || error?.message || "Erreur lors de la recuperation des colis";
+      toast.error(errMsg);
       setOptimisticStatut(null);
     } finally {
       setMultiPickupPending(false);
@@ -511,113 +468,9 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
 
   return (
     <>
-      {/* Modal annulation livreur (unifié colis + déplacement) */}
-      {showAnnulerCourse && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
-          style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)" }}
-        >
-          <div
-            className="w-full max-w-sm bg-white rounded-3xl shadow-2xl flex flex-col"
-            style={{ maxHeight: '88dvh' }}
-          >
-            {/* ── Header fixe ── */}
-            <div className="text-center px-6 pt-6 pb-3 flex-shrink-0">
-              <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-3 text-3xl">
-
-              </div>
-              <p className="text-xl font-black text-gray-900">Annuler la course</p>
-              <p className="text-sm text-gray-500 mt-1">
-                {isDeplacement
-                  ? "Pourquoi souhaitez-vous annuler ce déplacement ?"
-                  : "Pourquoi souhaitez-vous annuler cette course ?"}
-              </p>
-            </div>
-
-            {/* ── Corps scrollable : select + textarea ── */}
-            <div
-              ref={(el) => { annulationModalRef.current = el; }}
-              className="flex-1 overflow-y-auto px-6 py-3 min-h-0 space-y-3"
-            >
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-gray-600">
-                  Motif de l'annulation
-                </label>
-                <select
-                  value={motifAnnulationLivreur || ""}
-                  onChange={(e) => setMotifAnnulationLivreur(e.target.value)}
-                  className="w-full h-12 rounded-xl border-2 border-gray-200 px-3 text-sm font-medium text-gray-800 bg-white focus:border-red-400 focus:outline-none"
-                >
-                  <option value="" disabled>Sélectionnez un motif...</option>
-                  <optgroup label="Problème client (non imputable)">
-                    <option value="client_injoignable">Client injoignable</option>
-                    <option value="client_change_avis">Client a changé d'avis</option>
-                    <option value="mauvaise_adresse">Mauvaise adresse</option>
-                    <option value="colis_inexistant">Colis inexistant</option>
-                    <option value="colis_pas_pret">Colis pas prêt</option>
-                  </optgroup>
-                  <optgroup label="Problème livreur (imputable)">
-                    <option value="panne_vehicule">Panne du véhicule</option>
-                    <option value="batterie_dechargee">Batterie déchargée</option>
-                    <option value="course_trop_loin">Course trop loin</option>
-                    <option value="autre_course_conflit_planning">Conflit de planning</option>
-                    <option value="probleme_personnel">Problème personnel</option>
-                    <option value="acceptation_erreur">Acceptation par erreur</option>
-                    <option value="accident">Accident</option>
-                  </optgroup>
-                  <option value="prix_insuffisant">Prix insuffisant</option>
-                  <option value="autre">Autre</option>
-                </select>
-              </div>
-              {motifAnnulationLivreur && (
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-gray-600">
-                    {motifAnnulationLivreur === "autre"
-                      ? "Décrivez le motif de l'annulation (obligatoire) "
-                      : "Précisions (facultatif) "}
-                    <span className="text-gray-400 font-normal">(envoyé à l'admin)</span>
-                  </label>
-                  <textarea
-                    placeholder="Expliquez ce qui s'est passé..."
-                    value={motifAnnulationDetail}
-                    onChange={(e) => setMotifAnnulationDetail(e.target.value)}
-                    onFocus={() => {
-                      setTimeout(() => {
-                        const modal = annulationModalRef.current;
-                        if (modal) modal.scrollTo({ top: modal.scrollHeight, behavior: 'smooth' });
-                      }, 300);
-                    }}
-                    className="w-full h-20 rounded-xl border-2 border-gray-200 p-3 text-sm resize-none focus:border-red-400 focus:outline-none"
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* ── Footer fixe toujours visible ── */}
-            <div
-              className="grid grid-cols-2 gap-3 px-6 pt-3 pb-6 flex-shrink-0 border-t border-gray-100"
-              style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}
-            >
-              <button
-                className="h-12 rounded-2xl border border-gray-200 text-gray-600 font-bold text-sm"
-                onClick={() => {
-                  setShowAnnulerCourse(false);
-                  setMotifAnnulationLivreur("");
-                  setMotifAnnulationDetail("");
-                }}
-              >
-                Retour
-              </button>
-              <button
-                className="h-12 rounded-2xl bg-red-500 hover:bg-red-600 text-white font-bold text-sm disabled:opacity-50"
-                onClick={handleAnnulerCourseLivreur}
-                disabled={!motifAnnulationLivreur || (motifAnnulationLivreur === "autre" && !motifAnnulationDetail.trim()) || isPending}
-              >
-                Annuler la course
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <DriverWithdrawalDialog open={showAnnulerCourse} course={course} onClose={() => setShowAnnulerCourse(false)} onWithdrawn={({motif, detail}) => {
+        setMotifAnnulationLivreur(motif); setMotifAnnulationDetail(detail); setShowAnnulationChat(true);
+      }} />
 
       {/* 💬 Messagerie d'explication après annulation */}
       {showAnnulationChat && (
@@ -1004,8 +857,8 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                 destLat={course.gps_depart_lat}
                 destLng={course.gps_depart_lng}
                 destLabel={course.adresse_depart}
-                destinataireTelephone={getCourseContactForPhase(course, "recuperation").telephone}
-                contactClientId={course.expediteur_client_id || null}
+                destinataireTelephone={getCourseLocationTarget(course, "recuperation", getCourseContactForPhase(course, "recuperation").telephone).telephone}
+                contactClientId={getCourseLocationTarget(course, "recuperation").clientId}
               />
             ) : (
               // CORRECTION AUDIT : NavigationGPS relit le GPS du destinataire toutes les 5s via ClientExterne
@@ -1017,8 +870,8 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                 destLat={course.gps_arrivee_lat}
                 destLng={course.gps_arrivee_lng}
                 destLabel={course.adresse_arrivee}
-                destinataireTelephone={getCourseContactForPhase(course, "livraison").telephone}
-                contactClientId={course.destinataire_client_id || null}
+                destinataireTelephone={getCourseLocationTarget(course, "livraison", getCourseContactForPhase(course, "livraison").telephone).telephone}
+                contactClientId={getCourseLocationTarget(course, "livraison").clientId}
                 destinationInconnue={!!course.destination_inconnue}
               />
             )
@@ -1110,7 +963,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                     onClick={() => setShowAnnulerCourse(true)}
                     disabled={isPending}
                   >
-                    <X className="w-4 h-4" /> ANNULER LA COURSE
+                    <X className="w-4 h-4" /> Se retirer de cette course
                   </button>
                 )}
               </div>
@@ -1128,7 +981,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                   onClick={() => setShowAnnulerCourse(true)}
                   disabled={isPending}
                 >
-                  <X className="w-4 h-4" /> ANNULER LA COURSE
+                  <X className="w-4 h-4" /> Se retirer de cette course
                 </button>
               )}
 
@@ -1172,10 +1025,11 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                             throw new Error(res?.error || "Erreur lors de la récupération");
                           }
                         } catch (err) {
-                          setOptimisticStatut(null);
-                          toast.error(err?.message || "Erreur lors de la récupération. Réessayez.");
+                        setOptimisticStatut(null);
+                        const errMsg = err?.data?.error || err?.message || "Erreur lors de la récupération. Réessayez.";
+                        toast.error(errMsg);
                         } finally {
-                          setPickupBoutonPending(false);
+                        setPickupBoutonPending(false);
                         }
                       };
                       // GPS optionnel — ne pas bloquer la récupération si indisponible
@@ -1223,7 +1077,8 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                         toast.success("Colis récupéré avec succès !");
                       } catch (err) {
                         setOptimisticStatut(null);
-                        toast.error(err?.message || "Erreur réseau. Réessayez.");
+                        const errMsg = err?.data?.error || err?.message || "Erreur réseau. Réessayez.";
+                        toast.error(errMsg);
                       }
                     }}
                     disabled={isPending}

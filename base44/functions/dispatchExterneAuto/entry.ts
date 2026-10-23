@@ -12,6 +12,7 @@ import { resolveCourseParticipantUserIds } from '../../shared/conversationSecuri
 import { figerCommissionAcceptation, evaluerAvantageCommission } from '../../shared/commissionAvantage.ts';
 import { tauxCommissionEffectif, champsLockCommission, verifierCoherenceLock, zeroCommissionFields } from '../../shared/commissionLock.ts';
 import { normalizeEnterpriseId } from '../../shared/enterpriseFinance.ts';
+import { isTerminalCourse, updateActiveCourse } from '../../shared/courseTerminalGuard.ts';
 
 // 🔖 Redéploiement forcé — 2026-08-14-simplified-3 — rappel T+5min re-notifie les mêmes livreurs libres
 console.log(`[DISPATCH_EXTERNE_AUTO] 🔖 dispatchV2 bundle version: ${DISPATCH_V2_BUNDLE_VERSION}`);
@@ -618,14 +619,14 @@ export default async function(req) {
       // ⚠️ Ne pas filtrer livreur_id avec une chaîne vide : Base44 stocke aussi l'absence
       // de livreur avec null, ce qui empêchait toute acceptation de ces courses.
       await base44.asServiceRole.entities.CourseExterne.updateMany(
-        { id: course_id, dispatch_status: { $in: ['propose', 'disponible_push'] } },
+        { id: course_id, statut: { $nin: ['annulee', 'livree', 'terminee'] }, annulation_user_id: { $in: [null, ''] }, client_decision_attendue: { $ne: true }, dispatch_status: { $in: ['propose', 'disponible_push'] } },
         { $set: updateData }
       );
 
       // ✅ Vérification post-update : confirmer que CE livreur détient bien le verrou
       const courseVerifie = await base44.asServiceRole.entities.CourseExterne.get(course_id);
-      const isMyCourse = String(courseVerifie.livreur_id) === String(livreur_id) ||
-                         String(courseVerifie.accepted_by_livreur_id) === String(livreur_id);
+      const isMyCourse = !isTerminalCourse(courseVerifie) && (String(courseVerifie.livreur_id) === String(livreur_id) ||
+                         String(courseVerifie.accepted_by_livreur_id) === String(livreur_id));
       if (!isMyCourse) {
         console.warn(`[DISPATCH] 🏁 Race condition perdue — livreur ${livreur_id} n'a pas obtenu la course ${course_id} (attribuée à ${courseVerifie.livreur_id || courseVerifie.accepted_by_livreur_id || '?'})`);
         return Response.json(reponseDejaPrise('race_condition_lost', courseVerifie));
@@ -747,7 +748,7 @@ export default async function(req) {
       const etaitVerrouillee = course.livreur_id === livreur_id;
       if (etaitVerrouillee) {
         // V2 : publier dans le fil (isolation Enterprise automatique via publierCourseDansFil)
-        await base44.asServiceRole.entities.CourseExterne.update(course_id, {
+        if (!await updateActiveCourse(base44, course, {
           statut: 'recherche_livreur',
           dispatch_status: 'en_attente',
           remarque_livreur: raison || 'Refusé',
@@ -757,7 +758,7 @@ export default async function(req) {
           heure_acceptation: null,
           accepted_by_livreur_id: '',
           accepted_at: null,
-        });
+        })) return Response.json({ success: false, reason: 'course_changed', error: 'La course a changé. Actualisez.' });
         const result = await publierCourseDansFil(base44, course);
         return Response.json({ success: true, v2: true, ...result });
       }
@@ -776,7 +777,7 @@ export default async function(req) {
       if (expired && course.dispatch_status === 'propose' && course.livreur_id) {
         console.log(`[DISPATCH] ⏰ Verrou expiré course ${course_id} — redispatch V2`);
 
-        await base44.asServiceRole.entities.CourseExterne.update(course_id, {
+        if (!await updateActiveCourse(base44, course, {
           statut: 'recherche_livreur',
           dispatch_status: 'en_attente',
           livreur_id: '',
@@ -785,7 +786,7 @@ export default async function(req) {
           heure_acceptation: null,
           accepted_by_livreur_id: '',
           accepted_at: null,
-        });
+        })) return Response.json({ success: false, reason: 'course_changed', error: 'La course a changé. Actualisez.' });
 
         const result = await publierCourseDansFil(base44, course);
         return Response.json({ expired: true, redispatched: true, v2: true, ...result });
@@ -794,10 +795,10 @@ export default async function(req) {
       // Expiration vague multi (sans verrou) — V2 : publier dans le fil
       if (expired && course.dispatch_status === 'propose' && !course.livreur_id) {
         console.log(`[DISPATCH] ⏰ Vague expirée course ${course_id} — redispatch V2`);
-        await base44.asServiceRole.entities.CourseExterne.update(course_id, {
+        if (!await updateActiveCourse(base44, course, {
           statut: 'recherche_livreur',
           dispatch_status: 'en_attente',
-        });
+        })) return Response.json({ success: false, reason: 'course_changed', error: 'La course a changé. Actualisez.' });
 
         const result = await publierCourseDansFil(base44, course);
         return Response.json({ expired: true, redispatched: true, v2: true, ...result });
@@ -893,12 +894,14 @@ export default async function(req) {
         const commission = Math.round(prixManuel * (commissionPct / 100));
         const montantLivreur = prixManuel - commission;
 
-        const updated = await base44.asServiceRole.entities.CourseExterne.update(course_id, {
+        const applied = await updateActiveCourse(base44, course, {
           manual_price_status: 'accepted', client_price_validated_at: now,
           statut: 'livreur_en_route', dispatch_status: 'accepte', heure_acceptation: acceptanceTime,
           prix_final: prixManuel, commission_silga: commission, montant_livreur: montantLivreur,
           ...lockFields, ...zeroCommissionFields(lockedCourse),
         });
+        if (!applied) return Response.json({ success: false, error: 'Course modifiée simultanément. Actualisez.' }, { status: 409 });
+        const updated = await base44.asServiceRole.entities.CourseExterne.get(course_id);
         if (avantage) verifierCoherenceLock(updated, avantage);
 
         if (course.proposed_by_livreur_id) {
@@ -928,12 +931,12 @@ export default async function(req) {
       } else {
         const livreurRefuseId = course.proposed_by_livreur_id;
 
-        await base44.asServiceRole.entities.CourseExterne.update(course_id, {
+        if (!await updateActiveCourse(base44, course, {
           manual_price_status: 'refused', client_price_refused_at: now,
           statut: 'recherche_livreur', dispatch_status: 'en_attente',
           livreur_id: '', livreur_nom: '', livreur_telephone: '',
           pricing_mode: 'automatic', manual_price: null, proposed_by_livreur_id: '',
-        });
+        })) return Response.json({ success: false, error: 'Course modifiée simultanément. Actualisez.' }, { status: 409 });
 
         if (livreurRefuseId) {
           await base44.asServiceRole.entities.Livreur.update(livreurRefuseId, { statut: 'disponible' });
