@@ -18,8 +18,8 @@ spec.loader.exec_module(upload)
 
 class UploadTests(unittest.TestCase):
     def fixture_ipa(self, directory, **changes):
-        info = dict(CFBundleIdentifier=upload.BUNDLE_ID, CFBundleShortVersionString="1.0.60",
-                    CFBundleVersion="67", DTSDKName="iphoneos26.2", DTXcode="2620")
+        info = dict(CFBundleIdentifier=upload.BUNDLE_ID, CFBundleShortVersionString="1.0.64",
+                    CFBundleVersion="72", DTSDKName="iphoneos26.2", DTXcode="2620")
         info.update(changes)
         path = Path(directory) / "fixture.ipa"
         with zipfile.ZipFile(path, "w") as archive:
@@ -31,7 +31,7 @@ class UploadTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory, patch.object(upload, "LOGO_SHA256", hashlib.sha256(b"synthetic logo").hexdigest()):
             path, digest = self.fixture_ipa(directory)
             self.assertEqual(upload.verify_ipa(path, digest), "Payload/App.app")
-            with self.assertRaisesRegex(ValueError, "exact verified r2"):
+            with self.assertRaisesRegex(ValueError, "exact verified build 72"):
                 upload.verify_ipa(path)
             for changes in ({"CFBundleVersion": "66"}, {"CFBundleShortVersionString": "1.0.59"},
                             {"CFBundleIdentifier": "another.app"}, {"DTSDKName": "iphoneos18.5"}, {"DTXcode": "1640"}):
@@ -52,9 +52,9 @@ class UploadTests(unittest.TestCase):
                 upload.require_absent(payload)
 
     def test_receipt_requires_correct_apple_version_and_build(self):
-        payload = {"data": [{"id": "build-id", "attributes": {"version": "67", "processingState": "VALID"},
+        payload = {"data": [{"id": "build-id", "attributes": {"version": "72", "processingState": "VALID"},
                     "relationships": {"preReleaseVersion": {"data": {"id": "version-id"}}}}],
-                   "included": [{"type": "preReleaseVersions", "id": "version-id", "attributes": {"version": "1.0.60"}}]}
+                   "included": [{"type": "preReleaseVersions", "id": "version-id", "attributes": {"version": "1.0.64"}}]}
         self.assertEqual(upload.public_build(payload)["processing_state"], "VALID")
         payload["included"][0]["attributes"]["version"] = "1.0.59"
         with self.assertRaises(ValueError):
@@ -78,6 +78,18 @@ class UploadTests(unittest.TestCase):
         self.assertEqual(json.loads(header)["kid"], upload.KEY_ID)
         self.assertEqual(json.loads(claims), {"iss": upload.ISSUER_ID, "iat": 1000, "exp": 2200, "aud": "appstoreconnect-v1"})
         self.assertEqual(len(signature), 64)
+
+    def test_current_store_state_and_no_pending_review_required(self):
+        current = {"data": [{"id": "previous", "attributes": {"versionString": "1.0.63", "appStoreState": "READY_FOR_SALE"}}]}
+        self.assertEqual(len(upload.require_reviewed_apple_state(current)), 1)
+        for state in ("WAITING_FOR_REVIEW", "IN_REVIEW", "PENDING_DEVELOPER_RELEASE"):
+            payload = {"data": current["data"] + [{"id": "pending", "attributes": {"versionString": "1.0.64", "appStoreState": state}}]}
+            with self.subTest(state=state), self.assertRaises(ValueError):
+                upload.require_reviewed_apple_state(payload)
+        with self.assertRaises(ValueError):
+            upload.require_reviewed_apple_state({"data": current["data"], "links": {"next": "more"}})
+        with self.assertRaises(ValueError):
+            upload.require_reviewed_apple_state({"data": []})
 
     def test_local_or_manual_rerun_cannot_upload(self):
         with patch.object(upload.os, "environ", {}), patch("sys.argv", ["upload", "--ipa", "unopened.ipa", "--receipt", "unwritten.json"]):
