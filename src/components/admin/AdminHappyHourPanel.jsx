@@ -52,7 +52,7 @@ export default function AdminHappyHourPanel({ countryCode }) {
   });
 
   const toggleMutation = useMutation({
-    mutationFn: async ({ id, actif }) =>
+    mutationFn: /** @param {{id: string, actif: boolean}} input */ async ({ id, actif }) =>
       base44.entities.HappyHourConfig.update(id, { actif }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["happy-hour-admin"] });

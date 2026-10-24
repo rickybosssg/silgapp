@@ -42,7 +42,7 @@ export default function AdminPassOffersPanel({ countryCode }) {
   });
 
   const toggleMutation = useMutation({
-    mutationFn: async ({ id, actif }) =>
+    mutationFn: /** @param {{id: string, actif: boolean}} input */ async ({ id, actif }) =>
       base44.entities.PassOffer.update(id, { actif }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["pass-offers-admin"] });

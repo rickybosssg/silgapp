@@ -88,3 +88,15 @@ console.log('PASS Eco acceptance lost-response recovery, partial failure quarant
   assert.equal(f.mission.status, 'accepting');
 }
 console.log('PASS interrupted cancellation compensation resumes; collected parcels never released (isolated adapters)');
+{
+  const f = fixture();
+  const third = { ...structuredClone(f.rows[0]), id: 'third-course' };
+  f.rows.push(third);
+  f.mission.course_ids.push(third.id);
+  const result = await complete(f.api, f.mission, patch);
+  assert.equal(result.success, true);
+  assert.equal(f.mission.course_ids.length, 3);
+  assert.ok(f.rows.every(row => row.livreur_id === 'driver' && row.accepted_by_livreur_id === 'driver'));
+  assert.ok(f.rows.every(row => row.commission_locked_at && row.commission_taux_applique === 0));
+}
+console.log('PASS three-course acceptance retains per-course locks and commission invariants (isolated adapter)');

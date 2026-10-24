@@ -1,11 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { haversineKm } from "@/lib/priceEstimate";
 
-// Distance haversine en mètres entre deux coordonnées
-const haversineMeters = (lat1, lon1, lat2, lon2) => {
-  const km = haversineKm(lat1, lon1, lat2, lon2);
-  return km != null ? km * 1000 : null;
-};
 
 /**
  * Hook GPS natif Android via Capacitor Geolocation
@@ -60,17 +54,18 @@ export function useGPSNatif({ enabled = true, intervalMs = 15000, onPosition } =
 
   // Seuil de précision GPS — assoupli à 200m pour zones à couverture faible (Ouaga)
   const ACCURACY_THRESHOLD = 200;
-  // Distance minimale (mètres) pour mettre à jour — évite le bruit GPS
-  const MIN_DISTANCE_M = 10;
+
   // Délai maximum (ms) sans position avant d'accepter n'importe quelle précision
   const FALLBACK_DELAY_MS = 60000;
   const lastPosRef = useRef(null);
   const lastValidPosTimeRef = useRef(null);
 
   // Mise à jour de la position interne (avec filtrage précision + distance + fallback)
-  const applyPosition = useCallback((coords) => {
-    const accuracy = coords.accuracy || null;
+  const applyPosition = useCallback((coords, acquiredAt) => {
+    const accuracy = coords.accuracy ?? null;
     const now = Date.now();
+    const timestamp = typeof acquiredAt === 'number' && Number.isFinite(acquiredAt) && acquiredAt > 0 && acquiredAt <= now ? acquiredAt : null;
+    if (timestamp && lastPosRef.current?.timestamp > timestamp) return lastPosRef.current;
     const timeSinceLastPos = lastValidPosTimeRef.current ? now - lastValidPosTimeRef.current : Infinity;
 
     // Mode fallback : après 60s sans position valide, accepter n'importe quelle précision
@@ -85,31 +80,16 @@ export function useGPSNatif({ enabled = true, intervalMs = 15000, onPosition } =
       latitude: coords.latitude,
       longitude: coords.longitude,
       accuracy: accuracy,
-      timestamp: Date.now(),
+      timestamp,
     };
 
-    // Filtrer les déplacements négligeables (< 10m) si on a déjà une position
-    if (lastPosRef.current) {
-      const dist = haversineMeters(
-        lastPosRef.current.latitude,
-        lastPosRef.current.longitude,
-        pos.latitude,
-        pos.longitude
-      );
-      if (dist < MIN_DISTANCE_M) {
-        // Garder le timestamp à jour mais ne pas propager la position
-        lastPositionTimeRef.current = Date.now();
-        setAgeMinutes(0);
-        return lastPosRef.current;
-      }
-    }
-
+    // A stationary driver still needs to propagate the actual new acquisition.
     lastPosRef.current = pos;
     lastValidPosTimeRef.current = now;
     setPosition(pos);
     setGpsActif(true);
-    lastPositionTimeRef.current = now;
-    setAgeMinutes(0);
+    lastPositionTimeRef.current = timestamp;
+    setAgeMinutes(timestamp ? (now - timestamp) / 60000 : null);
     if (onPosition) onPosition(pos);
     return pos;
   }, [onPosition]);
@@ -148,7 +128,7 @@ export function useGPSNatif({ enabled = true, intervalMs = 15000, onPosition } =
           timeout: 15000,
           maximumAge: 0,
         });
-        applyPosition(result.coords);
+        applyPosition(result.coords, result.timestamp);
         return result.coords;
       } catch (err) {
         // 2e tentative : précision réduite (réseau/wifi)
@@ -158,7 +138,7 @@ export function useGPSNatif({ enabled = true, intervalMs = 15000, onPosition } =
             timeout: 10000,
             maximumAge: 30000,
           });
-          applyPosition(result.coords);
+          applyPosition(result.coords, result.timestamp);
           return result.coords;
         } catch (err2) {
           console.warn("[GPS Natif] Erreur Capacitor:", err2.message);
@@ -170,11 +150,11 @@ export function useGPSNatif({ enabled = true, intervalMs = 15000, onPosition } =
     // Fallback web — avec retry
     return new Promise((resolve) => {
       navigator.geolocation.getCurrentPosition(
-        (pos) => resolve(applyPosition(pos.coords)),
+        (pos) => resolve(applyPosition(pos.coords, pos.timestamp)),
         () => {
           // 2e tentative web : précision réduite
           navigator.geolocation.getCurrentPosition(
-            (pos) => resolve(applyPosition(pos.coords)),
+            (pos) => resolve(applyPosition(pos.coords, pos.timestamp)),
             () => { setGpsActif(false); resolve(null); },
             { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
           );

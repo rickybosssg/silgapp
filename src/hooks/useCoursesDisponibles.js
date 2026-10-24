@@ -6,6 +6,7 @@ import { base44 } from "@/api/base44Client";
 import { cityNamesPattern, operationalCityAliases, resolveOperationalName, canSeeOperationalCourse } from "../../base44/shared/cityNames.js";
 import { currentDriverGpsCity, gpsFixTime, CITY_GPS_MAX_AGE_MS } from "../../base44/shared/currentGpsCity.js";
 import { preserveConfirmedCancellation } from '@/lib/courseCancellationState';
+import { describeCityPolicy } from '../../base44/shared/cityPolicySummary.js';
 
 /**
  * useCoursesDisponibles — SOURCE UNIQUE DE VÉRITÉ pour les courses disponibles
@@ -102,10 +103,11 @@ export function useCoursesDisponibles(livreurProfil) {
     staleTime: 60000,
   });
 
-  const { data: zonePolicy = { cities: [], quartiers: [] }, isLoading: cityLoading, isError: cityError } = useQuery({
+  const { data: zonePolicy = { cities: [], quartiers: [], summary: null }, isLoading: cityLoading, isError: cityError } = useQuery({
     queryKey: ['operational-zone-policy', countryCode],
     queryFn: async () => {
       const cities = await base44.entities.OperationalCity.filter({ country_code: countryCode }, undefined, 100);
+      const flags = await base44.entities.AppConfig.filter({cle: `CITY_DISPATCH_ENABLED:${countryCode}`});
       const quartiers = cities.some(c => c.actif === true)
         ? await base44.entities.Quartier.filter({ country_code: countryCode, actif: true }, 'nom', 500) : [];
       // Invalid or overlapping aliases are a query error, not a render-time crash.
@@ -116,7 +118,7 @@ export function useCoursesDisponibles(livreurProfil) {
           }
         }
       }
-      return { cities, quartiers };
+      return { cities, quartiers, summary: describeCityPolicy(cities, flags || [], countryCode) };
     },
     enabled: !!countryCode, staleTime: 30000, refetchInterval: 60000,
   });
@@ -167,6 +169,10 @@ export function useCoursesDisponibles(livreurProfil) {
   const cityFilter = excludedAliases.length
     ? { ville_depart: { $not: { $regex: cityNamesPattern(excludedAliases), $options: 'i' } } } : {};
   const policyKey = JSON.stringify(zonePolicy);
+  const canSeeNewCourse = useMemo(() => course => !cityLoading && !cityError &&
+    course?.country_code === countryCode && normalizeEnterpriseId(course.enterprise_id) === livreurEnterpriseId &&
+    canSeeOperationalCourse(course, driverZone, zonePolicy.cities, zonePolicy.quartiers),
+  [countryCode, livreurEnterpriseId, driverZone, zonePolicy, cityLoading, cityError]);
   const { data: courses = [], isLoading: coursesLoading, isError: coursesError } = useQuery({
     queryKey: ["courses-externes-disponibles", livreurId, countryCode, livreurEnterpriseId, isV2Enabled, driverZone, policyKey],
     queryFn: async () => {
@@ -322,6 +328,9 @@ export function useCoursesDisponibles(livreurProfil) {
     eligibleCourses: availableFeed.individualCourses,
     availableOffers: availableFeed.offers,
     availableOffersCount: availableFeed.count,
+    canSeeNewCourse,
+    cityPolicySummary: zonePolicy.summary,
+    locationRefreshRequired: cityDispatchEnabled && !cityLoading && !cityError && !driverZone,
     courses,
     isLoading: cityLoading || coursesLoading || missionsLoading,
     isError: cityError || coursesError || missionsError,

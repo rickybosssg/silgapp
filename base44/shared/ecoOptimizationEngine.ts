@@ -812,10 +812,12 @@ export async function respondToOnRouteProposal(base44: any, proposalId: string, 
   const course = await base44.asServiceRole.entities.CourseExterne.get(proposal.course_id).catch(() => null);
   const livreur = await base44.asServiceRole.entities.Livreur.get(livreurId).catch(() => null);
   if (!course || !livreur) return { success: false, reason: 'missing_course_or_driver' };
+  if (!course.country_code || course.country_code !== livreur.country_code) return { success: false, reason: 'country_mismatch' };
   if (TERMINAL_STATUSES.includes(course.statut) || course.livreur_id || course.accepted_by_livreur_id) {
     await base44.asServiceRole.entities.EcoProposal.update(proposal.id, { status: 'invalidated', responded_at: new Date().toISOString() }).catch(() => null);
     return { success: false, reason: 'course_unavailable' };
   }
+
   if (normalizeEnterpriseId(course.enterprise_id) !== normalizeEnterpriseId(livreur.enterprise_id)) {
     return { success: false, reason: 'enterprise_mismatch' };
   }
@@ -850,6 +852,10 @@ export async function respondToOnRouteProposal(base44: any, proposalId: string, 
     }
   }
 
+
+  const { verifyCurrentCityAtClaim } = await import('./cityDispatchFilter.ts');
+  const finalCityCheck = await verifyCurrentCityAtClaim(base44, course, livreur);
+  if (!finalCityCheck.compatible) return { success: false, reason: finalCityCheck.reason || 'city_mismatch' };
   const claimProposal = await base44.asServiceRole.entities.EcoProposal.updateMany(
     { id: proposal.id, status: 'pending' },
     { $set: { status: 'accepted', responded_at: now } }
@@ -1545,7 +1551,8 @@ export async function acceptEcoMission(base44: any, missionId: string, livreurId
   const { verifyCityCompatibility, verifyCurrentCityAtClaim } = await import('./cityDispatchFilter.ts');
 
   const courseIds = Array.isArray(mission.course_ids) ? mission.course_ids : [];
-  if (courseIds.length !== 2 || new Set(courseIds).size !== 2) return { success: false, reason: 'mission_incomplete' };
+  if (courseIds.length < 2) return { success: false, reason: 'mission_incomplete' };
+  if (new Set(courseIds).size !== courseIds.length) return { success: false, reason: 'mission_incomplete' };
 
   const courses = [];
   for (const id of courseIds) {
@@ -1603,10 +1610,10 @@ export async function acceptEcoMission(base44: any, missionId: string, livreurId
   return completeEcoAcceptance(base44, { ...mission, status: 'accepting', livreur_id: livreurId, accepted_at: now }, updateData);
 }
 
-// A durable mission lock fences the two single-row claims. No multi-row transaction is assumed.
+// A durable mission lock fences every single-row claim. No multi-row transaction is assumed.
 export async function completeEcoAcceptance(base44: any, mission: any, updateData: any) {
   const ids = mission.course_ids;
-  if (!Array.isArray(ids) || ids.length !== 2 || new Set(ids).size !== 2 || !mission.livreur_id) {
+  if (!Array.isArray(ids) || ids.length < 2 || new Set(ids).size !== ids.length || !mission.livreur_id) {
     return { success: false, reason: 'mission_incomplete' };
   }
   try {
@@ -1678,7 +1685,7 @@ export async function recoverEcoAcceptances(base44: any, countryCode?: string, l
   if (countryCode) filter.country_code = String(countryCode).toUpperCase();
   const missions = await base44.asServiceRole.entities.EcoMission.filter(filter, 'accepted_at', limit);
   for (const mission of missions) {
-    if (!Array.isArray(mission.course_ids) || mission.course_ids.length !== 2 || new Set(mission.course_ids).size !== 2 || !mission.livreur_id) continue;
+    if (!Array.isArray(mission.course_ids) || mission.course_ids.length < 2 || new Set(mission.course_ids).size !== mission.course_ids.length || !mission.livreur_id) continue;
     try {
     const driver = await base44.asServiceRole.entities.Livreur.get(mission.livreur_id).catch(() => null);
     if (!driver || driver.country_code !== mission.country_code || normalizeEnterpriseId(driver.enterprise_id) !== null) continue;

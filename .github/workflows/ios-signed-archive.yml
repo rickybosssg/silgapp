@@ -65,6 +65,10 @@ jobs:
           printf '%s' "$FIREBASE_CONFIG_BASE64" | base64 --decode > ios/App/App/GoogleService-Info.plist
           python3 scripts/ios_release.py firebase --path ios/App/App/GoogleService-Info.plist
       - name: Install and build web app
+        env:
+          VITE_BASE44_APP_ID: 6a0ec08f3af5e1d1284254c1
+          VITE_BASE44_APP_BASE_URL: https://silga-dispatch-go.base44.app
+          VITE_BASE44_FUNCTIONS_VERSION: prod
         run: |
           npm ci
           npm run build

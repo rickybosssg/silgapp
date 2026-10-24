@@ -236,7 +236,7 @@ test('new-offer popup reuses eligible feed and cancels an old async result after
   const record = course('Bobo-Dioulasso', { dispatch_status: 'propose' });
   const api = { entities: { CourseExterne: { filter: () => { throw Error('No duplicated course polling'); } },
     DispatchNotification: { filter: () => new Promise(resolve => { resolveNotification = resolve; }) } } };
-  const stop = invoke('driver', fix(), [record], new Set(['course']), api, new Set(), true, value => updates.push(value),
+  const stop = invoke('driver', fix(), [record], new Set(['course']), api, new Set(), true, value => { const next = typeof value === 'function' ? value(null) : value; if(next !== null) updates.push(next); },
     error => { throw Error(error); }, () => 1, () => {});
   stop(); resolveNotification([{ course_id: 'course' }]);
   await new Promise(resolve => setImmediate(resolve));

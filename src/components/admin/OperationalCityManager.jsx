@@ -24,6 +24,7 @@ export default function OperationalCityManager({ countries, countryCode, onCount
   const [activating, setActivating] = useState(false);
   const queryClient = useQueryClient();
   const refreshPolicy = () => {
+    queryClient.invalidateQueries({ queryKey: ['city-dispatch-summary'] });
     for (const queryKey of [['operational-zone-policy'], ['city-dispatch-enabled'], ['op-cities'], ['cities-for-country'], ['city-dispatch-map-data'], ['city-stats'], ['courses-externes-disponibles'], ['eco-missions-disponibles']]) queryClient.invalidateQueries({ queryKey });
   };
 

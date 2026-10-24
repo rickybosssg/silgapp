@@ -1,4 +1,4 @@
-import { haversineKm } from './geoUtils.ts';
+import { haversineKm } from './geoDistance.js';
 
 // Pure canonical names shared by query filters and the available-feed UI.
 export function normalizeCityName(name) {

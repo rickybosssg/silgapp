@@ -8,6 +8,7 @@ import { MapPin, Users, Package, Bike, TrendingUp, Activity, Clock, AlertCircle,
 import CityDispatchMap from './CityDispatchMap';
 import { cityNamesPattern, normalizeCityName, operationalCityAliases } from '../../../base44/shared/cityNames.js';
 import OperationalCityManager from './OperationalCityManager';
+import { readCityPolicySummary } from '../../../base44/shared/cityPolicySummary.js';
 
 
 const ACTIVE_COURSE_STATUSES = ['nouvelle', 'en_attente', 'client_contacte', 'recherche_livreur', 'livreur_en_route', 'en_route_expediteur', 'arrive_prise_en_charge', 'colis_recupere', 'en_livraison', 'arrivee'];
@@ -109,16 +110,13 @@ export default function CityDispatchAdmin() {
   });
 
   // ── Feature flag status pour le pays sélectionné ──
-  const { data: cityFlagEnabled = false, isLoading: flagLoading, isError: flagError } = useQuery({
-    queryKey: ['city-dispatch-enabled', selectedCountry],
-    queryFn: async () => {
-      if (!selectedCountry) return false;
-      const cities = await base44.entities.OperationalCity.filter({ country_code: selectedCountry, actif: true }, undefined, 1);
-      return cities.length > 0;
-    },
+  const { data: cityPolicy, isLoading: flagLoading, isError: flagError } = useQuery({
+    queryKey: ['city-dispatch-summary', selectedCountry],
+    queryFn: () => readCityPolicySummary(base44.entities, selectedCountry),
     enabled: !!selectedCountry,
     staleTime: 15000,
   });
+  const cityFlagEnabled = cityPolicy?.enabled === true;
 
   const selectedCountryObj = useMemo(() => countries.find(c => c.code === selectedCountry), [countries, selectedCountry]);
 
@@ -139,6 +137,7 @@ export default function CityDispatchAdmin() {
   return (
     <div className="space-y-4 p-4 min-w-0">
       {(countriesError || citiesError || mapError || statsError) && <p role="alert" className="text-red-600">Données indisponibles. Veuillez actualiser.</p>}
+      {!!cityPolicy?.conflicts.length && <p role="alert" className="text-sm text-red-700 dark:text-red-300">Conflit entre le réglage pays historique et les villes activées. La règle existante repose sur les activations individuelles ; aucun choix enregistré n'a été modifié.</p>}
       {countriesLoading && <p>Chargement des pays...</p>}
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-2">

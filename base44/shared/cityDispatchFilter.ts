@@ -35,6 +35,7 @@ import {
   isOperationalCityActive,
   getActivatedZoneCityNames,
   getOperationalZoneCityNames,
+  invalidateOperationalCityCache,
 } from './operationalZones.ts';
 
 /**
@@ -95,13 +96,14 @@ export async function buildCourseCityFilterForLivreur(base44: any, livreur: any)
  * - Si la zone de la course est activée → le livreur doit être dans la même zone.
  * - Si la zone de la course n'est pas activée → toujours compatible (historique).
  */
-export async function verifyCityCompatibility(base44: any, course: any, livreur: any): Promise<{
+export async function verifyCityCompatibility(base44: any, course: any, livreur: any, freshPolicy = false): Promise<{
   compatible: boolean;
   reason?: string;
   courseCity?: string | null;
   livreurCity?: string | null;
 }> {
   const countryCode = String(course?.country_code || '').toUpperCase();
+  if (freshPolicy) invalidateOperationalCityCache(countryCode);
   if (!countryCode || !await isCityDispatchEnabled(base44, countryCode)) return { compatible: true };
 
   const courseCity = await getCourseDepartureCity(base44, course);
@@ -136,6 +138,7 @@ export async function filterCurrentCityCandidates(base44: any, course: any, cand
   const tenant = (value: any) => value == null || String(value).trim() === '' ? null : String(value).trim();
   const scoped = candidates.filter(driver => String(driver.country_code || '').toUpperCase() === country && tenant(driver.enterprise_id) === tenant(course.enterprise_id));
   if (!country) return [];
+  invalidateOperationalCityCache(country);
   if (!await isCityDispatchEnabled(base44, country)) return scoped;
   const courseCity = await getCourseDepartureCity(base44, course);
   if (!courseCity) return [];
@@ -156,6 +159,7 @@ export async function filterCurrentCityCandidates(base44: any, course: any, cand
 /** Recheck acquisition proof after asynchronous pricing/busy checks, at claim. */
 export async function verifyCurrentCityAtClaim(base44: any, course: any, driver: any) {
   const country = String(course?.country_code || '').toUpperCase();
+  invalidateOperationalCityCache(country);
   if (!country || !await isCityDispatchEnabled(base44, country)) return { compatible: true };
   const city = await getCourseDepartureCity(base44, course);
   if (!city) return { compatible: false, reason: 'course_city_unknown' };

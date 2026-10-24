@@ -244,9 +244,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   // ── Compteur de courses disponibles (pilote le point rouge) ──
   // ⚠️ Garde cohérente avec CoursesDisponibles.jsx : statut === "recherche_livreur"
   //    ET dispatch_status === "disponible_push" | "propose"
-  // Reuse the feed policy for badges and new-offer popups. Active missions
-  // continue to use mesCourses and are not filtered by this new-work policy.
-  const { eligibleCourses: cityEligibleCourses, availableOffersCount: availableCoursesCount } = useCoursesDisponibles(livreurProfil);
+  const { eligibleCourses: cityEligibleCourses, availableOffersCount: availableCoursesCount, canSeeNewCourse } = useCoursesDisponibles(livreurProfil);
   const cityEligibleCourseIds = useMemo(() => new Set(cityEligibleCourses.filter(course => !isEcoDeliveryCourse(course)).map(course => course.id)), [cityEligibleCourses]);
 
   // Le point rouge s'affiche dès qu'il y a des courses disponibles ET que le livreur
@@ -679,6 +677,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
     let cancelled = false;
 
+    setCourseProposeeDirecte(previous => previous && cityEligibleCourseIds.has(previous.id) ? previous : null);
     const checkCourseProposee = async () => {
       try {
         if (!livreurProfil?.country_code) return;
@@ -689,12 +688,10 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         // (remplace l'ancien champ JSON dispatch_notified_ids qui n'est plus mis à jour)
         let notifiedCourseIds = [];
         try {
-          if (allCourses.some(course => course.dispatch_status === "propose")) {
-          const myNotifs = await base44.entities.DispatchNotification.filter(
+          const myNotifs = allCourses.some(course => course.dispatch_status === 'propose') ? await base44.entities.DispatchNotification.filter(
             { livreur_id: livreurId, statut: 'notifie' }, '-date_notification', 50
-          );
+          ) : [];
           notifiedCourseIds = (myNotifs || []).map(n => n.course_id);
-          }
         } catch {}
 
         if (cancelled) return;
@@ -899,6 +896,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
   const courseEnAttente = useMemo(() => {
     const waiting = courseCandidates.find((course) => {
+      if (!canSeeNewCourse(course)) return false;
       if (isCourseDismissed(course)) return false; // déjà écartée, sauf nouvelle sollicitation
       // Dispatch V2 shows disponible_push courses exclusively in the
       // "Disponibles" feed. The legacy V1 modal must not open for them.
@@ -932,7 +930,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       });
     }
     return waiting;
-  }, [courseCandidates, livreurId, isV2Enabled, onRouteProposalCourseIds]);
+  }, [courseCandidates, livreurId, isV2Enabled, onRouteProposalCourseIds, canSeeNewCourse]);
 
   // ─── Course en attente de validation prix par le client ───────────────────
   const courseEnAttenteValidationPrix = useMemo(() => {

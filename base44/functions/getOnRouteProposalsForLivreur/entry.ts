@@ -22,6 +22,8 @@ const TERMINAL_STATUSES = ['livree', 'annulee', 'completed', 'delivered', 'cance
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
+    const user = await base44.auth.me().catch(() => null);
+    if (!user?.email) return Response.json({ success: false, error: 'Authentification requise' }, { status: 401 });
     const body = await req.json().catch(() => ({}));
     const livreurId = body?.livreur_id;
 
@@ -35,6 +37,10 @@ Deno.serve(async (req) => {
     const livreur = await base44.asServiceRole.entities.Livreur.get(livreurId).catch(() => null);
     if (!livreur) {
       return Response.json({ success: false, error: 'Livreur introuvable' }, { status: 404 });
+    }
+    const ownerEmail = (livreur.user_email || livreur.email || '').trim().toLowerCase();
+    if (ownerEmail !== user.email.trim().toLowerCase()) {
+      return Response.json({ success: false, error: 'Ce profil livreur ne vous appartient pas' }, { status: 403 });
     }
 
     // ── LAZY CLEANUP : Libérer les réservations sur trajet expirées ──

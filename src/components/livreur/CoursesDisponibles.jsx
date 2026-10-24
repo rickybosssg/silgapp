@@ -57,7 +57,7 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
   const livreurLng = livreurProfil?.longitude;
 
   // ── Source unique de vérité : hook partagé avec ActiviteTempsReel ──
-  const { eligibleCourses, courses, availableOffersCount, isLoading, isError, isV2Enabled, livreurDisponible, livreurPeutVoirFil, raisonBlocage, refusedCourseIds, setRefusedIds, ecoMissions = [] } = useCoursesDisponibles(livreurProfil);
+  const { eligibleCourses, courses, availableOffersCount, isLoading, isError, isV2Enabled, livreurDisponible, livreurPeutVoirFil, raisonBlocage, refusedCourseIds, setRefusedIds, ecoMissions = [], locationRefreshRequired } = useCoursesDisponibles(livreurProfil);
 
   // ── Tracking vue_at — DÉDUPLICATION LOCALE (Option C) ──
   // Un seul appel marquer_vue_course par course et par session composant.
@@ -246,9 +246,9 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
         <div className="w-14 h-14 rounded-2xl bg-orange-50 flex items-center justify-center mx-auto">
           <Flame className="w-7 h-7 text-orange-400" />
         </div>
-        <p className="text-sm font-bold text-slate-800">Aucune course disponible</p>
+        <p className="text-sm font-bold text-slate-800">{locationRefreshRequired ? 'Position GPS à actualiser' : 'Aucune course disponible'}</p>
         <p className="text-xs text-slate-500">
-          Les courses non acceptées par le dispatch automatique apparaîtront ici.
+          {locationRefreshRequired ? 'Une position récente et précise est nécessaire pour les offres des villes activées. Vos courses déjà acceptées restent accessibles.' : 'Les courses non acceptées par le dispatch automatique apparaîtront ici.'}
         </p>
       </div>
     );
@@ -256,6 +256,7 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
 
   return (
     <div className="space-y-3 rounded-lg bg-muted p-3">
+      {locationRefreshRequired && <p role="status" className="text-sm text-foreground">Actualisez votre position GPS pour voir les offres des villes activées.</p>}
       <div className="flex items-center justify-between px-1 py-0.5">
         <div>
           <p className="text-[11px] font-bold uppercase text-primary">Dispatch en direct</p>

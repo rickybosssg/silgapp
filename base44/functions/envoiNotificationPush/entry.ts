@@ -220,7 +220,7 @@ async function assertNotificationCountry(base44, { course_id, livreur_id, client
     for (const target of targets.filter(target => ['livreur_id', 'destinataire_email_livreur'].includes(target.context))) {
       const tenant = (value: unknown) => value == null || String(value).trim() === '' ? null : String(value).trim();
       if (tenant(target.entity.enterprise_id) !== tenant(course.enterprise_id)) return { ok: false, status: 403, payload: { success: false, blocked_reason: 'enterprise_mismatch' } };
-      if (!(await verifyCityCompatibility(base44, course, target.entity)).compatible) {
+      if (!(await verifyCityCompatibility(base44, course, target.entity, true)).compatible) {
         return { ok: false, status: 409, payload: { success: false, blocked_reason: 'city_gps_ineligible' } };
       }
     }

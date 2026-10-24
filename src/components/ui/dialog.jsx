@@ -25,7 +25,7 @@ const DialogOverlay = React.forwardRef(({ className, ...props }, ref) => (
 ))
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 
-const DialogContent = React.forwardRef(({ className, children, ...props }, ref) => (
+const DialogContent = React.forwardRef(/** @type {React.ForwardRefRenderFunction<HTMLDivElement, import('@radix-ui/react-dialog').DialogContentProps>} */ (({ className, children, ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay />
     <DialogPrimitive.Content
@@ -43,9 +43,10 @@ const DialogContent = React.forwardRef(({ className, children, ...props }, ref) 
       </DialogPrimitive.Close>
     </DialogPrimitive.Content>
   </DialogPortal>
-))
+)))
 DialogContent.displayName = DialogPrimitive.Content.displayName
 
+/** @param {React.HTMLAttributes<HTMLDivElement>} props */
 const DialogHeader = ({
   className,
   ...props
@@ -56,6 +57,7 @@ const DialogHeader = ({
 )
 DialogHeader.displayName = "DialogHeader"
 
+/** @param {React.HTMLAttributes<HTMLDivElement>} props */
 const DialogFooter = ({
   className,
   ...props
@@ -66,12 +68,12 @@ const DialogFooter = ({
 )
 DialogFooter.displayName = "DialogFooter"
 
-const DialogTitle = React.forwardRef(({ className, ...props }, ref) => (
+const DialogTitle = React.forwardRef(/** @type {React.ForwardRefRenderFunction<HTMLHeadingElement, import('@radix-ui/react-dialog').DialogTitleProps>} */ (({ className, ...props }, ref) => (
   <DialogPrimitive.Title
     ref={ref}
     className={cn("text-lg font-semibold leading-none tracking-tight", className)}
     {...props} />
-))
+)))
 DialogTitle.displayName = DialogPrimitive.Title.displayName
 
 const DialogDescription = React.forwardRef(({ className, ...props }, ref) => (

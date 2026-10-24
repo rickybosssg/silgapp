@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
 import { normalizeCityName, resolveOperationalName } from '../../shared/cityNames.js';
+import { describeCityPolicy } from '../../shared/cityPolicySummary.js';
 
 /**
  * manageOperationalCity — Gestion des villes opérationnelles
@@ -89,10 +90,12 @@ Deno.serve(async (req) => {
       const cities = await base44.asServiceRole.entities.OperationalCity.filter({
         country_code: code,
       }, 'nom_affichage', 100);
+      const countryFlags = await base44.asServiceRole.entities.AppConfig.filter({cle: `CITY_DISPATCH_ENABLED:${code}`});
 
       return Response.json({
         success: true,
         cities: cities || [],
+        policy: describeCityPolicy(cities || [], countryFlags || [], code),
       });
     }
 

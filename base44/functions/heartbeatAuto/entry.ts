@@ -130,7 +130,10 @@ Deno.serve(async (req) => {
         if (hasGps) {
           updateData.latitude = latNum;
           updateData.longitude = lngNum;
-          updateData.derniere_position_date = now;
+          const acquiredAt = gpsFixTime(gps_timestamp);
+          if (Number.isFinite(acquiredAt) && acquiredAt > 0 && acquiredAt <= Date.now()) {
+            updateData.derniere_position_date = new Date(acquiredAt).toISOString();
+          }
           if (accuracy !== undefined && accuracy !== null && Number.isFinite(Number(accuracy))) {
             updateData.gps_accuracy = Number(accuracy);
           }

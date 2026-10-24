@@ -1,3 +1,5 @@
+import * as confirmedCancellation from '../src/lib/courseCancellationState.js';
+import * as policySummary from '../base44/shared/cityPolicySummary.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -94,6 +96,8 @@ function actualHook(courses, missions, options = {}) {
       useQuery: config => { queries.push(config); const key = config.queryKey[0];
         return { data: key === 'dispatch-v2-enabled' ? true : key === 'operational-zone-policy' ? { cities: options.activeCity ? [{ nom: 'ouagadougou', actif: true }] : [], quartiers: [] }
           : key === 'courses-externes-disponibles' ? courses : key === 'eco-missions-disponibles' ? missions : [], isLoading: false, isError: false }; } };
+    if (name === '@/lib/courseCancellationState') return confirmedCancellation;
+    if (name.endsWith('cityPolicySummary.js')) return policySummary;
     if (name === '@/api/base44Client') return { base44: { entities } };
     if (name === '@/lib/availableCourseOffers') return { selectAvailableCourseOffers: select };
     if (name === '@/lib/sharedQuerySubscription') return { acquireQuerySubscription, createRealtimeRefresh };
@@ -213,8 +217,9 @@ test('three-member mission remains visible as in 139; frontend does not invent a
   assert.equal(r.missions[0].__available_courses.length, 3);
   assert.equal(r.individualCourses[0].id, 'independent');
   const backend = read('base44/shared/ecoOptimizationEngine.ts');
-  assert.ok(backend.includes("courseIds.length !== 2 || new Set(courseIds).size !== 2"));
-  // This existing server conflict is reported, not relaxed in a presentation fix.
+  assert.ok(backend.includes('if (courseIds.length < 2)'));
+  assert.ok(backend.includes('new Set(courseIds).size !== courseIds.length'));
+  // Reconciled latest contract: validate every unique member without an exact-two product limit.
   const unsafe = pick([], [mission([eco('a'), eco('b'), eco('c', { country_code: 'CI' })])]);
   assert.equal(unsafe.count, 0, 'all members still undergo isolation checks');
 });

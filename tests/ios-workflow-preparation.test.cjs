@@ -7,6 +7,18 @@ const yaml = require(process.env.IOS_TEST_YAML_PATH || 'js-yaml');
 const root = path.resolve(__dirname, '..');
 const read = p => fs.readFileSync(path.join(root, p), 'utf8');
 
+test('signed web build explicitly targets the existing production app without new credentials', () => {
+  const workflow = yaml.load(read('.github/workflows/ios-signed-archive.yml'));
+  const build = workflow.jobs['signed-archive'].steps.find(step => step.name === 'Install and build web app');
+  assert.deepEqual(build.env, {
+    VITE_BASE44_APP_ID: '6a0ec08f3af5e1d1284254c1',
+    VITE_BASE44_APP_BASE_URL: 'https://silga-dispatch-go.base44.app',
+    VITE_BASE44_FUNCTIONS_VERSION: 'prod',
+  });
+  assert.match(read('src/lib/app-params.js'), /6a0ec08f3af5e1d1284254c1/);
+  assert.match(read('src/lib/app-params.js'), /https:\/\/silga-dispatch-go\.base44\.app/);
+});
+
 test('workflows parse and only explicit tags can trigger a push build', () => {
   for (const [file, tag] of [['ios-cloud-build.yml', 'ios-check-*'], ['ios-signed-archive.yml', 'ios-signed-v*']]) {
     const workflow = yaml.load(read(`.github/workflows/${file}`));
