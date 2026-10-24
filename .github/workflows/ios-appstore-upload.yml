@@ -1,12 +1,12 @@
-name: Upload verified SILGAPP iOS r2 to App Store Connect
+name: Upload verified SILGAPP iOS 1.0.64 build 73 to App Store Connect
 on:
   push:
-    tags: ['ios-upload-v1.0.60-b67-r2']
+    tags: ['ios-upload-v1.0.64-b73']
 permissions:
   contents: read
   actions: read
 concurrency:
-  group: silgapp-appstore-6782046749-1.0.60-67
+  group: silgapp-appstore-6782046749
   cancel-in-progress: false
 jobs:
   upload:
@@ -19,22 +19,22 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - name: Download only the verified r2 IPA
+      - name: Download only the verified build 73 IPA
         uses: actions/download-artifact@v4
         with:
           name: SILGAPP-signed-ipa
-          run-id: 38528393904
+          run-id: 40073789288
           repository: rickybosssg/silgapp
           github-token: ${{ github.token }}
-          path: ${{ runner.temp }}/silgapp-upload-r2
-      - name: Upload exact r2 once and check Apple processing
+          path: ${{ runner.temp }}/silgapp-upload-b73
+      - name: Check Apple state, upload exact build 73 once and check processing
         env:
           APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
           APP_STORE_CONNECT_API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
           APP_STORE_CONNECT_API_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_API_PRIVATE_KEY }}
         run: |
           python3 scripts/ios_appstore_upload.py \
-            --ipa "$RUNNER_TEMP/silgapp-upload-r2/App.ipa" \
+            --ipa "$RUNNER_TEMP/silgapp-upload-b73/App.ipa" \
             --receipt "$RUNNER_TEMP/ios-appstore-upload-receipt.json"
       - name: Keep public upload receipt only
         if: always()

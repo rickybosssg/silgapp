@@ -1,5 +1,6 @@
-"""Upload only the verified r2 IPA on authorized macOS CI; never print credentials."""
+"""Upload only the verified build 73 IPA on authorized macOS CI; never print credentials."""
 import argparse
+import datetime as dt
 import base64
 import hashlib
 import json
@@ -17,17 +18,17 @@ import zipfile
 
 APP_ID = "6782046749"
 BUNDLE_ID = "com.base6a0ec08f3af5e1d1284254c1.app"
-VERSION, BUILD = "1.0.60", "67"
-IPA_SHA256 = "7cc210b408f5bb4fed735871ad8d6abcad68bada4b478762a6846c5221423306"
+VERSION, BUILD = "1.0.64", "73"
+IPA_SHA256 = "368e991c254fd85ef8ab0ef213183f90e88d800aa032a7330bc89894c2102641"
 LOGO_SHA256 = "12f592bbdde1ed319dc4e5be4e58707622a4612e3102abb6d500f9667e139fee"
 KEY_ID = "5SWTL5V4JG"
 ISSUER_ID = "5f873051-bf9a-4708-afa6-303117a82089"
-UPLOAD_TAG = "refs/tags/ios-upload-v1.0.60-b67-r2"
+UPLOAD_TAG = "refs/tags/ios-upload-v1.0.64-b73"
 
 
 def verify_ipa(path, expected_digest=IPA_SHA256):
     if hashlib.sha256(path.read_bytes()).hexdigest() != expected_digest:
-        raise ValueError("IPA differs from the exact verified r2 artifact.")
+        raise ValueError("IPA differs from the exact verified build 73 artifact.")
     with zipfile.ZipFile(path) as archive:
         names = archive.namelist()
         manifests = [n for n in names if re.fullmatch(r"Payload/[^/]+\.app/Info\.plist", n)]
@@ -99,16 +100,59 @@ def apple_builds(token):
         raise ValueError("Apple API connection failed; upload is not automatically retried.") from None
 
 
+def apple_versions(token):
+    query = urllib.parse.urlencode({"filter[platform]": "IOS", "limit": 200,
+        "fields[appStoreVersions]": "versionString,appStoreState,releaseType,platform"})
+    request = urllib.request.Request(
+        f"https://api.appstoreconnect.apple.com/v1/apps/{APP_ID}/appStoreVersions?" + query,
+        headers={"Authorization": "Bearer " + token})
+    try:
+        with urllib.request.urlopen(request, timeout=45) as response:
+            return json.load(response)
+    except urllib.error.HTTPError as error:
+        raise ValueError(f"Apple version-state access failed (HTTP {error.code}); no upload attempted.") from None
+    except (urllib.error.URLError, TimeoutError):
+        raise ValueError("Apple version-state connection failed; no upload attempted.") from None
+
+
+def require_reviewed_apple_state(payload):
+    if not isinstance(payload.get("data"), list) or payload.get("links", {}).get("next"):
+        raise ValueError("Incomplete Apple version-state response; no upload attempted.")
+    versions = []
+    for item in payload["data"]:
+        attrs = item.get("attributes", {})
+        version, state = attrs.get("versionString"), attrs.get("appStoreState")
+        if not isinstance(version, str) or not re.fullmatch(r"[0-9]+(?:\.[0-9]+){0,2}", version):
+            raise ValueError("Unexpected Apple version number; no upload attempted.")
+        numeric = tuple(map(int, version.split('.')))
+        if numeric + (0,) * (3 - len(numeric)) > (1, 0, 64):
+            raise ValueError("A newer Apple version exists; reconcile before upload.")
+        if state in {"WAITING_FOR_REVIEW", "IN_REVIEW", "PENDING_DEVELOPER_RELEASE",
+                     "PENDING_APPLE_RELEASE", "PROCESSING_FOR_APP_STORE", "READY_FOR_REVIEW"}:
+            raise ValueError(f"Apple version {version} is {state}; no existing review will be changed.")
+        if version == VERSION and state not in {"PREPARE_FOR_SUBMISSION", "DEVELOPER_REJECTED", "REJECTED", "METADATA_REJECTED"}:
+            raise ValueError(f"Target Apple version already has state {state}; inspect before upload.")
+        versions.append({"id": item.get("id"), "version": version, "state": state,
+                         "release_type": attrs.get("releaseType")})
+    current = [v for v in versions if v["version"] == "1.0.63"
+               and v["state"] in {"READY_FOR_SALE", "READY_FOR_DISTRIBUTION"}]
+    if len(current) != 1:
+        raise ValueError("Apple does not confirm 1.0.63 available for distribution; no upload attempted.")
+    return versions
+
+
 def require_absent(payload):
-    if not isinstance(payload.get("data"), list):
+    if not isinstance(payload.get("data"), list) or payload.get("links", {}).get("next"):
         raise ValueError("Apple returned an unexpected build response.")
     if payload["data"]:
-        raise ValueError("Build 67 already exists in Apple; refusing a duplicate upload. Verify its provenance first.")
+        raise ValueError("Build 73 already exists in Apple; refusing a duplicate upload. Verify its provenance first.")
 
 
 def public_build(payload):
     if not payload.get("data"):
         return None
+    if len(payload["data"]) != 1 or payload.get("links", {}).get("next"):
+        raise ValueError("Ambiguous or incomplete Apple build response; inspect before proceeding.")
     build = payload["data"][0]
     prerelease = build.get("relationships", {}).get("preReleaseVersion", {}).get("data", {})
     versions = [v.get("attributes", {}).get("version") for v in payload.get("included", [])
@@ -126,7 +170,8 @@ def main():
     args = parser.parse_args()
     key_path = None
     receipt = {"app_id": APP_ID, "bundle_id": BUNDLE_ID, "version": VERSION, "build": BUILD,
-               "ipa_sha256": IPA_SHA256, "source_run": 38528393904, "uploaded": False}
+               "ipa_sha256": IPA_SHA256, "source_run": 40073789288, "uploaded": False,
+               "upload_attempted": False}
     try:
         if not (os.environ.get("GITHUB_ACTIONS") == "true" and os.environ.get("RUNNER_OS") == "macOS"
                 and os.environ.get("GITHUB_REPOSITORY") == "rickybosssg/silgapp"
@@ -155,21 +200,30 @@ def main():
             key_file.write(key_text + "\n")
         del key_text
         token = access_token(key_path)
-        require_absent(apple_builds(token))
-        print("Apple API authentication succeeded; build 67 is absent. Uploading exact r2 once.", flush=True)
+        receipt["apple_versions_before_upload"] = require_reviewed_apple_state(apple_versions(token))
+        before_upload = apple_builds(token)
+        if before_upload.get("data"):
+            receipt["existing_apple_build"] = public_build(before_upload)
+        require_absent(before_upload)
+        receipt["upload_attempted"] = True
+        receipt["upload_started_at_utc"] = dt.datetime.now(dt.timezone.utc).isoformat()
+        receipt["processing_state"] = "UPLOAD_STARTED_OUTCOME_NOT_YET_KNOWN"
+        args.receipt.write_text(json.dumps(receipt, indent=2) + "\n")
+        print("Apple API confirms version 1.0.63 available and build 73 absent. Uploading exact verified IPA once.", flush=True)
         uploaded = subprocess.run(["xcrun", "altool", "--output-format", "xml", "--upload-app",
             "--file", str(args.ipa), "--type", "ios", "--apiKey", KEY_ID, "--apiIssuer", ISSUER_ID],
             capture_output=True, text=True, check=False)
         if uploaded.returncode:
             codes = sorted(set(re.findall(r"ITMS-[0-9]{4,6}", uploaded.stdout + uploaded.stderr)))
             raise ValueError(f"Apple upload failed (exit {uploaded.returncode}; codes {','.join(codes) or 'none'}). No automatic retry.")
-        receipt.update(uploaded=True, processing_state="AWAITING_APPLE_INDEX")
+        receipt.update(uploaded=True, processing_state="AWAITING_APPLE_INDEX",
+                       upload_accepted_at_utc=dt.datetime.now(dt.timezone.utc).isoformat())
         args.receipt.write_text(json.dumps(receipt, indent=2) + "\n")
-        print("APPLE_UPLOAD_ACCEPTED: SILGAPP 1.0.60/build67, exact r2 IPA.", flush=True)
+        print("APPLE_UPLOAD_ACCEPTED: SILGAPP 1.0.64/build73, exact verified IPA.", flush=True)
         for attempt in range(16):
             found = public_build(apple_builds(token))
             if found:
-                receipt.update(found)
+                receipt.update(found, processing_checked_at_utc=dt.datetime.now(dt.timezone.utc).isoformat())
                 args.receipt.write_text(json.dumps(receipt, indent=2) + "\n")
                 print(f"Apple build {found['apple_build_id']}: {found['processing_state']}", flush=True)
                 if found["processing_state"] == "VALID":
@@ -185,8 +239,11 @@ def main():
         print("Upload blocked: " + message, flush=True)
         return 2
     finally:
-        if key_path is not None:
-            key_path.unlink(missing_ok=True)
+        try:
+            args.receipt.write_text(json.dumps(receipt, indent=2) + "\n")
+        finally:
+            if key_path is not None:
+                key_path.unlink(missing_ok=True)
 
 
 if __name__ == "__main__":
