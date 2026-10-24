@@ -19,11 +19,11 @@ import zipfile
 APP_ID = "6782046749"
 BUNDLE_ID = "com.base6a0ec08f3af5e1d1284254c1.app"
 VERSION, BUILD = "1.0.64", "73"
-IPA_SHA256 = "368e991c254fd85ef8ab0ef213183f90e88d800aa032a7330bc89894c2102641"
+IPA_SHA256 = "368e991c254fd85ef8ab0ef213183f90e88d800aa032a7230bc89894c2102641"
 LOGO_SHA256 = "12f592bbdde1ed319dc4e5be4e58707622a4612e3102abb6d500f9667e139fee"
 KEY_ID = "5SWTL5V4JG"
 ISSUER_ID = "5f873051-bf9a-4708-afa6-303117a82089"
-UPLOAD_TAG = "refs/tags/ios-upload-v1.0.64-b73"
+UPLOAD_TAG = "refs/tags/ios-upload-v1.0.64-b73-r2"
 
 
 def verify_ipa(path, expected_digest=IPA_SHA256):

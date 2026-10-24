@@ -1,7 +1,7 @@
 name: Upload verified SILGAPP iOS 1.0.64 build 73 to App Store Connect
 on:
   push:
-    tags: ['ios-upload-v1.0.64-b73']
+    tags: ['ios-upload-v1.0.64-b73-r2']
 permissions:
   contents: read
   actions: read
