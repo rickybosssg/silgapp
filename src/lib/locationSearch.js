@@ -94,7 +94,17 @@ function queryCacheKey(countryCode, query) {
 export function getCachedLocationSuggestions(countryCode, query) {
   const code = String(countryCode || "").toUpperCase();
   const memory = memoryIndexes.get(code);
-  const cached = memory?.items || safeStorageRead(indexCacheKey(code), true) || [];
+  const memoryItems = memory?.items;
+  const storageItems = safeStorageRead(indexCacheKey(code), true);
+  // ── Un cache incomplet (boutiques mais aucun quartier) est un cache miss ──
+  // Une ancienne erreur API peut avoir laissé un catalogue partiel en cache.
+  // On ne l'utilise pas : on laisse le chemin async rafraîchir l'index.
+  let cached = [];
+  if (Array.isArray(memoryItems) && memoryItems.some((item) => item.type === "quartier")) {
+    cached = memoryItems;
+  } else if (Array.isArray(storageItems) && storageItems.some((item) => item.type === "quartier")) {
+    cached = storageItems;
+  }
   const remote = safeStorageRead(queryCacheKey(code, query), true) || [];
   return mergeLocationResults(filterAndRankLocations(cached, query), remote);
 }
@@ -107,13 +117,27 @@ export async function refreshCountryLocationIndex(countryCode, force = false) {
   if (!force && memory && Array.isArray(memory.items) && memory.items.length > 0 && Date.now() - memory.savedAt < INDEX_TTL_MS) return memory.items;
 
   const cached = safeStorageRead(indexCacheKey(code));
-  if (!force && cached && Array.isArray(cached) && cached.length > 0) {
+  // ── Refuser un cache localStorage sans quartiers (catalogue incomplet) ──
+  // Un cache ancien (avant correction) peut contenir boutiques mais aucun
+  // quartier. On le traite comme un cache miss pour forcer un rafraîchissement.
+  if (!force && Array.isArray(cached) && cached.length > 0 && cached.some((item) => item.type === "quartier")) {
     memoryIndexes.set(code, { items: cached, savedAt: Date.now() });
     return cached;
   }
 
-  const [quartiers, boutiques, restaurants, pharmacies, lieuxSilgapp] = await Promise.all([
-    base44.entities.Quartier.filter({ country_code: code, actif: true }, "nom", 500).catch(() => []),
+  // ── Le read Quartier est séparé : on doit savoir s'il a réussi ──
+  // Si l'API Quartier échoue mais que Boutique/Restaurant réussissent, on
+  // obtient un catalogue partiel (boutiques sans quartiers). Ne pas cacher.
+  let quartiers = [];
+  let quartiersLoaded = false;
+  try {
+    quartiers = await base44.entities.Quartier.filter({ country_code: code, actif: true }, "nom", 500);
+    quartiersLoaded = true;
+  } catch {
+    // Erreur API Quartier — on ne cachera pas l'index incomplet
+  }
+
+  const [boutiques, restaurants, pharmacies, lieuxSilgapp] = await Promise.all([
     base44.entities.Boutique.filter({ pays_code: code, actif: true }, "nom", 300).catch(() => []),
     base44.entities.Restaurant.filter({ pays_code: code, actif: true }, "nom", 300).catch(() => []),
     base44.entities.Pharmacie.filter({ pays_code: code, actif: true }, "nom", 300).catch(() => []),
@@ -128,11 +152,11 @@ export async function refreshCountryLocationIndex(countryCode, force = false) {
     ...pharmacies.map((item) => mapStructure(item, "pharmacie", code)),
   ];
 
-  // ── Ne JAMAIS cacher un résultat vide ──
-  // Si l'API échoue (réseau, token, etc.), items est [] et ne doit PAS être
-  // mis en cache. Sinon, safeStorageRead retourne [] (truthy en JS) pendant 6h,
-  // bloquant toutes les suggestions de quartiers sans rappeler l'API.
-  if (Array.isArray(items) && items.length > 0) {
+  // ── Ne cacher QUE si le read Quartier a réussi ──
+  // Un échec API sur Quartier donne un catalogue sans quartiers (boutiques
+  // seulement). Sans cette garde, ce catalogue partiel resterait 6h en cache
+  // et masquerait tous les quartiers jusqu'à expiration.
+  if (quartiersLoaded) {
     memoryIndexes.set(code, { items, savedAt: Date.now() });
     safeStorageWrite(indexCacheKey(code), items, INDEX_TTL_MS);
   }
@@ -205,5 +229,15 @@ export async function searchLocationSuggestions(countryCode, query, signal) {
       return [];
     }),
   ]);
-  return mergeLocationResults(filterAndRankLocations(index, query), cached, remote);
+  // ── Les quartiers sont recherchés AVANT la limite de 10 résultats ──
+  // Sans cette priorité, des boutiques/pharmacies peuvent occuper les 10 slots
+  // avant les quartiers, rendant ces derniers invisibles quel que soit le texte saisi.
+  const quartiers = index.filter((item) => item.type === "quartier");
+  const others = index.filter((item) => item.type !== "quartier");
+  return mergeLocationResults(
+    filterAndRankLocations(quartiers, query),
+    filterAndRankLocations(others, query),
+    cached,
+    remote,
+  );
 }
