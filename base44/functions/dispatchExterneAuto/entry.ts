@@ -185,9 +185,14 @@ export default async function(req) {
     }
 
     // ─── 0b. V2 : Accepter une course (updateMany + update single) ──────
+    // Le garde d'idempotence dans accepterCourseV2 garantit qu'un retry après 429
+    // ne dupliquera pas les side-effects post-acceptation (le atomic updateMany est
+    // conditionnel, et si déjà accepté, la fonction retourne succès immédiatement).
     if (action === 'accepter_course_v2') {
       const { pricing_mode, manual_price, override_pricing_mode } = body;
-      const result = await accepterCourseV2(base44, course_id, livreur_id, { pricing_mode, manual_price, override_pricing_mode });
+      const result = await withAuthRetry(req, 'accepterCourseV2', (b44: any) =>
+        accepterCourseV2(b44, course_id, livreur_id, { pricing_mode, manual_price, override_pricing_mode })
+      );
       return Response.json(result);
     }
 

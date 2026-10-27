@@ -72,22 +72,36 @@ export default async function(req: Request): Promise<Response> {
       updated_date: { $lte: thresholdDate },
     }, 'created_date', MAX_COURSES_PER_TICK).catch(() => []);
 
-    // ── BATCH : 1 seul DispatchNotification.filter pour toutes les courses publiées ──
-    // Avant : N+1 reads (1 DispatchNotification.filter par course, jusqu'à 20/tick).
-    // Maintenant : 1 seul read avec $in sur tous les course_ids, puis split en mémoire.
+    // ── BATCH : 1 seul DispatchNotification.aggregate pour toutes les courses publiées ──
+    // Avant : filter(limit=500).catch(() => []) — une page limitée à 500 ou une erreur
+    // de lecture était interprétée comme « aucune notification », déclenchant des
+    // re-notifications intempestives. Maintenant : aggregate(groupBy) sans limite de page,
+    // et un échec de lecture saute le « cas 3 » au lieu de le traiter comme absence.
     const publieesValides = (coursesPubliees || []).filter(c =>
       c?.id && c.client_decision_attendue !== true &&
       !c.livreur_id && !c.accepted_by_livreur_id
     );
     if (publieesValides.length > 0) {
       const courseIdsToCheck = publieesValides.map(c => c.id);
-      const allDn = await base44.asServiceRole.entities.DispatchNotification.filter(
-        { course_id: { $in: courseIdsToCheck } }, undefined, 500
-      ).catch(() => []);
-      const courseIdsWithNotif = new Set((allDn || []).map(dn => dn.course_id));
-      for (const c of publieesValides) {
-        if (!courseIdsWithNotif.has(c.id)) {
-          coursesSansNotif.push(c);
+      let notifLookupFailed = false;
+      let courseIdsWithNotif = new Set<string>();
+      try {
+        const aggResult = await base44.asServiceRole.entities.DispatchNotification.aggregate({
+          query: { course_id: { $in: courseIdsToCheck } },
+          groupBy: 'course_id',
+        });
+        courseIdsWithNotif = new Set((aggResult?.rows || []).map((r: any) => r.course_id));
+      } catch (err: any) {
+        // Une erreur de lecture ne doit JAMAIS être interprétée comme une absence de notification.
+        // On skip le « cas 3 » — les courses ne seront pas re-notifiées sur la base d'un échec.
+        notifLookupFailed = true;
+        console.error('[RECUP_COURSES] Erreur lecture DispatchNotification (cas 3 skip):', err?.message || String(err));
+      }
+      if (!notifLookupFailed) {
+        for (const c of publieesValides) {
+          if (!courseIdsWithNotif.has(c.id)) {
+            coursesSansNotif.push(c);
+          }
         }
       }
     }

@@ -361,6 +361,16 @@ export async function accepterCourseV2(base44: any, courseId: string, livreurId:
   const course = await base44.asServiceRole.entities.CourseExterne.get(courseId);
   if (!course) return { error: 'Course introuvable' };
 
+  // 1b. Idempotency guard — si ce livreur a DÉJÀ accepté cette course,
+  // on retourne succès immédiatement sans rejouer les side-effects post-acceptation.
+  // Cela permet à withAuthRetry de retenter en toute sécurité après un 429 :
+  // si l'updateMany a réussi mais qu'un appel ultérieur (notification, etc.) a
+  // eu un rate limit, le retry ne dupliquera pas les side-effects.
+  if (String(course.accepted_by_livreur_id) === String(livreurId) ||
+      String(course.livreur_id) === String(livreurId)) {
+    return { success: true, accepted: true, course_id: courseId, livreur_id: livreurId, idempotent: true };
+  }
+
   // 2. Check course still available (disponible_push V2, propose V1)
   // ⚠️ en_attente est EXCLU — c'est le statut utilisé par annulerCourseExterne
   // quand un livreur annule. Si on l'autorise ici, un autre livreur peut
