@@ -125,9 +125,14 @@ export default async function(req: Request): Promise<Response> {
       }
     }
 
-    // Validation spécifique: client_contacte réservé aux courses admin
+    // [FIX 2026-10-27] client_contacte autorisé pour les courses colis clientes (expedier/recevoir),
+    // pas seulement les courses admin. L'APK utilise ce parcours pour les colis clients :
+    // contact WhatsApp → trajet vers l'expéditeur → colis récupéré → livraison.
+    // La restriction reste pour les courses de déplacement (passagers) où cette étape n'existe pas.
     if (statut_cible === 'client_contacte' && course.source !== 'admin' && course.pricing_mode !== 'admin_manuel') {
-      return Response.json({ error: 'L\'étape "Client contacté" est réservée aux courses administratives' }, { status: 400 });
+      if (course.type_course === 'deplacement') {
+        return Response.json({ error: 'L\'étape "Client contacté" est réservée aux courses de colis' }, { status: 400 });
+      }
     }
 
     // Construire l'update
