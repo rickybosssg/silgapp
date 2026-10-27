@@ -400,12 +400,25 @@ export async function accepterCourseV2(base44: any, courseId: string, livreurId:
   // Conditions strictes :
   //   - dispatch_status === 'accepte' (PAS 'propose' qui est une proposition de prix en attente)
   //   - Le livreur authentifié est bien celui qui a accepté la course
-  // Permet à withAuthRetry de retenter après un 429 sans dupliquer les side-effects :
-  // si l'updateMany a réussi mais qu'un appel ultérieur a eu un rate limit,
-  // le retry ne rejoue pas les side-effects post-acceptation.
+  // Permet à withAuthRetry de retenter après un 429 sans dupliquer les side-effects.
+  // IMPORTANT : si l'attribution a réussi (updateMany atomique) mais qu'une écriture
+  // post-acceptation a échoué (ex: statut en_course du livreur), on reprend UNIQUEMENT
+  // les étapes manquantes de façon idempotente — sans doubler les push/messages.
   if (course.dispatch_status === 'accepte' &&
       (String(course.accepted_by_livreur_id) === String(livreurId) ||
        String(course.livreur_id) === String(livreurId))) {
+    // Étape critique 1 : le livreur doit être marqué en_course.
+    // Si une erreur 429 est survenue après le verrou d'attribution, ce statut
+    // n'a pas été écrit — on le complète maintenant (idempotent).
+    if (livreur.statut !== 'en_course') {
+      await base44.asServiceRole.entities.Livreur.update(livreurId, { statut: 'en_course' })
+        .catch((err: any) => console.error('[V2] idempotency: échec maj statut en_course:', err?.message));
+    }
+    // Étape critique 2 : marquer la DispatchNotification comme acceptée (idempotent).
+    await marquerAccepte(base44, courseId, livreurId)
+      .catch((err: any) => console.error('[V2] idempotency: échec marquerAccepte:', err?.message));
+    // Les étapes non critiques (WhatsApp, journalisation) ne sont PAS rejouées
+    // pour éviter les doublons de push/messages.
     return { success: true, accepted: true, course_id: courseId, livreur_id: livreurId, idempotent: true };
   }
 
