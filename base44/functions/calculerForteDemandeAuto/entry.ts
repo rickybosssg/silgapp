@@ -69,13 +69,13 @@ export default async function(req) {
       const seuilActivation = Number(country.forte_demande_seuil_activation) || 5;
       const seuilRetour = Number(country.forte_demande_seuil_retour) || 3;
 
-      // Compter les courses actives pour ce pays
-      const activeCourses = await base44.asServiceRole.entities.CourseExterne.filter({
+      // ── count() au lieu de filter() — compte côté serveur, ne charge aucun record ──
+      // Avant : filter limit 500 → chargeait 500 objets CourseExterne complets par pays
+      // juste pour lire .length. Maintenant : 1 appel count (agrégation serveur).
+      const activeCount = await base44.asServiceRole.entities.CourseExterne.count({
         country_code: countryCode,
         statut: STATUTS_ACTIFS_FORTE_DEMANDE,
-      }, "-created_date", 500);
-
-      const activeCount = (activeCourses || []).length;
+      });
       const prevState = !!country.forte_demande_active;
 
       // ── Appliquer l'hystérésis (logique identique à getForteDemandeStatus) ──
