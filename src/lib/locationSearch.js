@@ -104,10 +104,10 @@ export async function refreshCountryLocationIndex(countryCode, force = false) {
   if (!code) return [];
 
   const memory = memoryIndexes.get(code);
-  if (!force && memory && Date.now() - memory.savedAt < INDEX_TTL_MS) return memory.items;
+  if (!force && memory && Array.isArray(memory.items) && memory.items.length > 0 && Date.now() - memory.savedAt < INDEX_TTL_MS) return memory.items;
 
   const cached = safeStorageRead(indexCacheKey(code));
-  if (!force && cached) {
+  if (!force && cached && Array.isArray(cached) && cached.length > 0) {
     memoryIndexes.set(code, { items: cached, savedAt: Date.now() });
     return cached;
   }
@@ -128,8 +128,14 @@ export async function refreshCountryLocationIndex(countryCode, force = false) {
     ...pharmacies.map((item) => mapStructure(item, "pharmacie", code)),
   ];
 
-  memoryIndexes.set(code, { items, savedAt: Date.now() });
-  safeStorageWrite(indexCacheKey(code), items, INDEX_TTL_MS);
+  // ── Ne JAMAIS cacher un résultat vide ──
+  // Si l'API échoue (réseau, token, etc.), items est [] et ne doit PAS être
+  // mis en cache. Sinon, safeStorageRead retourne [] (truthy en JS) pendant 6h,
+  // bloquant toutes les suggestions de quartiers sans rappeler l'API.
+  if (Array.isArray(items) && items.length > 0) {
+    memoryIndexes.set(code, { items, savedAt: Date.now() });
+    safeStorageWrite(indexCacheKey(code), items, INDEX_TTL_MS);
+  }
   return items;
 }
 
