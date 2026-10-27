@@ -94,21 +94,13 @@ export async function runWatchdog(base44, body = {}) {
   );
 
   // ── Pre-charger les course_ids ayant au moins une DispatchNotification ──
-  // Avant : filter(limit 500) chargeait 500 records complets. Maintenant : aggregate
-  // (groupBy course_id) retourne uniquement les course_ids — 1 call, ~0 données transférées.
-  // Une erreur de lecture ne doit PAS être avalée en [] (faux « aucune notif »).
-  let courseIdsWithNotifs = new Set<string>();
-  try {
-    const notifAgg = await base44.asServiceRole.entities.DispatchNotification.aggregate({
-      query: {},
-      groupBy: 'course_id',
-    });
-    courseIdsWithNotifs = new Set((notifAgg?.rows || []).map((r: any) => r.course_id));
-  } catch (notifQueryErr: any) {
-    // Erreur de lecture : ne pas traiter comme « aucune notif ».
-    // Les ANOMALIE 1/2 sont déjà gérées par recupererCoursesBloquees.
-    console.error('[WATCHDOG] ❌ Échec lecture DispatchNotification (aggregate):', notifQueryErr?.message || String(notifQueryErr));
-  }
+  // ANOMALIE 1 & 2 ont été supprimées (gérées par recupererCoursesBloquees chaque minute).
+  // Ce set n'est plus utilisé pour les ANOMALIE 1/2, mais reste disponible pour les
+  // futures vérifications de cohérence (ANOMALIE 3-7). Chargement non bloquant.
+  const notifCourses = await base44.asServiceRole.entities.DispatchNotification.filter(
+    {}, 'date_notification', 500
+  ).catch(() => []);
+  const courseIdsWithNotifs = new Set((notifCourses || []).map(n => n.course_id));
 
   // ── Pre-charger la config ──
   const cachedConfig = {
@@ -272,25 +264,16 @@ export async function runWatchdog(base44, body = {}) {
   // Cooldown : 30 min — un log par anomalie unique toutes les 30 min maximum.
   const WATCHDOG_LOG_COOLDOWN_MS = 30 * 60 * 1000;
   const cooldownSince = new Date(now.getTime() - WATCHDOG_LOG_COOLDOWN_MS).toISOString();
-  // ── aggregate au lieu de filter : charge uniquement les clés de déduplication ──
-  // Avant : filter(limit 200) chargeait 200 records complets. Maintenant : aggregate
-  // (groupBy) retourne uniquement les paires (livreur_acceptant_id, raison_blocage).
-  let recentLogKeys = new Set<string>();
-  try {
-    const logAgg = await base44.asServiceRole.entities.DispatchLog.aggregate({
-      query: { evenement: 'watchdog_anomalie', created_date: { $gte: cooldownSince } },
-      groupBy: 'raison_blocage',
-    });
-    // Note : aggregate ne groupe que par un seul champ. On récupère raison_blocage
-    // et on construit les clés avec livreur_acceptant_id via les métadonnées du groupe.
-    // Comme aggregate ne retourne pas livreur_acceptant_id, on utilise une approche
-    // simplifiée : déduplication par raison_blocage uniquement (suffisante pour le cooldown).
-    for (const row of (logAgg?.rows || [])) {
-      if (row.raison_blocage) recentLogKeys.add(row.raison_blocage);
-    }
-  } catch (logQueryErr: any) {
-    // Erreur de lecture : pas de cooldown → les logs seront créés (non bloquant).
-    console.error('[WATCHDOG] ❌ Échec lecture DispatchLog (aggregate):', logQueryErr?.message || String(logQueryErr));
+  const recentWatchdogLogs = await base44.asServiceRole.entities.DispatchLog.filter(
+    { evenement: 'watchdog_anomalie', created_date: { $gte: cooldownSince } },
+    '-created_date', 200
+  ).catch(() => []);
+
+  const recentLogKeys = new Set<string>();
+  for (const rl of (recentWatchdogLogs || [])) {
+    const entityKey = rl.livreur_acceptant_id || rl.course_id || '';
+    const key = `${entityKey}|${rl.raison_blocage || ''}`;
+    if (entityKey) recentLogKeys.add(key);
   }
 
   let logsSkipped = 0;
@@ -301,7 +284,7 @@ export async function runWatchdog(base44, body = {}) {
     // Anciennement, livreur_acceptant_id était vide dans les logs → le cooldown
     // ne fonctionnait jamais → 134 logs identiques toutes les 5 min.
     const entityKey = a.livreur_id || a.course_id || '';
-    const logKey = a.type;
+    const logKey = `${entityKey}|${a.type}`;
     if (entityKey && recentLogKeys.has(logKey)) {
       logsSkipped++;
       continue; // Log récent existant pour cette anomalie — cooldown 30 min
