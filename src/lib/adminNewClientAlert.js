@@ -88,6 +88,12 @@ export async function notifyAdminsNewClient({ clientCountryCode, clientNom, clie
       }
 
       // ── Envoyer le push via le système existant ──
+      // Si le plan inclut les backend functions, envoiNotificationPush crée
+      // la Notification + AdminInboxItem + envoie le FCM push natif.
+      // Si le plan ne l'inclut pas (402), on crée quand même la Notification
+      // directement (notification in-app visible par l'admin dans son dashboard).
+      let pushSent = false;
+      let notifId = null;
       try {
         const res = await base44.functions.invoke("envoiNotificationPush", {
           titre: ALERT_TITLE,
@@ -96,15 +102,33 @@ export async function notifyAdminsNewClient({ clientCountryCode, clientNom, clie
           destinataire_email: adminEmail,
           user_type: "admin",
         });
-        results.push({
-          adminEmail,
-          sent: !!res?.success || !!res?.notification_id,
-          notification_id: res?.notification_id || null,
-          tokens_sent: res?.tokens_sent || 0,
-        });
-      } catch (err) {
-        results.push({ adminEmail, sent: false, error: err?.message || "unknown" });
+        pushSent = !!res?.success || !!res?.notification_id;
+        notifId = res?.notification_id || null;
+      } catch (_) {
+        // 402 (plan sans backend functions) ou autre erreur — fallback in-app
       }
+
+      // ── Fallback : créer la Notification directement si le push a échoué ──
+      // Garantit que l'admin voie l'alerte dans son dashboard même sans FCM.
+      if (!pushSent) {
+        try {
+          const notif = await base44.entities.Notification.create({
+            titre: ALERT_TITLE,
+            message,
+            type: ALERT_TYPE,
+            destinataire_email: adminEmail,
+            lue: false,
+          });
+          notifId = notif?.id || null;
+        } catch (_) {}
+      }
+
+      results.push({
+        adminEmail,
+        sent: pushSent,
+        in_app_created: !pushSent,
+        notification_id: notifId,
+      });
     }
 
     const anySent = results.some((r) => r.sent);

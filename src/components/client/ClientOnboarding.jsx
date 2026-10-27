@@ -7,6 +7,7 @@ import { useActiveCountries } from "@/lib/countryService";
 import { normalizePhone, validateLocalPhone } from "@/lib/phoneUtils";
 import CountrySelect from "@/components/ui/CountrySelect";
 import SmartAddressInput from "@/components/location/SmartAddressInput";
+import { notifyAdminsNewClient } from "@/lib/adminNewClientAlert";
 
 // ─── Helpers téléphone ────────────────────────────────────────────────────────
 function formaterAffichage(raw, maxDigits = 8) {
@@ -115,6 +116,7 @@ function EtapeProfil({ clientProfil, onSuccess, onBack }) {
         }
       }
 
+      let isNewClient = false;
       let updated;
       const profileData = {
         nom: nom.trim(),
@@ -134,6 +136,7 @@ function EtapeProfil({ clientProfil, onSuccess, onBack }) {
       if (clientProfil?.id) {
         updated = await base44.entities.ClientExterne.update(clientProfil.id, profileData);
       } else {
+        // Pas d'ID → vérifier par téléphone si le client existe déjà
         const user = await base44.auth.me();
         let existing = null;
         try {
@@ -146,6 +149,8 @@ function EtapeProfil({ clientProfil, onSuccess, onBack }) {
             user_email: user?.email || "",
           });
         } else {
+          // ── Véritable nouveau client — déclencher l'alerte push admin ──
+          isNewClient = true;
           updated = await base44.entities.ClientExterne.create({
             ...profileData,
             user_email: user?.email || "",
@@ -163,7 +168,7 @@ function EtapeProfil({ clientProfil, onSuccess, onBack }) {
       try { localStorage.setItem("client_profil_complet", "true"); } catch (_) {}
       toast.success(codePromoStatut === "valide" ? "Profil complété ! Code promo appliqué " : "Profil complété !");
 
-      base44.functions.invoke('initClientAuto', {
+      const initResult = await base44.functions.invoke('initClientAuto', {
         device_id: navigator.userAgent.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 50),
         platform: "web",
         notification_token: null,
@@ -172,6 +177,17 @@ function EtapeProfil({ clientProfil, onSuccess, onBack }) {
         country_code: countryCode,
         telephone: telNormalise,
       }).catch(() => null);
+
+      // ── Alerte push admin : uniquement pour un VRAI nouveau client ──
+      // Pas déclenché pour : connexion, modification profil, livreur, partenaire,
+      // ni pour un compte existant rattaché par téléphone.
+      if (isNewClient) {
+        notifyAdminsNewClient({
+          clientCountryCode: countryCode,
+          clientNom: nom.trim(),
+          clientId: updated?.id,
+        }).catch(() => null);
+      }
 
       onSuccess(updated || { ...(clientProfil || {}), ...profileData });
     } catch {
