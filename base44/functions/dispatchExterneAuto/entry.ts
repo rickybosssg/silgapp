@@ -37,7 +37,9 @@ console.log(`[DISPATCH_EXTERNE_AUTO] 🔖 dispatchV2 bundle version: ${DISPATCH_
 const AUTH_ERROR_SIGNATURE = 'You must be logged in to access this app';
 const MAX_AUTH_RETRIES = 2;
 const AUTH_RETRY_DELAY_MS = 500;
-const INFRA_RETRY_DELAY_MS = 1000; // Backoff pour erreurs infrastructure transitoires (rate limit, timeout, réseau)
+const INFRA_RETRY_DELAY_MS = 1000; // Backoff pour erreurs infrastructure transitoires (timeout, réseau)
+const RATE_LIMIT_RETRY_DELAY_MS = 5000; // Backoff pour rate limit (429) — fenêtre de 60s, pas 1s
+const RATE_LIMIT_MAX_RETRIES = 1; // 1 seul retry sur rate limit (2 tentatives total) — ne pas amplifier la surcharge
 
 /**
  * Classification des erreurs infrastructure transitoires.
@@ -114,12 +116,18 @@ async function withAuthRetry(req: Request, stepName: string, fn: (base44: any) =
       console.error(`[DISPATCH] STEP_FAILED=${stepName} attempt=${attempt + 1}/${MAX_AUTH_RETRIES + 1} auth_error=${isAuthError} infra_error=${isInfra} msg="${msg}"`);
 
       // ── Erreur infrastructure transitoire (rate limit, timeout, réseau) ──
-      // UNE seule retry avec backoff 1000ms
-      if (isInfra && !infraRetried && attempt < MAX_AUTH_RETRIES) {
+      // Rate limit (429) : backoff 5s — la fenêtre de quota est 60s, un retry à 1s
+      // frapperait le même quota. Autres erreurs infra : backoff 1s.
+      const isRateLimitErr = msg.includes('429') || msg.toLowerCase().includes('rate limit') || msg.toLowerCase().includes('rate_limit');
+      const infraDelay = isRateLimitErr ? RATE_LIMIT_RETRY_DELAY_MS : INFRA_RETRY_DELAY_MS;
+      // Rate limit : 1 seul retry max (ne pas amplifier la surcharge).
+      // Autre infra : jusqu'à MAX_AUTH_RETRIES retries.
+      const canRetryInfra = isRateLimitErr ? (!infraRetried && attempt < RATE_LIMIT_MAX_RETRIES) : (attempt < MAX_AUTH_RETRIES);
+      if (isInfra && canRetryInfra) {
         infraRetried = true;
         hadInfraError = true;
-        await new Promise(r => setTimeout(r, INFRA_RETRY_DELAY_MS));
-        console.log(`[DISPATCH] 🔄 Retrying ${stepName} after infra error (rate limit/timeout) — attempt ${attempt + 2}/${MAX_AUTH_RETRIES + 1}`);
+        await new Promise(r => setTimeout(r, infraDelay));
+        console.log(`[DISPATCH] 🔄 Retrying ${stepName} after ${isRateLimitErr ? 'rate limit' : 'infra'} error — attempt ${attempt + 2}/${MAX_AUTH_RETRIES + 1} delay=${infraDelay}ms`);
         continue;
       }
 

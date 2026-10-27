@@ -55,8 +55,18 @@ export async function passActifAt(
       expiration_at: { $gt: timestamp.toISOString() },
     }, '-debut_at', 100);
   } catch (error) {
-    console.error(JSON.stringify({ event: 'PASS_LOOKUP_ERROR', livreur_id: livreurId, timestamp: timestamp.toISOString(), error: error?.message }));
-    throw new Error('PASS_LOOKUP_ERROR: vérification indisponible, réessayez');
+    const origMsg = error?.message || String(error);
+    console.error(JSON.stringify({ event: 'PASS_LOOKUP_ERROR', livreur_id: livreurId, timestamp: timestamp.toISOString(), error: origMsg }));
+    // ── Préserver le contexte rate-limit dans le message ──
+    // Si l'erreur d'origine est un rate limit (429), le message doit le refléter
+    // pour que isTransientInfrastructureError() puisse la classifier correctement
+    // (RATE_LIMIT_429 au lieu de FATAL) et que withAuthRetry puisse la retryer.
+    const isRateLimit = origMsg.toLowerCase().includes('rate limit') || origMsg.includes('429');
+    throw new Error(
+      isRateLimit
+        ? `PASS_LOOKUP_ERROR: rate limit exceeded — ${origMsg}`
+        : `PASS_LOOKUP_ERROR: vérification indisponible, réessayez (${origMsg})`
+    );
   }
 
   for (const achat of (achats || [])) {

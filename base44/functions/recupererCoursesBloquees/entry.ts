@@ -72,16 +72,23 @@ export default async function(req: Request): Promise<Response> {
       updated_date: { $lte: thresholdDate },
     }, 'created_date', MAX_COURSES_PER_TICK).catch(() => []);
 
-    for (const c of (coursesPubliees || [])) {
-      if (!c?.id) continue;
-      if (c.client_decision_attendue === true) continue;
-      if (c.livreur_id || c.accepted_by_livreur_id) continue;
-      // Vérifier si la course a au moins 1 DispatchNotification
-      const dnCheck = await base44.asServiceRole.entities.DispatchNotification.filter(
-        { course_id: c.id }, undefined, 1
+    // ── BATCH : 1 seul DispatchNotification.filter pour toutes les courses publiées ──
+    // Avant : N+1 reads (1 DispatchNotification.filter par course, jusqu'à 20/tick).
+    // Maintenant : 1 seul read avec $in sur tous les course_ids, puis split en mémoire.
+    const publieesValides = (coursesPubliees || []).filter(c =>
+      c?.id && c.client_decision_attendue !== true &&
+      !c.livreur_id && !c.accepted_by_livreur_id
+    );
+    if (publieesValides.length > 0) {
+      const courseIdsToCheck = publieesValides.map(c => c.id);
+      const allDn = await base44.asServiceRole.entities.DispatchNotification.filter(
+        { course_id: { $in: courseIdsToCheck } }, undefined, 500
       ).catch(() => []);
-      if (!dnCheck || dnCheck.length === 0) {
-        coursesSansNotif.push(c);
+      const courseIdsWithNotif = new Set((allDn || []).map(dn => dn.course_id));
+      for (const c of publieesValides) {
+        if (!courseIdsWithNotif.has(c.id)) {
+          coursesSansNotif.push(c);
+        }
       }
     }
 
