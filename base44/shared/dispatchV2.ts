@@ -361,38 +361,10 @@ export async function accepterCourseV2(base44: any, courseId: string, livreurId:
   const course = await base44.asServiceRole.entities.CourseExterne.get(courseId);
   if (!course) return { error: 'Course introuvable' };
 
-  // 1b. Idempotency guard — si ce livreur a DÉJÀ accepté cette course,
-  // on retourne succès immédiatement sans rejouer les side-effects post-acceptation.
-  // Cela permet à withAuthRetry de retenter en toute sécurité après un 429 :
-  // si l'updateMany a réussi mais qu'un appel ultérieur (notification, etc.) a
-  // eu un rate limit, le retry ne dupliquera pas les side-effects.
-  if (String(course.accepted_by_livreur_id) === String(livreurId) ||
-      String(course.livreur_id) === String(livreurId)) {
-    return { success: true, accepted: true, course_id: courseId, livreur_id: livreurId, idempotent: true };
-  }
-
-  // 2. Check course still available (disponible_push V2, propose V1)
-  // ⚠️ en_attente est EXCLU — c'est le statut utilisé par annulerCourseExterne
-  // quand un livreur annule. Si on l'autorise ici, un autre livreur peut
-  // accepter une course que le livreur précédent a annulée.
-  // L'admin doit utiliser l'assignation manuelle (AssignLivreurDialog) pour
-  // réaffecter une course en attente.
-  if (course.dispatch_status !== 'disponible_push' && course.dispatch_status !== 'propose') {
-    return reponseDejaPrise('not_available', course);
-  }
-  // 2b. Refuser les courses en statut terminal (annulee / livree)
-  if (STATUTS_TERMINAUX_COURSE.includes(course.statut)) {
-    return { success: false, accepted: false, reason: 'course_terminal', error: 'Cette course n\'est plus disponible (terminée ou annulée).' };
-  }
-  if (course.livreur_id || course.accepted_by_livreur_id) {
-    return reponseDejaPrise('already_taken', course);
-  }
-
-  // 3. Get livreur + verify country
-  // ── [SÉCURITÉ] Vérification d'identité obligatoire avant toute logique de dispatch ──
+  // 2. [SÉCURITÉ] Vérification d'identité obligatoire AVANT toute logique de dispatch.
   // Le livreur_id provient du frontend. On vérifie qu'il appartient à l'utilisateur authentifié.
-  // Ce guard s'exécute AVANT les vérifications d'éligibilité, de scoring et de commission.
-  // Il ne modifie pas la logique de Dispatch V2 — c'est un middleware de sécurité.
+  // Ce guard s'exécute AVANT l'idempotency guard pour qu'aucun faux succès ne soit retourné
+  // à un utilisateur non authentifié ou dont l'identité ne correspond pas au livreur_id fourni.
   const { verifyLivreurIdentity } = await import('./livreurIdentityGuard.ts');
   const identityCheck = await verifyLivreurIdentity(base44, livreurId);
   if (!identityCheck.verified) {
@@ -400,6 +372,55 @@ export async function accepterCourseV2(base44: any, courseId: string, livreurId:
   }
   const livreur = identityCheck.livreur;
 
+  // 3. [SÉCURITÉ] Vérification du périmètre pays
+  const courseCountry = (course.country_code || '').trim().toUpperCase();
+  const livreurCountry = (livreur.country_code || '').trim().toUpperCase();
+  if (!courseCountry || !livreurCountry || courseCountry !== livreurCountry) {
+    return { success: false, error: 'country_mismatch' };
+  }
+
+  // 4. [SÉCURITÉ] Vérification du périmètre entreprise
+  // Comparaison canonique via normalizeEnterpriseId (null === null = match pour le réseau public).
+  const courseEnterpriseId = normalizeEnterpriseId(course.enterprise_id);
+  const livreurEnterpriseId = normalizeEnterpriseId(livreur.enterprise_id);
+  if (courseEnterpriseId !== livreurEnterpriseId) {
+    return {
+      success: false, accepted: false, reason: 'enterprise_mismatch',
+      error: 'Cette course appartient à un autre périmètre.',
+    };
+  }
+
+  // 5. Refuser les courses en statut terminal (annulee / livree)
+  // Ces courses ne peuvent JAMAIS être acceptées, même de façon idempotente.
+  if (STATUTS_TERMINAUX_COURSE.includes(course.statut)) {
+    return { success: false, accepted: false, reason: 'course_terminal', error: 'Cette course n\'est plus disponible (terminée ou annulée).' };
+  }
+
+  // 6. Idempotency guard — reconnaître une acceptation RÉELLEMENT confirmée.
+  // Conditions strictes :
+  //   - dispatch_status === 'accepte' (PAS 'propose' qui est une proposition de prix en attente)
+  //   - Le livreur authentifié est bien celui qui a accepté la course
+  // Permet à withAuthRetry de retenter après un 429 sans dupliquer les side-effects :
+  // si l'updateMany a réussi mais qu'un appel ultérieur a eu un rate limit,
+  // le retry ne rejoue pas les side-effects post-acceptation.
+  if (course.dispatch_status === 'accepte' &&
+      (String(course.accepted_by_livreur_id) === String(livreurId) ||
+       String(course.livreur_id) === String(livreurId))) {
+    return { success: true, accepted: true, course_id: courseId, livreur_id: livreurId, idempotent: true };
+  }
+
+  // 7. Check course still available (disponible_push V2, propose V1)
+  // ⚠️ en_attente est EXCLU — c'est le statut utilisé par annulerCourseExterne
+  // quand un livreur annule. Si on l'autorise ici, un autre livreur peut
+  // accepter une course que le livreur précédent a annulée.
+  if (course.dispatch_status !== 'disponible_push' && course.dispatch_status !== 'propose') {
+    return reponseDejaPrise('not_available', course);
+  }
+  if (course.livreur_id || course.accepted_by_livreur_id) {
+    return reponseDejaPrise('already_taken', course);
+  }
+
+  // 8. Vérifier l'éligibilité du livreur (après les vérifications de sécurité)
   const livreurEligible =
     livreur.type_livreur === 'externe' &&
     livreur.validation === 'valide' &&
@@ -410,25 +431,6 @@ export async function accepterCourseV2(base44: any, courseId: string, livreurId:
     livreur.admin_hors_ligne !== true;
   if (!livreurEligible) {
     return { success: false, accepted: false, reason: 'livreur_indisponible', error: 'Livreur non disponible pour cette course.' };
-  }
-
-  const courseCountry = (course.country_code || '').trim().toUpperCase();
-  const livreurCountry = (livreur.country_code || '').trim().toUpperCase();
-  if (!courseCountry || !livreurCountry || courseCountry !== livreurCountry) {
-    return { success: false, error: 'country_mismatch' };
-  }
-
-  // [ENTERPRISE] Vérification backend obligatoire : course.enterprise_id === livreur.enterprise_id
-  // Comparaison canonique via normalizeEnterpriseId (null === null = match pour le réseau public).
-  // Empêche un livreur Enterprise B d'accepter une course Enterprise A, et inversement.
-  // Empêche un livreur Enterprise d'accepter une course publique, et inversement.
-  const courseEnterpriseId = normalizeEnterpriseId(course.enterprise_id);
-  const livreurEnterpriseId = normalizeEnterpriseId(livreur.enterprise_id);
-  if (courseEnterpriseId !== livreurEnterpriseId) {
-    return {
-      success: false, accepted: false, reason: 'enterprise_mismatch',
-      error: 'Cette course appartient à un autre périmètre.',
-    };
   }
 
   // [CITY_DISPATCH] Vérification de compatibilité de ville (défense en profondeur).
