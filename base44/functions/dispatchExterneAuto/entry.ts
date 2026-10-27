@@ -38,8 +38,39 @@ const AUTH_ERROR_SIGNATURE = 'You must be logged in to access this app';
 const MAX_AUTH_RETRIES = 2;
 const AUTH_RETRY_DELAY_MS = 500;
 const INFRA_RETRY_DELAY_MS = 1000; // Backoff pour erreurs infrastructure transitoires (timeout, réseau)
-const RATE_LIMIT_RETRY_DELAY_MS = 5000; // Backoff pour rate limit (429) — fenêtre de 60s, pas 1s
+const RATE_LIMIT_RETRY_DELAY_MS = 5000; // Backoff par défaut pour rate limit (429) — fenêtre de 60s, pas 1s
 const RATE_LIMIT_MAX_RETRIES = 1; // 1 seul retry sur rate limit (2 tentatives total) — ne pas amplifier la surcharge
+const RATE_LIMIT_MAX_DELAY_MS = 120 * 1000; // Délai maximal (Retry-After plafonné à 120s)
+
+/**
+ * Extrait le délai Retry-After (ms) depuis une erreur 429.
+ * Sources (par ordre de priorité) :
+ *   1. En-tête HTTP Retry-After (si accessible via error.response.headers)
+ *   2. Message texte « Retry after Ns » (format Base44 entity_list rate limit)
+ * Respecte la valeur du serveur si présente et bornée (≤120s) ; sinon retourne null
+ * (l'appelant utilise le délai par défaut RATE_LIMIT_RETRY_DELAY_MS).
+ */
+function extractRetryAfterMs(error: any): number | null {
+  // 1. En-tête HTTP Retry-After
+  const headers = error?.response?.headers || error?.headers;
+  if (headers) {
+    const retryAfter = typeof headers.get === 'function'
+      ? (headers.get('retry-after') || headers.get('Retry-After'))
+      : (headers['retry-after'] || headers['Retry-After']);
+    if (retryAfter) {
+      const seconds = parseInt(String(retryAfter), 10);
+      if (Number.isFinite(seconds) && seconds > 0 && seconds <= 120) return seconds * 1000;
+    }
+  }
+  // 2. Message texte « Retry after Ns » (format Base44)
+  const msg = error?.message || String(error);
+  const match = msg.match(/retry after (\d+)\s*s/i);
+  if (match) {
+    const seconds = parseInt(match[1], 10);
+    if (Number.isFinite(seconds) && seconds > 0 && seconds <= 120) return seconds * 1000;
+  }
+  return null;
+}
 
 /**
  * Classification des erreurs infrastructure transitoires.
@@ -119,7 +150,9 @@ async function withAuthRetry(req: Request, stepName: string, fn: (base44: any) =
       // Rate limit (429) : backoff 5s — la fenêtre de quota est 60s, un retry à 1s
       // frapperait le même quota. Autres erreurs infra : backoff 1s.
       const isRateLimitErr = msg.includes('429') || msg.toLowerCase().includes('rate limit') || msg.toLowerCase().includes('rate_limit');
-      const infraDelay = isRateLimitErr ? RATE_LIMIT_RETRY_DELAY_MS : INFRA_RETRY_DELAY_MS;
+      // Respecter Retry-After si présent dans les en-têtes de l'erreur 429.
+      const retryAfterMs = isRateLimitErr ? extractRetryAfterMs(error) : null;
+      const infraDelay = retryAfterMs || (isRateLimitErr ? RATE_LIMIT_RETRY_DELAY_MS : INFRA_RETRY_DELAY_MS);
       // Rate limit : 1 seul retry max (ne pas amplifier la surcharge).
       // Autre infra : jusqu'à MAX_AUTH_RETRIES retries.
       const canRetryInfra = isRateLimitErr ? (!infraRetried && attempt < RATE_LIMIT_MAX_RETRIES) : (attempt < MAX_AUTH_RETRIES);

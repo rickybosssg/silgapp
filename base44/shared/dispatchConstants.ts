@@ -109,12 +109,16 @@ export async function chargerConfigPays(base44: any, countryCode: string) {
   if (!countryCode) return null;
   const cached = COUNTRY_CONFIG_CACHE.get(countryCode);
   if (cached && cached.expires > Date.now()) return cached.data;
-  try {
-    const countries = await base44.asServiceRole.entities.Country.filter({ code: countryCode, actif: true });
-    const data = countries?.[0] || null;
+  // ── Pas de try/catch : une erreur de lecture (rate limit, timeout) doit se propager ──
+  // Retourner null sur erreur ferait apparaître le faux message « Prix minimum non
+  // configuré pour le pays BF » alors que la config existe (prix_minimum=500).
+  // L'appelant (withAuthRetry ou le try/catch de la fonction) gère le retry.
+  // getIndicatifPays ci-dessus a son propre try/catch et reste compatible.
+  const countries = await base44.asServiceRole.entities.Country.filter({ code: countryCode, actif: true });
+  const data = countries?.[0] || null;
+  // Ne cacher QUE les résultats valides (pas les null = config absente légitime).
+  if (data) {
     COUNTRY_CONFIG_CACHE.set(countryCode, { data, expires: Date.now() + COUNTRY_CONFIG_TTL_MS });
-    return data;
-  } catch {
-    return null;
   }
+  return data;
 }

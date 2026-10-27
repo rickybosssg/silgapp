@@ -16,6 +16,15 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.49';
 //   - Aucune donnée privée exposée (uniquement des compteurs agrégés)
 //   - Cache in-memory 45s pour éviter la surcharge DB
 //
+// ROBUSTESSE (correctif 2026-10-27) :
+//   - Une erreur de lecture (rate limit, timeout) ne produit JAMAIS de faux zéros
+//     avec une date récente. Les dernières valeurs valides en cache sont conservées
+//     avec leur véritable ancienneté (updated_at d'origine, flag stale=true).
+//   - Si aucune donnée valide n'existe en cache, une erreur 503 explicite est
+//     retournée au lieu de faux zéros.
+//   - Les compteurs ne sont jamais recalculés en cacheant une erreur de lecture
+//     comme un résultat valide.
+//
 // DÉFINITION « EN LIGNE » :
 //   Un livreur est « en ligne » s'il a un heartbeat récent (< heartbeat_on_seuil_min)
 //   ET un statut actif (disponible ou en_course). Cette définition réutilise
@@ -24,6 +33,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.49';
 // ═══════════════════════════════════════════════════════════════════════════
 
 const CACHE_TTL_MS = 45 * 1000; // 45 secondes
+const STALE_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes max pour les valeurs stale
 const HEARTBEAT_ON_SEUIL_MIN = 10; // aligné sur le default Country.heartbeat_on_seuil_min
 
 // Cache in-memory : { [countryCode]: { data, expiresAt } }
@@ -51,24 +61,34 @@ export default async function(req: Request): Promise<Response> {
 
     if (!countryCode) {
       // Résoudre depuis le profil du user (ClientExterne, Livreur, ou Partenaire)
-      const [clients, livreurs] = await Promise.all([
-        base44.asServiceRole.entities.ClientExterne.filter({ user_email: user.email }).catch(() => []),
-        base44.asServiceRole.entities.Livreur.filter({ user_email: user.email }).catch(() => []),
-      ]);
-      countryCode = clients?.[0]?.country_code || livreurs?.[0]?.country_code || null;
-
-      // Fallback : partenaire (Boutique / Restaurant / Pharmacie)
-      if (!countryCode) {
-        const [boutiques, restaurants, pharmacies] = await Promise.all([
-          base44.asServiceRole.entities.Boutique.filter({ partenaire_id: user.id }).catch(() => []),
-          base44.asServiceRole.entities.Restaurant.filter({ partenaire_id: user.id }).catch(() => []),
-          base44.asServiceRole.entities.Pharmacie.filter({ partenaire_id: user.id }).catch(() => []),
+      // ── Ne pas avaler les erreurs de lecture : si le profil ne peut être lu ──
+      //    (rate limit), on retourne du stale ou une 503, pas de faux zéros.
+      try {
+        const [clients, livreurs] = await Promise.all([
+          base44.asServiceRole.entities.ClientExterne.filter({ user_email: user.email }),
+          base44.asServiceRole.entities.Livreur.filter({ user_email: user.email }),
         ]);
-        countryCode = boutiques?.[0]?.pays_code || restaurants?.[0]?.pays_code || pharmacies?.[0]?.pays_code || null;
+        countryCode = clients?.[0]?.country_code || livreurs?.[0]?.country_code || null;
+
+        // Fallback : partenaire (Boutique / Restaurant / Pharmacie)
+        if (!countryCode) {
+          const [boutiques, restaurants, pharmacies] = await Promise.all([
+            base44.asServiceRole.entities.Boutique.filter({ partenaire_id: user.id }),
+            base44.asServiceRole.entities.Restaurant.filter({ partenaire_id: user.id }),
+            base44.asServiceRole.entities.Pharmacie.filter({ partenaire_id: user.id }),
+          ]);
+          countryCode = boutiques?.[0]?.pays_code || restaurants?.[0]?.pays_code || pharmacies?.[0]?.pays_code || null;
+        }
+      } catch (profileErr: any) {
+        // Erreur de lecture profil (rate limit, timeout) — ne pas retourner de faux zéros.
+        // Tenter de retourner du stale pour le pays inconnu n'a pas de sens (on ne connaît
+        // pas le pays). Retourner une 503 explicite.
+        return Response.json({ error: 'Profil temporairement indisponible', detail: profileErr?.message }, { status: 503 });
       }
     }
 
     if (!countryCode) {
+      // Pays réellement inconnu (pas d'erreur de lecture) — zéros légitimes
       return Response.json({
         livreurs_en_ligne: 0,
         clients_silgapp: 0,
@@ -87,78 +107,99 @@ export default async function(req: Request): Promise<Response> {
     }
 
     // ── 3. Calculer les statistiques ──
-    const now = Date.now();
-    const heartbeatCutoff = new Date(now - HEARTBEAT_ON_SEUIL_MIN * 60 * 1000).toISOString();
+    // Toutes les lectures ici sont sans .catch(() => []) : une erreur de lecture
+    // déclenche le fallback stale/503 ci-dessous, pas des faux zéros.
+    try {
+      const now = Date.now();
 
-    // Livreurs en ligne : statut actif + heartbeat récent (isON)
-    const livreursPays = await base44.asServiceRole.entities.Livreur.filter({
-      country_code: countryCode,
-      statut: ['disponible', 'en_course'],
-    }).catch(() => []);
+      // Livreurs en ligne : statut actif + heartbeat récent (isON)
+      const livreursPays = await base44.asServiceRole.entities.Livreur.filter({
+        country_code: countryCode,
+        statut: ['disponible', 'en_course'],
+      });
 
-    const livreursEnLigne = (livreursPays || []).filter((l: any) => {
-      if (l.actif === false) return false;
-      if (l.validation !== 'valide') return false;
-      const dt = l.last_seen_at || l.derniere_position_date;
-      if (!dt) return false;
-      return new Date(dt).getTime() > (now - HEARTBEAT_ON_SEUIL_MIN * 60 * 1000);
-    }).length;
+      const livreursEnLigne = (livreursPays || []).filter((l: any) => {
+        if (l.actif === false) return false;
+        if (l.validation !== 'valide') return false;
+        const dt = l.last_seen_at || l.derniere_position_date;
+        if (!dt) return false;
+        return new Date(dt).getTime() > (now - HEARTBEAT_ON_SEUIL_MIN * 60 * 1000);
+      }).length;
 
-    // Clients SILGAPP : ClientExterne avec user_email (compte réel)
-    const clientsPays = await base44.asServiceRole.entities.ClientExterne.filter({
-      country_code: countryCode,
-    }).catch(() => []);
-    const clientsSilgapp = (clientsPays || []).filter((c: any) => !!c.user_email).length;
+      // Clients SILGAPP : ClientExterne avec user_email (compte réel)
+      const clientsPays = await base44.asServiceRole.entities.ClientExterne.filter({
+        country_code: countryCode,
+      });
+      const clientsSilgapp = (clientsPays || []).filter((c: any) => !!c.user_email).length;
 
-    // Courses livrées (paginé) — pour today et total
-    const startOfToday = getStartOfTodayISO(SILGAPP_TIMEZONE);
-    let coursesTotal = 0;
-    let coursesAujourdhui = 0;
-    let skip = 0;
-    const pageSize = 500;
-    let hasMore = true;
+      // Courses livrées (paginé) — pour today et total
+      const startOfToday = getStartOfTodayISO(SILGAPP_TIMEZONE);
+      let coursesTotal = 0;
+      let coursesAujourdhui = 0;
+      let skip = 0;
+      const pageSize = 500;
+      let hasMore = true;
 
-    while (hasMore) {
-      const batch = await base44.asServiceRole.entities.CourseExterne.filter(
-        { statut: 'livree', country_code: countryCode },
-        '-created_date', pageSize, skip
-      ).catch(() => []);
+      while (hasMore) {
+        const batch = await base44.asServiceRole.entities.CourseExterne.filter(
+          { statut: 'livree', country_code: countryCode },
+          '-created_date', pageSize, skip
+        );
 
-      if (!batch || batch.length === 0) {
-        hasMore = false;
-        break;
-      }
-
-      coursesTotal += batch.length;
-      for (const c of batch) {
-        const livraisonDate = c.heure_livraison || c.colis_livre_at || c.created_date;
-        if (livraisonDate && new Date(livraisonDate).toISOString() >= startOfToday) {
-          coursesAujourdhui++;
+        if (!batch || batch.length === 0) {
+          hasMore = false;
+          break;
         }
+
+        coursesTotal += batch.length;
+        for (const c of batch) {
+          const livraisonDate = c.heure_livraison || c.colis_livre_at || c.created_date;
+          if (livraisonDate && new Date(livraisonDate).toISOString() >= startOfToday) {
+            coursesAujourdhui++;
+          }
+        }
+
+        if (batch.length < pageSize) {
+          hasMore = false;
+        } else {
+          skip += pageSize;
+        }
+        // Aucun plafond arbitraire : pagination exhaustive jusqu'à épuisement
       }
 
-      if (batch.length < pageSize) {
-        hasMore = false;
-      } else {
-        skip += pageSize;
+      const data = {
+        livreurs_en_ligne: livreursEnLigne,
+        clients_silgapp: clientsSilgapp,
+        courses_aujourdhui: coursesAujourdhui,
+        courses_total: coursesTotal,
+        pays: countryCode,
+        updated_at: new Date().toISOString(),
+        cached: false,
+      };
+
+      // ── 4. Mettre en cache ──
+      cache.set(countryCode, { data, expiresAt: now + CACHE_TTL_MS });
+
+      return Response.json(data);
+    } catch (statsError: any) {
+      // ── Une erreur de lecture ne doit JAMAIS devenir des faux zéros avec une date récente ──
+      // Conserver les dernières valeurs valides avec leur véritable ancienneté.
+      const lastValid = cache.get(countryCode);
+      if (lastValid?.data && Date.now() < (lastValid.expiresAt + STALE_CACHE_TTL_MS)) {
+        // Retourner les données stale avec leur updated_at d'origine (pas new Date())
+        return Response.json({
+          ...lastValid.data,
+          cached: true,
+          stale: true,
+          error: 'lecture_partiellement_indisponible',
+        });
       }
-      // Aucun plafond arbitraire : pagination exhaustive jusqu'à épuisement
+      // Aucune donnée valide en cache — signaler l'indisponibilité explicitement
+      return Response.json(
+        { error: 'Statistiques temporairement indisponibles', detail: statsError?.message },
+        { status: 503 }
+      );
     }
-
-    const data = {
-      livreurs_en_ligne: livreursEnLigne,
-      clients_silgapp: clientsSilgapp,
-      courses_aujourdhui: coursesAujourdhui,
-      courses_total: coursesTotal,
-      pays: countryCode,
-      updated_at: new Date().toISOString(),
-      cached: false,
-    };
-
-    // ── 4. Mettre en cache ──
-    cache.set(countryCode, { data, expiresAt: now + CACHE_TTL_MS });
-
-    return Response.json(data);
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
   }
