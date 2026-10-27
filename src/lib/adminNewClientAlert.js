@@ -87,11 +87,10 @@ export async function notifyAdminsNewClient({ clientCountryCode, clientNom, clie
         continue;
       }
 
-      // ── Envoyer le push via le système existant ──
-      // Si le plan inclut les backend functions, envoiNotificationPush crée
-      // la Notification + AdminInboxItem + envoie le FCM push natif.
-      // Si le plan ne l'inclut pas (402), on crée quand même la Notification
-      // directement (notification in-app visible par l'admin dans son dashboard).
+      // ── Envoyer le push natif via le système existant ──
+      // envoiNotificationPush crée la Notification + AdminInboxItem + envoie
+      // le FCM push natif (son + vibration, même app fermée). C'est le même
+      // système que les notifications de dispatch, messages et paiements.
       let pushSent = false;
       let notifId = null;
       try {
@@ -104,29 +103,13 @@ export async function notifyAdminsNewClient({ clientCountryCode, clientNom, clie
         });
         pushSent = !!res?.success || !!res?.notification_id;
         notifId = res?.notification_id || null;
-      } catch (_) {
-        // 402 (plan sans backend functions) ou autre erreur — fallback in-app
-      }
-
-      // ── Fallback : créer la Notification directement si le push a échoué ──
-      // Garantit que l'admin voie l'alerte dans son dashboard même sans FCM.
-      if (!pushSent) {
-        try {
-          const notif = await base44.entities.Notification.create({
-            titre: ALERT_TITLE,
-            message,
-            type: ALERT_TYPE,
-            destinataire_email: adminEmail,
-            lue: false,
-          });
-          notifId = notif?.id || null;
-        } catch (_) {}
+      } catch (err) {
+        console.error("[notifyAdminsNewClient] Push échoué:", err?.message || err);
       }
 
       results.push({
         adminEmail,
         sent: pushSent,
-        in_app_created: !pushSent,
         notification_id: notifId,
       });
     }
