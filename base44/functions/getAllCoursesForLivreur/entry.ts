@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { isGuestCourse } from '../../shared/guestOrderPolicy.js';
 
 const normalizeCountry = (value) => String(value || '').trim().toUpperCase();
 const sameId = (value, expected) => value != null && expected != null && String(value) === String(expected);
@@ -75,6 +76,15 @@ Deno.serve(async (req) => {
 
     const coursesPourLivreur = allCourses.filter((c) => {
       if (normalizeCountry(c.country_code) !== effectiveCountry) return false;
+
+      // 0. Garde invité : les courses invitées ne sont visibles que si elles
+      //    ont été acceptées par ce livreur (ownership confirmé). Elles ne
+      //    doivent jamais apparaître via les propositions de dispatch ni via
+      //    l'historique financier tant qu'elles ne sont pas assignées, pour
+      //    empêcher l'exposition des données client invité avant acceptation.
+      if (isGuestCourse(c)) {
+        return sameId(c.livreur_id, livreur_id) || sameId(c.accepted_by_livreur_id, livreur_id);
+      }
 
       // 1. Courses deja acceptees (ownership opérationnel).
       if (
