@@ -48,6 +48,7 @@ const PublicSuiviCourse = lazy(() => import('./pages/PublicSuiviCourse.jsx'));
 const GestionPays = lazy(() => import('./pages/GestionPays.jsx'));
 const AdminGlobal = lazy(() => import('./pages/AdminGlobal.jsx'));
 const CommandeExpressAdmin = lazy(() => import('./pages/CommandeExpressAdmin.jsx'));
+const CommandeInvite = lazy(() => import('./pages/CommandeInvite.jsx'));
 const DashboardPays = lazy(() => import('./pages/DashboardPays.jsx'));
 const Maintenance = lazy(() => import('./pages/Maintenance.jsx'));
 const TwilioSandboxMonitor = lazy(() => import('./pages/TwilioSandboxMonitor.jsx'));
@@ -255,8 +256,9 @@ function AppContent() {
       </Suspense>
     );
   }
-  const isPublicRoute = currentPath === '/telecharger' || 
+  const isPublicRoute = currentPath === '/telecharger' ||
                         currentPath === '/privacy-policy' ||
+                        currentPath === '/commande-invite' ||
                         currentPath.startsWith('/suivi-public/') ||
                         currentPath.startsWith('/demo/') ||
                         currentPath.startsWith('/inscription-livreur');
@@ -281,6 +283,8 @@ function AppContent() {
           <Route path="/suivi-public/:token" element={<PublicSuiviCourse />} />
           {/* Route publique d'inscription livreur entreprise (via token invitation) */}
           <Route path="/inscription-livreur" element={<InscriptionLivreurEntreprise />} />
+          {/* Route publique de commande sans compte (invité) */}
+          <Route path="/commande-invite" element={<CommandeInvite />} />
           {/* Politique de confidentialité — requise Google Play */}
           <Route path="/privacy-policy" element={<PolitiqueConfidentialite />} />
           <Route path="*" element={<PageNotFound />} />

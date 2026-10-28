@@ -34,16 +34,17 @@
     },
     "enterprise_encours_comptabilise_montant": {
       "type": "number",
-      "description": "Montant de la commission entreprise comptabilis\u00e9e dans le EnterpriseLedger (pour audit)."
+      "description": "Montant de la commission entreprise comptabilis\u00e9 dans le EnterpriseLedger (pour audit)."
     },
     "source": {
       "type": "string",
       "enum": [
         "client",
-        "admin"
+        "admin",
+        "invite"
       ],
       "default": "client",
-      "description": "Origine de la creation"
+      "description": "Origine de la creation. invite = course creee par un visiteur sans compte (module Commander sans compte), authentifiee par OTP SMS, sans client_user_email."
     },
     "delivery_mode": {
       "type": "string",
@@ -136,11 +137,11 @@
     },
     "client_phone_normalized": {
       "type": "string",
-      "description": "Telephone du client normalise (format international sans + ni espace). Utilise pour les recherches CRM."
+      "description": "Telephone du client normalise (format international sans + ni espace). Utilise pour les recherches CRM et l'anti-doublon invit\u00e9."
     },
     "client_user_email": {
       "type": "string",
-      "description": "Email du compte User li\u00e9 au client. R\u00e9solu c\u00f4t\u00e9 backend UNIQUEMENT (jamais fourni par le frontend). Permet la RLS read pour que le client voie ses courses (y compris admin/VENUS). Null si le client n'a pas de compte User."
+      "description": "Email du compte User li\u00e9 au client. R\u00e9solu c\u00f4t\u00e9 backend UNIQUEMENT (jamais fourni par le frontend). Permet la RLS read pour que le client voie ses courses (y compris admin/VENUS). Null si le client n'a pas de compte User. Null pour les courses invit\u00e9 (source=invite)."
     },
     "contact_createur_course": {
       "type": "string",
