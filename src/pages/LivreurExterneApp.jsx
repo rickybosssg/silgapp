@@ -1407,6 +1407,26 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
   };
 
+  // ── Correctif session : finalisation livreur avec gestion d'erreur stricte ──
+  // Un 401 (session expirée) NE DOIT JAMAIS être transformé en succès.
+  // On redirige vers la page de connexion pour re-authentification.
+  // Les autres erreurs sont affichées au livreur sans marquer la course comme livrée.
+  const finaliserLivraisonSafe = async (payload) => {
+    try {
+      return await base44.functions.invoke("finaliserLivraisonLivreur", payload);
+    } catch (error) {
+      const status = error?.response?.status || error?.status;
+      if (status === 401) {
+        toast.error("Session expirée. Veuillez vous reconnecter.");
+        clearPersistedToken();
+        setTimeout(() => base44.auth.redirectToLogin(window.location.href), 800);
+        throw new Error("SESSION_EXPIRED");
+      }
+      toast.error(error?.message || "Erreur lors de la finalisation. Réessayez.");
+      throw error;
+    }
+  };
+
   const remettreDisponibleSiAutorise = async () => {
     if (!livreurProfil?.id || livreurProfil?.statut === "hors_ligne") return;
     const fresh = await base44.entities.Livreur.get(livreurProfil.id).catch(() => null);
@@ -1457,7 +1477,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         if (dist && dist >= 0.1) distUpdate.distance_reelle_km = Number(dist.toFixed(2));
       }
 
-      await base44.functions.invoke("finaliserLivraisonLivreur", {
+      await finaliserLivraisonSafe({
         course_id: course.id,
         prix_final_livreur: montantSaisi,
       });
@@ -1512,12 +1532,12 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         return;
       }
 
-      await base44.functions.invoke("finaliserLivraisonLivreur", {
+      await finaliserLivraisonSafe({
         course_id: course.id,
         prix_final_livreur: prixFinal,
       });
     } else {
-      await base44.functions.invoke("finaliserLivraisonLivreur", {
+      await finaliserLivraisonSafe({
         course_id: course.id,
       });
     }

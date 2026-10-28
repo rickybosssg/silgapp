@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { base44 } from "@/api/base44Client";
+import { clearPersistedToken } from "@/lib/authPersistence";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -293,7 +294,14 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
       base44.functions.invoke("finaliserLivraisonLivreur", {
         course_id: course.id,
         prix_final_livreur: montant,
-      }).catch(() => null);
+      }).catch(err => {
+        const status = err?.response?.status || err?.status;
+        if (status === 401) {
+          toast.error("Session expirée. Veuillez vous reconnecter.");
+          clearPersistedToken();
+          setTimeout(() => base44.auth.redirectToLogin(window.location.href), 800);
+        }
+      });
       queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
       setDeplacementRecap(mergedData);
       setShowPrixModal(false);
@@ -1316,7 +1324,14 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                           } catch (err) {
                             // Erreur — rester sur la course, permettre retry
                             setOptimisticStatut(null);
-                            toast.error(err?.message || "Erreur lors de la finalisation. Réessayez.");
+                            const status = err?.response?.status || err?.status;
+                            if (status === 401) {
+                              toast.error("Session expirée. Veuillez vous reconnecter.");
+                              clearPersistedToken();
+                              setTimeout(() => base44.auth.redirectToLogin(window.location.href), 800);
+                            } else {
+                              toast.error(err?.message || "Erreur lors de la finalisation. Réessayez.");
+                            }
                           } finally {
                             setDeliveryBoutonPending(false);
                           }
@@ -1457,10 +1472,24 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                     statut: "livree",
                   };
                   updateOptimisticStatut("livree", finalData);
-                  base44.functions.invoke("finaliserLivraisonLivreur", {
-                    course_id: course.id,
-                    prix_final_livreur: deplacementRecap.prix_final,
-                  }).catch(() => null);
+                  try {
+                    const res = await base44.functions.invoke("finaliserLivraisonLivreur", {
+                      course_id: course.id,
+                      prix_final_livreur: deplacementRecap.prix_final,
+                    });
+                    if (!res?.success && !res?.skipped) throw new Error(res?.error || "Erreur finalisation");
+                  } catch (err) {
+                    setOptimisticStatut(null);
+                    const status = err?.response?.status || err?.status;
+                    if (status === 401) {
+                      toast.error("Session expirée. Veuillez vous reconnecter.");
+                      clearPersistedToken();
+                      setTimeout(() => base44.auth.redirectToLogin(window.location.href), 800);
+                    } else {
+                      toast.error(err?.message || "Erreur lors de la finalisation. Réessayez.");
+                    }
+                    return;
+                  }
                   queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
                   // Appeler onColisLivre pour libérer le livreur UNIQUEMENT maintenant
                   onColisLivre(finalData, deplacementRecap.prix_final);
