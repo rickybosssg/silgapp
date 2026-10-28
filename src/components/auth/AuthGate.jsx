@@ -778,14 +778,6 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
             </button>
           )}
 
-          {authMode === "login" ? (
-            <a
-              href="/commande-invite"
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-3.5 font-bold text-white shadow-lg shadow-red-600/20 transition hover:bg-red-700 active:scale-[0.98]"
-            >
-              Commander sans compte
-            </a>
-          ) : null}
           </div>
         </div>
       </div>

@@ -1,0 +1,28 @@
+{
+  "name": "GuestOrderRegistry",
+  "type": "object",
+  "properties": {
+    "cle": {
+      "type": "string"
+    },
+    "revision": {
+      "type": "number",
+      "default": 0
+    },
+    "ledger": {
+      "type": "string",
+      "default": "[]"
+    }
+  },
+  "required": [
+    "cle",
+    "revision",
+    "ledger"
+  ],
+  "rls": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false
+  }
+}

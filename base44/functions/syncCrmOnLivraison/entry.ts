@@ -1,11 +1,14 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
 import { recalculateStatsForCourseContacts } from "../../shared/crmEngine.ts";
+import { isGuestCourse } from '../../shared/guestOrderPolicy.js';
 
 export default async function(req: Request): Promise<Response> {
   try {
     const base44 = createClientFromRequest(req);
     const body = await req.json();
     const { course_id, course_data, country_code } = body || {};
+    // Guest contacts stay in the private guest registry, not phone-linked account histories.
+    if (isGuestCourse(course_data)) return Response.json({ success: true, skipped: true, reason: 'guest_contact_not_identity' });
 
     if (!course_data || !country_code) {
       return Response.json({ error: 'course_data et country_code requis' }, { status: 400 });
