@@ -776,6 +776,54 @@
     "auto_completed_delay_minutes": {
       "type": "number",
       "description": "D\u00e9lai r\u00e9ellement appliqu\u00e9 (en minutes) au moment de la cl\u00f4ture automatique. Permet de conserver l'historique exact m\u00eame si le d\u00e9lai configur\u00e9 change ult\u00e9rieurement."
+    },
+    "annulation_user_id": {
+      "type": "string",
+      "description": "ID de l'utilisateur ayant proc\u00e9d\u00e9 \u00e0 l'annulation terminale. Mis \u00e0 jour uniquement par le garde terminal CAS. Null = course non annul\u00e9e."
+    },
+    "annulation_source": {
+      "type": "string",
+      "enum": [
+        "client",
+        "admin",
+        "livreur"
+      ],
+      "description": "Source de l'annulation terminale (client, admin ou livreur)."
+    },
+    "annulation_event_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Horodatage metadata-only pour notifier les consommateurs temps r\u00e9el apr\u00e8s un CAS terminal. Ne r\u00e9p\u00e8te jamais le payload statut/dispatch."
+    },
+    "accepted_by_livreur_id": {
+      "type": "string",
+      "description": "ID du livreur ayant accept\u00e9 la course (snapshot au moment de l'acceptation). Effac\u00e9 lors d'un retrait s\u00e9curis\u00e9."
+    },
+    "accepted_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Horodatage d'acceptation de la course par le livreur. Utilis\u00e9 pour la v\u00e9rification de concurrence (expected_acceptance_at)."
+    },
+    "livreur_retrait_user_id": {
+      "type": "string",
+      "description": "ID utilisateur du livreur ayant proc\u00e9d\u00e9 au retrait s\u00e9curis\u00e9. Utilis\u00e9 pour l'idempotence de reprise."
+    },
+    "livreur_retrait_livreur_id": {
+      "type": "string",
+      "description": "ID livreur (entit\u00e9 Livreur) ayant proc\u00e9d\u00e9 au retrait s\u00e9curis\u00e9. Conserv\u00e9 apr\u00e8s effacement de livreur_id pour l'audit et la reprise idempotente."
+    },
+    "livreur_retrait_operation_id": {
+      "type": "string",
+      "description": "UUID unique de l'op\u00e9ration de retrait. Sert de cl\u00e9 d'idempotence et de r\u00e9f\u00e9rence dans l'audit de mission Eco."
+    },
+    "livreur_retrait_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Horodatage du retrait s\u00e9curis\u00e9. Retourn\u00e9 au client comme withdrawn_at."
+    },
+    "livreur_retrait_mission_id": {
+      "type": "string",
+      "description": "ID de la mission Eco rattach\u00e9e au moment du retrait. Utilis\u00e9 par reconcileMission pour recalculer la mission apr\u00e8s retrait."
     }
   },
   "required": [

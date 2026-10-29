@@ -63,6 +63,10 @@
     "accepted_at": {
       "type": "string",
       "format": "date-time"
+    },
+    "withdrawal_audit_json": {
+      "type": "string",
+      "description": "JSON: tableau d audit des retraits securises affectant cette mission. Chaque entree contient operation_id, course_id, at, course_ids, route_plan_json, total_price. Permet la reprise idempotente apres echec de synchronisation."
     }
   },
   "required": [
