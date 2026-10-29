@@ -213,7 +213,7 @@ Deno.serve(async (req) => {
           country_code: course.country_code || "",
           ville: course.ville_depart || "",
           date_annulation: now,
-          course_redispatch: true,
+          course_redispatch: false,
           admin_notifie: true,
           // ── Snapshots pour audit (Phase 1 anti-annulation) ──
           heure_acceptation_livreur: course.heure_acceptation || null,
@@ -325,37 +325,7 @@ Deno.serve(async (req) => {
 
     } else {
       // ── ANNULATION CLIENT OU ADMIN : course définitivement annulée ──
-      const sourceLabel = source === "client" ? "CLIENT" : "ADMIN";
-      const annulData = {
-        statut: "annulee",
-        date_annulation: now,
-        livreur_id: "",
-        livreur_nom: "",
-        livreur_telephone: "",
-        livreur_photo_url: "",
-        livreur_vehicule: "",
-        livreur_note_moyenne: 0,
-        livreur_nombre_avis: 0,
-        livreur_user_email: null, // ⚠️ Retrait livreur → null pour RLS future
-        // ⚠️ livreur_financier_id N'EST JAMAIS effacé (immuable) — sécurité financière
-        notes: (course.notes || "") + ` | [ANNULÉ ${sourceLabel}] ${motif || ""}`,
-      };
-
-      // ⚠️ Toujours passer dispatch_status à "expire" pour les annulations client/admin,
-      // quel que soit le statut actuel (disponible_push, propose, en_attente, etc.).
-      // Sans cela, les courses annulées restent visibles dans le fil "Disponibles"
-      // des livreurs car la requête filtre par dispatch_status ∈ [disponible_push, propose].
-      annulData.dispatch_status = "expire";
-
-      if (course.pricing_mode === "manual" && course.manual_price_status === "pending_client_validation") {
-        annulData.manual_price_status = null;
-        annulData.manual_price = null;
-        annulData.pricing_mode = "automatic";
-      }
-
-      await asService.entities.CourseExterne.update(course_id, annulData);
-
-      // ── [ECO] Réévaluer la mission Éco après annulation client/admin ──
+      // Terminal CAS already committed before any release/notification above.
       // La course passe en "annulee" (terminal). Si elle faisait partie d'une mission Éco,
       // on vérifie si toutes les courses sont désormais annulées → mission "cancelled".
       // Si une seule course est annulée, l'autre reste accessible et la mission reste inchangée.
@@ -377,10 +347,12 @@ Deno.serve(async (req) => {
 
     return Response.json({
       success: true,
+      ...(withdrawalResult ? {withdrawn:true,client_decision_attendue:true,withdrawn_at:withdrawalResult.withdrawn_at,operation_id:withdrawalResult.operation_id,livreur_statut:withdrawalResult.livreur_statut,status_sync_pending:withdrawalResult.status_sync_pending,withdrawal_contract:'per-course-v1',guard_version:'terminal-v1'} : {}),
       course_id,
+      statut: source === 'livreur' ? 'en_attente' : 'annulee',
       livreur_libere: livreurLibere,
       course_redispatch: courseRedispatch,
-      message: "Course annulée définitivement",
+      message: source === 'livreur' ? "Retrait confirmé. Décision du client attendue." : "Course annulée définitivement",
     });
 
   } catch (error) {
