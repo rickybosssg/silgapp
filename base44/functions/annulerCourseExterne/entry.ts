@@ -1,6 +1,8 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
 import { normalizeEnterpriseId } from '../../shared/enterpriseFinance.ts';
 import { recalculateEcoMissionAfterCancellation } from '../../shared/ecoOptimizationEngine.ts';
+import { canCancelCourse, cancelCourseTerminal, expireCancelledCourseOffers } from '../../shared/courseTerminalGuard.ts';
+import { withdrawDriverCourse, synchronizeDriverCourseStatus } from '../../shared/driverWithdrawal.ts';
 
 const MOTIFS_VALIDES = [
   "client_injoignable",
@@ -28,14 +30,18 @@ Deno.serve(async (req) => {
     const asService = base44.asServiceRole;
     const body = await req.json();
     const { course_id, motif, motif_detail, source } = body; // source = "livreur" | "admin"
+    const user = await base44.auth.me().catch(() => null);
+    if (!user?.id) return Response.json({ success: false, error: 'Authentification requise', guard_version: 'terminal-v1' }, { status: 401, headers: { 'X-Silgapp-Cancellation-Guard': 'terminal-v1' } });
+    if (body.action === 'withdrawal_capability') return Response.json({success:true,withdrawal_contract:'per-course-v1',guard_version:'terminal-v1'});
 
     if (!course_id) {
-      return Response.json({ error: "course_id requis" }, { status: 400 });
+      return Response.json({ error: "course_id requis", guard_version: 'terminal-v1' }, { status: 400, headers: { 'X-Silgapp-Cancellation-Guard': 'terminal-v1' } });
     }
 
     // ── Validation : motif_detail OBLIGATOIRE uniquement pour motif=autre ──
     // Pour les autres motifs, motif_detail est facultatif.
     if (source === "livreur") {
+      if (!MOTIFS_VALIDES.includes(motif)) return Response.json({success:false,error:'Motif de retrait requis.'}, {status:400});
       if (motif === "autre" && (!motif_detail || !String(motif_detail).trim())) {
         return Response.json({
           error: "Le détail du motif est obligatoire pour le motif 'Autre'",
@@ -45,20 +51,21 @@ Deno.serve(async (req) => {
     }
 
     // ── Récupérer la course ───────────────────────────────────────────
-    const course = await asService.entities.CourseExterne.get(course_id);
+    let course = await asService.entities.CourseExterne.get(course_id);
     if (!course) {
       return Response.json({ error: "Course introuvable" }, { status: 404 });
     }
+    if (source !== 'livreur' && !await canCancelCourse(base44, user, course, source)) return Response.json({ success: false, error: 'Action non autorisée' }, { status: 403 });
 
     if (["annulee"].includes(course.statut)) {
-      return Response.json({ success: false, error: "Course déjà annulée" });
+      if (source === 'livreur') return Response.json({success:false,error:'Course définitivement annulée : aucun retrait possible.',guard_version:'terminal-v1'}, {status:409});
+      return Response.json({ success: true, already_cancelled: true, course_id, statut: 'annulee', message: 'Course déjà annulée' });
     }
     if (course.statut === "livree") {
       return Response.json({ success: false, error: "Course déjà livrée" });
     }
 
     // ── Vérification pays admin ──────────────────────────────────────
-    const user = await base44.auth.me().catch(() => null);
     if (user?.admin_type === "pays" && user.country_code && course.country_code !== user.country_code) {
       return Response.json({
         success: false,
@@ -70,7 +77,7 @@ Deno.serve(async (req) => {
     // ── [ENTERPRISE ISOLATION] Admin Enterprise ne peut annuler QUE les courses de son entreprise ──
     // Résolution côté backend UNIQUEMENT — jamais confiance au frontend.
     // normalizeEnterpriseId : null/undefined/"" → null (réseau public), "abc" → "abc" (entreprise).
-    const userEnterpriseId = normalizeEnterpriseId(user?.data?.enterprise_id);
+    const userEnterpriseId = normalizeEnterpriseId(user?.enterprise_id ?? user?.data?.enterprise_id);
     if (userEnterpriseId) {
       const courseEnterpriseId = normalizeEnterpriseId(course.enterprise_id);
       if (courseEnterpriseId !== userEnterpriseId) {
@@ -83,18 +90,31 @@ Deno.serve(async (req) => {
     }
     // ── Super Admin (enterprise_id null) : peut annuler toute course ──
 
-    const livreurId = course.livreur_id;
+    if (source !== 'livreur') {
+      const cancellation = await cancelCourseTerminal(base44, course_id, user.id, source === 'client' ? 'client' : 'admin', fresh => ({
+        livreur_id: '', livreur_nom: '', livreur_telephone: '', livreur_photo_url: '',
+        livreur_vehicule: '', livreur_note_moyenne: 0, livreur_nombre_avis: 0, livreur_user_email: null,
+        notes: `${fresh.notes || ''} | [ANNULÉ ${source === 'client' ? 'CLIENT' : 'ADMIN'} ${user.id}] ${motif || ''}`,
+        ...(fresh.pricing_mode === 'manual' && fresh.manual_price_status === 'pending_client_validation'
+          ? { manual_price_status: null, manual_price: null, pricing_mode: 'automatic' } : {}),
+      }));
+      if (!cancellation.success) return Response.json(cancellation, { status: 409 });
+      if (cancellation.already_cancelled) return Response.json({ success: true, already_cancelled: true, course_id, statut: 'annulee' });
+      course = cancellation.before;
+      await expireCancelledCourseOffers(base44, course_id).catch(() => console.warn('[ANNULATION] offers_cleanup_pending', course_id));
+    }
+
+    let livreurId = course.livreur_id;
     let livreurLibere = false;
     let courseRedispatch = false;
+    let withdrawalResult: any = null;
 
     // ── Libérer le livreur ────────────────────────────────────────────
-    if (livreurId) {
+    if (livreurId && source !== 'livreur') {
       const livreur = await asService.entities.Livreur.get(livreurId).catch(() => null);
       if (livreur) {
-        await asService.entities.Livreur.update(livreurId, {
-          statut: livreur.manual_hors_ligne === true ? "hors_ligne" : "disponible",
-        });
-        livreurLibere = true;
+        const availability = await synchronizeDriverCourseStatus(base44, livreurId);
+        livreurLibere = !availability.pending && availability.statut !== 'en_course';
 
         // Notification au livreur
         if (livreur.user_email) {
@@ -117,41 +137,14 @@ Deno.serve(async (req) => {
     const now = new Date().toISOString();
 
     if (source === "livreur") {
-      // ── ANNULATION LIVREUR APRÈS PRISE EN CHARGE : vérifier si des frais s'appliquent ──
-      // Si le livreur a déjà récupéré le colis (statut ≥ colis_recupere), des frais
-      // d'annulation peuvent s'appliquer pour compenser le client et SILGAPP.
-      const statutsApresPriseEnCharge = ["colis_recupere", "passager_embarque", "pris_en_charge", "en_livraison", "arrivee"];
-      if (statutsApresPriseEnCharge.includes(course.statut)) {
-        try {
-          const livreurPourFrais = await asService.entities.Livreur.get(livreurId).catch(() => null);
-          // Résoudre le client (expéditeur ou destinataire)
-          let clientId = course.expediteur_client_id || course.destinataire_client_id || "";
-          let clientNom = course.expediteur_nom || course.destinataire_nom || course.client_nom || "";
-          let clientTel = course.expediteur_telephone || course.destinataire_telephone || course.client_telephone || "";
-          if (!clientId && course.expediteur_client_id) {
-            const c = await asService.entities.ClientExterne.get(course.expediteur_client_id).catch(() => null);
-            if (c) { clientId = c.id; clientNom = c.nom || clientNom; clientTel = c.telephone || clientTel; }
-          }
-          if (livreurPourFrais && clientId && clientTel) {
-            await asService.entities.FraisAnnulation.create({
-              course_id,
-              client_id: clientId,
-              client_nom: clientNom,
-              client_telephone: clientTel,
-              livreur_id: livreurId,
-              livreur_nom: `${livreurPourFrais.prenom || ""} ${livreurPourFrais.nom || ""}`.trim(),
-              montant: 500,
-              country_code: course.country_code || "",
-              statut_paiement: "impaye",
-              raison: `Annulation livreur après prise en charge — ${motif || "non_specifie"}`,
-              date_annulation: now,
-            }).catch(() => null);
-            console.log(`[ANNULATION] Frais d'annulation créés pour livreur ${livreurId} — course ${course_id} (statut: ${course.statut})`);
-          }
-        } catch (fraisErr) {
-          console.error('[ANNULATION] Erreur création frais:', fraisErr?.message);
-        }
-      }
+      withdrawalResult = await withdrawDriverCourse(base44, user, course_id, body);
+      if (!withdrawalResult.success) return Response.json({...withdrawalResult,guard_version:'terminal-v1',withdrawal_contract:'per-course-v1'}, {status:withdrawalResult.httpStatus || 409});
+      if (withdrawalResult.already_withdrawn) return Response.json({...withdrawalResult,before:undefined,guard_version:'terminal-v1',withdrawal_contract:'per-course-v1'});
+      course = withdrawalResult.before;
+      livreurId = course.livreur_id;
+      livreurLibere = withdrawalResult.livreur_libere;
+      // Custody is refused before withdrawal: incident handling must keep the
+      // parcel/driver assignment. No fee or automatic release is created here.
 
       // ═══════════════════════════════════════════════════════════════════
       // NOUVEAU COMPORTEMENT : SUSPENSION DU REDISPATCH AUTOMATIQUE
@@ -165,10 +158,6 @@ Deno.serve(async (req) => {
       // Tant que client_decision_attendue=true, aucun mécanisme (watchdog,
       // orchestrator, dispatchExterneAuto) ne peut attribuer cette course.
       // ═══════════════════════════════════════════════════════════════════
-
-      let refusedIds = [];
-      try { refusedIds = JSON.parse(course.dispatch_refused_ids || '[]'); } catch {}
-      if (livreurId && !refusedIds.includes(livreurId)) refusedIds.push(livreurId);
 
       // ── Calculer le motif lisible pour le client ──
       const motifLabel = {
@@ -189,59 +178,8 @@ Deno.serve(async (req) => {
         autre: motif_detail || "Autre",
       }[motif] || motif || "non spécifié";
 
-      const resetData = {
-        statut: "en_attente",
-        dispatch_status: "en_attente",
-        client_decision_attendue: true,
-        livreur_annulation_motif: motifLabel,
-        client_decision_action: null,
-        client_decision_at: null,
-        dispatch_wave: 0,
-        livreur_id: null,
-        livreur_nom: "",
-        livreur_telephone: "",
-        livreur_photo_url: null,
-        livreur_vehicule: null,
-        livreur_note_moyenne: 0,
-        livreur_nombre_avis: 0,
-        livreur_user_email: null,
-        dispatch_notified_ids: "[]",
-        dispatch_refused_ids: JSON.stringify(refusedIds),
-        heure_acceptation: null,
-        heure_recuperation: null,
-        heure_livraison: null,
-        timeout_expires_at: null,
-        heure_sollicitation: null,
-        pickup_confirmed_by: null,
-        pickup_confirmed_at: null,
-        delivery_confirmed_by: null,
-        delivery_confirmed_at: null,
-        accepted_by_livreur_id: null,
-        accepted_at: null,
-        notes: (course.notes || "") + ` | [ANNULÉ LIVREUR → ATTENTE DÉCISION CLIENT] ${motif || "non spécifié"}`,
-      };
-
-      // Nettoyer prix manuel si applicable
-      if (course.pricing_mode === "manual" && course.manual_price_status === "pending_client_validation") {
-        resetData.manual_price_status = null;
-        resetData.manual_price = null;
-        resetData.pricing_mode = "automatic";
-      }
-
-      await asService.entities.CourseExterne.update(course_id, resetData);
-      courseRedispatch = true;
-
-      // ── [ECO] Réévaluer la mission Éco après annulation livreur ──
-      // La course est en "en_attente" (pas terminal), mais si elle faisait partie
-      // d'une mission Éco, on vérifie si les autres courses sont déjà annulées.
-      // La course actuelle n'étant pas terminal, la mission ne changera pas de statut
-      // ici — sauf si toutes les autres sont déjà annulées ET que la course courante
-      // est en "en_attente" (non terminal). Dans ce cas, la mission reste inchangée.
-      if (course.eco_mission_id) {
-        await recalculateEcoMissionAfterCancellation(base44, course_id).catch((err: any) =>
-          console.error('[ANNULATION] recalculateEcoMissionAfterCancellation error (livreur):', err?.message)
-        );
-      }
+      // The guarded withdrawal already committed this course and reconciled its
+      // mission. Keep client_decision_attendue; never dispatch before that choice.
 
       // Archiver toutes les notifications 'nouvelle_course' pour cette course
       // pour que les livreurs ne voient plus une course qui est retournée en dispatch

@@ -1,6 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
 import { normalizeEnterpriseId } from '../../shared/enterpriseFinance.ts';
 import { completeEcoMissionIfNeeded } from '../../shared/ecoOptimizationEngine.ts';
+import { isTerminalCourse, updateActiveCourse, expireCancelledCourseOffers } from '../../shared/courseTerminalGuard.ts';
 
 /**
  * deciderApresAnnulationLivreur
@@ -35,6 +36,7 @@ Deno.serve(async (req) => {
     }
 
     // ── Idempotence : si déjà décidé, retourner le résultat précédent ──
+    if (isTerminalCourse(course)) return Response.json({ success: false, error: 'Course définitivement terminée', terminal: true }, { status: 409 });
     if (course.client_decision_action) {
       return Response.json({
         success: true,
@@ -93,7 +95,7 @@ Deno.serve(async (req) => {
         notes: (course.notes || "") + ` | [DÉCISION CLIENT — CHERCHER AUTRE LIVREUR] ${now}`,
       };
 
-      await asService.entities.CourseExterne.update(course_id, updateData);
+      if (!await updateActiveCourse(base44, course, updateData)) return Response.json({ success: false, error: 'Course modifiée simultanément. Actualisez.' }, { status: 409 });
 
       // ── Déclencher le redispatch via dispatchExterneAuto ──
       try {
@@ -133,11 +135,15 @@ Deno.serve(async (req) => {
         client_decision_at: now,
         client_decision_action: "terminer_course",
         statut: "annulee",
+        date_annulation: now,
+        annulation_user_id: user.id,
+        annulation_source: 'client',
         dispatch_status: "expire",
         notes: (course.notes || "") + ` | [DÉCISION CLIENT — TERMINER LA COURSE] ${now}`,
       };
 
-      await asService.entities.CourseExterne.update(course_id, updateData);
+      if (!await updateActiveCourse(base44, course, updateData)) return Response.json({ success: false, error: 'Course modifiée simultanément. Actualisez.' }, { status: 409 });
+      await expireCancelledCourseOffers(base44, course_id).catch(() => {});
 
       // ── Notification au client ──
       if (clientEmail) {
