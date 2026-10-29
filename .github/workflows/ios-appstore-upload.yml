@@ -1,12 +1,12 @@
 name: Upload verified SILGAPP iOS r2 to App Store Connect
 on:
   push:
-    tags: ['ios-upload-v1.0.60-b67-r2']
+    tags: ['ios-upload-v1.0.66-b75']
 permissions:
   contents: read
   actions: read
 concurrency:
-  group: silgapp-appstore-6782046749-1.0.60-67
+  group: silgapp-appstore-6782046749-1.0.66-75
   cancel-in-progress: false
 jobs:
   upload:
@@ -19,15 +19,15 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - name: Download only the verified r2 IPA
+      - name: Download only the verified reviewed IPA
         uses: actions/download-artifact@v4
         with:
           name: SILGAPP-signed-ipa
-          run-id: 38528393904
+          run-id: 40893137802
           repository: rickybosssg/silgapp
           github-token: ${{ github.token }}
           path: ${{ runner.temp }}/silgapp-upload-r2
-      - name: Upload exact r2 once and check Apple processing
+      - name: Upload exact reviewed once and check Apple processing
         env:
           APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
           APP_STORE_CONNECT_API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
