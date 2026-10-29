@@ -1,12 +1,12 @@
 name: Upload verified SILGAPP iOS r2 to App Store Connect
 on:
   push:
-    tags: ['ios-upload-v1.0.60-b67-r2']
+    tags: ['ios-upload-v1.0.65-b74-r2']
 permissions:
   contents: read
   actions: read
 concurrency:
-  group: silgapp-appstore-6782046749-1.0.60-67
+  group: silgapp-appstore-6782046749-1.0.65-74
   cancel-in-progress: false
 jobs:
   upload:
@@ -23,7 +23,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: SILGAPP-signed-ipa
-          run-id: 38528393904
+          run-id: 40815560130
           repository: rickybosssg/silgapp
           github-token: ${{ github.token }}
           path: ${{ runner.temp }}/silgapp-upload-r2

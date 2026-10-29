@@ -18,8 +18,8 @@ spec.loader.exec_module(upload)
 
 class UploadTests(unittest.TestCase):
     def fixture_ipa(self, directory, **changes):
-        info = dict(CFBundleIdentifier=upload.BUNDLE_ID, CFBundleShortVersionString="1.0.60",
-                    CFBundleVersion="67", DTSDKName="iphoneos26.2", DTXcode="2620")
+        info = dict(CFBundleIdentifier=upload.BUNDLE_ID, CFBundleShortVersionString="1.0.65",
+                    CFBundleVersion="74", DTSDKName="iphoneos26.2", DTXcode="2620")
         info.update(changes)
         path = Path(directory) / "fixture.ipa"
         with zipfile.ZipFile(path, "w") as archive:
@@ -52,9 +52,9 @@ class UploadTests(unittest.TestCase):
                 upload.require_absent(payload)
 
     def test_receipt_requires_correct_apple_version_and_build(self):
-        payload = {"data": [{"id": "build-id", "attributes": {"version": "67", "processingState": "VALID"},
+        payload = {"data": [{"id": "build-id", "attributes": {"version": "74", "processingState": "VALID"},
                     "relationships": {"preReleaseVersion": {"data": {"id": "version-id"}}}}],
-                   "included": [{"type": "preReleaseVersions", "id": "version-id", "attributes": {"version": "1.0.60"}}]}
+                   "included": [{"type": "preReleaseVersions", "id": "version-id", "attributes": {"version": "1.0.65"}}]}
         self.assertEqual(upload.public_build(payload)["processing_state"], "VALID")
         payload["included"][0]["attributes"]["version"] = "1.0.59"
         with self.assertRaises(ValueError):

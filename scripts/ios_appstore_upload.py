@@ -17,12 +17,12 @@ import zipfile
 
 APP_ID = "6782046749"
 BUNDLE_ID = "com.base6a0ec08f3af5e1d1284254c1.app"
-VERSION, BUILD = "1.0.60", "67"
-IPA_SHA256 = "7cc210b408f5bb4fed735871ad8d6abcad68bada4b478762a6846c5221423306"
+VERSION, BUILD = "1.0.65", "74"
+IPA_SHA256 = "9c58adb44d966835533d6e03105169c03a4a61aab87445967c30bcce7f9906e9"
 LOGO_SHA256 = "12f592bbdde1ed319dc4e5be4e58707622a4612e3102abb6d500f9667e139fee"
 KEY_ID = "5SWTL5V4JG"
 ISSUER_ID = "5f873051-bf9a-4708-afa6-303117a82089"
-UPLOAD_TAG = "refs/tags/ios-upload-v1.0.60-b67-r2"
+UPLOAD_TAG = "refs/tags/ios-upload-v1.0.65-b74-r2"
 
 
 def verify_ipa(path, expected_digest=IPA_SHA256):
@@ -103,7 +103,7 @@ def require_absent(payload):
     if not isinstance(payload.get("data"), list):
         raise ValueError("Apple returned an unexpected build response.")
     if payload["data"]:
-        raise ValueError("Build 67 already exists in Apple; refusing a duplicate upload. Verify its provenance first.")
+        raise ValueError("Build 74 already exists in Apple; refusing a duplicate upload. Verify its provenance first.")
 
 
 def public_build(payload):
@@ -126,7 +126,7 @@ def main():
     args = parser.parse_args()
     key_path = None
     receipt = {"app_id": APP_ID, "bundle_id": BUNDLE_ID, "version": VERSION, "build": BUILD,
-               "ipa_sha256": IPA_SHA256, "source_run": 38528393904, "uploaded": False}
+               "ipa_sha256": IPA_SHA256, "source_run": 40815560130, "uploaded": False}
     try:
         if not (os.environ.get("GITHUB_ACTIONS") == "true" and os.environ.get("RUNNER_OS") == "macOS"
                 and os.environ.get("GITHUB_REPOSITORY") == "rickybosssg/silgapp"
@@ -156,7 +156,7 @@ def main():
         del key_text
         token = access_token(key_path)
         require_absent(apple_builds(token))
-        print("Apple API authentication succeeded; build 67 is absent. Uploading exact r2 once.", flush=True)
+        print("Apple API authentication succeeded; build 74 is absent. Uploading exact r2 once.", flush=True)
         uploaded = subprocess.run(["xcrun", "altool", "--output-format", "xml", "--upload-app",
             "--file", str(args.ipa), "--type", "ios", "--apiKey", KEY_ID, "--apiIssuer", ISSUER_ID],
             capture_output=True, text=True, check=False)
@@ -165,7 +165,7 @@ def main():
             raise ValueError(f"Apple upload failed (exit {uploaded.returncode}; codes {','.join(codes) or 'none'}). No automatic retry.")
         receipt.update(uploaded=True, processing_state="AWAITING_APPLE_INDEX")
         args.receipt.write_text(json.dumps(receipt, indent=2) + "\n")
-        print("APPLE_UPLOAD_ACCEPTED: SILGAPP 1.0.60/build67, exact r2 IPA.", flush=True)
+        print("APPLE_UPLOAD_ACCEPTED: SILGAPP 1.0.65/build74, exact r2 IPA.", flush=True)
         for attempt in range(16):
             found = public_build(apple_builds(token))
             if found:
