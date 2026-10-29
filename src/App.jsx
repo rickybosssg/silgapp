@@ -45,6 +45,8 @@ const DashboardAdminExterne = lazy(() => import('./pages/DashboardAdminExterne.j
 const DusLivreursExternes = lazy(() => import('./pages/DusLivreursExternes.jsx'));
 const ClientsExternesPage = lazy(() => import('./pages/ClientsExternesPage.jsx'));
 const PublicSuiviCourse = lazy(() => import('./pages/PublicSuiviCourse.jsx'));
+const GuestOrderPage = lazy(() => import('./pages/GuestOrderPage.jsx'));
+const GuestOrdersAdmin = lazy(() => import('./pages/GuestOrdersAdmin.jsx'));
 const GestionPays = lazy(() => import('./pages/GestionPays.jsx'));
 const AdminGlobal = lazy(() => import('./pages/AdminGlobal.jsx'));
 const CommandeExpressAdmin = lazy(() => import('./pages/CommandeExpressAdmin.jsx'));
@@ -182,6 +184,10 @@ function AppContent() {
   useEffect(() => {
     const handleBackButton = (e) => {
       e.preventDefault();
+      if (location.pathname === '/commande-invitee') {
+        document.dispatchEvent(new Event('silgapp:guest-back'));
+        return;
+      }
       if (location.pathname !== '/') {
         navigate(-1);
       }
@@ -256,6 +262,7 @@ function AppContent() {
     );
   }
   const isPublicRoute = currentPath === '/telecharger' || 
+                        currentPath === '/commande-invitee' ||
                         currentPath === '/privacy-policy' ||
                         currentPath.startsWith('/suivi-public/') ||
                         currentPath.startsWith('/demo/') ||
@@ -279,6 +286,7 @@ function AppContent() {
           <Route path="/telecharger" element={<TelechargerSILGAPP />} />
           {/* Route publique de suivi de course */}
           <Route path="/suivi-public/:token" element={<PublicSuiviCourse />} />
+          <Route path="/commande-invitee" element={<GuestOrderPage />} />
           {/* Route publique d'inscription livreur entreprise (via token invitation) */}
           <Route path="/inscription-livreur" element={<InscriptionLivreurEntreprise />} />
           {/* Politique de confidentialité — requise Google Play */}
@@ -454,6 +462,7 @@ function AppContent() {
           <Route path="/notifications" element={<AnimatedRoutes><Notifications /></AnimatedRoutes>} />
           <Route path="/admin/test-notifications" element={<AnimatedRoutes><TestNotifications /></AnimatedRoutes>} />
           <Route path="/admin/commande-express" element={<AnimatedRoutes><CommandeExpressAdmin /></AnimatedRoutes>} />
+          <Route path="/admin/commandes-sans-compte" element={<AnimatedRoutes><GuestOrdersAdmin /></AnimatedRoutes>} />
           <Route path="/diagnostic-push-complet" element={<AnimatedRoutes><DiagnosticPushComplet /></AnimatedRoutes>} />
           <Route path="/admin/test-dispatch-livreur" element={<AnimatedRoutes><TestDispatchLivreur /></AnimatedRoutes>} />
           <Route path="/admin/centre-notifications" element={<AnimatedRoutes><CentreNotifications /></AnimatedRoutes>} />

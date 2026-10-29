@@ -109,12 +109,9 @@ export async function chargerConfigPays(base44: any, countryCode: string) {
   if (!countryCode) return null;
   const cached = COUNTRY_CONFIG_CACHE.get(countryCode);
   if (cached && cached.expires > Date.now()) return cached.data;
-  try {
-    const countries = await base44.asServiceRole.entities.Country.filter({ code: countryCode, actif: true });
-    const data = countries?.[0] || null;
-    COUNTRY_CONFIG_CACHE.set(countryCode, { data, expires: Date.now() + COUNTRY_CONFIG_TTL_MS });
-    return data;
-  } catch {
-    return null;
-  }
+  // A read failure is not proof that the country's tariff is absent.
+  const countries = await base44.asServiceRole.entities.Country.filter({ code: countryCode, actif: true });
+  const data = countries?.[0] || null;
+  if (data) COUNTRY_CONFIG_CACHE.set(countryCode, { data, expires: Date.now() + COUNTRY_CONFIG_TTL_MS });
+  return data;
 }

@@ -673,6 +673,10 @@ export async function createOnRouteProposal(base44: any, courseId: string, livre
   const courseEnterpriseId = normalizeEnterpriseId(course.enterprise_id);
   const livreurEnterpriseId = normalizeEnterpriseId(livreur.enterprise_id);
   if (courseEnterpriseId !== livreurEnterpriseId) return { success: false, reason: 'enterprise_mismatch' };
+  if (course.country_code !== livreur.country_code) return { success: false, reason: 'country_mismatch' };
+  const { verifyCurrentCityAtClaim } = await import('./cityDispatchFilter.ts');
+  const cityCheck = await verifyCurrentCityAtClaim(base44, course, livreur);
+  if (!cityCheck.compatible) return { success: false, reason: cityCheck.reason || 'city_mismatch' };
   const config = await loadEcoConfig(base44, course.country_code);
   if (!config.enabled || !config.onRouteEnabled) return { success: false, reason: 'on_route_disabled' };
   if (TERMINAL_STATUSES.includes(course.statut) || course.livreur_id || course.accepted_by_livreur_id) {
@@ -1539,6 +1543,10 @@ export async function acceptEcoMission(base44: any, missionId: string, livreurId
   if (normalizeEnterpriseId(mission.enterprise_id) !== normalizeEnterpriseId(livreur.enterprise_id)) {
     return { success: false, reason: 'enterprise_mismatch' };
   }
+  if (['accepted', 'in_progress'].includes(mission.status) && String(mission.livreur_id) === String(livreurId)) {
+    return { success: true, accepted: true, idempotent: true, mission_id: mission.id, course_ids: mission.course_ids, livreur_id: livreurId };
+  }
+  if (mission.status !== 'available') return { success: false, reason: 'mission_unavailable' };
   if (livreur.type_livreur !== 'externe' || livreur.validation !== 'valide' || livreur.actif !== true ||
       (mission.status === 'available' && livreur.statut !== 'disponible') || livreur.manual_hors_ligne === true ||
       livreur.admin_hors_ligne === true || livreur.bloque_encours === true) {

@@ -1,3 +1,5 @@
+import { acquireFeedReadBudget, retryFeedRead } from '../src/lib/feedReadBudget.js';
+import { isKnownCancelledCourse, preserveConfirmedCancellation } from '../src/lib/courseCancellationState.js';
 import { selectAvailableCourseOffers } from '../src/lib/availableCourseOffers.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -189,13 +191,13 @@ test('production hook query functions use current GPS and preserve Public/Enterp
     const api = { entities: { CourseExterne: { filter: async () => records }, EcoMission: { filter: async () => [] }, Livreur: { get: async () => driver } } };
     const useFeed = new Function('useEffect', 'useMemo', 'useState', 'useQuery', 'useQueryClient', 'base44',
       'cityNamesPattern', 'operationalCityAliases', 'resolveOperationalName', 'canSeeOperationalCourse',
-      'currentDriverGpsCity', 'gpsFixTime', 'CITY_GPS_MAX_AGE_MS', 'selectAvailableCourseOffers', `${compiled};return useCoursesDisponibles;`)(
+      'currentDriverGpsCity', 'gpsFixTime', 'CITY_GPS_MAX_AGE_MS', 'selectAvailableCourseOffers', 'acquireFeedReadBudget', 'retryFeedRead', 'isKnownCancelledCourse', 'preserveConfirmedCancellation', `${compiled};return useCoursesDisponibles;`)(
       () => {}, fn => fn(), initial => [typeof initial === 'function' ? initial() : initial, () => {}],
       query => { queries.set(query.queryKey[0], query); if (query.queryKey[0] === 'operational-zone-policy') return { data: { cities, quartiers } };
         if (query.queryKey[0] === 'driver-current-gps') return { data: driver };
         if (query.queryKey[0] === 'courses-externes-disponibles') return { data: records }; return {}; },
       () => ({}), api, cityNamesPattern, operationalCityAliases, resolveOperationalName, canSeeOperationalCourse,
-      currentDriverGpsCity, gpsFixTime, CITY_GPS_MAX_AGE_MS, selectAvailableCourseOffers);
+      currentDriverGpsCity, gpsFixTime, CITY_GPS_MAX_AGE_MS, selectAvailableCourseOffers, acquireFeedReadBudget, retryFeedRead, isKnownCancelledCourse, preserveConfirmedCancellation);
     const feed = useFeed(driver);
     assert.deepEqual(feed.eligibleCourses.map(c => c.id), driver.gps_fix_valid ? [driver.latitude === 11.17 ? 'course' : 'ouaga'] : []);
     assert.equal(await queries.get('driver-current-gps').queryFn(), driver);

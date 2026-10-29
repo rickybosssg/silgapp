@@ -4,8 +4,9 @@ const owners = new WeakMap();
 
 // Collapse a realtime burst without cancelling a running read or losing the
 // event that arrived during it. A stopped account scope never starts more reads.
-export function createRealtimeRefresh(refresh, delay = 100) {
+export function createRealtimeRefresh(refresh, delay = 100, minInterval = 0) {
   let timer = null, running = false, pending = false, stopped = false;
+  let lastStarted = -Infinity;
   const schedule = () => {
     if (stopped) return;
     pending = true;
@@ -15,13 +16,14 @@ export function createRealtimeRefresh(refresh, delay = 100) {
       if (stopped) return;
       pending = false;
       running = true;
+      lastStarted = Date.now();
       try { await refresh(); }
       catch { /* Query state retains the error; the polling fallback remains. */ }
       finally {
         running = false;
         if (pending && !stopped) schedule();
       }
-    }, delay);
+    }, Math.max(delay, minInterval - (Date.now() - lastStarted)));
   };
   return { schedule, stop() { stopped = true; pending = false; clearTimeout(timer); timer = null; } };
 }

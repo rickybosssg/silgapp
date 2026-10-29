@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 import { resolveDialCode } from '../../shared/countryResolver.ts';
+import { isGuestCourse } from '../../shared/guestOrderPolicy.js';
 
 /**
  * Déclenché par automation quand une CourseExterne est créée/mise à jour.
@@ -77,6 +78,8 @@ Deno.serve(async (req) => {
     }
 
     const course = await base44.asServiceRole.entities.CourseExterne.get(courseId);
+    // A declared guest phone must never resolve an existing account or trigger its push.
+    if (isGuestCourse(course)) return Response.json({ success: true, skipped: true, reason: 'guest_private_tracking' });
     if (!course) {
       return Response.json({ error: "Course non trouvée" }, { status: 404 });
     }

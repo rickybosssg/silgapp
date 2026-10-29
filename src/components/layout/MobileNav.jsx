@@ -205,7 +205,7 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
 
             {/* Nav items */}
             <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-0.5">
-              {allNavItems.filter(item => !item.superAdminOnly || canManageExpress).map((item) => {
+              {allNavItems.filter(item => !item.superAdminOnly || canManageExpress).filter(item => !item.publicAdminOnly || (user?.role === 'admin' && !user?.enterprise_id && !user?.data?.enterprise_id && user?.silgapp_role !== 'admin_entreprise')).map((item) => {
                 const isActive = location.pathname === item.path;
                 const Icon = item.icon;
                 return (

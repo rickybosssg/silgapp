@@ -7,6 +7,7 @@ import { CARTO_TILE_URL } from "@/lib/cartTiles";
 import "leaflet/dist/leaflet.css";
 import { haversineKm as haversine } from "@/lib/priceEstimate";
 import { base44 } from "@/api/base44Client";
+import { isExpressAwaitingDispatch } from "@/lib/expressTracking";
 
 const DEPART_ICON = L.divIcon({
   html: '<div style="width:20px;height:20px;border-radius:50%;background:#3b82f6;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);"></div>',
@@ -30,6 +31,7 @@ const REASSURANCE_MESSAGES = [
 ];
 
 export default function RechercheLivreurScreen({ course, position, countryCode, onClose }) {
+  const awaitingExpressDispatch = isExpressAwaitingDispatch(course);
   const [msgIndex, setMsgIndex] = useState(0);
   const [elapsedSec, setElapsedSec] = useState(0);
   const [nearbyLivreurs, setNearbyLivreurs] = useState([]);
@@ -118,6 +120,7 @@ export default function RechercheLivreurScreen({ course, position, countryCode, 
 
   // ETA estimation
   const etaText = useMemo(() => {
+    if (awaitingExpressDispatch) return "Votre commande est conservée. Actualisation automatique en cours.";
     const mins = Math.floor(elapsedSec / 60);
     const secs = elapsedSec % 60;
     if (mins === 0) return `≈ 1 min ${secs}s`;
@@ -125,7 +128,7 @@ export default function RechercheLivreurScreen({ course, position, countryCode, 
     if (currentWave <= 1) return "Un livreur est généralement trouvé en moins de 2 minutes";
     if (currentWave === 2) return "Recherche élargie en cours...";
     return "Nous continuons à chercher le meilleur livreur...";
-  }, [elapsedSec, currentWave]);
+  }, [elapsedSec, currentWave, awaitingExpressDispatch]);
 
   const elapsedDisplay = useMemo(() => {
     const m = Math.floor(elapsedSec / 60);
@@ -133,7 +136,9 @@ export default function RechercheLivreurScreen({ course, position, countryCode, 
     return `${m}:${s.toString().padStart(2, "0")}`;
   }, [elapsedSec]);
 
-  const msg = REASSURANCE_MESSAGES[msgIndex];
+  const msg = awaitingExpressDispatch
+    ? { emoji: "", text: "Commande enregistrée. La recherche n’a pas encore démarré." }
+    : REASSURANCE_MESSAGES[msgIndex];
 
   return (
     <motion.div
@@ -210,7 +215,7 @@ export default function RechercheLivreurScreen({ course, position, countryCode, 
         >
           <div className="bg-primary text-white rounded-full px-4 py-2 shadow-lg flex items-center gap-2">
             <Radio className="w-4 h-4 animate-pulse" />
-            <span className="text-xs font-bold">Recherche en cours</span>
+            <span className="text-xs font-bold">{awaitingExpressDispatch ? "En attente de diffusion" : "Recherche en cours"}</span>
           </div>
         </motion.div>
       </div>
@@ -266,7 +271,7 @@ export default function RechercheLivreurScreen({ course, position, countryCode, 
           </div>
 
           {/* Vagues de dispatch */}
-          <div className="bg-gray-50 rounded-2xl p-3 mb-3">
+          {!awaitingExpressDispatch && <div className="bg-gray-50 rounded-2xl p-3 mb-3">
             <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1">
               <Zap className="w-3 h-3" /> Vagues de dispatch
             </p>
@@ -303,8 +308,7 @@ export default function RechercheLivreurScreen({ course, position, countryCode, 
                 Vague {currentWave} : {waveNotifiedCount} livreur{waveNotifiedCount > 1 ? "s" : ""} notifié{waveNotifiedCount > 1 ? "s" : ""}
               </p>
             )}
-          </div>
-
+          </div>}
           {/* ETA */}
           <div className="bg-indigo-50 rounded-2xl p-3 text-center">
             <p className="text-xs text-indigo-700 font-medium">{etaText}</p>

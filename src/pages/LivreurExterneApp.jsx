@@ -1,10 +1,13 @@
 import { useState, useEffect, useMemo, useRef } from "react";
+import { reconcilePickupRows } from '@/lib/confirmedPickupView';
+import { finaliserLivraisonSafe } from '@/lib/safeDeliveryFinalization';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { logoutPersistent } from "@/lib/authPersistence";
 import { preserveConfirmedCancellation, isKnownCancelledCourse } from '@/lib/courseCancellationState';
 import { AlertTriangle, Check, Truck, X, Wallet, ChevronRight } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { confirmedDeliverySnapshot } from '@/lib/confirmedDelivery';
 import { toast } from "sonner";
 import { useHeartbeat } from "@/hooks/useHeartbeat";
 import { useCoursesDisponibles } from "@/hooks/useCoursesDisponibles";
@@ -62,7 +65,6 @@ import PassActifBadge from "@/components/livreur/PassActifBadge";
 import HappyHourBadge from "@/components/livreur/HappyHourBadge";
 import PassZeroCommissionSection from "@/components/livreur/PassZeroCommissionSection";
 import LivreurVictoryOverlay from "@/components/livreur/LivreurVictoryOverlay";
-import { confirmDelivery } from "@/lib/deliveryConfirmation";
 import EcoMissionDashboard from "@/components/livreur/EcoMissionDashboard";
 import OnRouteProposalCard from "@/components/livreur/OnRouteProposalCard";
 import { useOnRouteProposals } from "@/hooks/useOnRouteProposals";
@@ -129,6 +131,9 @@ function logAcceptationLivreur(event, details = {}) {
 
 export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const pendingVictoryRecapRef = useRef(null);
+  const deliveryRequestsRef = useRef(new Map());
   const [activeTab, setActiveTab] = useState("courses");
   const [pendingConversationId, setPendingConversationId] = useState(null);
   const [gpsActif, setGpsActif] = useState(false);
@@ -257,7 +262,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     }
   }, [availableCoursesCount, activeTab]);
 
-  // useCoursesDisponibles owns realtime invalidation for both the feed and badge.
+  // The shared feed owns realtime refresh for offers and their counter.
 
   const { data: countryCommissionRows = [] } = useQuery({
     queryKey: ["country-commission", livreurProfil?.country_code],
@@ -736,6 +741,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
   const { data: mesCourses = [] } = useQuery({
     queryKey: ["mes-courses-externes", livreurId, livreurEmail, notificationCourseId],
+    structuralSharing: reconcilePickupRows,
     queryFn: async () => {
       const results = [];
       let successfulCourseSources = 0;
@@ -1438,7 +1444,9 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     statutMutation.mutate("disponible");
   };
 
-  const handleColisLivre = async (course, montantSaisi) => {
+  const handleColisLivre = (course, montantSaisi, options = /** @type {{confirmedResult?: any}} */ ({})) => {
+    if (deliveryRequestsRef.current.has(course.id)) return deliveryRequestsRef.current.get(course.id);
+    const operation = (async () => {
     // Server is authoritative for driver availability after cancellation.
     if (course.statut === "annulee") {
       queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
@@ -1476,11 +1484,17 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         if (dist && dist >= 0.1) distUpdate.distance_reelle_km = Number(dist.toFixed(2));
       }
 
-      await confirmDelivery(base44, course.id, { prix_final_livreur: montantSaisi });
-      await verifierEncoursApresCourse(course.id);
+      const receipt = await finaliserLivraisonSafe(base44, {
+        course_id: course.id,
+        prix_final_livreur: montantSaisi,
+      });
+      const confirmed = confirmedDeliverySnapshot(course, receipt);
+      pendingVictoryRecapRef.current = course.eco_mission_id || isEcoDeliveryCourse(course) ? null : confirmed;
+      queryClient.invalidateQueries({ queryKey: ['mes-courses-externes'] });
+      await verifierEncoursApresCourse(course.id).catch(() => {});
       // [ECO] Ne pas remettre disponible si la course fait partie d'une mission Eco
       if (!course.eco_mission_id) {
-        await remettreDisponibleSiAutorise();
+        await remettreDisponibleSiAutorise().catch(() => {});
       }
       // ── Animation Victory après confirmation backend ──
       if (!celebratedCourseIdsRef.current.has(course.id)) {
@@ -1488,19 +1502,23 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         setVictoryCourseId(course.id);
       }
       toast.success(`Livraison terminée ! ${montantSaisi.toLocaleString()} F`);
-      return;
+      return confirmed;
     }
 
     // Cas QR externe (non admin) : la course est déjà "livree" en DB (validée par le backend validateQRCode)
     // On fait juste les invalidations + statut livreur, le récap est géré dans CourseActiveCard
     if (course.statut === "livree") {
+      const receipt = options.confirmedResult || { success: true, course: await base44.entities.CourseExterne.get(course.id) };
+      if (!options.confirmedResult && receipt.course?.statut !== 'livree') throw new Error('Livraison non confirmée. Actualisez.');
+      const confirmed = confirmedDeliverySnapshot(course, receipt);
+      pendingVictoryRecapRef.current = course.eco_mission_id || isEcoDeliveryCourse(course) ? null : confirmed;
       queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
       queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
-      await verifierEncoursApresCourse(course.id);
+      await verifierEncoursApresCourse(course.id).catch(() => {});
       // [ECO] Ne pas remettre disponible si la course fait partie d'une mission Eco
       // — d'autres courses de la mission sont peut-être encore actives.
       if (!course.eco_mission_id) {
-        await remettreDisponibleSiAutorise();
+        await remettreDisponibleSiAutorise().catch(() => {});
       }
       // ── Animation Victory après confirmation backend ──
       if (!celebratedCourseIdsRef.current.has(course.id)) {
@@ -1508,12 +1526,13 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         setVictoryCourseId(course.id);
       }
       toast.success("Livraison terminée ! ");
-      return;
+      return confirmed;
     }
 
     // Cas interne (bouton manuel) : calcul prix via GPS
     const gpsArrivee = montantSaisi; // en interne, le 2e paramètre peut être le GPS
     const baseData = { statut: "livree", heure_livraison: new Date().toISOString() };
+    let receipt;
 
     if (gpsArrivee && course.latitude_recuperation && course.longitude_recuperation) {
       const distance = haversineKm(
@@ -1528,15 +1547,22 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         return;
       }
 
-      await confirmDelivery(base44, course.id, { prix_final_livreur: prixFinal });
+      receipt = await finaliserLivraisonSafe(base44, {
+        course_id: course.id,
+        prix_final_livreur: prixFinal,
+      });
     } else {
-      await confirmDelivery(base44, course.id);
+      receipt = await finaliserLivraisonSafe(base44, {
+        course_id: course.id,
+      });
     }
 
-    await verifierEncoursApresCourse(course.id);
+    const confirmed = confirmedDeliverySnapshot(course, receipt);
+    pendingVictoryRecapRef.current = course.eco_mission_id || isEcoDeliveryCourse(course) ? null : confirmed;
+    await verifierEncoursApresCourse(course.id).catch(() => {});
     // [ECO] Ne pas remettre disponible si la course fait partie d'une mission Eco
     if (!course.eco_mission_id) {
-      await remettreDisponibleSiAutorise();
+      await remettreDisponibleSiAutorise().catch(() => {});
     }
     // ── Animation Victory après confirmation backend (parcours interne) ──
     if (!celebratedCourseIdsRef.current.has(course.id)) {
@@ -1544,6 +1570,11 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       setVictoryCourseId(course.id);
     }
     toast.success("Livraison terminée ! ");
+    return confirmed;
+    })();
+    deliveryRequestsRef.current.set(course.id, operation);
+    operation.catch(() => { deliveryRequestsRef.current.delete(course.id); });
+    return operation;
   };
 
   const handlePricingModeChange = (mode) => {
@@ -2031,6 +2062,13 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         courseId={victoryCourseId}
         onClose={() => {
           setVictoryCourseId(null);
+          const recap = pendingVictoryRecapRef.current;
+          pendingVictoryRecapRef.current = null;
+          if (recap && recap.id === victoryCourseId) {
+            try { sessionStorage.setItem(`silgapp_recap_course_${recap.id}`, JSON.stringify(recap)); } catch { /* Recap can read the confirmed course normally. */ }
+            navigate(`/livreur/recap-course/${recap.id}`, { replace: true, state: { course: recap } });
+            return;
+          }
           // [ECO] Si une mission Éco est active ou des courses restent, rester sur "courses"
           if (activeEcoMission || coursesActives.length > 0) {
             setActiveTab("courses");

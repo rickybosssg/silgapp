@@ -11,6 +11,7 @@ import { format, isToday, isThisWeek, isThisMonth } from "date-fns";
 import { fr } from "date-fns/locale";
 import { getCourseStatusLabel, getCourseStatusColor } from "@/lib/courseStatuses";
 import RefaireCourseButton from "./RefaireCourseButton";
+import { toast } from 'sonner';
 
 const TYPE_COLIS_ICONS = {
   petit_colis: "",
@@ -118,9 +119,13 @@ export default function HistoriqueCoursesClient({ courses = [], fraisAnnulation 
   const [recherche, setRecherche] = useState("");
 
   const handleRefaireCourse = (route, state) => {
+    if (!clientProfil?.country_code) {
+      toast.error('Votre profil et votre pays sont encore indisponibles. Actualisez puis réessayez.');
+      return false;
+    }
     // Effacer le brouillon existant pour démarrer depuis les données pré-remplies
     try { localStorage.removeItem("silgapp_course_draft"); localStorage.removeItem("silgapp_course_step"); } catch {}
-    navigate(route, { state });
+    navigate(route, { state: { ...state, clientProfil, position } });
   };
 
   // Filtrage par période

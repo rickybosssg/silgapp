@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useRef } from "react";
 import { base44 } from "@/api/base44Client";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, CheckCircle, XCircle, Package, ImageOff, Tag } from "lucide-react";
 
 const VALIDATION_LABELS = {
@@ -11,27 +11,28 @@ const VALIDATION_LABELS = {
 
 export default function BoutiqueProductsSection({ boutiqueId }) {
   const queryClient = useQueryClient();
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(null);
-
-  useEffect(() => {
-    if (!boutiqueId) return;
-    loadProducts();
-  }, [boutiqueId]);
-
-  const loadProducts = async () => {
-    setLoading(true);
-    try {
+  const pendingRef = useRef(false);
+  const selectionRef = useRef(boutiqueId);
+  selectionRef.current = boutiqueId;
+  const [actionError, setActionError] = useState(null);
+  const { data: products = [], isLoading: loading, error: productsError, refetch: loadProducts } = useQuery({
+    queryKey: ["admin-boutique-products", boutiqueId],
+    enabled: !!boutiqueId,
+    retry: false,
+    queryFn: async () => {
       const data = await base44.entities.ProduitBoutique.filter({ boutique_id: boutiqueId }, "-created_date", 100);
-      setProducts(data || []);
-    } catch (err) {
-      console.error("Erreur chargement produits:", err);
-    }
-    setLoading(false);
-  };
+      if (!Array.isArray(data)) throw new Error("Réponse catalogue invalide");
+      if (data.some(product => product.boutique_id !== boutiqueId)) throw new Error('Le catalogue reçu ne correspond pas à cette boutique. Actualisez.');
+      return data;
+    },
+  });
 
   const handleProductValidation = async (productId, action) => {
+    if (pendingRef.current) return;
+    pendingRef.current = true;
+    const selection = boutiqueId;
+    setActionError(null);
     setActionLoading(`${productId}-${action}`);
     try {
       let me = null;
@@ -45,13 +46,17 @@ export default function BoutiqueProductsSection({ boutiqueId }) {
         actif: action === "valider",
       };
 
-      await base44.entities.ProduitBoutique.update(productId, updates);
+      const raw = await base44.entities.ProduitBoutique.update(productId, updates);
+      const updated = raw?.data ?? raw;
+      if (updated?.id !== productId || updated.validation !== updates.validation || updated.boutique_id !== selection) throw new Error('Validation de cet article non confirmée. Actualisez avant de réessayer.');
       queryClient.invalidateQueries({ queryKey: ["admin-boutiques"] });
       await loadProducts();
     } catch (err) {
-      console.error("Erreur validation produit:", err);
+      if (selectionRef.current === selection) setActionError({ boutiqueId: selection, message: err?.response?.data?.error || err?.message || 'Impossible de valider cet article.' });
+    } finally {
+      pendingRef.current = false;
+      setActionLoading(null);
     }
-    setActionLoading(null);
   };
 
   const stats = {
@@ -66,10 +71,16 @@ export default function BoutiqueProductsSection({ boutiqueId }) {
       <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wide mb-2 flex items-center gap-2">
         <Package className="w-3.5 h-3.5" /> Articles de la boutique
       </h3>
+      {actionError?.boutiqueId === boutiqueId && <p role="alert" className="text-sm text-red-600">{actionError.message}</p>}
 
       {loading ? (
         <div className="flex items-center justify-center py-8">
           <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+        </div>
+      ) : productsError ? (
+        <div role="alert" className="rounded-xl border border-red-200 p-4 text-sm text-red-600">
+          <p>Impossible de charger les articles : {productsError.message}</p>
+          <button type="button" onClick={() => loadProducts()} className="mt-2 font-bold">Réessayer</button>
         </div>
       ) : products.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-gray-200 p-6 text-center">

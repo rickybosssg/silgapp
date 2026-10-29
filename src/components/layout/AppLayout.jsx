@@ -82,6 +82,7 @@ function AppLayoutInner({ reseau }) {
     fetchNotifs();
     fetchDemandes();
     fetchPartenaireDemandes();
+    window.addEventListener("silgapp:partner-validation-changed", fetchPartenaireDemandes);
     const fetchPaiements = async () => {
       try {
         const data = await base44.entities.PaiementSilgapp.filter({ statut: "en_attente" });
@@ -152,7 +153,7 @@ function AppLayoutInner({ reseau }) {
       if (event.type === "create") { fetchMessages(); fetchWhatsAppMessages(); }
     });
     const iv = setInterval(() => { fetchNotifs(); fetchDemandes(); fetchPartenaireDemandes(); fetchNeoCount(); fetchPaiements(); fetchLivreursBloques(); fetchMessages(); fetchWhatsAppMessages(); }, 30000);
-    return () => { clearInterval(iv); unsubConv?.(); unsubMsg?.(); };
+    return () => { window.removeEventListener("silgapp:partner-validation-changed", fetchPartenaireDemandes); clearInterval(iv); unsubConv?.(); unsubMsg?.(); };
   }, []);
 
   return (

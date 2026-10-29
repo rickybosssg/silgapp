@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
+import { parcelProgressIndex } from '@/lib/parcelProgress';
+import { reconcilePickupView, pickupDisplayStatus } from '@/lib/confirmedPickupView';
+import { readConfirmedParcelPickup, recoverUncertainParcelPickup, pickupRead, pickupTransition, optionalPickupPosition } from '@/lib/pickupConfirmation';
 import { MapPin, Phone, Navigation, Package, Check, X, AlertTriangle, ChevronRight, Clock, Ruler } from "lucide-react";
 import MultiColisProgressBadge from "@/components/multi-colis/MultiColisProgressBadge";
 import MultiColisLivreurView from "@/components/multi-colis/MultiColisLivreurView";
@@ -7,6 +10,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { base44 } from "@/api/base44Client";
 import { cn } from "@/lib/utils";
+import { confirmedDeliverySnapshot } from '@/lib/confirmedDelivery';
+import { finaliserLivraisonSafe } from '@/lib/safeDeliveryFinalization';
+import { deliveryRecapValues } from '@/lib/deliveryRecap';
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getCourseLocationTarget } from "@/lib/courseLocationTarget";
@@ -18,6 +24,7 @@ import DriverWithdrawalDialog from "./DriverWithdrawalDialog";
 import { getPrixAffichable, getDeviseAffichable } from "@/utils/getPrixAffichable";
 
 import { getCourseContactForPhase, normalizePhoneForWhatsapp } from "@/lib/courseContact";
+import { normalizeCourseFunctionResult } from "@/lib/courseFunctionResult";
 import { haversineKm as haversine } from "@/lib/priceEstimate";
 
 // [CORRECTION PIN/QR] Les PIN/QR sont supprimés de tous les parcours.
@@ -95,10 +102,11 @@ const DEPLACEMENT_STEPS = [
   { key: "termine", label: "Terminé", icon: "" },
 ];
 
-function ProgressBar({ statut, isDeplacement, isAdminColis }) {
+function ProgressBar({ statut, isDeplacement, isAdminColis, contactedAt }) {
   const steps = isDeplacement ? DEPLACEMENT_STEPS : (isAdminColis ? ADMIN_COLIS_STEPS : STEPS);
   const idx = steps.findIndex(s => s.key === statut);
-  const current = idx === -1 ? 0 : (statut === "livree" && isDeplacement ? steps.length - 1 : idx);
+  const current = !isDeplacement && isAdminColis ? parcelProgressIndex(statut, contactedAt)
+    : idx === -1 ? (isDeplacement && statut === 'livree' ? steps.length - 1 : (!isDeplacement && statut === 'en_livraison' ? 1 : 0)) : idx;
 
   return (
     <div className="flex items-center gap-1 py-1">
@@ -129,10 +137,12 @@ function ProgressBar({ statut, isDeplacement, isAdminColis }) {
   );
 }
 
-import { confirmDelivery, functionBody } from "@/lib/deliveryConfirmation";
+import { functionBody } from "@/lib/deliveryConfirmation";
 import { captureDeliveryGps } from "@/lib/deliveryGps";
 
-export default function CourseActiveCard({ course, onColisRecupere, onColisLivre, onClientAnnule, onMettrePause, isPending, isExterne = false, livreurLat, livreurLng, livreurId, livreurNom, onDeliveryVictory }) {
+export default function CourseActiveCard({ course: incomingCourse, onColisRecupere, onColisLivre, onClientAnnule = undefined, onMettrePause = undefined, isPending, isExterne = false, livreurLat = undefined, livreurLng = undefined, livreurId = undefined, livreurNom = undefined, onDeliveryVictory = undefined }) {
+  const [confirmedPickup, setConfirmedPickup] = useState(null);
+  const course = reconcilePickupView(confirmedPickup, incomingCourse);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [prixReel, setPrixReel] = useState("");
@@ -146,6 +156,15 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   const [pickupBoutonPending, setPickupBoutonPending] = useState(false);
   const [deliveryBoutonPending, setDeliveryBoutonPending] = useState(false);
   const transitionPendingRef = useRef(false);
+  const deliveryConfirmationRef = useRef(false);
+  const pickupConfirmationRef = useRef(false);
+  const pickupGenerationRef = useRef(0);
+  useEffect(() => {
+    pickupGenerationRef.current++;
+    pickupConfirmationRef.current = false;
+    setPickupBoutonPending(false);
+    return () => { pickupGenerationRef.current++; };
+  }, [course.id]);
   // Optimistic status — overrides course.statut immediately on tap
   const [optimisticStatut, setOptimisticStatut] = useState(null);
   // Données de livraison en attente (admin_manuel : saisie montant après validation QR/PIN)
@@ -166,7 +185,8 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
     }
   }, [showPrixModal, course.prix_propose_admin]);
 
-  const effectiveStatut = optimisticStatut || course.statut;
+  const effectiveStatut = pickupDisplayStatus(course, optimisticStatut);
+  useEffect(() => { setOptimisticStatut(null); }, [course.id, course.statut]);
   const isDeplacement = course.type_course === "deplacement";
   const isPartnerCourse = !!(
     course.commande_boutique_id ||
@@ -196,42 +216,22 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
     return split;
   };
 
-  // ── Auto-appliquer prix_propose_admin comme prix_final pour les courses admin livrées sans prix ──
-  useEffect(() => {
-    if (course.statut !== "livree") return;
-    if (course.prix_final > 0) return;
-    if (course.pricing_mode !== "admin_manuel" && course.source !== "admin") return;
-    if (!course.prix_propose_admin) return;
-
-    const autoSetPrice = async () => {
-      try {
-        await base44.functions.invoke("finaliserLivraisonLivreur", {
-          course_id: course.id,
-          prix_final_livreur: Number(course.prix_propose_admin),
-        });
-        queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
-      } catch (err) {
-        console.error("[CourseActiveCard] Auto-set prix_final error:", err?.message);
-      }
-    };
-    autoSetPrice();
-  }, [course.id, course.statut, course.prix_final, course.prix_propose_admin, course.pricing_mode, course.source]);
+  // Displaying an existing delivery must never finalize or repair its accounting.
 
   // 🔄 Auto-transition : colis_recupere → en_livraison après 10 secondes
   useEffect(() => {
-    if (effectiveStatut !== "colis_recupere" || isDeplacement) return;
+    if (course.statut !== "colis_recupere" || isDeplacement) return;
     const timer = setTimeout(() => {
-      setOptimisticStatut("en_livraison");
-      queryClient.setQueryData(['mes-courses-externes'], (old) =>
-        (old || []).map(c => c.id === course.id ? { ...c, statut: "en_livraison" } : c)
-      );
       base44.functions.invoke("transitionStatutLivreur", {
         course_id: course.id,
         statut_cible: "en_livraison",
-      }).then((res) => {
+      }).then((rawRes) => {
+          const res = normalizeCourseFunctionResult(rawRes);
         if (!res?.success && !res?.skipped) {
           setOptimisticStatut(null);
           toast.error(res?.error || "Transition automatique échouée. Réessayez.");
+        } else {
+          queryClient.invalidateQueries({ queryKey: ['mes-courses-externes'] });
         }
       }).catch(() => {
         setOptimisticStatut(null);
@@ -239,7 +239,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
       });
     }, 10000);
     return () => clearTimeout(timer);
-  }, [effectiveStatut, course.id, isDeplacement, isExterne]);
+  }, [course.statut, course.id, isDeplacement, isExterne]);
 
   const navigateToRecap = (courseData = {}) => {
     const courseId = courseData?.id || course.id;
@@ -274,6 +274,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   const colisLivre = course.statut === "livree";
 
   const handleConfirmerLivraison = async () => {
+    if (deliveryConfirmationRef.current) return;
     // DÉPLACEMENT : prix saisi → recap local → attendre TERMINER
     // IMPORTANT : garder statut "arrivee" (pas "livree") pour que syncStatutLivreurOnCourse
     // ne libère PAS le livreur automatiquement. Le livreur doit rester "en_course" jusqu'à TERMINER.
@@ -291,14 +292,8 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
         commission_silga: split.commission_silga,
         montant_livreur: split.montant_livreur,
         commission_pct: split.commission_pct,
-        heure_livraison: new Date().toISOString(),
       };
-      // On sauvegarde le prix mais on garde statut="arrivee" — le livreur reste en_course
-      base44.functions.invoke("finaliserLivraisonLivreur", {
-        course_id: course.id,
-        prix_final_livreur: montant,
-      }).catch(() => null);
-      queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+      // Draft only: TERMINER is the single explicit finalization command.
       setDeplacementRecap(mergedData);
       setShowPrixModal(false);
       setPrixReel("");
@@ -319,37 +314,32 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
         toast.error("Prix admin invalide — contactez le support.");
         return;
       }
-      const split = getRequiredSplit(montant);
-      if (!split) return;
-      const mergedData = {
-        ...(pendingDeliveryData || {}),
-        prix_final: montant,
-        commission_silga: split.commission_silga,
-        montant_livreur: split.montant_livreur,
-        commission_pct: split.commission_pct,
-        heure_livraison: pendingDeliveryData?.heure_livraison || new Date().toISOString(),
-      };
-      if (deliveryBoutonPending) return;
+      deliveryConfirmationRef.current = true;
       setDeliveryBoutonPending(true);
       try {
-        await onColisLivre({ ...course, ...mergedData }, montant);
-        onDeliveryVictory?.(course.id);
+        const confirmed = await onColisLivre(course, montant);
+        if (!confirmed || confirmed.statut !== 'livree') throw new Error('Livraison non confirmée. Actualisez.');
+        setPendingDeliveryData(null);
       } catch (error) {
-        toast.error(error?.message || "Livraison non confirmée. Réessayez.");
+        toast.error(error?.message || 'Impossible de confirmer la livraison. Réessayez.');
         return;
       } finally {
+        deliveryConfirmationRef.current = false;
         setDeliveryBoutonPending(false);
       }
-      setPendingDeliveryData(null);
     } else if (isExterne) {
-      onColisLivre(course);
+      try { await onColisLivre(course); } catch (error) {
+        toast.error(error?.message || 'Livraison non confirmée.'); return;
+      }
     } else {
       const montant = parseFloat(prixReel);
       if (!prixReel || isNaN(montant) || montant <= 0) {
         toast.error("Entrez le montant reçu du client");
         return;
       }
-      onColisLivre(course, montant);
+      try { await onColisLivre(course, montant); } catch (error) {
+        toast.error(error?.message || 'Livraison non confirmée.'); return;
+      }
     }
     setShowPrixModal(false);
     setPrixReel("");
@@ -388,10 +378,11 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
     const now = new Date().toISOString();
     updateOptimisticStatut("client_contacte", { heure_contact_client: now });
     try {
-      const res = await base44.functions.invoke("transitionStatutLivreur", {
+      const rawRes = await base44.functions.invoke("transitionStatutLivreur", {
         course_id: course.id,
         statut_cible: "client_contacte",
       });
+      const res = normalizeCourseFunctionResult(rawRes);
       if (!res?.success && !res?.skipped) {
         throw new Error(res?.error || "Erreur lors de la transition");
       }
@@ -410,10 +401,11 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
     }
     updateOptimisticStatut("en_route_expediteur", {});
     try {
-      const res = await base44.functions.invoke("transitionStatutLivreur", {
+      const rawRes = await base44.functions.invoke("transitionStatutLivreur", {
         course_id: course.id,
         statut_cible: "en_route_expediteur",
       });
+      const res = normalizeCourseFunctionResult(rawRes);
       if (!res?.success && !res?.skipped) {
         throw new Error(res?.error || "Erreur lors de la transition");
       }
@@ -552,7 +544,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
 
               </div>
               <p className="text-xl font-black text-gray-900">
-                Confirmer la livraison
+                {(course.pricing_mode === 'admin_manuel' || course.source === 'admin') && course.prix_propose_admin ? 'Confirmer la remise du colis ?' : 'Confirmer la livraison'}
               </p>
               <p className="text-sm text-gray-500 mt-1">
                 {(course.pricing_mode === "admin_manuel" || course.source === "admin")
@@ -562,7 +554,11 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                   : "Quel montant avez-vous reçu du client ?"}
               </p>
             </div>
-            <div className="relative">
+            {(course.pricing_mode === 'admin_manuel' || course.source === 'admin') && course.prix_propose_admin ? (
+              <p className="text-center text-2xl font-black text-gray-900" data-testid="confirmed-delivery-amount">
+                {Number(course.prix_propose_admin).toLocaleString('fr-FR')} {getDeviseAffichable(course)}
+              </p>
+            ) : <div className="relative">
               <Input
                 type="number"
                 placeholder="1 500"
@@ -573,20 +569,21 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                 autoFocus
               />
               <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-gray-600">FCFA</span>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
+            </div>}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <button
                 className="h-12 rounded-2xl border border-gray-200 text-gray-600 font-bold text-sm"
                 onClick={() => setShowPrixModal(false)}
+                disabled={deliveryBoutonPending}
               >
                 Annuler
               </button>
               <button
                 className="h-12 rounded-2xl bg-primary text-white font-black text-sm shadow-lg shadow-primary/20 disabled:opacity-50"
                 onClick={handleConfirmerLivraison}
-                disabled={isPending}
+                disabled={isPending || deliveryBoutonPending}
               >
-                OK
+                Confirmer la livraison
               </button>
             </div>
           </div>
@@ -621,7 +618,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
 
         <div className="p-5 space-y-4">
           {/* Barre de progression */}
-          <ProgressBar statut={effectiveStatut} isDeplacement={isDeplacement} isAdminColis={isAdminColisCourse} />
+          <ProgressBar statut={course.statut} contactedAt={course.heure_contact_client} isDeplacement={isDeplacement} isAdminColis={isAdminColisCourse} />
 
           {/* Badge ETA temps réel */}
           {!colisLivre && !adminPreTrip && (
@@ -642,10 +639,11 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
               const now = new Date().toISOString();
               updateOptimisticStatut("client_contacte", { heure_contact_client: now });
               try {
-                const res = await base44.functions.invoke("transitionStatutLivreur", {
+                const rawRes = await base44.functions.invoke("transitionStatutLivreur", {
                   course_id: course.id,
                   statut_cible: "client_contacte",
                 });
+                const res = normalizeCourseFunctionResult(rawRes);
                 if (!res?.success && !res?.skipped) {
                   throw new Error(res?.error || "Erreur lors de la transition");
                 }
@@ -668,6 +666,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
               const prixLabel = (course.prix_a_confirmer === true || !prix || !Number.isFinite(prix) || prix <= 0)
                 ? "Le prix de la course vous sera confirmé par SILGAPP."
                 : `Prix de la course : ${prix.toLocaleString()} ${devise}.`;
+              const websiteSuffix = course.delivery_mode === "eco" ? "" : "\n\nDécouvrez notre site web :\nhttps://silgapp-vitrine.mythicteal5.chatgpt.site";
 
               const msg = encodeURIComponent(
                 isDeplacement
@@ -675,8 +674,8 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                   : colisRecupere
                     ? `Bonjour, je suis votre livreur SILGAPP. Je suis en route pour vous livrer votre colis. ${prixLabel}`
                     : (livreurNomFormate
-                      ? `Bonjour, je suis ${livreurNomFormate}, votre livreur SILGAPP. Je suis en route pour récupérer votre colis. ${prixLabel} Merci de m'envoyer la localisation du lieu de récupération.\n\nDécouvrez notre site web :\nhttps://silgapp-vitrine.mythicteal5.chatgpt.site`
-                      : `Bonjour, je suis votre livreur SILGAPP. Je suis en route pour récupérer votre colis. ${prixLabel} Merci de m'envoyer la localisation du lieu de récupération.\n\nDécouvrez notre site web :\nhttps://silgapp-vitrine.mythicteal5.chatgpt.site`)
+                      ? `Bonjour, je suis ${livreurNomFormate}, votre livreur SILGAPP. Je suis en route pour récupérer votre colis. ${prixLabel} Merci de m'envoyer la localisation du lieu de récupération.${websiteSuffix}`
+                      : `Bonjour, je suis votre livreur SILGAPP. Je suis en route pour récupérer votre colis. ${prixLabel} Merci de m'envoyer la localisation du lieu de récupération.${websiteSuffix}`)
               );
               const lien = `https://wa.me/${num}?text=${msg}`;
               const popup = window.open(lien, "_blank", "noopener,noreferrer");
@@ -772,12 +771,9 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
             (() => {
               const isPrixManuel = course.pricing_mode === "manual" && course.manual_price_status === "accepted" && Number(course.manual_price) > 0;
               const prixBase = getPrixAffichable(course);
-              const split = splitAmountByCommission(prixBase, commissionPct);
-              const gain = split.montant_livreur;
 
               if (prixBase <= 0) return null;
 
-              const hasClientPrix = Number(course.prix_propose_client) > 0;
 
               return (
                 <div className={cn(
@@ -788,24 +784,12 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                 )}>
                   <div className="flex items-center justify-between mb-1">
                     <span className={cn("text-xs font-semibold", isPrixManuel ? "text-green-700" : "text-blue-700")}>
-                      {isPrixManuel ? "Prix validé " : (hasClientPrix ? "Prix proposé par le client" : (course.prix_propose_admin ? "Prix proposé (admin)" : "Prix estimé"))}
+                      Prix de la course :
                     </span>
                     <span className={cn("text-lg font-black", isPrixManuel ? "text-green-900" : "text-blue-900")}>
-                      {isPrixManuel
-                        ? `${prixBase.toLocaleString()} ${getDeviseAffichable(course)}`
-                        : `~${prixBase.toLocaleString()} ${getDeviseAffichable(course)}`
-                      }
+                      {prixBase.toLocaleString('fr-FR')} {getDeviseAffichable(course)}
                     </span>
                   </div>
-                  {isPrixManuel ? (
-                    <p className="text-[10px] text-green-600 font-medium">
-                      Prix convenu avec le client
-                    </p>
-                  ) : (
-                    <p className="text-[10px] text-blue-600">
-                      Prix final calculé à la livraison selon le tarif du pays
-                    </p>
-                  )}
                 </div>
               );
             })()
@@ -1005,35 +989,61 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                   <button
                     className="w-full h-14 rounded-2xl bg-gradient-to-b from-amber-500 to-amber-600 text-white font-black text-base shadow-lg shadow-amber-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
                     onClick={async () => {
-                      if (pickupBoutonPending) return;
+                      if (pickupConfirmationRef.current || pickupBoutonPending) return;
+                      pickupConfirmationRef.current = true;
+                      const generation = pickupGenerationRef.current;
                       setPickupBoutonPending(true);
-                      const now = new Date().toISOString();
-                      const invokeTransition = async (gps) => {
+                      const invokeTransition = async (lat, lng) => {
+                        if (generation !== pickupGenerationRef.current) return;
                         try {
-                          const res = functionBody(await base44.functions.invoke("transitionStatutLivreur", {
-                            course_id: course.id,
-                            statut_cible: "colis_recupere",
-                            ...gps,
-                            confirmation_method: "bouton",
-                          }));
-                          if (res?.success || res?.skipped) {
-                            updateOptimisticStatut("colis_recupere", { heure_recuperation: now });
-                            queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
-                            onColisRecupere({ ...course, statut: "colis_recupere", heure_recuperation: now });
-                            toast.success("Colis récupéré avec succès !");
-                          } else {
-                            throw new Error(res?.error || "Erreur lors de la récupération");
+                          let saved;
+                          let rawRes;
+                          const before = await pickupRead(base44, course.id);
+                          if (generation !== pickupGenerationRef.current) return;
+                          if (before.heure_recuperation || before.pickup_confirmed_at) {
+                            saved = await readConfirmedParcelPickup(base44, course.id, { success: true, course: before });
+                          } else if (['annulee', 'livree', 'terminee'].includes(before.statut) || before.annulation_user_id) {
+                            throw new Error('Cette course ne permet plus de confirmer une récupération. Actualisez.');
                           }
+                          if (!saved) {
+                          try {
+                          rawRes = await pickupTransition(base44, {
+                            course_id: course.id, statut_cible: 'colis_recupere', confirmation_method: 'bouton',
+                            ...(Number.isFinite(lat) && Number.isFinite(lng) ? { latitude: lat, longitude: lng } : {}),
+                          });
+                          } catch (error) {
+                            saved = await recoverUncertainParcelPickup(base44, course.id, error);
+                          }
+                          }
+                          if (!saved) {
+                            const res = normalizeCourseFunctionResult(rawRes);
+                            saved = await readConfirmedParcelPickup(base44, course.id, res);
+                          }
+                          if (generation !== pickupGenerationRef.current) return;
+                            setConfirmedPickup(saved);
+                            setOptimisticStatut(null);
+                            await queryClient.cancelQueries({ queryKey: ["mes-courses-externes"] });
+                            if (generation !== pickupGenerationRef.current) return;
+                            queryClient.setQueriesData({ queryKey: ["mes-courses-externes"] }, old =>
+                              Array.isArray(old) ? old.map(row => row.id === saved.id ? reconcilePickupView(row, saved) : row) : old);
+                            queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+                            onColisRecupere(saved);
+                            toast.success("Colis récupéré avec succès !");
                         } catch (err) {
+                        if (generation !== pickupGenerationRef.current) return;
                         setOptimisticStatut(null);
                         const errMsg = err?.data?.error || err?.message || "Erreur lors de la récupération. Réessayez.";
                         toast.error(errMsg);
                         } finally {
+                        if (generation === pickupGenerationRef.current) {
+                        pickupConfirmationRef.current = false;
                         setPickupBoutonPending(false);
+                        }
                         }
                       };
                       // GPS optionnel — ne pas bloquer la récupération si indisponible
-                      await invokeTransition(await captureDeliveryGps());
+                      const position = await optionalPickupPosition(navigator.geolocation);
+                      await invokeTransition(position?.latitude, position?.longitude);
                     }}
                     disabled={isPending || pickupBoutonPending}
                   >
@@ -1064,11 +1074,12 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                       const now = new Date().toISOString();
                       updateOptimisticStatut("colis_recupere", { heure_recuperation: now });
                       try {
-                        const res = await base44.functions.invoke("transitionStatutLivreur", {
+                        const rawRes = await base44.functions.invoke("transitionStatutLivreur", {
                           course_id: course.id,
                           statut_cible: "colis_recupere",
                           confirmation_method: "bouton",
                         });
+                        const res = normalizeCourseFunctionResult(rawRes);
                         if (!res?.success && !res?.skipped) {
                           throw new Error(res?.error || "Erreur lors de la récupération");
                         }
@@ -1096,7 +1107,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                       <button
                         className="w-full h-14 rounded-2xl bg-primary text-white font-black text-base shadow-lg shadow-primary/20 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
                         onClick={async () => {
-                          if (deliveryBoutonPending) return;
+                          if (deliveryConfirmationRef.current || deliveryBoutonPending) return;
                           // Admin : ouvrir la modale de prix (comme avant)
                           if (course.pricing_mode === "admin_manuel" || course.source === "admin") {
                             setPendingDeliveryData({});
@@ -1104,13 +1115,18 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                             return;
                           }
                           setDeliveryBoutonPending(true);
+                          deliveryConfirmationRef.current = true;
                           try {
-                            const res = await confirmDelivery(base44, course.id);
+                            const rawRes = await finaliserLivraisonSafe(base44, {
+                              course_id: course.id,
+                            });
+                            const res = normalizeCourseFunctionResult(rawRes);
                             if (res?.success || res?.skipped) {
                               queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
                               queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
+                              const confirmed = confirmedDeliverySnapshot(course, res);
+                              await onColisLivre(confirmed, null, { confirmedResult: res });
                               onDeliveryVictory?.(course.id);
-                              await onColisLivre({ ...course, statut: "livree" }, null);
                             } else {
                               throw new Error(res?.error || "Erreur finalisation");
                             }
@@ -1119,6 +1135,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                             setOptimisticStatut(null);
                             toast.error(err?.message || "Erreur lors de la finalisation. Réessayez.");
                           } finally {
+                            deliveryConfirmationRef.current = false;
                             setDeliveryBoutonPending(false);
                           }
                         }}
@@ -1252,22 +1269,26 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
               <button
                 className="w-full h-14 rounded-2xl bg-primary text-white font-black text-base shadow-lg shadow-primary/20 active:scale-[0.98] transition-all flex items-center justify-center gap-3"
                 onClick={async () => {
-                  const finalData = {
-                    ...course,
-                    ...deplacementRecap,
-                    statut: "livree",
-                  };
-                  updateOptimisticStatut("livree", finalData);
-                  base44.functions.invoke("finaliserLivraisonLivreur", {
-                    course_id: course.id,
-                    prix_final_livreur: deplacementRecap.prix_final,
-                  }).catch(() => null);
-                  queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
-                  // Appeler onColisLivre pour libérer le livreur UNIQUEMENT maintenant
-                  onColisLivre(finalData, deplacementRecap.prix_final);
-                  navigateToRecap(finalData);
-                  setDeplacementRecap(null);
+                  if (deliveryConfirmationRef.current) return;
+                  deliveryConfirmationRef.current = true;
+                  setDeliveryBoutonPending(true);
+                  try {
+                    const receipt = await finaliserLivraisonSafe(base44, {
+                      course_id: course.id,
+                      prix_final_livreur: deplacementRecap.prix_final,
+                    });
+                    const finalData = confirmedDeliverySnapshot(course, receipt);
+                    await onColisLivre(finalData, null, { confirmedResult: receipt });
+                    queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+                    setDeplacementRecap(null);
+                  } catch (error) {
+                    toast.error(error?.message || 'Livraison non confirmée.');
+                  } finally {
+                    deliveryConfirmationRef.current = false;
+                    setDeliveryBoutonPending(false);
+                  }
                 }}
+                disabled={deliveryBoutonPending}
               >
                 <Check className="w-6 h-6" />
                 TERMINER
@@ -1320,10 +1341,9 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
             // Colis unique : logique existante inchangée
             const isPrixManuel = course.pricing_mode === "manual" && course.manual_price_status === "accepted" && Number(course.manual_price) > 0;
             const dist = Number(course.distance_reelle_km) > 0 ? Number(course.distance_reelle_km) : null;
-            const prix = isPrixManuel
-              ? Number(course.manual_price)
-              : (Math.max(1000, Number(course.prix_final) || (dist ? Math.round(dist * 100) : 0)) || null);
-            const split = prix ? resolveStoredOrDynamicSplit(course, prix, commissionPct) : { montant_livreur: null, commission_silga: null };
+            const stored = deliveryRecapValues(course);
+            const prix = stored.price;
+            const split = { montant_livreur: stored.driver, commission_silga: stored.commission };
             const gain = split.montant_livreur;
             const commission = split.commission_silga;
             return (

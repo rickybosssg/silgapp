@@ -1,0 +1,309 @@
+import { silgappLogo } from "@/lib/iosBranding";
+import React, { useState } from "react";
+import { Link, useLocation } from "react-router-dom";
+import { logoutPersistent } from "@/lib/authPersistence";
+import { 
+  LayoutDashboard, MapPin, Plus, Truck, BarChart3, Bell, Mic,
+  Package, TrendingUp, ChevronLeft, ChevronRight, LogOut, Wallet, Shield, Globe, Settings, MessageCircle, Users, Megaphone, ChevronDown, Check, UserCheck, ShieldAlert, Store, UtensilsCrossed, Pill, PieChart, Sparkles, Brain, FlaskConical, Cpu, Crown, Zap, Coins, Radio, Trophy, Activity, Ticket, Building2, Rocket
+} from "lucide-react";
+import { base44 } from "@/api/base44Client";
+import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
+import { useQuery } from "@tanstack/react-query";
+import { useAdminContext } from "@/hooks/useAdminContext.js";
+import { usePaysActifs } from "@/components/international/CountrySelector.jsx";
+import { isAudioSettingsAdmin } from "../../../base44/shared/audioContract.js";
+
+const doLogout = async () => {
+  ['base44_access_token', 'access_token', 'base44_token', 'token'].forEach(k => {
+    try { localStorage.removeItem(k); } catch(_) {}
+  });
+  try { await logoutPersistent(); }
+  catch { window.alert("La déconnexion n’a pas pu être enregistrée. Réessayez."); return; }
+  setTimeout(() => window.location.reload(), 300);
+};
+
+
+export const navItems = [
+  { path: "/", label: "Tableau de bord", icon: LayoutDashboard },
+  { path: "/admin/nouvelle-course", label: "Nouvelle course", icon: Plus },
+  { path: "/carte", label: "Carte en direct", icon: MapPin },
+  { path: "/courses", label: "Toutes les courses", icon: Package },
+  { path: "/livreurs", label: "Livreurs", icon: Truck },
+  { path: "/admin/externe/dus-livreurs", label: "Dû Utilisateur", icon: Wallet },
+  { path: "/admin/paiements", label: "Paiements", icon: Wallet },
+  { path: "/rapport", label: "Rapport du jour", icon: BarChart3 },
+  { path: "/recapitulatif", label: "Récapitulatif", icon: TrendingUp },
+  { path: "/admin/statistiques", label: "Statistiques", icon: PieChart },
+  { path: "/admin/comptabilite", label: "Comptabilité", icon: Wallet },
+  { path: "/admin/global", label: "Admin Global", icon: Globe },
+  { path: "/admin/commande-express", label: "Commande express", icon: Mic, superAdminOnly: true },
+  { path: "/admin/tarification", label: "Tarification", icon: Coins },
+  { path: "/admin/pass-zero-commission", label: "Pass Zéro Commission", icon: Ticket },
+  { path: "/admin/gestion-pays", label: "Gestion des pays", icon: Settings },
+  { path: "/admin/crm-clients", label: "CRM Clients", icon: Users },
+  { path: "/admin/reactivation-clients", label: "Réactivation Clients", icon: Bell },
+  { path: "/admin/externe/clients", label: "Clients externes", icon: Users },
+  { path: "/admin/publicites", label: "Publicités", icon: Megaphone },
+  { path: "/admin/venus-brain", label: "Cerveau de VENUS", icon: Brain },
+  { path: "/admin/venus-intelligence", label: "Centre d'Intelligence VENUS", icon: Brain },
+  { path: "/admin/venus-improvement", label: "Amélioration VENUS", icon: Sparkles },
+  { path: "/admin/venus-test-lab", label: "Laboratoire de Test VENUS", icon: FlaskConical },
+  { path: "/admin/openai-dashboard", label: "Suivi OpenAI", icon: Cpu },
+  { path: "/admin/credits-integration", label: "Crédits d'intégration", icon: Zap },
+  { path: "/admin/centre-notifications", label: "Centre de notifications", icon: Bell },
+  { path: "/admin/externe", label: "Config Dispatch", icon: Settings },
+  { path: "/admin/livreurs-prioritaires", label: "Livreurs prioritaires", icon: Crown },
+  { path: "/admin/demandes-livreurs", label: "Livreurs à valider", icon: UserCheck },
+  { path: "/admin/livreurs-bloques", label: "Livreurs bloqués", icon: ShieldAlert },
+  { path: "/admin/anti-fraude", label: "Anti-Fraude", icon: Shield },
+  { path: "/admin/messages", label: "Messagerie", icon: MessageCircle },
+  { path: "/admin/whatsapp", label: "WhatsApp Admin", icon: MessageCircle },
+  { path: "/admin/support", label: "Support tickets", icon: MessageCircle },
+  { path: "/admin/boutiques", label: "Boutiques", icon: Store },
+  { path: "/admin/restaurants", label: "Restaurants", icon: UtensilsCrossed },
+  { path: "/admin/pharmacies", label: "Pharmacies", icon: Pill },
+  { path: "/admin/commandes-partenaires", label: "Commandes Partenaires", icon: Package },
+  { path: "/admin/neo", label: "NEO – Moteur d'amélioration", icon: Sparkles },
+  { path: "/admin/reactivation-clients", label: "Réactivation Clients", icon: Bell },
+  { path: "/admin/rappels-habitude", label: "Rappels Habitude", icon: Activity },
+  { path: "/admin/clients-autonomiser", label: "Clients à autonomiser", icon: Users },
+  { path: "/admin/growth", label: "Growth / Croissance", icon: TrendingUp },
+  { path: "/admin/autopilote", label: "Autopilote Acquisition", icon: Rocket },
+  { path: "/admin/city-dispatch", label: "Dispatch par Ville", icon: MapPin },
+  { path: "/admin/meta-ads", label: "Publicités Meta", icon: Megaphone },
+  { path: "/admin/bugs", label: "Suivi des bugs", icon: ShieldAlert },
+  { path: "/admin/courses-a-sauver", label: "Courses à sauver", icon: ShieldAlert },
+  { path: "/admin/fiabilite-push", label: "Fiabilité Push", icon: Radio },
+  { path: "/admin/silga-score", label: "Silga Score", icon: Trophy },
+  { path: "/admin/entreprises", label: "SILGAPP Entreprise", icon: Building2 },
+  { path: "/admin/suivi-enterprise", label: "Suivi Enterprise", icon: TrendingUp },
+  { path: "/notifications", label: "Notifications", icon: Bell },
+  { path: "/maintenance", label: "Maintenance", icon: Shield },
+];
+
+export default function Sidebar({ notificationCount = 0, demandesCount = 0, partenaireDemandesCount = 0, neoCount = 0, paiementCount = 0, messageCount = 0, livreursBloquesCount = 0, whatsappMessageCount = 0, reseau }) {
+  const [collapsed, setCollapsed] = useState(false);
+  const [countryOpen, setCountryOpen] = useState(false);
+  const location = useLocation();
+  const { isPays, countryCode: adminCountryCode, selectedCountry, setSelectedCountry, user } = useAdminContext();
+  const canManageExpress = isAudioSettingsAdmin(user);
+  const effectiveCountry = isPays ? adminCountryCode : selectedCountry;
+  const showCountryPicker = reseau === "externe" && !isPays;
+  const { pays: paysListe } = usePaysActifs();
+
+  // ── Badge non-lu pour le Centre de notifications ──
+  const { data: inboxUnread = 0 } = useQuery({
+    queryKey: ["admin-inbox-unread-count"],
+    queryFn: async () => {
+      try {
+        const items = await base44.entities.AdminInboxItem.filter({ status: "unread" }, "-created_date", 200);
+        return items?.length || 0;
+      } catch { return 0; }
+    },
+    refetchInterval: 30000,
+  });
+
+  // ── Badge demandes Pass en attente (validation admin) ──
+  const { data: passAchatsEnAttente = 0 } = useQuery({
+    queryKey: ["pass-achats-en-attente", effectiveCountry],
+    queryFn: async () => {
+      try {
+        const filter = { statut: "en_attente" };
+        if (effectiveCountry) filter.country_code = effectiveCountry;
+        const items = await base44.entities.PassAchat.filter(filter, "-date_demande", 200);
+        return items?.length || 0;
+      } catch { return 0; }
+    },
+    refetchInterval: 30000,
+  });
+
+
+  return (
+    <aside className={cn(
+      "h-screen bg-sidebar flex flex-col transition-all duration-300 sticky top-0 shadow-[8px_0_30px_rgba(0,0,0,0.3)] border-r border-white/5",
+      collapsed ? "w-[68px]" : "w-60"
+    )}>
+      {/* Logo — relief 3D subtil sur le badge S */}
+      <div className={cn(
+        "h-16 flex items-center border-b border-white/5 flex-shrink-0 overflow-hidden",
+        collapsed ? "px-4 justify-center" : "px-5 gap-3"
+      )}>
+        <div className="w-9 h-9 rounded-xl bg-sidebar-primary flex items-center justify-center silgapp-relief flex-shrink-0">
+          <img 
+            src={silgappLogo("https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/962cfba1f_IMG-20260819-WA0003.jpg")}
+            alt="SILGAPP"
+            className="w-full h-full rounded-xl object-cover"
+          />
+        </div>
+        {!collapsed && (
+          <div>
+            <h1 className="font-extrabold text-sm text-white tracking-wide">SILGAPP</h1>
+            <p className="text-[10px] text-slate-300">SILGAPP Livraison</p>
+          </div>
+        )}
+      </div>
+
+      {/* Navigation */}
+      <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto">
+        {navItems.filter(item => !item.superAdminOnly || canManageExpress).map((item) => {
+          const isActive = location.pathname === item.path;
+          const Icon = item.icon;
+          return (
+            <Link
+              key={item.path}
+              to={item.path}
+              title={collapsed ? item.label : undefined}
+              className={cn(
+                "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all group",
+                isActive
+                  ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm silgapp-relief-surface"
+                  : "text-slate-300 hover:bg-white/5 hover:text-sidebar-primary"
+              )}
+            >
+              <Icon className="w-4 h-4 flex-shrink-0" />
+              {!collapsed && (
+                <>
+                  <span className="truncate flex-1">{item.label}</span>
+                  {item.path === "/notifications" && notificationCount > 0 && (
+                    <Badge className="bg-destructive text-white text-[10px] h-5 min-w-5 flex items-center justify-center px-1">
+                      {notificationCount}
+                    </Badge>
+                  )}
+                  {item.path === "/admin/demandes-livreurs" && demandesCount > 0 && (
+                    <Badge className="bg-destructive text-white text-[10px] h-5 min-w-5 flex items-center justify-center px-1">
+                      {demandesCount}
+                    </Badge>
+                  )}
+                  {["/admin/boutiques", "/admin/restaurants", "/admin/pharmacies"].includes(item.path) && partenaireDemandesCount > 0 && (
+                    <Badge className="bg-destructive text-white text-[10px] h-5 min-w-5 flex items-center justify-center px-1">
+                      {partenaireDemandesCount}
+                    </Badge>
+                  )}
+                  {item.path === "/admin/neo" && neoCount > 0 && (
+                    <Badge className="bg-cyan-500 text-white text-[10px] h-5 min-w-5 flex items-center justify-center px-1">
+                      {neoCount}
+                    </Badge>
+                  )}
+                  {item.path === "/admin/paiements" && paiementCount > 0 && (
+                    <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
+                  )}
+                  {item.path === "/admin/messages" && messageCount > 0 && (
+                    <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
+                  )}
+                  {item.path === "/admin/whatsapp" && whatsappMessageCount > 0 && (
+                    <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
+                  )}
+                  {item.path === "/admin/livreurs-bloques" && livreursBloquesCount > 0 && (
+                    <Badge className="bg-destructive text-white text-[10px] h-5 min-w-5 flex items-center justify-center px-1">
+                      {livreursBloquesCount}
+                    </Badge>
+                  )}
+                  {item.path === "/admin/centre-notifications" && inboxUnread > 0 && (
+                    <Badge className="bg-red-500 text-white text-[10px] h-5 min-w-5 flex items-center justify-center px-1 animate-pulse">
+                      {inboxUnread > 99 ? "99+" : inboxUnread}
+                    </Badge>
+                  )}
+                  {item.path === "/admin/pass-zero-commission" && passAchatsEnAttente > 0 && (
+                    <Badge className="bg-destructive text-white text-[10px] h-5 min-w-5 flex items-center justify-center px-1">
+                      {passAchatsEnAttente > 9 ? "9+" : passAchatsEnAttente}
+                    </Badge>
+                  )}
+                </>
+              )}
+              {(item.path === "/notifications" && notificationCount > 0) || (item.path === "/admin/demandes-livreurs" && demandesCount > 0) || (["/admin/boutiques", "/admin/restaurants", "/admin/pharmacies"].includes(item.path) && partenaireDemandesCount > 0) || (item.path === "/admin/neo" && neoCount > 0) || (item.path === "/admin/messages" && messageCount > 0) || (item.path === "/admin/whatsapp" && whatsappMessageCount > 0) || (item.path === "/admin/livreurs-bloques" && livreursBloquesCount > 0) || (item.path === "/admin/centre-notifications" && inboxUnread > 0) || (item.path === "/admin/pass-zero-commission" && passAchatsEnAttente > 0) ? (
+                collapsed && (
+                  <span className="absolute right-1 top-1 w-2 h-2 rounded-full bg-destructive" />
+                )
+              ) : null}
+            </Link>
+          );
+        })}
+      </nav>
+
+      {/* Footer */}
+      <div className="border-t border-white/5 flex-shrink-0">
+
+        {/* Sélecteur de pays — réseau externe uniquement */}
+        {showCountryPicker && (
+          <div className={cn("relative border-b border-white/5", collapsed ? "px-2 py-2" : "px-3 py-2")}>
+            {collapsed ? (
+              <button
+                onClick={() => setCountryOpen(!countryOpen)}
+                className="w-full flex items-center justify-center h-9 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
+                title={effectiveCountry ? paysListe.find(p => p.code === effectiveCountry)?.nom : "Choisir un pays"}
+              >
+                <span className="text-base">
+                  {effectiveCountry ? paysListe.find(p => p.code === effectiveCountry)?.emoji_flag || "🌍" : "🌍"}
+                </span>
+              </button>
+            ) : (
+              <button
+                onClick={() => setCountryOpen(!countryOpen)}
+                style={{ backgroundColor: '#ffffff', color: '#111827' }}
+                className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl transition-colors"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-base flex-shrink-0">
+                    {effectiveCountry ? paysListe.find(p => p.code === effectiveCountry)?.emoji_flag || "🌍" : "🌍"}
+                  </span>
+                  <span className="text-xs font-semibold truncate" style={{ color: '#111827' }}>
+                    {effectiveCountry ? paysListe.find(p => p.code === effectiveCountry)?.nom : "Choisir un pays"}
+                  </span>
+                </div>
+                <ChevronDown className="w-3.5 h-3.5 flex-shrink-0 transition-transform" style={{ color: '#6b7280' }} />
+              </button>
+            )}
+
+            {/* Dropdown pays */}
+            {countryOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setCountryOpen(false)} />
+                <div className={cn(
+                   "absolute z-50 bg-white border border-gray-200 rounded-xl shadow-2xl max-h-72 overflow-y-auto",
+                   collapsed ? "left-14 bottom-0 w-52" : "left-3 right-3 bottom-full mb-2"
+                 )}>
+                   {paysListe.map((p) => (
+                     <button
+                       key={p.code}
+                       onClick={() => { setSelectedCountry(p.code); setCountryOpen(false); }}
+                       className={cn(
+                         "w-full flex items-center gap-3 px-3 py-2.5 text-sm transition-colors hover:bg-gray-100",
+                         effectiveCountry === p.code ? "bg-blue-50 text-blue-700" : "text-gray-900"
+                       )}
+                     >
+                       <span className="text-base flex-shrink-0">{p.emoji_flag}</span>
+                       <span className="flex-1 text-left font-medium">{p.nom}</span>
+                       {effectiveCountry === p.code && <Check className="w-3.5 h-3.5 text-primary flex-shrink-0" />}
+                     </button>
+                   ))}
+                 </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Déconnexion */}
+        <button
+          onClick={doLogout}
+          className={cn(
+            "w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-slate-400 hover:text-red-500 hover:bg-red-500/10 transition-colors",
+            collapsed ? "justify-center" : ""
+          )}
+          title="Déconnexion"
+        >
+          <LogOut className="w-4 h-4 flex-shrink-0" />
+          {!collapsed && <span>Déconnexion</span>}
+        </button>
+        {/* Collapse toggle */}
+        <button
+          onClick={() => setCollapsed(!collapsed)}
+          className="w-full h-9 flex items-center justify-center text-slate-400 hover:text-[#00a86b] hover:bg-white/5 transition-colors"
+          title={collapsed ? "Étendre" : "Réduire"}
+        >
+          {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+        </button>
+      </div>
+    </aside>
+  );
+}

@@ -502,7 +502,17 @@ export default async function(req) {
         if (countryConfig?.prix_minimum && countryConfig.prix_minimum > 0) {
           PRIX_MIN = countryConfig.prix_minimum;
         }
-      } catch (_) {}
+      } catch (error: any) {
+        const status = Number(error?.response?.status ?? error?.status ?? error?.status_code);
+        const limited = status === 429 || /rate limit exceeded|entity_list allows/i.test(String(error?.message || ''));
+        return Response.json({
+          success: false,
+          error: 'Configuration tarifaire temporairement indisponible. Réessayez.',
+          blocked_reason: 'country_config_unavailable',
+          retryable: true,
+          tariff_contract: 'country-config-read-v1',
+        }, { status: limited ? 429 : 503 });
+      }
       if (PRIX_MIN === null) {
         return Response.json({
           success: false,
@@ -1114,7 +1124,7 @@ export default async function(req) {
       return Response.json({ success: true, vue_enregistree: false, reason: 'no_dispatch_notification_tracking_only_for_notified_livreurs' });
     }
 
-    return Response.json({ error: 'Action inconnue' }, { status: 400 });
+    return Response.json({ error: 'Action inconnue' }, { status: 400, headers: { 'X-Silgapp-Tariff-Contract': 'country-config-read-v1' } });
   } catch (error) {
     const isInfraError = isTransientInfrastructureError(error);
     const isAuthError = error.message?.includes(AUTH_ERROR_SIGNATURE);

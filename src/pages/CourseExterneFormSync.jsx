@@ -59,7 +59,7 @@ export default function CourseExterneFormSync() {
   const savedLng = clientProfil?.longitude || position?.longitude || null;
 
   // Restaurer l'étape depuis localStorage si disponible
-  const savedStep = parseInt(localStorage.getItem(STEP_KEY) || "0", 10);
+  const savedStep = prefillCourse ? 0 : parseInt(localStorage.getItem(STEP_KEY) || "0", 10);
   const [currentStep, setCurrentStep] = useState(isNaN(savedStep) ? 0 : savedStep);
   const [courseCreated, setCourseCreated] = useState(false);
   const [createdCourse, setCreatedCourse] = useState(null);
@@ -105,6 +105,9 @@ export default function CourseExterneFormSync() {
         destinataire_nom: prefillCourse.destinataire_nom || "",
         destinataire_telephone: prefillCourse.destinataire_telephone || "",
         type_colis: prefillCourse.type_colis || "petit_colis",
+        passager_nom: prefillCourse.passager_nom || '',
+        passager_telephone: prefillCourse.passager_telephone || '',
+        nb_passagers: prefillCourse.nb_passagers || 1,
         adresse_depart: prefillCourse.adresse_depart || "",
         adresse_arrivee: prefillCourse.adresse_arrivee || "",
         quartier_depart: prefillCourse.quartier_depart || "",

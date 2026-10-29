@@ -38,6 +38,7 @@ export const navItems = [
   { path: "/admin/comptabilite", label: "Comptabilité", icon: Wallet },
   { path: "/admin/global", label: "Admin Global", icon: Globe },
   { path: "/admin/commande-express", label: "Commande express", icon: Mic, superAdminOnly: true },
+  { path: "/admin/commandes-sans-compte", label: "Commandes sans compte", icon: Package, publicAdminOnly: true },
   { path: "/admin/tarification", label: "Tarification", icon: Coins },
   { path: "/admin/pass-zero-commission", label: "Pass Zéro Commission", icon: Ticket },
   { path: "/admin/gestion-pays", label: "Gestion des pays", icon: Settings },
@@ -146,7 +147,7 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, part
 
       {/* Navigation */}
       <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto">
-        {navItems.filter(item => !item.superAdminOnly || canManageExpress).map((item) => {
+        {navItems.filter(item => !item.superAdminOnly || canManageExpress).filter(item => !item.publicAdminOnly || (user?.role === 'admin' && !user?.enterprise_id && !user?.data?.enterprise_id && user?.silgapp_role !== 'admin_entreprise')).map((item) => {
           const isActive = location.pathname === item.path;
           const Icon = item.icon;
           return (

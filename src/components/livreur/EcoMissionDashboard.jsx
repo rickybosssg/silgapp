@@ -12,9 +12,10 @@ import {
   computeActiveStepIndex, getStepCourse,
 } from "@/lib/ecoMissionHelpers";
 import { getCourseContactForPhase, normalizePhoneForWhatsapp } from "@/lib/courseContact";
+import { normalizeCourseFunctionResult } from "@/lib/courseFunctionResult";
 import { getPrixAffichable, getDeviseAffichable } from "@/utils/getPrixAffichable";
-import { confirmDelivery, functionBody } from "@/lib/deliveryConfirmation";
 import { captureDeliveryGps } from "@/lib/deliveryGps";
+import { finaliserLivraisonSafe } from "@/lib/safeDeliveryFinalization";
 import DriverWithdrawalDialog from './DriverWithdrawalDialog';
 import {DRIVER_PRE_PICKUP_STATUSES,driverHasCustody} from '../../../base44/shared/driverWithdrawalPolicy.js';
 
@@ -101,14 +102,16 @@ export default function EcoMissionDashboard({ mission, livreurProfil, onAllDeliv
     try {
       const gps = ["colis_recupere", "pris_en_charge", "arrivee"].includes(statutCible)
         ? await captureDeliveryGps() : {};
-      const response = await base44.functions.invoke("transitionStatutLivreur", {
+      const rawRes = await base44.functions.invoke("transitionStatutLivreur", {
         course_id: courseId,
         statut_cible: statutCible,
         ...extraData,
         ...gps,
       });
-      const result = functionBody(response);
-      if (result?.success !== true) throw new Error(result?.error || "Mise à jour non confirmée");
+      const res = normalizeCourseFunctionResult(rawRes);
+      if (!res?.success && !res?.skipped) {
+        throw new Error(res?.error || "Erreur lors de la mise à jour");
+      }
       queryClient.invalidateQueries({ queryKey: ["eco-mission-active-courses", mission.id] });
       queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
     } catch (err) {
@@ -122,7 +125,8 @@ export default function EcoMissionDashboard({ mission, livreurProfil, onAllDeliv
     if (actionPending) return;
     setActionPending(true);
     try {
-      const res = await confirmDelivery(base44, courseId);
+      const rawRes = await finaliserLivraisonSafe(base44, { course_id: courseId, ...await captureDeliveryGps() });
+      const res = normalizeCourseFunctionResult(rawRes);
       if (res?.success || res?.skipped) {
         queryClient.invalidateQueries({ queryKey: ["eco-mission-active-courses", mission.id] });
         queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });

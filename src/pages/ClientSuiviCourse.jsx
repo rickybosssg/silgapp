@@ -135,15 +135,24 @@ export default function ClientSuiviCourse() {
   }, []);
 
   const [clientProfilId, setClientProfilId] = useState(null);
+  const [clientProfil, setClientProfil] = useState(null);
 
   useEffect(() => {
+    let cancelled = false;
+    setClientProfil(null);
+    setClientProfilId(null);
     if (!userId) return;
     base44.auth.me().then(async (user) => {
       try {
+        if (cancelled || user?.id !== userId || !user.email) return;
         const clients = await base44.entities.ClientExterne.filter({ user_email: user.email });
-        if (clients?.length > 0) setClientProfilId(clients[0].id);
+        if (!cancelled && clients?.length > 0) {
+          setClientProfilId(clients[0].id);
+          setClientProfil(clients[0]);
+        }
       } catch (_) {}
     }).catch(() => null);
+    return () => { cancelled = true; };
   }, [userId]);
 
   // Charger les courses créées par l'utilisateur + celles où il est destinataire
@@ -406,6 +415,8 @@ export default function ClientSuiviCourse() {
         )}
         {onglet === "historique" && userId && userEmail && !isLoading && !coursesError && (
           <HistoriqueCoursesClient
+            clientProfil={clientProfil}
+            position={undefined}
             courses={coursesHistorique}
             fraisAnnulation={fraisImpayes}
             onSelectCourse={(id) => {

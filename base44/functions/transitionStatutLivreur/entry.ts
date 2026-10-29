@@ -1,7 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
 import { updateEcoMissionRouteProgress } from '../../shared/ecoOptimizationEngine.ts';
 import { resolveDeliveryGps } from '../../shared/deliveryGps.ts';
-import { updateActiveCourse } from '../../shared/courseTerminalGuard.ts';
+import { transitionTerminal, transitionScopeMatches, sameActiveTransition, writeOwnedTransition } from '../../shared/transitionSafety.ts';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TRANSITION STATUT LIVREUR — Toutes les transitions de statut sans prix
@@ -54,7 +54,9 @@ const FORBIDDEN_FIELDS = [
   'client_price_validated_at', 'client_price_refused_at', 'pricing_mode',
   'tracking_token', 'tracking_link', 'tracking_shared_at', 'tracking_opened_count',
   'pickup_qr_token', 'pickup_code_4_digits', 'delivery_qr_token', 'delivery_code_4_digits',
-  'delivery_confirmed_by',
+  // [FIX] pickup_confirmed_by retiré de FORBIDDEN_FIELDS : la fonction le définit elle-même
+  // de manière sécurisée (basée sur confirmation_method). Il ne vient jamais du frontend.
+  // Avant, il était strippé → jamais sauvegardé en base.
   'heure_acceptation', 'source', 'country_code', 'type_course', 'is_multi_colis',
   'nb_colis', 'nb_colis_livres', 'nb_colis_annules',
 ];
@@ -62,8 +64,8 @@ const FORBIDDEN_FIELDS = [
 export default async function(req: Request): Promise<Response> {
   try {
     const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
-    if (!user) return Response.json({ error: 'Non autorisé' }, { status: 401 });
+    const user = await base44.auth.me().catch(() => null);
+    if (!user?.email) return Response.json({ error: 'Non autorisé', transition_contract: 'transition-terminal-scope-v1' }, { status: 401 });
 
     const body = await req.json();
     const { course_id, statut_cible, latitude, longitude, remarque, confirmation_method } = body;
@@ -82,7 +84,7 @@ export default async function(req: Request): Promise<Response> {
     if (!course) return Response.json({ error: 'Course introuvable' }, { status: 404 });
 
     // Vérifier que la course n'est pas terminée
-    if (['livree', 'annulee'].includes(course.statut)) {
+    if (transitionTerminal(course)) {
       return Response.json({ error: 'Course terminée ou annulée' }, { status: 400 });
     }
 
@@ -96,24 +98,30 @@ export default async function(req: Request): Promise<Response> {
       }, { status: 400 });
     }
 
+    // A parcel cannot start delivery before its recorded pickup. No backfill.
+    if (statut_cible === 'en_livraison' && ['expedier', 'recevoir'].includes(course.type_course) &&
+        ['en_route_expediteur', 'livreur_en_route'].includes(course.statut) &&
+        ![course.heure_recuperation, course.pickup_confirmed_at].some(value => value && Number.isFinite(Date.parse(value)))) {
+      return Response.json({ success: false, error: 'Confirmez la récupération avant de démarrer la livraison.', transition_contract: 'transition-pickup-order-v1' }, { status: 409 });
+    }
+
     // Vérifier l'identité du livreur
     if (!course.livreur_id) {
       return Response.json({ error: 'Aucun livreur assigné à cette course' }, { status: 403 });
     }
     const livreur = await base44.asServiceRole.entities.Livreur.get(course.livreur_id).catch(() => null);
     if (!livreur) return Response.json({ error: 'Livreur introuvable' }, { status: 404 });
-    if (livreur.user_email !== user.email) {
+    if (!transitionScopeMatches(user, course, livreur)) return Response.json({ error: 'Course hors de votre pays ou entreprise' }, { status: 403 });
+    if (String(livreur.user_email || '').trim().toLowerCase() !== String(user.email).trim().toLowerCase()) {
       // ── Fallback : auto-liaison si email correspond mais user_email est null/différent ──
       // Corrige le bug où un livreur créé par admin sans user_email peut accepter des courses
       // mais pas les terminer (accepterCourseV2 ne vérifie pas user_email).
       const livreurEmailNorm = (livreur.email || '').trim().toLowerCase();
       const userEmailNorm = (user.email || '').trim().toLowerCase();
-      if (livreurEmailNorm && livreurEmailNorm === userEmailNorm) {
-        await base44.asServiceRole.entities.Livreur.update(course.livreur_id, {
-          user_email: user.email,
-        }).catch(() => {});
+      if (!livreur.user_email && livreurEmailNorm && livreurEmailNorm === userEmailNorm) {
+        await base44.asServiceRole.entities.Livreur.updateMany({ id: course.livreur_id, user_email: { $in: [null, ''] }, country_code: livreur.country_code, enterprise_id: livreur.enterprise_id || { $in: [null, ''] } }, { $set: { user_email: user.email } }).catch(() => {});
         const livreurRelu = await base44.asServiceRole.entities.Livreur.get(course.livreur_id).catch(() => null);
-        if (!livreurRelu || livreurRelu.user_email !== user.email) {
+        if (!livreurRelu || livreurRelu.user_email !== user.email || !transitionScopeMatches(user, course, livreurRelu)) {
           return Response.json({ error: 'Vous n\'êtes pas le livreur assigné à cette course' }, { status: 403 });
         }
       } else {
@@ -128,14 +136,23 @@ export default async function(req: Request): Promise<Response> {
       }
     }
 
+
+    // Idempotence : si déjà au statut cible, retourner success
     if (course.statut === statut_cible) {
+      const current = await base44.asServiceRole.entities.CourseExterne.get(course_id);
+      if (!sameActiveTransition(current, course, statut_cible)) return Response.json({ error: 'Course modifiée ou annulée. Actualisez.' }, { status: 409 });
       if (course.eco_mission_id) await updateEcoMissionRouteProgress(base44, course_id).catch(() => null);
       return Response.json({ success: true, skipped: 'already_at_target', course_id, statut: statut_cible });
     }
 
-    // Validation spécifique: client_contacte réservé aux courses admin
+    // [FIX 2026-10-27] client_contacte autorisé pour les courses colis clientes (expedier/recevoir),
+    // pas seulement les courses admin. L'APK utilise ce parcours pour les colis clients :
+    // contact WhatsApp → trajet vers l'expéditeur → colis récupéré → livraison.
+    // La restriction reste pour les courses de déplacement (passagers) où cette étape n'existe pas.
     if (statut_cible === 'client_contacte' && course.source !== 'admin' && course.pricing_mode !== 'admin_manuel') {
-      return Response.json({ error: 'L\'étape "Client contacté" est réservée aux courses administratives' }, { status: 400 });
+      if (course.type_course === 'deplacement') {
+        return Response.json({ error: 'L\'étape "Client contacté" est réservée aux courses de colis' }, { status: 400 });
+      }
     }
 
     // Construire l'update
@@ -178,16 +195,11 @@ export default async function(req: Request): Promise<Response> {
       delete updateData[f];
     }
 
-    if (!await updateActiveCourse(base44, course, updateData)) return Response.json({ success: false, error: "Course modifiée ou annulée. Actualisez." }, { status: 409 });
-    const updated = await base44.asServiceRole.entities.CourseExterne.get(course_id);
-    if (updated?.livreur_id !== course.livreur_id || updated?.statut !== statut_cible) {
-      return Response.json({ error: 'La course a changé. Actualisez avant de continuer.', statut_actuel: updated?.statut }, { status: 409 });
-    }
-    const ecoProgress = course.eco_mission_id
-      ? await updateEcoMissionRouteProgress(base44, course_id).catch(() => ({ updated: false, reason: 'progress_sync_failed' }))
-      : undefined;
-    return Response.json({ success: true, course: updated, statut: statut_cible, eco_progress: ecoProgress });
+    const outcome = await writeOwnedTransition(base44, course, updateData);
+    if (!outcome) return Response.json({ success: false, error: 'Course modifiée ou annulée. Actualisez.', transition_contract: 'transition-terminal-scope-v1' }, { status: 409 });
+    const ecoProgress = course.eco_mission_id ? await updateEcoMissionRouteProgress(base44, course_id).catch(() => ({ updated: false, reason: 'progress_sync_failed' })) : undefined;
+    return Response.json({ success: true, course: outcome.course, statut: outcome.course.statut, eco_progress: ecoProgress, ...(outcome.skipped ? { skipped: 'already_at_target' } : {}), transition_contract: 'transition-terminal-scope-v1' });
   } catch (error) {
-    return Response.json({ error: error instanceof Error ? error.message : 'Erreur de transition' }, { status: 500 });
+    return Response.json({ error: error instanceof Error ? error.message : 'Transition impossible' }, { status: 500 });
   }
 }

@@ -1,0 +1,15 @@
+{
+  "name": "GuestOrderControl",
+  "type": "object",
+  "properties": {
+    "cle": { "type": "string" },
+    "enabled": { "type": "boolean", "default": false },
+    "safety_reviewed": { "type": "boolean", "default": false },
+    "countries": { "type": "string", "default": "[]" },
+    "revision": { "type": "number", "default": 0 },
+    "grants": { "type": "string", "default": "[]" },
+    "audit": { "type": "string", "default": "[]" }
+  },
+  "required": ["cle", "enabled", "safety_reviewed", "countries", "revision", "grants", "audit"],
+  "rls": { "read": false, "create": false, "update": false, "delete": false }
+}

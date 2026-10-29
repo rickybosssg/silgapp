@@ -1,0 +1,235 @@
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
+
+/**
+ * Heartbeat automatique - appelé toutes les 30s par les apps
+ * Met à jour : last_seen, GPS, app_active, session
+ * Vérifie la validité de la session unique (session_id)
+ */
+Deno.serve(async (req) => {
+  try {
+    const base44 = createClientFromRequest(req);
+    const user = await base44.auth.me();
+
+    if (!user) {
+      return Response.json({ error: 'Unauthorized', heartbeat_contract: 'heartbeat-read-budget-v167' }, { status: 401 });
+    }
+
+    const payload = await req.json();
+    const {
+      user_type,
+      latitude,
+      longitude,
+      accuracy,
+      app_active = true,
+      background_active = false,
+      device_id,
+      session_id, // NEW : ID de session unique
+    } = payload;
+
+    const now = new Date().toISOString();
+    const profileIds = new Map();
+    async function readProfile(entityName: string) {
+      const entity = base44.asServiceRole.entities[entityName];
+      const id = profileIds.get(entityName);
+      if (!id) {
+        const rows = await entity.filter({ user_email: user.email });
+        if (rows?.[0]?.id) profileIds.set(entityName, rows[0].id);
+        return rows;
+      }
+      // Keep a fresh presence/session read without another entity_list request.
+      const row = await entity.get(id);
+      if (!row || row.user_email !== user.email) throw new Error('Profil non confirme.');
+      return [row];
+    }
+    // ✅ Validation numérique complète — ne pas traiter 0,0 ou valeurs non-finies comme GPS valide
+    const latNum = Number(latitude);
+    const lngNum = Number(longitude);
+    const hasGps = Number.isFinite(latNum) && Number.isFinite(lngNum) &&
+      latNum >= -90 && latNum <= 90 && lngNum >= -180 && lngNum <= 180;
+
+    // --- VÉRIFICATION SESSION UNIQUE POUR LES LIVREURS ---
+    if (user_type === "livreur" && session_id) {
+      const livreurs = await readProfile('Livreur');
+      if (livreurs && livreurs.length > 0) {
+        const livreur = livreurs[0];
+        if (livreur.session_active_id && livreur.session_active_id !== session_id) {
+          console.log('[heartbeatAuto] Session livreur expirée', {
+            livreur_id: livreur.id,
+            session_attendue: livreur.session_active_id,
+            session_recue: session_id,
+          });
+          return Response.json({
+            success: false,
+            error: 'session_expired',
+            message: 'Vous avez été déconnecté car une autre session a été ouverte sur un autre appareil.',
+            force_hors_ligne: true,
+          }, { status: 409 });
+        }
+      }
+    }
+
+    // --- VÉRIFICATION SESSION UNIQUE POUR LES CLIENTS ---
+    if (user_type === "client" && session_id) {
+      const clients = await readProfile('ClientExterne');
+      if (clients && clients.length > 0) {
+        const client = clients[0];
+        if (client.session_active_id && client.session_active_id !== session_id) {
+          console.log('[heartbeatAuto] Session client expirée', {
+            client_id: client.id,
+            session_attendue: client.session_active_id,
+            session_recue: session_id,
+          });
+          return Response.json({
+            success: false,
+            error: 'session_expired',
+            message: 'Vous avez été déconnecté car une autre session a été ouverte sur un autre appareil.',
+          }, { status: 409 });
+        }
+      }
+    }
+
+    // 1. Mettre à jour la session device
+    if (device_id) {
+      const sessions = await base44.asServiceRole.entities.DeviceSession.filter({
+        user_email: user.email,
+        device_id: device_id,
+        session_actif: true
+      });
+
+      if (sessions && sessions.length > 0) {
+        await base44.asServiceRole.entities.DeviceSession.update(sessions[0].id, {
+          last_seen_at: now,
+          app_active: app_active,
+          derniere_position_lat: hasGps ? latitude : sessions[0].derniere_position_lat,
+          derniere_position_lng: hasGps ? longitude : sessions[0].derniere_position_lng,
+          derniere_sync_date: hasGps ? now : sessions[0].derniere_sync_date,
+          gps_actif: hasGps,
+        });
+      }
+    }
+
+    // 2. Mettre à jour le profil (Client ou Livreur)
+    if (user_type === "client") {
+      const clients = await readProfile('ClientExterne');
+      if (clients && clients.length > 0) {
+        const client = clients[0];
+        await base44.asServiceRole.entities.ClientExterne.update(client.id, {
+          latitude: latitude || client.latitude,
+          longitude: longitude || client.longitude,
+          last_seen_at: now,
+          app_active: app_active,
+        });
+      }
+    } else if (user_type === "livreur") {
+      const livreurs = await readProfile('Livreur');
+      if (livreurs && livreurs.length > 0) {
+        const livreur = livreurs[0];
+        const updateData = {
+          last_seen_at: now,
+          app_active: app_active,
+          background_active: background_active,
+        };
+
+        // 📍 Ne mettre à jour le GPS que si des coordonnées valides sont reçues.
+        // Cela garantit que derniere_position_date reflète le VRAI moment de réception GPS,
+        // et non un heartbeat sans coordonnées (app en arrière-plan sans GPS).
+        if (hasGps) {
+          updateData.latitude = latitude;
+          updateData.longitude = longitude;
+          updateData.derniere_position_date = now;
+          if (accuracy !== undefined && accuracy !== null) {
+            updateData.gps_accuracy = Number(accuracy);
+          }
+
+          // [OPERATIONAL ZONES] Détection automatique de la zone opérationnelle du livreur.
+          // Utilise shouldUpdateDriverOperationalCity qui encapsule toutes les règles :
+          // - Pas de changement pendant une mission (statut = en_course)
+          // - GPS avec précision > 100m ignoré
+          // - Hystérésis anti-flicker (5km) aux limites de zones
+          // - Utilise ville_operationnelle des quartiers (ex: Saaba → ouagadougou)
+          // - Ne jamais effacer une ville existante par une position incertaine
+          // Aucune API externe — utilise le cache des quartiers (TTL 10 min).
+          try {
+            const { shouldUpdateDriverOperationalCity } = await import('../../shared/operationalZones.ts');
+            const accuracyVal = accuracy !== undefined && accuracy !== null ? Number(accuracy) : undefined;
+            const cityUpdate = await shouldUpdateDriverOperationalCity(base44, livreur, latNum, lngNum, accuracyVal);
+            if (cityUpdate.shouldUpdate && cityUpdate.newCity) {
+              updateData.ville = cityUpdate.newCity;
+              console.log('[heartbeatAuto] 🏙️ Zone opérationnelle livreur mise à jour', {
+                livreur_id: livreur.id,
+                ancienne_ville: livreur.ville || '(vide)',
+                nouvelle_ville: cityUpdate.newCity,
+                raison: cityUpdate.reason,
+              });
+            }
+          } catch (cityError: any) {
+            // Non-bloquant : la détection de ville est une optimisation, pas une obligation.
+            console.error('[heartbeatAuto] ⚠️ Operational zone resolution failed:', cityError?.message || String(cityError));
+          }
+        }
+
+        // 🔄 Remontée automatique : si le livreur est hors_ligne (mais pas désactivé par admin,
+        // ni mis hors ligne manuellement, ni en course), un heartbeat récent prouve qu'il est
+        // actif → repasser en disponible. Le livreur reste en ligne tant qu'il ne se met pas
+        // hors ligne lui-même manuellement.
+        if (livreur.statut === 'hors_ligne' && livreur.admin_hors_ligne !== true && livreur.manual_hors_ligne !== true) {
+          updateData.statut = 'disponible';
+          console.log('[heartbeatAuto] 🔄 Remontée hors_ligne → disponible', {
+            livreur_id: livreur.id,
+            nom: `${livreur.prenom || ''} ${livreur.nom}`.trim(),
+          });
+        }
+
+        await base44.asServiceRole.entities.Livreur.update(livreur.id, updateData);
+
+        // ── Alerte GPS stale : si le livreur est disponible mais n'envoie pas
+        //    de GPS valide depuis >5 min, lui envoyer une push notification pour
+        //    lui demander de rouvrir l'app. Évite les "ghost livreurs" visibles
+        //    en admin mais invisibles au dispatch (GPS expiré). ──
+        if (livreur.statut === 'disponible' && !hasGps && livreur.user_email) {
+          const lastGpsDate = livreur.derniere_position_date || livreur.last_seen_at;
+          if (lastGpsDate) {
+            const gpsAgeMin = (Date.now() - new Date(lastGpsDate).getTime()) / 60000;
+            if (gpsAgeMin >= 5 && gpsAgeMin < 60) {
+              // Une seule alerte par 10 min (éviter le spam)
+              const lastAlert = livreur.encours_alerte_at ? new Date(livreur.encours_alerte_at).getTime() : 0;
+              if (Date.now() - lastAlert > 600000) {
+                await base44.asServiceRole.entities.Livreur.update(livreur.id, {
+                  encours_alerte_at: now,
+                }).catch(() => null);
+                base44.asServiceRole.functions.invoke('envoiNotificationPush', {
+                  destinataire_email: livreur.user_email,
+                  livreur_id: livreur.id,
+                  titre: '📍 GPS indisponible',
+                  message: 'Votre position GPS n\'est plus à jour. Rouvrez l\'application SILGAPP pour rester visible et recevoir des courses.',
+                  type: 'livreur_hors_ligne',
+                }).catch((err) => console.error('[heartbeatAuto] ❌ Push GPS alert:', err.message));
+                console.log(`[heartbeatAuto] 📍 Alerte GPS stale envoyée à ${livreur.prenom || ''} ${livreur.nom || ''} (GPS: ${Math.round(gpsAgeMin)}min)`);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    return Response.json({
+      success: true,
+      timestamp: now,
+      gps_sync: hasGps,
+    });
+  } catch (error: any) {
+    console.error('[heartbeatAuto] Erreur:', error);
+    const status = Number(error?.response?.status || error?.status);
+    if (status === 401 || status === 403) {
+      return Response.json({ success: false, error: 'Authentification requise ou acces refuse.', heartbeat_contract: 'heartbeat-read-budget-v167' }, { status });
+    }
+    if (status === 429 || /Rate limit exceeded/i.test(error?.message || '')) {
+      const header = error?.response?.headers?.['retry-after'];
+      const seconds = Number(header ?? error?.message?.match(/Retry after\s+(\d+)s/i)?.[1]);
+      const retryAfter = Number.isFinite(seconds) && seconds > 0 ? Math.ceil(seconds) : 30;
+      return Response.json({ success: false, error: 'Actualisation temporairement limitee. Reessayez apres le delai indique.', code: 'RATE_LIMITED' },
+        { status: 429, headers: { 'Retry-After': String(retryAfter) } });
+    }
+    return Response.json({ error: error.message }, { status: 500 });
+  }
+});

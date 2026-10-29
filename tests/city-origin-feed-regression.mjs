@@ -1,3 +1,6 @@
+import * as cityPolicySummary from '../base44/shared/cityPolicySummary.js';
+import * as cancellation from '../src/lib/courseCancellationState.js';
+import * as budget from '../src/lib/feedReadBudget.js';
 // Isolated regression: executes the real hook and backend city guards, never a live SDK.
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -67,6 +70,7 @@ async function actualFeed({ p, d = driver(), rows = [], missions = [], dismissed
     ['dispatch-refused-courses', refused],
   ]), reads = [];
   const entities = {
+    AppConfig: { filter: async () => [] },
     CourseExterne: { filter: async (query, sort, limit) => { reads.push({ name: 'CourseExterne', query, sort, limit }); return rows.filter(r => matches(r, query)).slice(0, limit); } },
     EcoMission: { filter: async query => missions.filter(r => matches(r, query)) },
     OperationalCity: { filter: async query => p.cities.filter(r => matches(r, query)) },
@@ -82,8 +86,11 @@ async function actualFeed({ p, d = driver(), rows = [], missions = [], dismissed
     if (name === '@/api/base44Client') return { base44: { entities } };
     if (name === '@/lib/availableCourseOffers') return offers;
     if (name === '@/lib/sharedQuerySubscription') return subscriptions;
+    if (name.endsWith('cityPolicySummary.js')) return cityPolicySummary;
     if (name.endsWith('cityNames.js')) return names;
     if (name.endsWith('currentGpsCity.js')) return gps;
+    if (name === '@/lib/courseCancellationState') return cancellation;
+    if (name === '@/lib/feedReadBudget') return budget;
     throw Error('Unexpected hook dependency ' + name);
   };
   const module = { exports: {} };

@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useRef } from "react";
+import { buildRepeatCourseDraft } from '@/lib/repeatCourseDraft';
 import { RotateCcw } from "lucide-react";
 
 /**
@@ -8,48 +9,20 @@ import { RotateCcw } from "lucide-react";
  * NE RECOPIE PAS : livreur, dispatch, statut, commission, paiement, prix final garanti.
  */
 export default function RefaireCourseButton({ course, clientProfil, position, onNavigate }) {
+  const navigating = useRef(false);
   if (!course || course.statut !== "livree") return null;
 
   const handleClick = () => {
-    const route = `/client/course/${course.type_course || "expedier"}`;
-    // ── GPS : ne PAS propager les coordonnées "quartier" comme GPS exact ──
-    // Une ancienne course dont le GPS provenait du centre du quartier (fallback)
-    // ne doit pas être recopiée avec ces coordonnées approximatives. Le nouveau
-    // formulaire acquerra un GPS frais (client exact ou géocodage) à la création.
-    const gpsDepartExact = course.gps_depart_source === "exact" || course.gps_depart_source === "geocodage";
-    const gpsArriveeExact = course.gps_arrivee_source === "exact" || course.gps_arrivee_source === "geocodage";
-
-    const prefillData = {
-      type_course: course.type_course,
-      adresse_depart: course.adresse_depart || "",
-      adresse_arrivee: course.adresse_arrivee || "",
-      quartier_depart: course.quartier_depart || "",
-      quartier_arrivee: course.quartier_arrivee || "",
-      ville_depart: course.ville_depart || "",
-      ville_arrivee: course.ville_arrivee || "",
-      gps_depart_lat: gpsDepartExact ? (course.gps_depart_lat || null) : null,
-      gps_depart_lng: gpsDepartExact ? (course.gps_depart_lng || null) : null,
-      gps_arrivee_lat: gpsArriveeExact ? (course.gps_arrivee_lat || null) : null,
-      gps_arrivee_lng: gpsArriveeExact ? (course.gps_arrivee_lng || null) : null,
-      gps_depart_source: gpsDepartExact ? course.gps_depart_source : null,
-      gps_arrivee_source: gpsArriveeExact ? course.gps_arrivee_source : null,
-      expediteur_nom: course.expediteur_nom || "",
-      expediteur_telephone: course.expediteur_telephone || "",
-      destinataire_nom: course.destinataire_nom || "",
-      destinataire_telephone: course.destinataire_telephone || "",
-      type_colis: course.type_colis || "petit_colis",
-      passager_nom: course.passager_nom || "",
-      passager_telephone: course.passager_telephone || "",
-      nb_passagers: course.nb_passagers || 1,
-      notes: "",
-      destination_inconnue: course.destination_inconnue || false,
-    };
-
-    onNavigate?.(route, {
+    if (navigating.current || typeof onNavigate !== 'function') return;
+    const prefillData = buildRepeatCourseDraft(course);
+    if (!prefillData) return;
+    const route = `/client/course/${prefillData.type_course}`;
+    navigating.current = true;
+    try { const result = onNavigate(route, {
       position,
       clientProfil,
       prefillCourse: prefillData,
-    });
+    }); if (result === false) navigating.current = false; } catch (error) { navigating.current = false; throw error; }
   };
 
   return (

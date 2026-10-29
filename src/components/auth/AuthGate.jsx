@@ -1,6 +1,6 @@
 import { silgappLogo } from "@/lib/iosBranding";
 import React, { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { base44, detectedToken } from "@/api/base44Client";
 import { APP_PUBLIC_URL, BASE44_APP_ID } from "@/lib/app-params";
 import { ArrowRight, Loader2, Lock, Mail, ShieldCheck, Store } from "lucide-react";
@@ -11,6 +11,8 @@ import RoleSelection from "@/pages/RoleSelection";
 import BlockedLivreurScreen from "@/components/auth/BlockedLivreurScreen";
 import SocialLoginButtons from "@/components/auth/SocialLoginButtons";
 import { cancelPendingNativeSocialAuth } from "@/lib/nativeSocialAuth";
+import GuestOrderEntry from '@/components/guest/GuestOrderEntry';
+import { guestStorage } from '@/lib/guestOrderClient';
 
 const AUTH_TOKEN_KEYS = ["base44_access_token", "access_token", "base44_token", "token"];
 
@@ -218,10 +220,11 @@ async function resetPasswordWithToken(resetToken, newPassword) {
  */
 export default function AuthGate({ children, onLivreur, onClient, onPartenaire }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [state, setState] = useState("loading");
   const [authRetry, setAuthRetry] = useState(0);
   const initialResetToken = getPasswordResetTokenFromUrl();
-  const [authMode, setAuthMode] = useState(initialResetToken ? "reset_confirm" : "login");
+  const [authMode, setAuthMode] = useState(initialResetToken ? "reset_confirm" : location.state?.guestSignup === true ? "register" : "login");
   const [loginForm, setLoginForm] = useState({
     email: "",
     password: "",
@@ -253,6 +256,14 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
         if (storedToken && storedToken.length > 10) {
           window.location.reload();
           return;
+        }
+        if (!initialResetToken && !location.state?.guestSignup && !location.state?.guestLogin) {
+          const savedGuest = await guestStorage().read().catch(() => null);
+          if (!mounted) return;
+          if (savedGuest) {
+            navigate('/commande-invitee', { replace: true });
+            return;
+          }
         }
       }
 
@@ -782,6 +793,8 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
               </button>
             ) : null}
           </form>
+
+          {authMode === 'login' && <GuestOrderEntry />}
 
           {authMode === "reset_request" || authMode === "reset_confirm" ? (
             <button

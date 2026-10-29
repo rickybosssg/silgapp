@@ -12,13 +12,24 @@ import { Loader2, Globe } from "lucide-react";
  * - onChange: callback(code)
  * - disabled: bool
  */
-export default function CountrySelect({ value, onChange, disabled = false, className = "" }) {
+function ConnectedCountrySelect(props) {
   const { countries, loading } = useActiveCountries();
+  return <CountrySelectView {...props} countries={countries} loading={loading} />;
+}
+
+export default function CountrySelect(props) {
+  return props.countries ? <CountrySelectView {...props} /> : <ConnectedCountrySelect {...props} />;
+}
+
+/** Guest callers supply a server-filtered catalogue: no authenticated entity read.
+ * @param {any} props
+ */
+export function CountrySelectView({ value, onChange, disabled = false, className = "", countries = [], loading = false, ariaLabel = undefined }) {
   const selected = countries.find(c => c.code === value);
 
   return (
     <Select value={value || undefined} onValueChange={onChange} disabled={disabled || loading}>
-      <SelectTrigger className={`h-12 rounded-xl bg-blue-50/40 border-blue-100/50 text-sm font-medium text-gray-900 focus:ring-blue-300/50 ${className}`}>
+      <SelectTrigger aria-label={ariaLabel} className={`h-12 rounded-xl bg-blue-50/40 border-blue-100/50 text-sm font-medium text-gray-900 focus:ring-blue-300/50 ${className}`}>
         {loading && !value ? (
           <span className="flex items-center gap-2 text-gray-400">
             <Loader2 className="h-4 w-4 animate-spin" /> Chargement des pays…

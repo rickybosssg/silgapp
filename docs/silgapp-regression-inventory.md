@@ -787,3 +787,12 @@ Detailed policy, compatibility, costs and validation are recorded in
 - 292 focused/historical Node checks pass, including actual hook/handler adapters, Express, cancellation, withdrawal, Eco, iOS branding/push/workflow and auth protections. Six typing-only UI edits have identical executable Babel ASTs. Lint and no-emit TypeScript pass; checkJs remains false. Android-only native normalization/icon checks are outside this iOS validation, not physical-device passes. The Windows shell harness uses existing Git Bash; no assertion is removed to accommodate WSL.
 - Prepared archive target1.0.64/build73 uses the existing certificate/profile. Apple numbering is read-only and must be rechecked immediately before the archive tag; upload/review/version association are excluded. Existing archive workflow exports to a GitHub artifact only. No successful native build or signed artifact is claimed until its run and IPA are inspected.
 - Known limits remain: older installed APKs may display stale eligibility; no physical city-ON scenario is established, no live course/payment/notification is used for validation. Current deployed server functions and city activations remain under their separate verified deployment evidence and must not be overwritten from this source snapshot.
+
+## Android170 to isolated iOS preparation — 2026-10-29
+
+- Verified Android1.0.163/code170 APK/AAB and all1281 frozen source hashes; do not use169 or its incomplete Base44401 patch.
+- Preserve guest entry/noOTP/optional signup, explicit service-country choice BF/BJ/CI/GH/TG independent of phone prefix, repeated requests and persistent capability tracking.
+- Preserve safeDeliveryFinalization, confirmed pickup/pricing, single terminal callback, no automatic token erasure on401 or repeated financial write.
+- Retain iOS session generation/logout, callbacks, timestamped GPS, scoped reads, blue branding and Victory sound/layout; keep providers disabled.
+- No native/permissions/signing/dependency-lock/Android change, server deployment, city activation, real course or Apple mutation. Public push/CI and final Apple submission remain gated by current task authorization.
+- Historical server tests use portable original snapshots, not proof of deployed sources. Preserve messaging participant-first idempotency and same-account push identity. See ios170-release-preparation.md for evidence, tests and privacy limitations.

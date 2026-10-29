@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { isGuestCourse } from '../../shared/guestOrderPolicy.js';
 
 /**
  * Endpoint PUBLIC pour récupérer les données de suivi d'une course par tracking_token ou ID.
@@ -41,6 +42,8 @@ Deno.serve(async (req) => {
     }
 
     const course = courses[0];
+    // Guest access is a separate private capability, never an ID/public tracking link.
+    if (isGuestCourse(course)) return Response.json({ error: 'not_found' }, { status: 404, headers: corsHeaders });
 
     // Récupérer la position live du livreur si assigné
     let livreurPos = null;

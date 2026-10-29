@@ -1,6 +1,8 @@
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import { base44 } from "@/api/base44Client";
 import { getConfig, subscribeToConfigChanges, getConfigVersion } from "@/lib/dispatchConfigStore";
+import { isRateLimited } from '@/lib/feedReadBudget';
+import { retryDelayMs } from '@/lib/guestTrackingState';
 import {
   isNativeMobile,
   isNativeAndroid,
@@ -12,6 +14,8 @@ export function useHeartbeat({ user_type, position, enabled = true, debugLabel =
   const intervalRef = useRef(null);
   const nativeStopRef = useRef(null);
   const lastSyncRef = useRef(null);
+  const inFlightRef = useRef(false);
+  const retryAtRef = useRef(0);
 
   // ── Réactivité à la config dynamique ──
   // Quand AppConfig change (via useDispatchConfig), setConfig() incrémente
@@ -30,11 +34,13 @@ export function useHeartbeat({ user_type, position, enabled = true, debugLabel =
     //    est limité à 1 appel toutes les 30s. La dernière position GPS acquise
     //    entre deux heartbeats est envoyée lors du heartbeat suivant.
     const now = Date.now();
+    if (inFlightRef.current || now < retryAtRef.current) return;
     const throttleMs = getConfig().heartbeat_web_interval_ms;
     if (!force && lastSyncRef.current && now - lastSyncRef.current < throttleMs) {
       return;
     }
     lastSyncRef.current = now;
+    inFlightRef.current = true;
 
     try {
       const isNative = isNativeMobile();
@@ -74,7 +80,13 @@ export function useHeartbeat({ user_type, position, enabled = true, debugLabel =
         );
       }
     } catch (err) {
+      if (isRateLimited(err)) {
+        const headers = err?.response?.headers;
+        retryAtRef.current = Date.now() + retryDelayMs(headers?.get?.('retry-after') ?? headers?.['retry-after']);
+      }
       console.error("[useHeartbeat] Erreur sync:", err);
+    } finally {
+      inFlightRef.current = false;
     }
   };
 

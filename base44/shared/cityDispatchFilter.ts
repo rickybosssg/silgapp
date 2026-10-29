@@ -200,4 +200,3 @@ export async function buildCourseCityFilterFromCourse(base44: any, course: any):
 
   return { ville_depart: { $regex: cityNamesPattern(zoneCityNames), $options: 'i' } };
 }
-

@@ -4,14 +4,17 @@ import {
   mergeLocationResults,
   normalizeLocationText,
 } from "./locationSearchCore";
+import { createFeedReadBudget } from './feedReadBudget.js';
 
 export { normalizeLocationText } from "./locationSearchCore";
 
-const INDEX_CACHE_PREFIX = "silgapp_location_index_v1";
+const INDEX_CACHE_PREFIX = "silgapp_location_index_v2";
 const QUERY_CACHE_PREFIX = "silgapp_location_query_v1";
 const INDEX_TTL_MS = 6 * 60 * 60 * 1000;
 const QUERY_TTL_MS = 24 * 60 * 60 * 1000;
 const memoryIndexes = new Map();
+const pendingIndexes = new Map();
+const readBudgets = new Map();
 
 function safeStorageRead(key, allowExpired = false) {
   try {
@@ -102,6 +105,14 @@ export function getCachedLocationSuggestions(countryCode, query) {
 export async function refreshCountryLocationIndex(countryCode, force = false) {
   const code = String(countryCode || "").toUpperCase();
   if (!code) return [];
+  if (pendingIndexes.has(code)) return pendingIndexes.get(code);
+  const pending = loadCountryLocationIndex(code, force);
+  pendingIndexes.set(code, pending);
+  try { return await pending; }
+  finally { if (pendingIndexes.get(code) === pending) pendingIndexes.delete(code); }
+}
+
+async function loadCountryLocationIndex(code, force) {
 
   const memory = memoryIndexes.get(code);
   if (!force && memory && Date.now() - memory.savedAt < INDEX_TTL_MS) return memory.items;
@@ -112,12 +123,15 @@ export async function refreshCountryLocationIndex(countryCode, force = false) {
     return cached;
   }
 
+  let complete = true;
+  if (!readBudgets.has(code)) readBudgets.set(code, createFeedReadBudget());
+  const read = operation => readBudgets.get(code).read(operation).catch(() => { complete = false; return []; });
   const [quartiers, boutiques, restaurants, pharmacies, lieuxSilgapp] = await Promise.all([
-    base44.entities.Quartier.filter({ country_code: code, actif: true }, "nom", 500).catch(() => []),
-    base44.entities.Boutique.filter({ pays_code: code, actif: true }, "nom", 300).catch(() => []),
-    base44.entities.Restaurant.filter({ pays_code: code, actif: true }, "nom", 300).catch(() => []),
-    base44.entities.Pharmacie.filter({ pays_code: code, actif: true }, "nom", 300).catch(() => []),
-    base44.entities.LieuSilgapp.filter({ country_code: code, statut: "actif" }, "nom", 500).catch(() => []),
+    read(() => base44.entities.Quartier.filter({ country_code: code, actif: true }, "nom", 500)),
+    read(() => base44.entities.Boutique.filter({ pays_code: code, actif: true }, "nom", 300)),
+    read(() => base44.entities.Restaurant.filter({ pays_code: code, actif: true }, "nom", 300)),
+    read(() => base44.entities.Pharmacie.filter({ pays_code: code, actif: true }, "nom", 300)),
+    read(() => base44.entities.LieuSilgapp.filter({ country_code: code, statut: "actif" }, "nom", 500)),
   ]);
 
   const items = [
@@ -128,8 +142,11 @@ export async function refreshCountryLocationIndex(countryCode, force = false) {
     ...pharmacies.map((item) => mapStructure(item, "pharmacie", code)),
   ];
 
-  memoryIndexes.set(code, { items, savedAt: Date.now() });
-  safeStorageWrite(indexCacheKey(code), items, INDEX_TTL_MS);
+  // An incomplete read is not an authoritative six-hour empty catalogue.
+  if (complete) {
+    memoryIndexes.set(code, { items, savedAt: Date.now() });
+    safeStorageWrite(indexCacheKey(code), items, INDEX_TTL_MS);
+  }
   return items;
 }
 

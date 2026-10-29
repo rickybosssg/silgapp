@@ -31,7 +31,7 @@ export default function ActiviteTempsReel({ livreurProfil, mesCourses = [], isEx
   const hasGPS = typeof latitude === "number" && typeof longitude === "number";
 
   // ── Courses disponibles (SOURCE UNIQUE — hook partagé avec CoursesDisponibles) ──
-  const { availableOffers = [], availableOffersCount = 0, isLoading: loadingCourses } = useCoursesDisponibles(livreurProfil);
+  const { availableOffers = [], availableOffersCount = 0, isLoading: loadingCourses, isError: coursesError } = useCoursesDisponibles(livreurProfil);
 
   // ── Distance de chaque course disponible (tri par distance croissante) ──
   const coursesWithDistance = useMemo(() => {
@@ -61,27 +61,27 @@ export default function ActiviteTempsReel({ livreurProfil, mesCourses = [], isEx
   const rayonKm = countryData?.rayon_km || 30;
 
   // ── Livreurs à proximité (même pays, disponibles, GPS dans le rayon d'opération) ──
-  const { data: nearbyDriversCount = 0 } = useQuery({
-    queryKey: ["activite-nearby-drivers", country_code, latitude, longitude, livreurId],
+  const { data: nearbyDrivers, isError: nearbyError } = useQuery({
+    queryKey: ["activite-nearby-drivers", country_code, livreurId],
     queryFn: async () => {
-      if (!country_code || !hasGPS) return 0;
+      if (!country_code || !hasGPS) return [];
       const all = await base44.entities.Livreur.filter(
         { country_code, statut: "disponible", actif: true },
         "-created_date",
         100
       );
-      const others = (all || []).filter(
+      return (all || []).filter(
         (d) => d.id !== livreurId && hasValidGPS(d)
       );
-      return others.filter((d) => {
-        const dist = haversineKm(latitude, longitude, d.latitude, d.longitude);
-        return dist !== null && dist <= rayonKm;
-      }).length;
     },
     enabled: !!country_code && isDisponible && hasGPS,
     refetchInterval: 30000,
     staleTime: 20000,
   });
+  const nearbyDriversCount = useMemo(() => nearbyDrivers?.filter((driver) => {
+    const dist = haversineKm(latitude, longitude, driver.latitude, driver.longitude);
+    return dist !== null && dist <= rayonKm;
+  }).length, [nearbyDrivers, latitude, longitude, rayonKm]);
 
   // ── VENUS: zone plus active (uniquement si ≥ 2 courses dans le même quartier) ──
   const hotZone = useMemo(() => {
@@ -103,6 +103,7 @@ export default function ActiviteTempsReel({ livreurProfil, mesCourses = [], isEx
       return "Recherche en cours — nous te préviendrons dès qu'une mission sera disponible.";
     }
     if (loadingCourses) return "Analyse des courses disponibles…";
+    if (coursesError) return "Actualisation indisponible. Réessayez dans un instant.";
     if (availableOffersCount === 0) {
       return "Aucune course pour le moment. Je continue la recherche.";
     }
@@ -110,7 +111,7 @@ export default function ActiviteTempsReel({ livreurProfil, mesCourses = [], isEx
       return "1 course disponible.";
     }
     return `${availableOffersCount} courses disponibles.`;
-  }, [isExterne, loadingCourses, availableOffersCount]);
+  }, [isExterne, loadingCourses, coursesError, availableOffersCount]);
 
   // ── Rendu ──
   return (
@@ -138,16 +139,17 @@ export default function ActiviteTempsReel({ livreurProfil, mesCourses = [], isEx
               <p className={`text-xl font-black leading-none ${
                 availableOffersCount > 0 ? "text-orange-500" : "text-slate-400"
               }`}>
-                {isExterne ? availableOffersCount : "—"}
+                {isExterne && !coursesError ? availableOffersCount : "—"}
               </p>
             )}
             <p className="text-[10px] text-slate-500 mt-1">Courses dispo</p>
           </div>
           <div className="min-w-0">
             <p className="text-xl font-black text-slate-700 leading-none">
-              {hasGPS ? nearbyDriversCount : "—"}
+              {hasGPS && nearbyDriversCount !== undefined ? nearbyDriversCount : "—"}
             </p>
             <p className="text-[9px] text-slate-500 mt-1 leading-tight">Autres livreurs à proximité</p>
+            {nearbyError && <p className="text-[9px] text-slate-500">{nearbyDrivers ? "Dernière valeur connue" : "Données indisponibles"}</p>}
           </div>
         </div>
 

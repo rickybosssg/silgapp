@@ -2,18 +2,18 @@ import React, { useEffect, useRef, useState } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { Loader2, CheckCircle2, AlertTriangle, RefreshCw } from "lucide-react";
-import { normalizeCommissionPct, resolveStoredOrDynamicSplit } from "@/lib/commissionUtils";
-import { getPrixAffichable } from "@/utils/getPrixAffichable";
+import { deliveryRecapValues, pickupRecordedAt, formatRecordedTime, recordedDate } from '@/lib/deliveryRecap';
 import { haversineKm as haversine } from "@/lib/priceEstimate";
 
 function formatHeure(iso) {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+  return formatRecordedTime(iso);
 }
 
 function dureeMinutes(debut, fin) {
   if (!debut || !fin) return null;
-  const diff = Math.round((new Date(fin) - new Date(debut)) / 60000);
+  const start = recordedDate(debut), end = recordedDate(fin);
+  if (!start || !end) return null;
+  const diff = Math.round((end.getTime() - start.getTime()) / 60000);
   if (diff <= 0) return null;
   if (diff >= 60) return `${Math.floor(diff / 60)}h${diff % 60 > 0 ? String(diff % 60).padStart(2, "0") : ""}`;
   return `${diff} min`;
@@ -45,12 +45,13 @@ export default function RecapCourseLivreur() {
   const [course, setCourse] = useState(initialCourse);
   const [loading, setLoading] = useState(!initialCourse);
   const [error, setError] = useState(null);
-  const [commissionPct, setCommissionPct] = useState(null);
   const inFlightRef = useRef(false);
+  const readGeneration = useRef(0);
 
-  const chargerCourse = async ({ silent = false, retries = 2 } = {}) => {
+  const chargerCourse = async ({ silent = false } = {}) => {
     if (!courseId || inFlightRef.current) return;
     inFlightRef.current = true;
+    const generation = ++readGeneration.current;
     if (!silent) setLoading(true);
     setError(null);
 
@@ -58,11 +59,14 @@ export default function RecapCourseLivreur() {
       let c = null;
       try {
         c = await base44.entities.CourseExterne.get(courseId);
-      } catch (_) {
+      } catch (readError) {
+        if (/rate limit|429/i.test(String(readError?.message || '')) || readError?.response?.status === 429) throw readError;
+        if (generation !== readGeneration.current) return;
         const results = await base44.entities.CourseExterne.filter({ id: courseId }, "-updated_date", 1);
         c = Array.isArray(results) ? results[0] : results;
       }
 
+      if (generation !== readGeneration.current) return;
       if (!c) {
         setError("Course introuvable.");
         setLoading(false);
@@ -74,15 +78,10 @@ export default function RecapCourseLivreur() {
       } catch (_) {}
       setLoading(false);
     } catch (err) {
+      if (generation !== readGeneration.current) return;
       const message = err?.message || String(err);
       const isRateLimit = /rate limit/i.test(message);
-      if (isRateLimit && retries > 0) {
-        setTimeout(() => {
-          inFlightRef.current = false;
-          chargerCourse({ silent, retries: retries - 1 });
-        }, retries === 2 ? 900 : 1800);
-        return;
-      }
+      // No automatic quota retry or mutation; cached recap stays readable.
       if (!course) {
         setError(isRateLimit
           ? "Le serveur est momentanement surcharge. Le recapitulatif va rester disponible depuis les donnees locales."
@@ -90,37 +89,18 @@ export default function RecapCourseLivreur() {
       }
       setLoading(false);
     } finally {
-      if (inFlightRef.current) inFlightRef.current = false;
+      if (generation === readGeneration.current) inFlightRef.current = false;
     }
   };
 
   useEffect(() => {
-    if (!course) {
-      chargerCourse();
-    } else {
-      chargerCourse({ silent: true, retries: 1 });
-    }
+    inFlightRef.current = false;
+    setCourse(initialCourse);
+    setLoading(!initialCourse);
+    chargerCourse({ silent: !!initialCourse });
 
+    return () => { readGeneration.current++; inFlightRef.current = false; };
   }, [courseId]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const loadCommission = async () => {
-      const code = course?.country_code;
-      if (!code) {
-        setCommissionPct(null);
-        return;
-      }
-      try {
-        const rows = await base44.entities.Country.filter({ code, actif: true });
-        if (!cancelled) setCommissionPct(normalizeCommissionPct(rows?.[0]?.commission_pct));
-      } catch (_) {
-        if (!cancelled) setCommissionPct(null);
-      }
-    };
-    loadCommission();
-    return () => { cancelled = true; };
-  }, [course?.country_code]);
 
   const handleTerminer = async () => {
     // Retourner au dashboard livreur (reload propre)
@@ -160,7 +140,11 @@ export default function RecapCourseLivreur() {
 
 
 
-  // ── Calcul avec fallbacks (données parfois manquantes) ──────────────────
+  if (!course || !['livree', 'terminee', 'completed', 'delivered'].includes(course.statut)) {
+    return <div className="min-h-screen p-6"><p>Livraison non confirmée.</p><button onClick={() => navigate('/', { replace: true })}>Retourner au dashboard</button></div>;
+  }
+
+  // Read stored delivery facts only; never rebuild accounting in the recap.
   const dist = Number(course.distance_reelle_km) > 0
     ? Number(course.distance_reelle_km)
     : (course.gps_depart_lat && course.gps_arrivee_lat
@@ -169,14 +153,12 @@ export default function RecapCourseLivreur() {
 
   // Prix manuel accepté → priorité absolue
   const isPrixManuel = course.pricing_mode === "manual" && course.manual_price_status === "accepted" && Number(course.manual_price) > 0;
-  const prixBrut = getPrixAffichable(course) || 0;
-  const prixFinal = Math.max(1000, prixBrut);
-  const split = resolveStoredOrDynamicSplit(course, prixFinal, commissionPct);
-  const gainLivreur = split.montant_livreur || 0;
-  const commissionSilga = split.commission_silga || 0;
+  const { price: prixFinal, driver: gainLivreur, commission: commissionSilga } = deliveryRecapValues(course);
+  const currency = course.devise || 'FCFA';
+  const pickupTime = pickupRecordedAt(course);
   const duree = course.type_course === "deplacement"
     ? dureeMinutes(course.heure_prise_en_charge, course.heure_livraison)
-    : dureeMinutes(course.heure_recuperation, course.heure_livraison);
+    : dureeMinutes(pickupTime, course.heure_livraison);
 
   return (
     <div className="min-h-screen bg-gray-950 flex flex-col">
@@ -205,7 +187,7 @@ export default function RecapCourseLivreur() {
               <p className="text-amber-400/70 text-xs mt-0.5">Cela peut arriver si la course n'a pas été finalisée correctement.</p>
             </div>
             <button
-              onClick={chargerCourse}
+              onClick={() => chargerCourse()}
               className="flex items-center gap-2 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl transition-all"
             >
               <RefreshCw className="w-3.5 h-3.5" />
@@ -228,14 +210,8 @@ export default function RecapCourseLivreur() {
               {dist > 0 ? (
                 <>
                   <div className="space-y-1">
-                    <p className="text-gray-600 text-sm">Distance réelle</p>
+                    <p className="text-gray-600 text-sm">Distance enregistrée</p>
                     <p className="text-white text-2xl font-black">{dist.toFixed(2)} km</p>
-                  </div>
-                  <div className="text-gray-500 text-sm">
-                    {prixBrut < 1000
-                      ? <span className="text-amber-400 font-semibold">Prix minimum SILGAPP appliqué</span>
-                      : `Calcul : ${dist.toFixed(2)} km × 100 F`
-                    }
                   </div>
                 </>
               ) : (
@@ -246,27 +222,27 @@ export default function RecapCourseLivreur() {
 
           <div className="border-t border-gray-700 pt-3">
             <p className="text-gray-600 text-xs mb-1">Montant final</p>
-            <p className="text-5xl font-black text-white">{prixFinal.toLocaleString()}</p>
-            <p className="text-gray-600 text-lg font-semibold">FCFA</p>
+            <p className={`${prixFinal === null ? 'text-2xl' : 'text-5xl'} font-black text-white`}>{prixFinal === null ? 'Indisponible' : prixFinal.toLocaleString()}</p>
+            <p className="text-gray-600 text-lg font-semibold">{currency}</p>
           </div>
         </div>
 
         {/* RÉPARTITION */}
         <div className="bg-gray-900 rounded-3xl p-5 border border-gray-800 space-y-3">
           <p className="text-gray-600 text-xs font-semibold uppercase tracking-widest mb-2">Répartition</p>
-          <div className="flex items-center justify-between py-2 border-b border-gray-800">
+          <div className="flex flex-wrap items-center justify-between gap-3 py-2 border-b border-gray-800">
             <div>
               <p className="text-green-400 font-bold text-sm">Ton gain</p>
               <p className="text-gray-500 text-xs">À encaisser auprès du client</p>
             </div>
-            <p className="text-green-400 text-2xl font-black">+{gainLivreur.toLocaleString()} F</p>
+            <p className="text-green-400 text-2xl font-black">{gainLivreur === null ? 'Indisponible' : `+${gainLivreur.toLocaleString()} ${currency}`}</p>
           </div>
-          <div className="flex items-center justify-between py-2">
+          <div className="flex flex-wrap items-center justify-between gap-3 py-2">
             <div>
               <p className="text-red-400 font-bold text-sm">Commission SILGAPP</p>
               <p className="text-gray-500 text-xs">À reverser à SILGAPP</p>
             </div>
-            <p className="text-red-400 text-xl font-black">{commissionSilga.toLocaleString()} F</p>
+            <p className="text-red-400 text-xl font-black">{commissionSilga === null ? 'Indisponible' : `${commissionSilga.toLocaleString()} ${currency}`}</p>
           </div>
         </div>
 
@@ -323,7 +299,7 @@ export default function RecapCourseLivreur() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-gray-800 rounded-2xl p-3 text-center">
                   <p className="text-gray-500 text-[10px] uppercase mb-1">Récupération</p>
-                  <p className="text-white font-bold">{formatHeure(course.heure_recuperation)}</p>
+                  <p className="text-white font-bold">{formatHeure(pickupTime)}</p>
                 </div>
                 <div className="bg-gray-800 rounded-2xl p-3 text-center">
                   <p className="text-gray-500 text-[10px] uppercase mb-1">Livraison</p>

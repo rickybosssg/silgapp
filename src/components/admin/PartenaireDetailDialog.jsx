@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, X, Save, CheckCircle, XCircle, PauseCircle, MapPin, Phone, Mail, Wallet, Store, UtensilsCrossed, Pill, Calendar, Percent, User } from "lucide-react";
@@ -22,6 +22,10 @@ export default function PartenaireDetailDialog({ open, etablissement, type, onCl
   const [motif, setMotif] = useState("");
   const [saving, setSaving] = useState(false);
   const [actionLoading, setActionLoading] = useState(null);
+  const validationPending = useRef(false);
+  const [validationError, setValidationError] = useState("");
+  const selectionRef = useRef('');
+  selectionRef.current = `${open}:${type}:${etablissement?.id || ''}`;
 
   const entityName = type === "restaurant" ? "Restaurant" : type === "pharmacie" ? "Pharmacie" : "Boutique";
   const typeIcon = type === "restaurant" ? UtensilsCrossed : type === "pharmacie" ? Pill : Store;
@@ -29,6 +33,7 @@ export default function PartenaireDetailDialog({ open, etablissement, type, onCl
   const Icon = typeIcon;
 
   useEffect(() => {
+    setValidationError("");
     if (etablissement) {
       setCommission(etablissement.commission_pct != null ? String(etablissement.commission_pct) : "");
       setMotif(etablissement.motif_refus || "");
@@ -53,7 +58,11 @@ export default function PartenaireDetailDialog({ open, etablissement, type, onCl
   };
 
   const handleValidation = async (action) => {
+    if (validationPending.current) return;
+    validationPending.current = true;
+    setValidationError("");
     setActionLoading(action);
+    const selection = selectionRef.current;
     try {
       const updates = { valide_par: null, valide_at: new Date().toISOString() };
       // Récupérer l'utilisateur courant pour valide_par
@@ -80,16 +89,30 @@ export default function PartenaireDetailDialog({ open, etablissement, type, onCl
         updates.motif_refus = "";
       }
 
-      await base44.entities[entityName].update(etablissement.id, updates);
+      const rawUpdated = await base44.entities[entityName].update(etablissement.id, updates);
+      const updated = rawUpdated?.data ?? rawUpdated;
+      if (updated?.id !== etablissement.id || updated.validation !== updates.validation) {
+        throw new Error("Validation non confirmée. Fermez puis rouvrez la fiche pour vérifier avant de réessayer.");
+      }
       queryClient.invalidateQueries({ queryKey: ["admin-boutiques"] });
       queryClient.invalidateQueries({ queryKey: ["admin-restaurants"] });
       queryClient.invalidateQueries({ queryKey: ["admin-pharmacies"] });
-      queryClient.invalidateQueries({ queryKey: ["partenaires-en-attente"] });
+      queryClient.setQueriesData({ queryKey: [`admin-${type === 'restaurant' ? 'restaurants' : type === 'pharmacie' ? 'pharmacies' : 'boutiques'}`] }, rows =>
+        Array.isArray(rows) ? rows.map(row => row.id === updated.id ? { ...row, ...updated } : row) : rows);
+      for (const key of ["partenaires-en-attente-boutiques", "partenaires-en-attente-restaurants", "partenaires-en-attente-pharmacies"]) {
+        queryClient.invalidateQueries({ queryKey: [key] });
+      }
       queryClient.invalidateQueries({ queryKey: ["ma-boutique"] });
       queryClient.invalidateQueries({ queryKey: ["mon-restaurant"] });
       queryClient.invalidateQueries({ queryKey: ["ma-pharmacie"] });
-    } catch (err) {}
-    setActionLoading(null);
+      window.dispatchEvent(new Event("silgapp:partner-validation-changed"));
+      if (selectionRef.current === selection) onClose();
+    } catch (err) {
+      if (selectionRef.current === selection) setValidationError(err?.response?.data?.error || err?.message || "Impossible de valider le partenaire. Réessayez.");
+    } finally {
+      validationPending.current = false;
+      setActionLoading(null);
+    }
   };
 
   const InfoRow = ({ icon: I, label, value }) => (
@@ -215,6 +238,8 @@ export default function PartenaireDetailDialog({ open, etablissement, type, onCl
               </button>
             </div>
           </section>
+
+          {validationError && <p role="alert" className="text-sm text-red-600">{validationError}</p>}
 
           {/* Actions de validation */}
           <section>

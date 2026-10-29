@@ -73,8 +73,26 @@ Deno.serve(async (req) => {
       500,
     );
 
+    // Guest records must not inherit the legacy ID-only polling permission.
+    const hasGuests = allCourses.some(c => String(c.request_id || '').startsWith('guest-v1:'));
+    const caller = hasGuests ? await base44.auth.me().catch(() => null) : null;
+    const ownsGuestDriverSession = !!caller?.id && !!caller.email &&
+      caller.email === livreur.user_email && !caller.enterprise_id &&
+      !caller.data?.enterprise_id && !livreur.enterprise_id &&
+      (!caller.country_code || normalizeCountry(caller.country_code) === livreurCountry);
+
     const coursesPourLivreur = allCourses.filter((c) => {
       if (normalizeCountry(c.country_code) !== effectiveCountry) return false;
+
+      if (String(c.request_id || '').startsWith('guest-v1:')) {
+        if (!ownsGuestDriverSession || c.enterprise_id || !livreurCountry ||
+            effectiveCountry !== livreurCountry) return false;
+        // An offer is not permission to read a guest's full contact record.
+        // Historical access remains limited to the actual financial driver.
+        const terminal = c.statut === 'livree' || c.statut === 'annulee';
+        return sameId(c.livreur_id, livreur_id) ||
+          (terminal && sameId(c.livreur_financier_id, livreur_id));
+      }
 
       // 1. Courses deja acceptees (ownership opérationnel).
       if (

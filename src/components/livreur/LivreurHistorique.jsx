@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { base44 } from "@/api/base44Client";
 import { normalizeCommissionPct, splitAmountByCommission } from "@/lib/commissionUtils";
 import { getPrixAffichable } from "@/utils/getPrixAffichable";
+import { Link } from 'react-router-dom';
 
 const periodFilters = [
   { value: "today", label: "Aujourd'hui" },
@@ -346,6 +347,9 @@ export default function LivreurHistorique({ mesCourses, livreurProfil, isExterne
                           </div>
                         )
                       )
+                    )}
+                    {isExterne && !isEnterpriseDriver && course.statut === 'livree' && (
+                      <Link className="inline-flex mt-2 text-sm font-semibold text-blue-600 underline" to={`/livreur/recap-course/${course.id}`} state={{ course }}>Récapitulatif</Link>
                     )}
                   </div>
                 </div>

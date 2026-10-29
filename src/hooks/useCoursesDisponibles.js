@@ -7,6 +7,7 @@ import { cityNamesPattern, operationalCityAliases, resolveOperationalName, canSe
 import { currentDriverGpsCity, gpsFixTime, CITY_GPS_MAX_AGE_MS } from "../../base44/shared/currentGpsCity.js";
 import { preserveConfirmedCancellation } from '@/lib/courseCancellationState';
 import { describeCityPolicy } from '../../base44/shared/cityPolicySummary.js';
+import { acquireFeedReadBudget, retryFeedRead } from '@/lib/feedReadBudget';
 
 /**
  * useCoursesDisponibles — SOURCE UNIQUE DE VÉRITÉ pour les courses disponibles
@@ -62,6 +63,9 @@ export function useCoursesDisponibles(livreurProfil) {
   const livreurId = livreurProfil?.id;
   const countryCode = livreurProfil?.country_code;
   const livreurEnterpriseId = normalizeEnterpriseId(livreurProfil?.enterprise_id);
+  const readBudget = useMemo(() => acquireFeedReadBudget(queryClient,
+    JSON.stringify([livreurId, countryCode, livreurEnterpriseId])),
+  [queryClient, livreurId, countryCode, livreurEnterpriseId]);
 
   const livreurDisponible =
     livreurProfil?.type_livreur === "externe" &&
@@ -95,17 +99,18 @@ export function useCoursesDisponibles(livreurProfil) {
   // ── Feature flag V2 ──
   const { data: isV2Enabled = true } = useQuery({
     queryKey: ["dispatch-v2-enabled", livreurId],
-    queryFn: async () => {
+    queryFn: () => readBudget.read(async () => {
       const configs = await base44.entities.AppConfig.filter({ cle: "DISPATCH_V2_ENABLED" });
       return configs?.[0] ? configs[0].valeur !== "false" : true;
-    },
+    }),
+    retry: retryFeedRead,
     enabled: !!livreurId,
     staleTime: 60000,
   });
 
   const { data: zonePolicy = { cities: [], quartiers: [], summary: null }, isLoading: cityLoading, isError: cityError } = useQuery({
     queryKey: ['operational-zone-policy', countryCode],
-    queryFn: async () => {
+    queryFn: () => readBudget.read(async () => {
       const cities = await base44.entities.OperationalCity.filter({ country_code: countryCode }, undefined, 100);
       const flags = await base44.entities.AppConfig.filter({cle: `CITY_DISPATCH_ENABLED:${countryCode}`});
       const quartiers = cities.some(c => c.actif === true)
@@ -119,7 +124,8 @@ export function useCoursesDisponibles(livreurProfil) {
         }
       }
       return { cities, quartiers, summary: describeCityPolicy(cities, flags || [], countryCode) };
-    },
+    }),
+    retry: retryFeedRead,
     enabled: !!countryCode, staleTime: 30000, refetchInterval: 60000,
   });
   useEffect(() => {
@@ -136,13 +142,14 @@ export function useCoursesDisponibles(livreurProfil) {
   const cityDispatchEnabled = zonePolicy.cities.some(c => c.actif === true);
   const { data: liveGpsDriver, isError: gpsError } = useQuery({
     queryKey: ['driver-current-gps', livreurId, countryCode],
-    queryFn: async () => {
+    queryFn: () => readBudget.read(async () => {
       const driver = await base44.entities.Livreur.get(livreurId);
       if (driver?.country_code !== countryCode || normalizeEnterpriseId(driver?.enterprise_id) !== livreurEnterpriseId) {
         throw new Error('driver_scope_mismatch');
       }
       return driver;
-    },
+    }),
+    retry: retryFeedRead,
     enabled: !!livreurId && !!countryCode && cityDispatchEnabled && !cityError,
     refetchInterval: 10000, staleTime: 0,
   });
@@ -175,7 +182,7 @@ export function useCoursesDisponibles(livreurProfil) {
   [countryCode, livreurEnterpriseId, driverZone, zonePolicy, cityLoading, cityError]);
   const { data: courses = [], isLoading: coursesLoading, isError: coursesError } = useQuery({
     queryKey: ["courses-externes-disponibles", livreurId, countryCode, livreurEnterpriseId, isV2Enabled, driverZone, policyKey],
-    queryFn: async () => {
+    queryFn: () => readBudget.read(async () => {
       if (!livreurPeutVoirFil || !isV2Enabled) return [];
       if (!countryCode || !isV2Enabled) return [];
       const all = await base44.entities.CourseExterne.filter(
@@ -199,17 +206,18 @@ export function useCoursesDisponibles(livreurProfil) {
         if (course?.id) byId.set(course.id, course);
       });
       return Array.from(byId.values()).filter(c => canSeeOperationalCourse(c, driverZone, zonePolicy.cities, zonePolicy.quartiers));
-    },
+    }),
+    retry: retryFeedRead,
     enabled: !!livreurId && !!countryCode && livreurPeutVoirFil && isV2Enabled && !cityLoading && !cityError,
     refetchInterval: 10000,
-    staleTime: 0,
+    staleTime: 3000,
     refetchOnWindowFocus: true,
     refetchOnMount: true,
   });
 
   const { data: ecoMissions = [], isLoading: missionsLoading, isError: missionsError } = useQuery({
     queryKey: ["eco-missions-disponibles", livreurId, countryCode, livreurEnterpriseId, isV2Enabled, driverZone, policyKey, "members-v2"],
-    queryFn: async () => {
+    queryFn: () => readBudget.read(async () => {
       if (!livreurPeutVoirFil || !isV2Enabled || !countryCode) return [];
       if (livreurEnterpriseId !== null) return [];
       const missions = await base44.entities.EcoMission.filter(
@@ -226,10 +234,11 @@ export function useCoursesDisponibles(livreurProfil) {
         const c = byId.get(id);
         return c && canSeeOperationalCourse(c, driverZone, zonePolicy.cities, zonePolicy.quartiers);
       })).map(m => ({ ...m, __available_courses: m.course_ids.map(id => byId.get(id)) }));
-    },
+    }),
+    retry: retryFeedRead,
     enabled: !!livreurId && !!countryCode && livreurPeutVoirFil && isV2Enabled && !cityLoading && !cityError,
     refetchInterval: 10000,
-    staleTime: 0,
+    staleTime: 3000,
     refetchOnWindowFocus: true,
     refetchOnMount: true,
   });
@@ -240,7 +249,7 @@ export function useCoursesDisponibles(livreurProfil) {
       const refreshQueue = createRealtimeRefresh(() => Promise.all([
         queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles", livreurId, countryCode] }, { cancelRefetch: false }),
         queryClient.invalidateQueries({ queryKey: ["eco-missions-disponibles", livreurId, countryCode] }, { cancelRefetch: false }),
-      ]));
+      ]), 100, 5000);
       const refresh = event => {
         // Partial/delete events still refresh: missing metadata is not proof
         // that the changed record belongs to another country.
@@ -258,14 +267,15 @@ export function useCoursesDisponibles(livreurProfil) {
   // ── Courses refusées (DispatchNotification) ──
   const { data: refusedCourseIds = [] } = useQuery({
     queryKey: ["dispatch-refused-courses", livreurId],
-    queryFn: async () => {
+    queryFn: () => readBudget.read(async () => {
       if (!livreurId) return [];
       const refused = await base44.entities.DispatchNotification.filter(
         { livreur_id: livreurId, statut: "refuse" },
         "-date_reponse", 50
       );
       return (refused || []).map(n => n.course_id);
-    },
+    }),
+    retry: retryFeedRead,
     enabled: !!livreurId,
     refetchInterval: 30000,
     staleTime: 15000,
