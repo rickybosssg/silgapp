@@ -95,15 +95,26 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
     }
   }, [courses, livreurId]);
 
-  // Realtime subscription — mise à jour instantanée
+  // Realtime subscription — mise à jour avec debounce anti-rate-limit
+  // Au lieu d'invalider à chaque événement CourseExterne (création, update de statut,
+  // dispatch, etc.), on debounce les invalidations par lot de 5s. Pendant une vague de
+  // dispatch (20-50 updates en quelques secondes), cela réduit 20-50 refetchs à 1 seul.
   useEffect(() => {
     if (!livreurId) return;
+    let debounceTimer = null;
     const unsubscribe = base44.entities.CourseExterne.subscribe((event) => {
       if (event.type === "create" || event.type === "update" || event.type === "delete") {
-        queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles", livreurId, countryCode] });
+        if (debounceTimer) return;
+        debounceTimer = setTimeout(() => {
+          debounceTimer = null;
+          queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles", livreurId, countryCode] });
+        }, 5000);
       }
     });
-    return unsubscribe;
+    return () => {
+      unsubscribe();
+      if (debounceTimer) clearTimeout(debounceTimer);
+    };
   }, [livreurId, countryCode, queryClient]);
 
   // ── eligibleCourses provient du hook useCoursesDisponibles (source unique) ──

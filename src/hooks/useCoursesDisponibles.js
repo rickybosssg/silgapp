@@ -119,8 +119,8 @@ export function useCoursesDisponibles(livreurProfil) {
       return all || [];
     },
     enabled: !!livreurId && !!countryCode && livreurPeutVoirFil && isV2Enabled,
-    refetchInterval: 10000,
-    staleTime: 0,
+    refetchInterval: 15000,
+    staleTime: 8000,
     refetchOnWindowFocus: true,
     refetchOnMount: true,
   });
@@ -181,8 +181,8 @@ export function useCoursesDisponibles(livreurProfil) {
       return missions;
     },
     enabled: !!livreurId && !!countryCode && livreurPeutVoirFil,
-    refetchInterval: 10000,
-    staleTime: 0,
+    refetchInterval: 15000,
+    staleTime: 8000,
     refetchOnWindowFocus: true,
   });
 
