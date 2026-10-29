@@ -194,7 +194,7 @@ test('unknown phone country and attempted promotional opt-in create nothing', as
 });
 
 test('guest phone input strips only the selected international prefix and preserves BF zero', async () => {
-  const text = fs.readFileSync('src/lib/guestPhone.js', 'utf8').replace(/import .*?;\n/, '').replace('export { normalizeGuestPhone };', '').replaceAll('export function', 'function');
+  const text = fs.readFileSync('src/lib/guestPhone.js', 'utf8').replace(/import .*?;\r?\n/, '').replace('export { normalizeGuestPhone };', '').replaceAll('export function', 'function');
   const context = { String }; vm.createContext(context); vm.runInContext(text + '; globalThis.input=guestNationalInput; globalThis.flag=guestCountryFlag;', context);
   for (const value of ['+226 04 04 01 01', '00226 04 04 01 01', '22604040101']) assert.equal(context.input(value, country), '04040101');
   assert.equal(context.input('04040101', country), '04040101'); assert.equal(context.input('+233201234567', country), '+233201234567');

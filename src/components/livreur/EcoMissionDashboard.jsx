@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import {
@@ -12,10 +12,14 @@ import {
   computeActiveStepIndex, getStepCourse,
 } from "@/lib/ecoMissionHelpers";
 import { getCourseContactForPhase, normalizePhoneForWhatsapp } from "@/lib/courseContact";
+import { finaliserLivraisonSafe } from '@/lib/safeDeliveryFinalization';
+import { confirmedDeliverySnapshot, commitConfirmedDeliveryView } from '@/lib/confirmedDelivery';
+import { reconcilePickupRows, reconcilePickupView } from '@/lib/confirmedPickupView';
+import { pickupRead, pickupTransition, readConfirmedParcelPickup, recoverUncertainParcelPickup } from '@/lib/pickupConfirmation';
+import { withRequestDeadline } from '@/lib/guestTrackingState';
 import { normalizeCourseFunctionResult } from "@/lib/courseFunctionResult";
 import { getPrixAffichable, getDeviseAffichable } from "@/utils/getPrixAffichable";
 import { captureDeliveryGps } from "@/lib/deliveryGps";
-import { finaliserLivraisonSafe } from "@/lib/safeDeliveryFinalization";
 import DriverWithdrawalDialog from './DriverWithdrawalDialog';
 import {DRIVER_PRE_PICKUP_STATUSES,driverHasCustody} from '../../../base44/shared/driverWithdrawalPolicy.js';
 
@@ -37,20 +41,23 @@ const ACTIVE_STATUSES = new Set([
 export default function EcoMissionDashboard({ mission, livreurProfil, onAllDelivered, onDeliveryConfirmed }) {
   const queryClient = useQueryClient();
   const [actionPending, setActionPending] = useState(false);
+  const actionLock = useRef(false);
   const [withdrawalCourse, setWithdrawalCourse] = useState(null);
   const livreurId = livreurProfil?.id;
 
   // ── Fetch les courses de la mission (refetch automatique toutes les 5s) ──
-  const { data: courses = [], isLoading } = useQuery({
+  const { data: courses = [], isLoading, isError } = useQuery({
     queryKey: ["eco-mission-active-courses", mission?.id],
+    structuralSharing: reconcilePickupRows,
     queryFn: async () => {
       if (!mission?.course_ids?.length) return [];
       const results = await Promise.all(
         mission.course_ids.map(id =>
-          base44.entities.CourseExterne.get(id).catch(() => null)
+          withRequestDeadline(base44.entities.CourseExterne.get(id), 10000, 'Actualisation de la mission indisponible.')
         )
       );
-      return results.filter(Boolean);
+      if (results.some((row, index) => !row || row.id !== mission.course_ids[index])) throw new Error('Lecture de mission incomplète.');
+      return results;
     },
     enabled: !!mission?.id,
     refetchInterval: 5000,
@@ -88,7 +95,7 @@ export default function EcoMissionDashboard({ mission, livreurProfil, onAllDeliv
   }, [courses]);
 
   // ── Détection de fin de mission ──
-  const allDone = courses.length === mission?.course_ids?.length && courses.length > 0 && courses.every(c =>
+  const allDone = !isError && courses.length > 0 && courses.length === mission?.course_ids?.length && courses.every(c =>
     c.statut === "livree" || c.statut === "annulee"
   );
   useEffect(() => {
@@ -97,37 +104,63 @@ export default function EcoMissionDashboard({ mission, livreurProfil, onAllDeliv
 
   // ── Handlers ──
   const handleTransition = async (courseId, statutCible, extraData = {}) => {
-    if (actionPending) return;
+    if (actionLock.current) return;
+    actionLock.current = true;
     setActionPending(true);
     try {
-      const gps = ["colis_recupere", "pris_en_charge", "arrivee"].includes(statutCible)
-        ? await captureDeliveryGps() : {};
-      const rawRes = await base44.functions.invoke("transitionStatutLivreur", {
+      let saved;
+      if (statutCible === 'colis_recupere') {
+        const before = await pickupRead(base44, courseId);
+        if (before.heure_recuperation || before.pickup_confirmed_at) saved = await readConfirmedParcelPickup(base44, courseId, {success:true, course:before});
+        else if (['annulee', 'livree', 'terminee'].includes(before.statut) || before.annulation_user_id) throw new Error('Cette course ne permet plus cette récupération.');
+      }
+      const gps = !saved && ["colis_recupere", "pris_en_charge", "arrivee"].includes(statutCible) ? await captureDeliveryGps() : {};
+      const rawRes = saved ? { success: true, course: saved } : await pickupTransition(base44, {
         course_id: courseId,
         statut_cible: statutCible,
         ...extraData,
         ...gps,
+      }).catch(async error => {
+        if (statutCible !== 'colis_recupere') throw error;
+        return { success: true, course: await recoverUncertainParcelPickup(base44, courseId, error) };
       });
       const res = normalizeCourseFunctionResult(rawRes);
       if (!res?.success && !res?.skipped) {
         throw new Error(res?.error || "Erreur lors de la mise à jour");
+      }
+      if (statutCible === 'colis_recupere') {
+        saved = await readConfirmedParcelPickup(base44, courseId, res);
+        for (const queryKey of [['eco-mission-active-courses', mission.id], ['mes-courses-externes']]) {
+          await queryClient.cancelQueries({ queryKey });
+          queryClient.setQueriesData({ queryKey }, rows => Array.isArray(rows)
+            ? rows.map(row => row.id === courseId ? reconcilePickupView(row, saved) : row) : rows);
+        }
       }
       queryClient.invalidateQueries({ queryKey: ["eco-mission-active-courses", mission.id] });
       queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
     } catch (err) {
       toast.error(err?.message || "Erreur lors de la mise à jour");
     } finally {
+      actionLock.current = false;
       setActionPending(false);
     }
   };
 
   const handleFinalize = async (courseId) => {
-    if (actionPending) return;
+    if (actionLock.current) return;
+    actionLock.current = true;
     setActionPending(true);
     try {
-      const rawRes = await finaliserLivraisonSafe(base44, { course_id: courseId, ...await captureDeliveryGps() });
+      const course = courses.find(row => row.id === courseId);
+      if (!course || ['livree', 'annulee', 'terminee'].includes(course.statut)) throw new Error('Course indisponible ou déjà terminée. Actualisez.');
+      const rawRes = await finaliserLivraisonSafe(base44, {
+        course_id: courseId,
+        ...await captureDeliveryGps(),
+      });
       const res = normalizeCourseFunctionResult(rawRes);
       if (res?.success || res?.skipped) {
+        const confirmed = confirmedDeliverySnapshot(course, res);
+        await commitConfirmedDeliveryView(queryClient, confirmed, mission.id);
         queryClient.invalidateQueries({ queryKey: ["eco-mission-active-courses", mission.id] });
         queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
         queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
@@ -142,6 +175,7 @@ export default function EcoMissionDashboard({ mission, livreurProfil, onAllDeliv
     } catch (err) {
       toast.error(err?.message || "Erreur lors de la finalisation");
     } finally {
+      actionLock.current = false;
       setActionPending(false);
     }
   };
@@ -178,10 +212,11 @@ export default function EcoMissionDashboard({ mission, livreurProfil, onAllDeliv
     );
   }
 
-  if (courses.length === 0) return null;
+  if (courses.length === 0) return isError ? <p role="alert">Actualisation de la mission indisponible. Réessayez dans un instant.</p> : null;
 
   return (
     <div className="space-y-3">
+      {isError && <p role="alert">Actualisation indisponible. Dernier état connu conservé.</p>}
       {/* ── Header Mission ── */}
       <div className="overflow-hidden rounded-2xl border-2 border-green-200 bg-card shadow-[0_8px_22px_rgba(15,23,42,0.07)]">
         <div className="bg-gradient-to-r from-green-600 to-emerald-600 px-4 py-3 flex items-center justify-between">

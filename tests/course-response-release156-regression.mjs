@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import ts from 'typescript';
 import { normalizeCourseFunctionResult } from '../src/lib/courseFunctionResult.js';
-import { confirmedDeliverySnapshot } from '../src/lib/confirmedDelivery.js';
+import { confirmedDeliverySnapshot, commitConfirmedDeliveryView } from '../src/lib/confirmedDelivery.js';
 import { finaliserLivraisonSafe } from '../src/lib/safeDeliveryFinalization.js';
 import { readConfirmedParcelPickup, recoverUncertainParcelPickup, pickupRead, pickupTransition } from '../src/lib/pickupConfirmation.js';
 
@@ -27,7 +27,7 @@ assert.equal(handlers.length, 9);
 function fixture(index, response, rejection, pending = false) {
   const errors = [], successes = [], effects = [], calls = [], rollbacks = [];
   let reads = 0;
-  const context = vm.createContext({ Date, Error, captureDeliveryGps, normalizeCourseFunctionResult, finaliserLivraisonSafe, confirmedDeliverySnapshot, readConfirmedParcelPickup, recoverUncertainParcelPickup, pickupRead, pickupTransition,
+  const context = vm.createContext({ Date, Error, captureDeliveryGps, commitConfirmedDeliveryView, actionLock:{current:pending}, courses:[{id:"synthetic-course",statut:"colis_recupere",pickup_confirmed_at:"2026-10-27T00:00:00Z"}], normalizeCourseFunctionResult, finaliserLivraisonSafe, confirmedDeliverySnapshot, readConfirmedParcelPickup, recoverUncertainParcelPickup, pickupRead, pickupTransition,
     generation: 1, pickupGenerationRef: { current: 1 }, pickupConfirmationRef: { current: false },
     deliveryConfirmationRef: { current: false },
     course: { id: 'synthetic-course', statut: 'livreur_en_route', livreur_id: 'synthetic-driver', source: 'client' },

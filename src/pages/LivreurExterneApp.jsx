@@ -1,13 +1,14 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { reconcilePickupRows } from '@/lib/confirmedPickupView';
+import { reconcilePickupRows, newestCourseRows } from '@/lib/confirmedPickupView';
 import { finaliserLivraisonSafe } from '@/lib/safeDeliveryFinalization';
+import { readLivreurCoursesResponse } from '@/lib/courseFunctionResult';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { logoutPersistent } from "@/lib/authPersistence";
 import { preserveConfirmedCancellation, isKnownCancelledCourse } from '@/lib/courseCancellationState';
 import { AlertTriangle, Check, Truck, X, Wallet, ChevronRight } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
-import { confirmedDeliverySnapshot } from '@/lib/confirmedDelivery';
+import { confirmedDeliverySnapshot, commitConfirmedDeliveryView } from '@/lib/confirmedDelivery';
 import { toast } from "sonner";
 import { useHeartbeat } from "@/hooks/useHeartbeat";
 import { useCoursesDisponibles } from "@/hooks/useCoursesDisponibles";
@@ -77,13 +78,7 @@ const PROPOSED_DISPATCH_STATUSES = new Set(["propose", "assigne_manuel", "en_att
 const PROPOSED_COURSE_STATUSES = new Set(["nouvelle", "recherche_livreur", "en_attente_livreur", "en_attente"]);
 const FINAL_COURSE_STATUSES = new Set(["livree", "annulee", "completed", "delivered", "canceled"]);
 
-function uniqById(items = []) {
-  const map = new Map();
-  items.filter(Boolean).forEach((item) => {
-    if (item?.id && !map.has(item.id)) map.set(item.id, item);
-  });
-  return [...map.values()];
-}
+const uniqById = newestCourseRows;
 
 function isCourseTargetingLivreur(course, livreurId) {
   if (!course || !livreurId) return false;
@@ -748,8 +743,9 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       const allCoursesForLivreur = await base44.functions.invoke("getAllCoursesForLivreur", {
         livreur_id: livreurId,
       }).then((res) => {
+        const rows = readLivreurCoursesResponse(res);
         successfulCourseSources += 1;
-        return res?.data?.courses || [];
+        return rows;
       }).catch((error) => {
         logAcceptationLivreur("get-all-courses-for-livreur-error", {
           error: error?.message || String(error),
@@ -1489,6 +1485,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         prix_final_livreur: montantSaisi,
       });
       const confirmed = confirmedDeliverySnapshot(course, receipt);
+      await commitConfirmedDeliveryView(queryClient, confirmed, course.eco_mission_id);
       pendingVictoryRecapRef.current = course.eco_mission_id || isEcoDeliveryCourse(course) ? null : confirmed;
       queryClient.invalidateQueries({ queryKey: ['mes-courses-externes'] });
       await verifierEncoursApresCourse(course.id).catch(() => {});
@@ -1511,6 +1508,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       const receipt = options.confirmedResult || { success: true, course: await base44.entities.CourseExterne.get(course.id) };
       if (!options.confirmedResult && receipt.course?.statut !== 'livree') throw new Error('Livraison non confirmée. Actualisez.');
       const confirmed = confirmedDeliverySnapshot(course, receipt);
+      await commitConfirmedDeliveryView(queryClient, confirmed, course.eco_mission_id);
       pendingVictoryRecapRef.current = course.eco_mission_id || isEcoDeliveryCourse(course) ? null : confirmed;
       queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
       queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
@@ -1558,6 +1556,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     }
 
     const confirmed = confirmedDeliverySnapshot(course, receipt);
+      await commitConfirmedDeliveryView(queryClient, confirmed, course.eco_mission_id);
     pendingVictoryRecapRef.current = course.eco_mission_id || isEcoDeliveryCourse(course) ? null : confirmed;
     await verifierEncoursApresCourse(course.id).catch(() => {});
     // [ECO] Ne pas remettre disponible si la course fait partie d'une mission Eco

@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import ts from 'typescript';
 import { deliveryRecapValues, pickupRecordedAt, formatRecordedTime } from '../src/lib/deliveryRecap.js';
-import { confirmedDeliverySnapshot } from '../src/lib/confirmedDelivery.js';
+import { confirmedDeliverySnapshot, commitConfirmedDeliveryView } from '../src/lib/confirmedDelivery.js';
 import { finaliserLivraisonSafe } from '../src/lib/safeDeliveryFinalization.js';
 import { splitAmountByCommission } from '../src/lib/commissionUtils.js';
 import { isEcoDeliveryCourse } from '../src/lib/availableCourseOffers.js';
@@ -40,8 +40,8 @@ test('confirmation rejects malformed, refused, cancelled and mismatched receipts
 });
 function parentFixture(response={data:{success:true,prix_final:500,commission_silga:100,montant_livreur:400}}){
  const events=[],requests=[],pending={current:null},deliveries={current:new Map()},celebrated={current:new Set()};
- const ctx={playVictorySoundOnce,confirmedDeliverySnapshot,finaliserLivraisonSafe,splitAmountByCommission,isEcoDeliveryCourse,deliveryRequestsRef:deliveries,pendingVictoryRecapRef:pending,celebratedCourseIdsRef:celebrated,
-  commissionPct:20,livreurProfil:{id:'driver',country_code:'BF'},queryClient:{invalidateQueries:()=>{}},toast:{success:()=>{},error:e=>events.push(['error',e])},
+ const ctx={playVictorySoundOnce,confirmedDeliverySnapshot,commitConfirmedDeliveryView,finaliserLivraisonSafe,splitAmountByCommission,isEcoDeliveryCourse,deliveryRequestsRef:deliveries,pendingVictoryRecapRef:pending,celebratedCourseIdsRef:celebrated,
+  commissionPct:20,livreurProfil:{id:'driver',country_code:'BF'},queryClient:{cancelQueries:async()=>{},setQueriesData(){},invalidateQueries:()=>{}},toast:{success:()=>{},error:e=>events.push(['error',e])},
   base44:{functions:{invoke:async(name,args)=>{requests.push({name,args});return typeof response==='function'?response():response;}},entities:{CourseExterne:{get:async()=>({id:'course',statut:'annulee'})}}},
   verifierEncoursApresCourse:async()=>{},remettreDisponibleSiAutorise:async()=>events.push(['availability']),setVictoryCourseId:id=>events.push(['victory',id]),haversineKm:()=>null};
  const handler=vm.runInNewContext('('+arrow('src/pages/LivreurExterneApp.jsx','handleColisLivre')+')',ctx);

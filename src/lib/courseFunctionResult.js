@@ -1,5 +1,13 @@
 const invalid = () => ({ success: false, skipped: false, error: 'Réponse du serveur invalide. Actualisez la course avant de réessayer.' });
 
+export function readLivreurCoursesResponse(response) {
+  const body = normalizeCourseFunctionResult(response);
+  if (body.error || body.success === false || !Array.isArray(body.courses)) {
+    throw new Error(body.error || 'Liste des courses indisponible. Actualisez.');
+  }
+  return body.courses;
+}
+
 export function normalizeCourseFunctionResult(response) {
   const wrapped = response && typeof response === 'object' && Object.prototype.hasOwnProperty.call(response, 'data');
   const body = wrapped ? response.data : response;

@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import ts from 'typescript';
 
-const source = fs.readFileSync('tests/fixtures/android170-history/release167-evidence-20261028/heartbeat-stage/base44/functions/heartbeatAuto/entry.ts', 'utf8').replace(/^import .*;\n/, '');
+const source = fs.readFileSync('tests/fixtures/android170-history/release167-evidence-20261028/heartbeat-stage/base44/functions/heartbeatAuto/entry.ts', 'utf8').replace(/^import .*;\r?\n/, '');
 async function run({ type='livreur', session='s', row={}, fresh={}, fail, device=false }={}) {
   let handler; const calls=[];
   const initial={id:'p',user_email:'test@example.test',session_active_id:'s',statut:'en_course',...row};

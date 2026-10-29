@@ -796,3 +796,9 @@ Detailed policy, compatibility, costs and validation are recorded in
 - Retain iOS session generation/logout, callbacks, timestamped GPS, scoped reads, blue branding and Victory sound/layout; keep providers disabled.
 - No native/permissions/signing/dependency-lock/Android change, server deployment, city activation, real course or Apple mutation. Public push/CI and final Apple submission remain gated by current task authorization.
 - Historical server tests use portable original snapshots, not proof of deployed sources. Preserve messaging participant-first idempotency and same-account push identity. See ios170-release-preparation.md for evidence, tests and privacy limitations.
+
+## Android171 vers iOS — 2026-10-29
+
+- Préserver le delta des cinq fichiers vérifiés et les protections iOS GPS/session/suivi. Cache de livraison et mutex Éco avant Victory ; aucune répétition d’écriture métier pour actualiser l’affichage.
+- Les réponses getAllCoursesForLivreur directes/enveloppées sont validées ; refus et données malformées ne deviennent pas un succès vide.
+- Compteur Aujourd’hui, sonnerie sans carte et erreurs historiques restent des limites explicites. Aucun serveur ni droit modifié. La revue du74 reste préservée.
