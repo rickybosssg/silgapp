@@ -191,28 +191,27 @@ function buildStyles() {
       box-shadow: 0 2px 8px rgba(37, 99, 235, 0.45);
     }
 
-    /* ─── Client RÉCENT (🟡 jaune/orange) ─── */
+    /* ─── Client INSCRIT / HORS LIGNE (🩷 rose) ─── */
     .dmap-client-recent .dmap-client-ring {
-      background: rgba(234, 179, 8, 0.25);
-      animation: dmap-pulse-jaune 2s ease-out infinite;
+      background: rgba(236, 72, 153, 0.25);
     }
     .dmap-client-recent .dmap-client-dot {
-      background: #eab308;
+      background: #ec4899;
       border-color: white;
-      box-shadow: 0 2px 8px rgba(234, 179, 8, 0.45);
+      box-shadow: 0 2px 8px rgba(236, 72, 153, 0.4);
     }
 
-    /* ─── Client INACTIF (⚫ noir) ─── */
+    /* ─── Client INSCRIT / HORS LIGNE (🩷 rose) ─── */
     .dmap-client-inactif .dmap-client-ring {
-      background: rgba(0, 0, 0, 0.3);
+      background: rgba(236, 72, 153, 0.2);
     }
     .dmap-client-inactif .dmap-client-dot {
-      background: #000000;
+      background: #ec4899;
       border-color: white;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+      box-shadow: 0 2px 6px rgba(236, 72, 153, 0.35);
     }
     .dmap-client-container.dmap-inactif-marker {
-      opacity: 0.85;
+      opacity: 0.9;
     }
 
     /* ─── Course en attente (🔴 rouge) ─── */
@@ -804,15 +803,15 @@ function buildClientPopup(client) {
   const gpsStr = gpsMin === null ? "?" : gpsMin < 1 ? "à l'instant" : `${gpsMin} min`;
   
   const statutLabels = {
-    actif: "🔵 Client actif — GPS récent",
-    recent: "🟡 Client récent — GPS > 5 min",
-    inactif: "⚫ Hors ligne — non dispatchable",
+    actif: "🔵 Client en ligne",
+    recent: "🩷 Client inscrit — hors ligne",
+    inactif: "🩷 Client inscrit — hors ligne",
   };
   
   const statutColors = {
     actif: "#2563eb",
-    recent: "#eab308",
-    inactif: "#374151",
+    recent: "#ec4899",
+    inactif: "#ec4899",
   };
   
   // Qualité GPS
