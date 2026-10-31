@@ -440,8 +440,8 @@ function buildStyles() {
       border-radius: 50%;
     }
     .dmap-client-dot {
-      width: 18px;
-      height: 18px;
+      width: 22px;
+      height: 22px;
       border-radius: 50%;
       border: 3px solid;
       position: relative;

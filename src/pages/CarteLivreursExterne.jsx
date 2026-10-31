@@ -696,7 +696,7 @@ export default function CarteLivreursExterne() {
       {/* ── Modale carte interactive ─────────────────────────────────────── */}
       {showMap && (
         <div className="fixed inset-0 z-50 bg-background flex flex-col">
-          <div className="flex-shrink-0 border-b bg-slate-900">
+          <div className="flex-shrink-0 border-b bg-slate-800">
             <div className="flex items-center justify-between px-3 py-2.5">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
@@ -705,10 +705,10 @@ export default function CarteLivreursExterne() {
               <div className="flex items-center gap-1.5">
                 <button
                   onClick={() => setMasquerInactifs(v => !v)}
-                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[11px] font-semibold border transition-all ${
+                  className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
                     masquerInactifs
                       ? "bg-white text-slate-900 border-white"
-                      : "bg-white/10 text-white/70 border-white/20 hover:bg-white/20"
+                      : "bg-white/20 text-white border-white/40 hover:bg-white/30"
                   }`}
                 >
                   <span className="w-2 h-2 rounded-full bg-gray-400 flex-shrink-0" />
@@ -716,10 +716,10 @@ export default function CarteLivreursExterne() {
                 </button>
                 <button
                   onClick={() => setShowLivreurs(v => !v)}
-                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[11px] font-semibold border transition-all ${
+                  className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
                     showLivreurs
                       ? "bg-green-600 text-white border-green-600"
-                      : "bg-white/10 text-white/70 border-white/20 hover:bg-white/20"
+                      : "bg-white/20 text-white border-white/40 hover:bg-white/30"
                   }`}
                 >
                   <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
@@ -727,10 +727,10 @@ export default function CarteLivreursExterne() {
                 </button>
                 <button
                   onClick={() => setShowClients(v => !v)}
-                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[11px] font-semibold border transition-all ${
+                  className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
                     showClients
                       ? "bg-blue-600 text-white border-blue-600"
-                      : "bg-white/10 text-white/70 border-white/20 hover:bg-white/20"
+                      : "bg-white/20 text-white border-white/40 hover:bg-white/30"
                   }`}
                 >
                   <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
@@ -738,10 +738,10 @@ export default function CarteLivreursExterne() {
                 </button>
                 <button
                   onClick={() => setShowPartenaires(v => !v)}
-                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[11px] font-semibold border transition-all ${
+                  className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
                     showPartenaires
                       ? "bg-violet-600 text-white border-violet-600"
-                      : "bg-white/10 text-white/70 border-white/20 hover:bg-white/20"
+                      : "bg-white/20 text-white border-white/40 hover:bg-white/30"
                   }`}
                 >
                   <span className="w-2 h-2 rounded-full bg-violet-500 flex-shrink-0" />
@@ -749,10 +749,10 @@ export default function CarteLivreursExterne() {
                 </button>
                 <button
                   onClick={() => setShowOldPositions(v => !v)}
-                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[11px] font-semibold border transition-all ${
+                  className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
                     showOldPositions
                       ? "bg-gray-600 text-white border-gray-600"
-                      : "bg-white/10 text-white/70 border-white/20 hover:bg-white/20"
+                      : "bg-white/20 text-white border-white/40 hover:bg-white/30"
                   }`}
                   title="Afficher les livreurs dont le GPS date de plus de 30 min"
                 >
