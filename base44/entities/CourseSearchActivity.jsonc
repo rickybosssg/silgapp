@@ -1,0 +1,34 @@
+{
+  "name": "CourseSearchActivity",
+  "type": "object",
+  "properties": {
+    "course_id": {
+      "type": "string"
+    },
+    "attempt": {
+      "type": "string"
+    },
+    "driver_id": {
+      "type": "string"
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "view",
+        "refusal"
+      ]
+    }
+  },
+  "required": [
+    "course_id",
+    "attempt",
+    "driver_id",
+    "kind"
+  ],
+  "rls": {
+    "create": false,
+    "read": false,
+    "update": false,
+    "delete": false
+  }
+}
