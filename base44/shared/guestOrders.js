@@ -44,8 +44,8 @@ export function createGuestOrdersService(deps) {
   async function credentials(body, action = false) {
     if (!validRequest(body.request_id) || !validSecret(body[action ? 'action_token' : 'read_token'])) failGuest('ACCESS_DENIED', 'Accès privé invalide.', 403);
     const hash = await sha256(body[action ? 'action_token' : 'read_token']);
-    const control = await store.read();
-    const entry = parseGuestLedger(control).find(e => e.request_id === body.request_id);
+    const entry = store.findEntry ? await store.findEntry(body.request_id)
+      : parseGuestLedger(await store.read()).find(e => e.request_id === body.request_id);
     if (!entry || entry[action ? 'action_hash' : 'read_hash'] !== hash || entry.revoked_at || now() >= Date.parse(entry.expires_at)) failGuest('ACCESS_DENIED', 'Accès privé expiré ou indisponible.', 403);
     return entry;
   }
@@ -60,6 +60,10 @@ export function createGuestOrdersService(deps) {
     return matches[0] ? assertCourse(entry, matches[0]) : null;
   }
   async function receipt(entry, course) {
+    if (store.changeEntry) return store.changeEntry(entry.request_id, current => {
+      if (current.revoked_at || current.read_hash !== entry.read_hash) failGuest('ACCESS_DENIED', 'Accès indisponible.', 403);
+      current.course_id = course.id; current.state = 'created';
+    });
     await store.mutate((_control, ledger) => {
       const current = ledger.find(e => e.request_id === entry.request_id);
       if (!current || current.revoked_at || current.read_hash !== entry.read_hash) failGuest('ACCESS_DENIED', 'Accès indisponible.', 403);
@@ -97,7 +101,10 @@ export function createGuestOrdersService(deps) {
     if (!course) return { success: false, pending: true, code: 'CREATION_UNCERTAIN', message: 'Vérification en cours. Ne recommencez pas la commande.' };
     if (!entry.course_id) await receipt(entry, course);
     if (['livree', 'annulee', 'terminee'].includes(course.statut) && !entry.closed_at) {
-      await store.mutate((_control, ledger) => {
+      if (store.changeEntry) await store.changeEntry(entry.request_id, current => {
+        if (!current.closed_at) current.closed_at = new Date(now()).toISOString();
+      });
+      else await store.mutate((_control, ledger) => {
         const current = ledger.find(e => e.request_id === entry.request_id);
         if (current && !current.closed_at) current.closed_at = new Date(now()).toISOString();
         return { patch: { ledger: JSON.stringify(ledger) }, value: null };
@@ -109,8 +116,9 @@ export function createGuestOrdersService(deps) {
     const allowed = ['action', 'request_id', 'read_token', 'action_token', 'device_token', 'draft'];
     if (Object.keys(body).some(k => !allowed.includes(k)) || !validRequest(body.request_id) || !validSecret(body.read_token) || !validSecret(body.action_token) || !validSecret(body.device_token) || body.read_token === body.action_token || body.device_token === body.read_token || body.device_token === body.action_token) failGuest('INVALID_REQUEST', 'Commande invalide.');
     const [readHash, actionHash, deviceHash] = await Promise.all([sha256(body.read_token), sha256(body.action_token), sha256(body.device_token)]);
-    const registry = await store.read();
-    const previous = parseGuestLedger(registry).find(e => e.request_id === body.request_id);
+    const registry = store.findEntry ? null : await store.read();
+    const previous = store.findEntry ? await store.findEntry(body.request_id)
+      : parseGuestLedger(registry).find(e => e.request_id === body.request_id);
     if (previous) {
       if (previous.read_hash !== readHash || previous.action_hash !== actionHash || previous.device_hash !== deviceHash) failGuest('ACCESS_DENIED', 'Accès privé invalide.', 403);
       // Recovery never writes another course or repeats publication, even with creation disabled.
@@ -118,10 +126,15 @@ export function createGuestOrdersService(deps) {
     }
     // Resolve only this device capability's earlier pending attempts. A terminal
     // receipt frees the active slot, never reopens or deletes the previous course.
-    for (const older of parseGuestLedger(registry).filter(e => e.device_hash === deviceHash && !e.closed_at)) {
+    const olderEntries = store.deviceEntries ? await store.deviceEntries(deviceHash)
+      : parseGuestLedger(registry).filter(e => e.device_hash === deviceHash && !e.closed_at);
+    for (const older of olderEntries) {
       const course = await findCourse(older);
       if (course && ['livree', 'annulee', 'terminee'].includes(course.statut)) {
-        await store.mutate((_control, ledger) => {
+        if (store.changeEntry) await store.changeEntry(older.request_id, current => {
+          if (!current.closed_at) current.closed_at = new Date(now()).toISOString();
+        });
+        else await store.mutate((_control, ledger) => {
           const current = ledger.find(e => e.request_id === older.request_id);
           if (current && !current.closed_at) current.closed_at = new Date(now()).toISOString();
           return { patch: { ledger: JSON.stringify(ledger) }, value: null };
@@ -142,7 +155,7 @@ export function createGuestOrdersService(deps) {
       currency: c.devise_symbole || c.devise, invitation_channel: null, last_invitation_at: null, invitation_result: 'not_sent',
       created_at: new Date(now()).toISOString(), expires_at: new Date(now() + GUEST_ACCESS_MS).toISOString(), state: 'creating', course_id: null };
     // This CAS orders authorization against OFF. Already authorized requests may finish.
-    await store.mutatePolicy(control => {
+    if (!store.reserve) await store.mutatePolicy(control => {
       if (!guestCreationEnabled(control) || control.countries !== priorControl.countries) failGuest('DISABLED', 'Les nouvelles commandes sans compte ne sont plus disponibles.', 403);
       let grants; try { grants = JSON.parse(control.grants || '[]'); } catch { failGuest('CONFIG_INVALID', 'Registre des autorisations indisponible.', 503); }
       if (!Array.isArray(grants) || grants.length >= GUEST_CAPACITY) failGuest('CAPACITY', 'Commandes sans compte temporairement indisponibles.', 503);
@@ -155,7 +168,7 @@ export function createGuestOrdersService(deps) {
       grants.push({ request_id: entry.request_id, fingerprint, read_hash: readHash, action_hash: actionHash, device_hash: deviceHash, country_code: c.code, at: new Date(now()).toISOString() });
       return { patch: { grants: JSON.stringify(grants) }, value: null };
     });
-    const won = await store.mutate((_control, ledger) => {
+    const won = store.reserve ? await store.reserve(entry, priorControl) : await store.mutate((_control, ledger) => {
       const existing = ledger.find(e => e.request_id === entry.request_id);
       if (existing) {
         if (existing.read_hash !== readHash || existing.action_hash !== actionHash || existing.device_hash !== deviceHash || existing.fingerprint !== fingerprint) failGuest('REQUEST_CONFLICT', 'Cette tentative correspond à une autre commande.', 409);
@@ -193,7 +206,12 @@ export function createGuestOrdersService(deps) {
       if (result.success !== true) return { ...await view(entry, await entities.CourseExterne.get(course.id)), ...result };
     } else if (body.action === 'consent') {
       if (body.consent !== false) failGuest('CONSENT_INVALID', 'Les invitations promotionnelles ne sont pas proposées.');
-      await store.mutate((_control, ledger) => {
+      if (store.changeEntry) await store.changeEntry(entry.request_id, current => {
+        if (current.revoked_at) failGuest('ACCESS_DENIED', 'Accès indisponible.', 403);
+        current.invitation_consent = false; current.opposed = true;
+        current.consent_at = new Date(now()).toISOString();
+      });
+      else await store.mutate((_control, ledger) => {
         const current = ledger.find(e => e.request_id === entry.request_id);
         if (!current || current.revoked_at) failGuest('ACCESS_DENIED', 'Accès indisponible.', 403);
         current.invitation_consent = body.consent; current.opposed = !body.consent;
@@ -223,19 +241,29 @@ export function createGuestOrdersService(deps) {
       });
     }
     if (body.action === 'revoke') {
-      await store.mutate((_control, ledger) => {
+      if (store.changeEntry) await store.changeEntry(body.request_id, e => {
+        if (scope && e.country_code !== scope) failGuest('NOT_FOUND', 'Commande introuvable.', 404);
+        e.revoked_at = new Date(now()).toISOString(); e.revoked_by = user.id;
+      });
+      else await store.mutate((_control, ledger) => {
         const e = ledger.find(v => v.request_id === body.request_id && (!scope || v.country_code === scope));
         if (!e) failGuest('NOT_FOUND', 'Commande introuvable.', 404);
         e.revoked_at = new Date(now()).toISOString(); e.revoked_by = user.id;
         return { patch: { ledger: JSON.stringify(ledger) }, value: null };
       });
     } else if (!['admin_list', 'set_enabled'].includes(body.action)) failGuest('ACTION_INVALID', 'Action non autorisée.');
-    const registry = await store.read();
     const control = await store.policy().catch(() => null);
-    const scopedLedger = parseGuestLedger(registry).filter(e => !scope || e.country_code === scope);
+    const entries = store.allEntries ? await store.allEntries() : parseGuestLedger(await store.read());
+    const scopedLedger = entries.filter(e => !scope || e.country_code === scope);
     const selected = scopedLedger.filter(e =>
       (!body.from || e.created_at >= body.from) && (!body.to || e.created_at <= body.to));
-    const courses = selected.length ? await entities.CourseExterne.filter({ request_id: { $in: selected.map(e => GUEST_PREFIX + e.request_id) }, enterprise_id: null, ...(scope ? { country_code: scope } : {}) }, '-created_date', GUEST_CAPACITY + 1) : [];
+    const courses = [];
+    for (let offset = 0; offset < selected.length; offset += 100) {
+      const batch = selected.slice(offset, offset + 100);
+      const found = await entities.CourseExterne.filter({ request_id: { $in: batch.map(e => GUEST_PREFIX + e.request_id) }, enterprise_id: null, ...(scope ? { country_code: scope } : {}) }, '-created_date', 101);
+      if (found.length > batch.length) failGuest('DUPLICATE_DETECTED', 'Vérification administrative nécessaire.', 409);
+      courses.push(...found);
+    }
     const rows = selected.map(e => {
       const course = courses.find(c => c.request_id === GUEST_PREFIX + e.request_id && c.country_code === e.country_code && !c.enterprise_id);
       return { request_id: e.request_id, course_id: course?.id || null, reference: course?.reference || course?.reference_course || (course?.id && course?.created_date && deps.reference ? deps.reference(course) : null),
