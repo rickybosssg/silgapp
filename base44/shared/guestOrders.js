@@ -1,5 +1,6 @@
 import { readSearchActivity } from './courseSearchActivity.js';
 import { canEditSearchPrice } from './clientRelaunch.js';
+import { clientDecisionView } from './clientDecisionView.js';
 import {
   GUEST_PREFIX, GUEST_CAPACITY, GUEST_ACCESS_MS, validSecret, validRequest, sha256,
   failGuest, guestCreationEnabled, parseGuestLedger, guestAdminScope, guestSuperAdmin,
@@ -68,6 +69,16 @@ export function createGuestOrdersService(deps) {
   }
   async function view(entry, course) {
     const dto = guestCourseView(course, entry.currency);
+    dto.can_edit_search_price = canEditSearchPrice(course);
+    const decision = clientDecisionView(course);
+    Object.assign(dto, {
+      updated_at: course.updated_date || null,
+      decision_required: decision.waiting, decision_reason: decision.reason, decision_kind: decision.kind,
+      decision_event: course.livreur_retrait_operation_id || course.livreur_retrait_at || null,
+      country_code: course.country_code, price_revision: Number(course.client_price_revision || 0),
+      relaunch: { operation_id: course.client_relaunch_operation_id || null, state: course.client_relaunch_state || null,
+        mode: course.client_relaunch_mode || null, price: course.client_relaunch_price ?? null },
+    });
     dto.search_activity = null;
     if (canEditSearchPrice(course) && entities.CourseSearchActivity) {
       try { dto.search_activity = await readSearchActivity(entities, course); } catch { /* Keep unavailable distinct from zero. */ }
@@ -176,8 +187,10 @@ export function createGuestOrdersService(deps) {
       if (course.statut !== 'annulee' && !dto.can_cancel) failGuest('INCIDENT_ADMIN', 'Contactez le support pour cette course déjà prise en charge.', 409);
       await cancel(course, GUEST_PREFIX + entry.request_id);
     } else if (body.action === 'retry_dispatch') {
-      if (!course.client_decision_attendue || course.livreur_id || course.heure_recuperation || course.pickup_confirmed_at || course.annulation_user_id || ['livree', 'annulee', 'terminee'].includes(course.statut)) failGuest('DECISION_REFUSED', 'Cette course ne peut pas être relancée.', 409);
-      await decide(course);
+      if (!deps.relaunch) failGuest('RELAUNCH_UNAVAILABLE', 'Relance temporairement indisponible.', 503);
+      const input = body.operation_id ? body : { operation_id: `legacy_relaunch_${course.livreur_retrait_operation_id || course.id}`, mode: 'same_price', expected_revision: course.updated_date };
+      const result = await deps.relaunch(course, input);
+      if (result.success !== true) return { ...await view(entry, await entities.CourseExterne.get(course.id)), ...result };
     } else if (body.action === 'consent') {
       if (body.consent !== false) failGuest('CONSENT_INVALID', 'Les invitations promotionnelles ne sont pas proposées.');
       await store.mutate((_control, ledger) => {
