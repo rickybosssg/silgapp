@@ -46,6 +46,10 @@ import { buildLivreurCityFilter, buildCourseCityFilterFromCourse, verifyCityComp
 
 // ── Version du bundle (pour vérifier que la production charge la dernière version) ──
 export const DISPATCH_V2_BUNDLE_VERSION = '2026-09-25-v2-only-unique-moteur';
+export const DISPATCH_TERMINAL_GUARD_VERSION = '2026-11-02-terminal-cas';
+function terminalDispatchCourse(course: any) {
+  return !!course?.annulation_user_id || STATUTS_TERMINAUX_COURSE.includes(course?.statut);
+}
 
 // ── Feature flag cache (TTL 2 min) ──
 let V2_FLAG_CACHE: { enabled: boolean; expires: number } | null = null;
@@ -73,6 +77,9 @@ export async function isV2Enabled(base44: any): Promise<boolean> {
 async function notifierLivreursEligiblesV2(base44: any, course: any, options: any = {}) {
   const { priorityOnly = false, skipAlreadyPublishedCheck = false } = options;
   if (!course?.id || !course?.country_code) return { notified: 0 };
+  course = await base44.asServiceRole.entities.CourseExterne.get(course.id);
+  if (!course || terminalDispatchCourse(course) || course.dispatch_status !== 'disponible_push' ||
+      course.client_decision_attendue || course.livreur_id || course.accepted_by_livreur_id) return { notified: 0 };
 
   // [ENTERPRISE] Filtre enterprise_id : course Enterprise → livreurs même entreprise uniquement.
   // Course publique (enterprise_id null/absent) → livreurs publics uniquement.
@@ -204,8 +211,10 @@ export async function publierCourseDansFil(base44: any, course: any) {
   // L'objet course passé en paramètre peut être stale (lu avant que les champs
   // Éco ne soient écrits par prepareEcoCreationFields). On re-lit toujours la
   // course depuis la base avant d'évaluer les guards.
-  const freshCourse = await base44.asServiceRole.entities.CourseExterne.get(course.id).catch(() => null);
-  if (freshCourse) course = freshCourse;
+  const freshCourse = await base44.asServiceRole.entities.CourseExterne.get(course.id);
+  if (!freshCourse) return { success: false, error: 'Course introuvable' };
+  course = freshCourse;
+  if (terminalDispatchCourse(course)) return { success: false, reason: 'course_terminal' };
 
   // 🔖 Log de version bundle — pour vérifier que la production charge la dernière version
   dispatchLog(`[V2] 🔖 publierCourseDansFil — bundle version: ${DISPATCH_V2_BUNDLE_VERSION} — course ${course.id}`);
@@ -261,7 +270,9 @@ export async function publierCourseDansFil(base44: any, course: any) {
   }
 
   await base44.asServiceRole.entities.CourseExterne.updateMany(
-    { id: course.id, dispatch_status: { $nin: ['disponible_push', 'accepte', 'propose', 'redispatch'] }, client_decision_attendue: { $ne: true } },
+    { id: course.id, updated_date: course.updated_date,
+      statut: { $nin: STATUTS_TERMINAUX_COURSE }, annulation_user_id: { $in: [null, ''] },
+      dispatch_status: { $nin: ['disponible_push', 'accepte', 'propose', 'redispatch'] }, client_decision_attendue: { $ne: true } },
     { $set: {
       statut: 'recherche_livreur',
       dispatch_status: 'disponible_push',
@@ -279,6 +290,10 @@ export async function publierCourseDansFil(base44: any, course: any) {
   // ou si un autre appel a déjà publié avant nous.
   const coursePubliee = await base44.asServiceRole.entities.CourseExterne.get(course.id);
   if (!coursePubliee) return { error: 'Course introuvable' };
+  if (terminalDispatchCourse(coursePubliee) || coursePubliee.dispatch_status !== 'disponible_push' ||
+      coursePubliee.client_decision_attendue || coursePubliee.livreur_id || coursePubliee.accepted_by_livreur_id) {
+    return { success: false, reason: 'course_not_available' };
+  }
 
   if (coursePubliee.heure_sollicitation !== nowIso) {
     // ── RE-NOTIFICATION DE SECOURS ──
@@ -392,7 +407,7 @@ export async function accepterCourseV2(base44: any, courseId: string, livreurId:
 
   // 5. Refuser les courses en statut terminal (annulee / livree)
   // Ces courses ne peuvent JAMAIS être acceptées, même de façon idempotente.
-  if (STATUTS_TERMINAUX_COURSE.includes(course.statut)) {
+  if (terminalDispatchCourse(course)) {
     return { success: false, accepted: false, reason: 'course_terminal', error: 'Cette course n\'est plus disponible (terminée ou annulée).' };
   }
 
@@ -551,12 +566,18 @@ export async function accepterCourseV2(base44: any, courseId: string, livreurId:
   // chaine vide : Base44 stocke aussi l'absence de livreur avec null, ce qui
   // empêchait toute acceptation de ces courses.
   await base44.asServiceRole.entities.CourseExterne.updateMany(
-    { id: courseId, dispatch_status: { $in: ['propose', 'disponible_push'] } },
+    { id: courseId, updated_date: course.updated_date,
+      statut: { $nin: STATUTS_TERMINAUX_COURSE }, annulation_user_id: { $in: [null, ''] },
+      client_decision_attendue: { $ne: true },
+      dispatch_status: { $in: ['propose', 'disponible_push'] } },
     { $set: updateData }
   );
 
   // 10. Verify winner
   const courseVerifie = await base44.asServiceRole.entities.CourseExterne.get(courseId);
+  if (!courseVerifie || terminalDispatchCourse(courseVerifie)) {
+    return { success: false, accepted: false, reason: 'course_terminal', error: 'Cette course n est plus disponible.' };
+  }
   const isMyCourse = String(courseVerifie.livreur_id) === String(livreurId) ||
                      String(courseVerifie.accepted_by_livreur_id) === String(livreurId);
 
@@ -685,6 +706,9 @@ export function calculerScore(livreur: any, course: any): number {
 export async function secoursDispatchV2(base44: any, course: any, nbLivreurs: number, options: { excludeAlreadyNotified?: boolean } = {}) {
   const { excludeAlreadyNotified = true } = options;
   if (!course?.id || !course.country_code) return { pushed: 0 };
+  course = await base44.asServiceRole.entities.CourseExterne.get(course.id);
+  if (!course || terminalDispatchCourse(course) || course.dispatch_status !== 'disponible_push' ||
+      course.client_decision_attendue || course.livreur_id || course.accepted_by_livreur_id) return { pushed: 0 };
 
   // 1. Get eligible livreurs
   const courseEnterpriseId = normalizeEnterpriseId(course.enterprise_id);
