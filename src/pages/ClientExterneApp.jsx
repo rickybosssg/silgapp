@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { preserveConfirmedCancellation, isKnownCancelledCourse } from '@/lib/courseCancellationState';
-import { motion } from "framer-motion";
+import { cancelCourseWithConfirmation, preserveConfirmedCancellation, isKnownCancelledCourse } from '@/lib/courseCancellationState';
+import { useClientCourseEvents } from '@/hooks/useClientCourseEvents';
 import { base44 } from "@/api/base44Client";
 import { createScopedRefreshQueue } from "@/lib/scopedRefreshQueue";
 import { logoutPersistent } from "@/lib/authPersistence";
@@ -21,11 +21,12 @@ import {
   MapPin, Navigation, MessageCircle, User, Package,
   Clock, ChevronRight, TrendingUp, Loader2, ArrowLeft, RefreshCw, Wallet,
   Store, UtensilsCrossed, Bell, Inbox, Car, Headphones, ShieldCheck,
-  Zap, CheckCircle2, RotateCcw
+  Zap, RotateCcw
 } from "lucide-react";
 import LivreurRatingDialog from "@/components/client/LivreurRatingDialog";
 import CourseAnnuleeRelanceDialog from "@/components/client/CourseAnnuleeRelanceDialog";
 import LivreurAnnulationDecisionModal from "@/components/client/LivreurAnnulationDecisionModal";
+import { clientDecisionView } from '../../base44/shared/clientDecisionView.js';
 import VenusFloatingButton from "@/components/client/VenusFloatingButton";
 import LiveCounterBadge from "@/components/ui/LiveCounterBadge";
 import SilgappLiveStats from "@/components/shared/SilgappLiveStats";
@@ -41,8 +42,11 @@ import { MOMENTS as PUB_MOMENTS } from "@/lib/publiciteUtils";
 import MultiColisProgressBadge from "@/components/multi-colis/MultiColisProgressBadge";
 import FraisAnnulationBannerClient from "@/components/client/FraisAnnulationBannerClient";
 import SuiviBarreFlottante from "@/components/client/SuiviBarreFlottante";
+import RechercheLivreurScreen from "@/components/client/RechercheLivreurScreen";
+import DriverFoundNotice from '@/components/client/DriverFoundNotice';
 import SuiviCourseFullscreen from "@/components/client/SuiviCourseFullscreen";
 import EcranFinCourse from "@/components/client/EcranFinCourse";
+import { readClientCourseOutcome } from '@/lib/clientCourseOutcome';
 import AnnulerCourseDialog from "@/components/client/AnnulerCourseDialog";
 import MultiCourseSelector from "@/components/client/MultiCourseSelector";
 import ExpressVoiceOrder from "@/components/client/ConnectedExpressVoiceOrder";
@@ -106,6 +110,8 @@ export default function ClientExterneApp() {
   const [notationShownFor, setNotationShownFor] = useState(null);
   const [courseAnnuleeRelance, setCourseAnnuleeRelance] = useState(null); // course annulée auto → proposer relance
   const [courseDecisionClient, setCourseDecisionClient] = useState(null); // course en attente de décision client (livreur a annulé)
+  const dismissedDecisions = useRef(new Set());
+  const decisionEventKey = course => `${course.id}:${course.livreur_retrait_operation_id || course.livreur_retrait_at || course.livreur_annulation_date || 'waiting'}`;
   const [showMessages, setShowMessages] = useState(false);
   const [messageCourseId, setMessageCourseId] = useState(null);
   const [courseToCancel, setCourseToCancel] = useState(null);
@@ -255,37 +261,44 @@ export default function ClientExterneApp() {
     ), [coursesActives]);
 
   // Détection d'une course qui vient d'être livrée (transition vers "livree")
-  const prevActiveIds = useRef(new Set());
-  const prevStatuses = useRef({});
   const prevCoursesRef = useRef({});
+  const terminalScope = useRef(null);
+  const terminalReads = useRef(new Set());
   const [courseLivreId, setCourseLivreId] = useState(null);
   const [courseLivreData, setCourseLivreData] = useState(null);
   useEffect(() => {
+    let disposed = false;
+    if (terminalScope.current !== clientProfil?.id) {
+      terminalScope.current = clientProfil?.id;
+      prevCoursesRef.current = {};
+      setCourseLivreId(null);
+      setCourseLivreData(null);
+    }
     const currentIds = new Set(coursesActives.map(c => c.id));
     // Détecter les courses qui ont disparu de coursesActives (→ livrées ou annulées)
-    for (const id of prevActiveIds.current) {
+    for (const id of Object.keys(prevCoursesRef.current)) {
       if (!currentIds.has(id)) {
-        const lastStatus = prevStatuses.current[id];
-        // A missing active course can be cancelled or temporarily absent. Read its real status.
-        if (lastStatus && lastStatus !== "annulee") {
-          base44.entities.CourseExterne.get(id).then(saved => {
-            if (saved?.id !== id || saved.statut !== "livree") return;
-            setCourseLivreId(id);
-            setCourseLivreData(saved);
-            if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 400]);
-            setTimeout(() => setCourseLivreId(prev => prev === id ? null : prev), 30000);
-          }).catch(() => {});
-        }
+        if (terminalReads.current.has(id)) continue;
+        terminalReads.current.add(id);
+        void readClientCourseOutcome(id, key => base44.entities.CourseExterne.get(key)).then(fresh => {
+          if (disposed || !fresh) return;
+          delete prevCoursesRef.current[id];
+          setCourseLivreData(preserveConfirmedCancellation(fresh));
+          setCourseLivreId(id);
+        }).catch(() => {
+          // Retry on the next normal refresh, without inventing success.
+        }).finally(() => terminalReads.current.delete(id));
       }
     }
     // Sauvegarder les objets course pour la détection de livraison
     coursesActives.forEach(c => { prevCoursesRef.current[c.id] = c; });
-    // Mettre à jour les refs
-    prevActiveIds.current = currentIds;
-    const nowStatuses = {};
-    coursesActives.forEach(c => { nowStatuses[c.id] = c.statut; });
-    prevStatuses.current = nowStatuses;
-  }, [coursesActives]);
+    return () => { disposed = true; };
+  }, [coursesActives, clientProfil?.id]);
+  useEffect(() => {
+    if (!courseLivreId) return;
+    const timer = setTimeout(() => setCourseLivreId(null), 30000);
+    return () => clearTimeout(timer);
+  }, [courseLivreId]);
 
   // Configuration dynamique du moment publicitaire (priorité: recherche > assignation > livraison > ouverture)
   const pubConfig = (() => {
@@ -299,6 +312,25 @@ export default function ClientExterneApp() {
   const coursePrincipale = useMemo(() =>
     coursesActives.find(c => c.id === suiviCourseId) || courseAssignee || courseEnRecherche || coursesActives[0] || null
   , [coursesActives, courseEnRecherche, courseAssignee, suiviCourseId]);
+  useClientCourseEvents(coursePrincipale);
+  const cancelDisplayedPending = useRef(false);
+  async function cancelDisplayedCourse(course, confirmed = false) {
+    if (!course?.id || cancelDisplayedPending.current) return;
+    if (!confirmed && !window.confirm('Confirmer l’annulation de cette course ?')) return;
+    cancelDisplayedPending.current = true;
+    try {
+      const cancelled = await cancelCourseWithConfirmation(base44, { course_id: course.id, motif: 'Annulé par le client', source: 'client' });
+      delete prevCoursesRef.current[course.id];
+      setCourseLivreData(cancelled);
+      setCourseLivreId(course.id);
+      statusRequest.current++;
+      setCoursesActives(previous => previous.filter(item => item.id !== course.id));
+      toast.success('Course annulée');
+      setShowSuiviFullscreen(false); setShowRecherche(false);
+      await checkStatus(position, clientProfil);
+    } catch (e) { toast.error(e.message || 'Annulation non confirmée. Actualisez le suivi.'); }
+    finally { cancelDisplayedPending.current = false; }
+  }
 
   // ── Auto-ouverture de l'écran "Recherche livreur" quand une nouvelle course entre en recherche ──
   useEffect(() => {
@@ -963,12 +995,8 @@ export default function ClientExterneApp() {
         // ── Détecter les courses en attente de décision client (livreur a annulé) ──
         // Une course avec client_decision_attendue=true signifie que le livreur a annulé
         // et le client doit choisir : chercher un autre livreur ou terminer la course.
-        if (!courseDecisionClient) {
-          const courseEnAttenteDecision = toutes.find(c => c.client_decision_attendue === true);
-          if (courseEnAttenteDecision) {
-            setCourseDecisionClient(courseEnAttenteDecision);
-          }
-        }
+        const courseEnAttenteDecision = toutes.find(c => clientDecisionView(c).waiting && !dismissedDecisions.current.has(decisionEventKey(c)));
+        setCourseDecisionClient(courseEnAttenteDecision || null);
       } else {
         setNotifications([]);
       }
@@ -1567,24 +1595,11 @@ export default function ClientExterneApp() {
       {courseDecisionClient && (
         <LivreurAnnulationDecisionModal
           course={courseDecisionClient}
-          onDecided={async (action) => {
-            try {
-              await base44.functions.invoke("deciderApresAnnulationLivreur", {
-                course_id: courseDecisionClient.id,
-                action,
-              });
-              if (action === "chercher_autre_livreur") {
-                toast.success("Un nouveau livreur est recherché");
-              } else {
-                toast.success("Course terminée");
-              }
-            } catch (err) {
-              toast.error("Erreur lors de la décision");
-            }
+          onDecided={async () => {
             setCourseDecisionClient(null);
             checkStatus(position, clientProfil);
           }}
-          onClose={() => setCourseDecisionClient(null)}
+          onClose={() => { dismissedDecisions.current.add(decisionEventKey(courseDecisionClient)); setCourseDecisionClient(null); }}
         />
       )}
 
@@ -1610,41 +1625,17 @@ export default function ClientExterneApp() {
 
       {/* ── ÉCRAN RECHERCHE LIVREUR — carte vivante + vagues de dispatch ── */}
       {showRecherche && !showSuiviFullscreen && courseEnRecherche && (
-        <SuiviCourseFullscreen
+          <RechercheLivreurScreen
           course={courseEnRecherche}
           position={position}
+            countryCode={clientProfil?.country_code}
           onClose={() => setShowRecherche(false)}
-          onCancel={() => setCourseToCancel(courseEnRecherche)}
+          onCancel={() => cancelDisplayedCourse(courseEnRecherche)}
         />
       )}
 
       {/* ── ANIMATION D'ACCEPTATION — vibration + check ── */}
-      {showAcceptanceAnim && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[70] bg-black/40 backdrop-blur-sm flex items-center justify-center"
-        >
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ type: "spring", stiffness: 200, damping: 15 }}
-            className="bg-white rounded-3xl p-8 flex flex-col items-center shadow-2xl"
-          >
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ type: "spring", stiffness: 200, damping: 12, delay: 0.15 }}
-              className="w-20 h-20 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center shadow-xl shadow-emerald-200"
-            >
-              <CheckCircle2 className="w-12 h-12 text-white" strokeWidth={2.5} />
-            </motion.div>
-            <p className="text-lg font-black text-gray-900 mt-4">Livreur trouvé !</p>
-            <p className="text-sm text-gray-500 mt-1">{courseAssignee?.livreur_nom || "Votre livreur"} arrive</p>
-          </motion.div>
-        </motion.div>
-      )}
+      {showAcceptanceAnim && <DriverFoundNotice name={courseAssignee?.livreur_nom} />}
 
       {/* ── ÉCRAN DE FIN — animation de réussite + actions ── */}
       {courseLivreId && (
@@ -1678,7 +1669,7 @@ export default function ClientExterneApp() {
             setShowSuiviFullscreen(false);
             setShowMessages(true);
           }}
-          onCancel={() => setCourseToCancel(coursePrincipale)}
+          onCancel={() => cancelDisplayedCourse(coursePrincipale, true)}
         />
       )}
 

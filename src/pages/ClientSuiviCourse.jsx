@@ -1,4 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
+import ClientDecisionNotice from '@/components/client/ClientDecisionNotice';
+import ClientRelaunchActions from '@/components/client/ClientRelaunchActions';
+import { clientDecisionView } from '../../base44/shared/clientDecisionView.js';
 import { base44 } from "@/api/base44Client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useClientNotifications } from "@/hooks/useClientNotifications";
@@ -38,7 +41,8 @@ import HistoriqueCoursesClient from "@/components/client/HistoriqueCoursesClient
 import FraisAnnulationBannerClient from "@/components/client/FraisAnnulationBannerClient";
 import MultiColisClientView from "@/components/multi-colis/MultiColisClientView";
 import { useDestinataireGPS } from "@/hooks/useDestinataireGPS";
-import { playNotificationSound } from "@/hooks/useSonEtVibration";
+import { useClientCourseEvents } from '@/hooks/useClientCourseEvents';
+import { playClientCourseAudio } from '@/lib/clientCourseAudio';
 
 
 function buildWhatsAppMessage(course) {
@@ -228,6 +232,9 @@ export default function ClientSuiviCourse() {
   // Course sélectionnée : celle choisie ou la première active ou la dernière
   const maCourse = selectedCourseId ? courses.find(c => c.id === selectedCourseId) || selectedCourse || null
     : coursesActives[0] || courses[0] || null;
+  useClientCourseEvents(maCourse);
+  const currentTrackedCourse = useRef(maCourse);
+  useEffect(() => { currentTrackedCourse.current = maCourse; return () => { currentTrackedCourse.current = null; }; }, [maCourse]);
 
   // Déclencheur direct sur changement de statut critique (fallback si notification ratée)
   const [prevStatut, setPrevStatut] = useState(null);
@@ -235,8 +242,7 @@ export default function ClientSuiviCourse() {
     if (!maCourse?.statut || prevStatut === maCourse.statut) return;
     
     const statutsCritiques = ["livreur_en_route", "colis_recupere", "en_livraison", "livree"];
-    if (statutsCritiques.includes(maCourse.statut) && !statutsCritiques.includes(prevStatut)) {
-      playNotificationSound();
+    if (prevStatut && statutsCritiques.includes(maCourse.statut) && !statutsCritiques.includes(prevStatut)) {
       navigator.vibrate?.([500, 150, 500, 150, 500]);
     }
     
@@ -251,12 +257,14 @@ export default function ClientSuiviCourse() {
 
     const hadLivreur = !!prevLivreurIdRef.current;
     const hasLivreurNow = !!maCourse.livreur_id;
-    const isRedispatch = maCourse.statut === "nouvelle" && !hasLivreurNow;
+    const isRedispatch = maCourse.statut === "nouvelle" && !hasLivreurNow && !clientDecisionView(maCourse).waiting;
 
     if (hadLivreur && !hasLivreurNow && isRedispatch) {
       // Récupérer le motif depuis AnnulationLivreur
       base44.entities.AnnulationLivreur.filter({ course_id: maCourse.id }, "-date_annulation", 1)
         .then(annulations => {
+          const current = currentTrackedCourse.current;
+          if (!current || current.id !== maCourse.id || current.livreur_id || current.statut !== 'nouvelle' || clientDecisionView(current).waiting) return;
           if (annulations?.length > 0) {
             const a = annulations[0];
             const motifLabel = {
@@ -271,7 +279,7 @@ export default function ClientSuiviCourse() {
             }[a.motif] || a.motif || "non spécifié";
             setMotifAnnulation(motifLabel);
             setShowAnnulationLivreur(true);
-            playNotificationSound();
+            void playClientCourseAudio('refusal');
             navigator.vibrate?.([300, 150, 300]);
           }
         })
@@ -342,6 +350,7 @@ export default function ClientSuiviCourse() {
   }
 
   const getStatutLabel = (course) => {
+    if (clientDecisionView(course).waiting) return 'En attente de votre decision';
     if (course?.statut === "recherche_livreur" &&
         course?.pricing_mode === "manual" &&
         course?.manual_price_status === "pending_client_validation") {
@@ -410,10 +419,18 @@ export default function ClientSuiviCourse() {
         )}
 
         {/* ── ONGLET HISTORIQUE ── */}
+        {onglet === 'actives' && clientDecisionView(maCourse).waiting && <section className="space-y-3">
+          <ClientDecisionNotice course={maCourse} />
+          <ClientRelaunchActions key={maCourse.id} identity={maCourse.id}
+            readContext={() => base44.functions.invoke('relaunchClientCourse', { action: 'context', course_id: maCourse.id })}
+            execute={input => base44.functions.invoke('relaunchClientCourse', { ...input, course_id: maCourse.id })}
+            onConfirmed={() => queryClient.invalidateQueries({ queryKey: ['mes-courses-externes'] })} />
+        </section>}
         {(!userId || !userEmail || isLoading) && !coursesError && !sessionError && (
           <div role="status" className="py-12 text-center text-sm text-gray-600">Chargement de vos courses...</div>
         )}
         {onglet === "historique" && userId && userEmail && !isLoading && !coursesError && (
+
           <HistoriqueCoursesClient
             clientProfil={clientProfil}
             position={undefined}

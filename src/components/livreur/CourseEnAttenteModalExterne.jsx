@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { displayedPriceQuote, courseQuotedPrice } from '../../../base44/shared/coursePriceQuote.js';
 import { MapPin, Navigation, Check, X, Package, Clock, Ruler, AlertCircle } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { cn } from "@/lib/utils";
@@ -166,6 +167,7 @@ export default function CourseEnAttenteModalExterne({
         course_id: course.id,
         livreur_id: livreurId,
         override_pricing_mode: "admin_manuel",
+        ...displayedPriceQuote(course),
       });
       const data = res;
       if (data?.already_accepted) { stopUrgentCourseAlert("course-accepted"); onAccepter(); return; }
@@ -193,6 +195,7 @@ export default function CourseEnAttenteModalExterne({
     try {
       const res = await base44.functions.invoke('dispatchExterneAuto', {
         action: 'accepter_course_v2',
+        ...displayedPriceQuote(course),
         course_id: course.id,
         livreur_id: livreurId,
       });
@@ -233,6 +236,7 @@ export default function CourseEnAttenteModalExterne({
         livreur_id: livreurId,
         pricing_mode: "manual",
         manual_price: montant,
+        ...displayedPriceQuote(course),
       });
       const data = res;
 
@@ -441,7 +445,7 @@ export default function CourseEnAttenteModalExterne({
               {(() => {
                 const isPrixManuel = course.pricing_mode === "manual" && course.manual_price_status === "accepted" && Number(course.manual_price) > 0;
                 const prixAdmin = Number(course.prix_propose_admin) > 0 ? Number(course.prix_propose_admin) : null;
-                const prixBase = isPrixManuel ? Number(course.manual_price) : (prixAdmin || (isAdminCourse ? 0 : (course.prix_estimate || 0)));
+                const prixBase = courseQuotedPrice(course);
                 if (!prixBase) return null;
                 const isPrixAdmin = !isPrixManuel && prixAdmin !== null;
                 return (

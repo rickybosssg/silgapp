@@ -55,6 +55,8 @@ export function guestApi(api = base44) {
       if (!value || typeof value !== 'object' || value.error || (value.success === false && !value.pending)) throw Object.assign(new Error(value?.error || 'Réponse non confirmée.'), { code: value?.code });
       const valid = action === 'config' ? typeof value.enabled === 'boolean' && Array.isArray(value.countries)
         : action === 'catalog' ? typeof value.country?.code === 'string' && Array.isArray(value.quartiers)
+          : action === 'chat_read' ? value.success === true && Array.isArray(value.messages)
+          : action === 'chat_send' ? value.success === true && typeof value.message?.id === 'string'
           : ['admin_list', 'set_enabled', 'revoke'].includes(action) ? value.success === true && Array.isArray(value.rows) && Array.isArray(value.contacts) && value.counts && typeof value.counts === 'object'
             : value.pending === true || (value.success === true && typeof value.course?.statut === 'string');
       if (!valid) throw new Error('Réponse du service non confirmée. Conservez votre tentative.');

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
+import { forteDemandeView } from '../../base44/shared/forteDemandeView.js';
 
 /**
  * useForteDemande — Hook client pour le mode Forte Demande.
@@ -25,15 +26,9 @@ export function useForteDemande(countryCode) {
 
   const applyCountryState = (country) => {
     if (!country) return;
-    const isClientActive = !!country.forte_demande_client_actif;
-    setForteDemande(isClientActive && !!country.forte_demande_active);
-    setConfig({
-      actif: isClientActive,
-      seuil_activation: country.forte_demande_seuil_activation || 5,
-      seuil_retour: country.forte_demande_seuil_retour || 3,
-      titre: country.forte_demande_titre || "🔥 FORTE DEMANDE EN COURS",
-      message: country.forte_demande_message || "Plusieurs commandes sont en cours. Proposez un prix attractif pour augmenter vos chances de trouver rapidement un livreur.",
-    });
+    const view = forteDemandeView(country);
+    setForteDemande(view.active);
+    setConfig(view.config);
   };
 
   const loadCountryState = async (cc) => {

@@ -77,6 +77,7 @@ export default function OnRouteProposalCard({ proposal, livreurProfil, onDismiss
         proposal_id: proposal.proposal_id,
         livreur_id: livreurProfil.id,
         response: "accept",
+        price_quote: { observed_price: proposal.prix, observed_price_revision: Number(proposal.price_revision || 0) },
       });
       const res = rawRes?.data ?? rawRes;
       if (res?.success && res?.accepted) {

@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { displayedPriceQuote } from '../../../base44/shared/coursePriceQuote.js';
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Check, Leaf, Navigation } from "lucide-react";
@@ -56,6 +57,7 @@ export default function EcoMissionCard({ mission, availableCourses, livreurProfi
     try {
       const res = await base44.functions.invoke("ecoOptimizationOrchestrator", {
         action: "accept_eco_mission",
+        price_quotes: Object.fromEntries(courses.map(course => [course.id, displayedPriceQuote(course, prixCourseEco(course))])),
         mission_id: mission.id,
         livreur_id: livreurProfil.id,
       });

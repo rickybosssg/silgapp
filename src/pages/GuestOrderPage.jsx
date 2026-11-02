@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { clientCourseOutcome } from '@/lib/clientCourseOutcome';
 import { useNavigate } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -11,7 +12,17 @@ import { guestCountryFlag, guestCountryName, guestNationalInput, normalizeGuestP
 import { GuestRoute } from '@/components/guest/GuestOrderPresentation';
 import GuestClientHome from '@/components/guest/GuestClientHome';
 import CourseTimeline from '@/components/client/CourseTimeline';
+import ClientDecisionNotice from '@/components/client/ClientDecisionNotice';
+import ClientRelaunchActions from '@/components/client/ClientRelaunchActions';
+import { clientDecisionView } from '../../base44/shared/clientDecisionView.js';
 import GuestCourseMap from '@/components/guest/GuestCourseMap';
+import RechercheLivreurScreen from '@/components/client/RechercheLivreurScreen';
+import SuiviCourseFullscreen from '@/components/client/SuiviCourseFullscreen';
+import DriverFoundNotice from '@/components/client/DriverFoundNotice';
+import ChatWindow from '@/components/chat/ChatWindow';
+import LivreurAnnulationDecisionModal from '@/components/client/LivreurAnnulationDecisionModal';
+import { guestCoursePresentation } from '@/lib/guestCoursePresentation';
+import { useClientCourseEvents } from '@/hooks/useClientCourseEvents';
 import { CountrySelectView } from '@/components/ui/CountrySelect';
 import { preferredGuestCountry, reconcileGuestCourse } from '@/lib/guestTrackingState';
 import '@/components/guest/guestOrder.css';
@@ -55,6 +66,18 @@ export default function GuestOrderPage({ call: suppliedCall, storage: suppliedSt
   const [view, setView] = useState('home');
   const [previous, setPrevious] = useState([]);
   const [loginPrompt, setLoginPrompt] = useState(false);
+  const [dismissedDecision, setDismissedDecision] = useState('');
+  const [foundNotice, setFoundNotice] = useState(false);
+  const [contactError, setContactError] = useState('');
+  const [showChat, setShowChat] = useState(false);
+  const chatTransport = useMemo(() => access ? {
+    read: async () => (await call('chat_read', { request_id: access.request_id, read_token: access.read_token })).messages,
+    send: input => call('chat_send', { request_id: access.request_id, action_token: access.action_token, ...input })
+  } : null, [call, access?.request_id, access?.read_token, access?.action_token]);
+  const courseEvent = useClientCourseEvents(course);
+  const presentedCourse = course ? guestCoursePresentation(course) : null;
+  const waiting = course && clientDecisionView(course).waiting;
+  const decisionKey = waiting ? `${course.reference}:${course.decision_event || course.relaunch?.revision || 'waiting'}` : '';
   const lock = useRef(false);
   const generation = useRef(0);
   const catalogGeneration = useRef(0);
@@ -178,13 +201,13 @@ export default function GuestOrderPage({ call: suppliedCall, storage: suppliedSt
     } catch (e) { if (token === generation.current) setError(e.message); }
     finally { if (token === generation.current) { lock.current = false; setBusy(false); } }
   }
-  async function operation(action, automatic = false) {
+  async function operation(action, automatic = false, relaunchInput = null, confirmed = false) {
     if (lock.current) return;
     if (action === 'track' && (Date.now() < retryNotBefore.current || (automatic && Date.now() < nextReadAt.current))) return;
     lock.current = true; setBusy(true); setError('');
     const token = generation.current;
     const sequence = ++trackingSequence.current;
-    if (action === 'track') nextReadAt.current = Date.now() + 30000;
+    if (action === 'track') nextReadAt.current = Date.now() + 8000;
     try {
       let result;
       if (action === 'create') {
@@ -193,8 +216,8 @@ export default function GuestOrderPage({ call: suppliedCall, storage: suppliedSt
         if (token === generation.current) { setAccess(saved); setReview(false); setView('track'); }
       } else if (action === 'track') result = await call('track', { request_id: access.request_id, read_token: access.read_token });
       else {
-        if (!window.confirm(action === 'cancel' ? 'Annuler définitivement cette commande ?' : action === 'consent' ? 'Refuser les invitations à créer un compte ?' : 'Rechercher un autre livreur pour cette commande ?')) return;
-        result = await call(action, { request_id: access.request_id, action_token: access.action_token, ...(action === 'consent' ? { consent: false } : {}) });
+        if (!confirmed && action !== 'retry_dispatch' && !window.confirm(action === 'cancel' ? 'Annuler définitivement cette commande ?' : 'Refuser les invitations à créer un compte ?')) return;
+        result = await call(action, { request_id: access.request_id, action_token: access.action_token, ...(action === 'consent' ? { consent: false } : {}), ...(relaunchInput || {}) });
       }
       if (token !== generation.current || sequence !== trackingSequence.current || !result) return;
       if (result.course && Number.isFinite(Date.parse(result.expires_at))) {
@@ -205,8 +228,10 @@ export default function GuestOrderPage({ call: suppliedCall, storage: suppliedSt
       }
       if (result.course) { setCourse(current => reconcileGuestCourse(current, result.course)); setPending(false); retryNotBefore.current = 0; }
       else { setPending(true); setError(result.message || 'Résultat non confirmé. Vérifiez le suivi.'); }
+      return result;
     } catch (e) {
       if (token === generation.current && sequence === trackingSequence.current) {
+        if (action === 'retry_dispatch') throw e;
         if (action === 'track') {
           retryNotBefore.current = Date.now() + Math.max(30000, e.retryAfterMs || 0);
           setError(`Actualisation momentanément indisponible. Dernier état connu conservé. ${e.message}`);
@@ -226,13 +251,28 @@ export default function GuestOrderPage({ call: suppliedCall, storage: suppliedSt
       }
     } finally { if (token === generation.current) { lock.current = false; setBusy(false); } }
   }
+  const operationRef = useRef(operation);
+  operationRef.current = operation;
   useEffect(() => {
     if (!access || !course || ['livree', 'annulee', 'terminee'].includes(course.statut)) return;
-    const refresh = () => { if (document.visibilityState === 'visible' && !lock.current) operation('track', true); };
-    const timer = setInterval(refresh, 30000);
-    document.addEventListener('visibilitychange', refresh);
-    return () => { clearInterval(timer); document.removeEventListener('visibilitychange', refresh); };
-  }, [access, course?.statut, error]);
+    const refresh = () => { if (document.visibilityState === 'visible' && navigator.onLine !== false && !lock.current) void operationRef.current('track', true); };
+    const resume = () => { nextReadAt.current = 0; refresh(); };
+    const timer = setInterval(refresh, 8000);
+    document.addEventListener('visibilitychange', resume);
+    window.addEventListener('online', resume);
+    let disposed = false, subscription;
+    if (Capacitor.isNativePlatform()) CapacitorApp.addListener('appStateChange', ({ isActive }) => { if (isActive) resume(); }).then(handle => {
+      if (disposed) handle.remove(); else subscription = handle;
+    }).catch(() => {});
+    return () => { disposed = true; subscription?.remove(); clearInterval(timer); document.removeEventListener('visibilitychange', resume); window.removeEventListener('online', resume); };
+  }, [access?.request_id, course?.statut]);
+  useEffect(() => {
+    if (courseEvent?.kind !== 'acceptance') return;
+    setFoundNotice(true);
+    const timer = setTimeout(() => setFoundNotice(false), 2500);
+    return () => clearTimeout(timer);
+  }, [courseEvent]);
+  useEffect(() => { if (!waiting) setDismissedDecision(''); }, [waiting]);
   useEffect(() => {
     const back = () => { if (review) setReview(false); else setView('home'); };
     let disposed = false;
@@ -266,19 +306,22 @@ export default function GuestOrderPage({ call: suppliedCall, storage: suppliedSt
       {error && <p role="alert" className="guest-notice">{error}</p>}
       {view === 'home' ? <GuestClientHome enabled={config?.enabled === true} loading={!config} course={course} onOrder={startOrder} onTrack={() => setView('track')} onLogin={() => setLoginPrompt(true)} previous={previous} onPrevious={openPrevious} /> : course && view === 'track' ? <section aria-label="Suivi privé">
         <h2 className="guest-eyebrow">{course.reference || 'Votre course'}</h2>
-        <p className="guest-status"><CheckCircle2 aria-hidden="true" />{course.assigned && ['livreur_en_route', 'client_contacte'].includes(course.statut) ? 'Livreur trouvé' : getCourseStatusLabel(course.statut)}</p>
+        <p className="guest-status"><CheckCircle2 aria-hidden="true" />{clientCourseOutcome(course) === 'cancelled' ? 'Course annulée' : clientDecisionView(course).waiting ? 'En attente de votre décision' : course.assigned && ['livreur_en_route', 'client_contacte'].includes(course.statut) ? 'Livreur trouvé' : getCourseStatusLabel(course.statut)}</p>
+        <ClientDecisionNotice course={course} />
         <GuestCourseMap course={course} isolated={isolatedMap} />
         {course.assigned && !course.driver_position && !course.delivered && <p className="guest-muted py-3">Position récente du livreur indisponible.</p>}
         <GuestRoute depart={course.depart} arrivee={course.arrivee} />
         {course.price_decision_required && <p role="alert" className="text-sm text-amber-800">Un autre prix a été proposé. Contactez l’administration avant de poursuivre.</p>}
         <div className="guest-total"><span>Montant de la course</span><strong>{amount(course.prix)} {course.devise}</strong></div>
-        {course.statut !== 'annulee' && <div className="guest-timeline py-4"><CourseTimeline statut={course.statut} typeCourse="expedier" /></div>}
+        {course.statut !== 'annulee' && !clientDecisionView(course).waiting && <div className="guest-timeline py-4"><CourseTimeline statut={course.statut} typeCourse="expedier" /></div>}
         {course.pickup_at && <p>Récupération : {new Date(course.pickup_at).toLocaleString('fr-FR')}</p>}
         <div className="guest-actions"><button type="button" className="guest-secondary" disabled={busy} onClick={() => operation('track')}><RefreshCw className="h-4 w-4" />Actualiser</button>
         {course.can_cancel && <button type="button" disabled={busy} className="guest-danger" onClick={() => operation('cancel')}>Annuler la commande</button>}
-        {course.decision_required && <button type="button" disabled={busy} className={button} onClick={() => operation('retry_dispatch')}>Rechercher un autre livreur</button>}
+        {course.decision_required && <ClientRelaunchActions identity={`guest:${access.request_id}`} disabled={busy}
+          context={{ ...course.relaunch, price: course.prix, revision: course.updated_at, currency: course.devise, waiting: course.decision_required }}
+          execute={input => operation('retry_dispatch', false, input)} />}
         {course.invitation_consent && <button type="button" disabled={busy} className="block py-2 text-sm text-gray-600 underline" onClick={() => operation('consent')}>Ne plus recevoir d’invitation</button>}
-        </div>{course.delivered && <div className="guest-complete"><p>Créez votre compte pour accéder à votre espace personnel et à votre historique.</p><button type="button" className={button} onClick={() => navigate('/', { state: { guestSignup: true } })}>Créer mon compte</button><button type="button" className="guest-secondary" onClick={returnHome}>Plus tard</button></div>}
+        </div>{clientCourseOutcome(course) === 'delivered' && <div className="guest-complete"><p>Créez votre compte pour accéder à votre espace personnel et à votre historique.</p><button type="button" className={button} onClick={() => navigate('/', { state: { guestSignup: true } })}>Créer mon compte</button><button type="button" className="guest-secondary" onClick={returnHome}>Plus tard</button></div>}
       </section> : access || pending ? <section className="guest-actions"><p className="guest-muted">Votre tentative est conservée sur cet appareil.</p><button type="button" disabled={busy} className={button} onClick={() => operation('track')}>Actualiser le suivi</button><button type="button" disabled={busy} className="guest-secondary" onClick={() => operation('create')}>Vérifier la création initiale</button></section> : !config ? <p role="status">{error ? 'Chargement impossible.' : 'Chargement…'}</p> : !config.enabled ? <div className="guest-disabled"><p>Les nouvelles commandes sans compte sont indisponibles.</p><button type="button" className={button} onClick={() => navigate('/')}>Se connecter</button></div> : <form onSubmit={prepareReview} className="guest-form">
         <label className="guest-field">Pays<select required className={input} value={draft.country_code} onChange={e => loadCatalog(e.target.value, true)}><option value="">Choisir le pays de la course</option>{config.countries.map(code => <option key={code} value={code}>{guestCountryName(code)}</option>)}</select></label>
         {catalogBusy && <p role="status">Chargement des quartiers…</p>}
@@ -287,6 +330,7 @@ export default function GuestOrderPage({ call: suppliedCall, storage: suppliedSt
           <label className="guest-field">Prix proposé ({currency})<input required type="text" inputMode="numeric" pattern="[0-9]+" className={input} value={draft.prix} onChange={e => setDraft(d => ({ ...d, prix: e.target.value }))} /></label>
           <div className="guest-phone"><div className="guest-field"><span>Pays du téléphone</span><CountrySelectView ariaLabel="Pays du téléphone" countries={phoneCountries.map(c => ({ ...c, emoji_flag: guestCountryFlag(c.code) }))} value={draft.phone_country_code} onChange={code => setDraft(d => ({ ...d, phone_country_code: code }))} className="guest-phone-select" /></div>
           <label className="guest-field">Téléphone de contact<span className="guest-phone-number"><span className="guest-dial" aria-hidden="true">+{phoneDial || '—'}</span><input required type="tel" inputMode="tel" autoComplete="tel-national" aria-describedby="guest-phone-purpose" className={input} value={draft.telephone} onChange={e => setDraft(d => ({ ...d, telephone: guestNationalInput(e.target.value, phoneCountry) }))} /></span></label><p id="guest-phone-purpose" className="guest-muted">Pour vous joindre au sujet de cette livraison.</p></div>
+          {catalog.forte_demande?.active === true && <aside role="status" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950"><p className="font-semibold">{catalog.forte_demande.titre}</p><p className="mt-1">{catalog.forte_demande.message}</p></aside>}
           <button type="submit" className={button}>Vérifier ma commande<ArrowRight className="h-4 w-4" aria-hidden="true" /></button>
           <button type="button" disabled={busy} className="guest-quiet" onClick={abandonDraft}>Abandonner le brouillon</button>
         </>}
@@ -299,5 +343,21 @@ export default function GuestOrderPage({ call: suppliedCall, storage: suppliedSt
         <div className="guest-actions"><button type="button" disabled={busy} className={button} onClick={() => operation('create')}>Confirmer la commande</button><button type="button" disabled={busy} className="guest-secondary" onClick={() => setReview(false)}>Modifier</button></div>
       </div></div>}
     </div>
+    {!isolatedMap && view === 'track' && course && !waiting && !['livree', 'annulee', 'terminee'].includes(course.statut) && (
+      course.assigned ? <SuiviCourseFullscreen course={presentedCourse} position={null} onClose={returnHome}
+        onCall={() => { const phone = String(course.driver?.telephone || '').replace(/[^+0-9]/g, ''); if (phone) window.location.href = `tel:${phone}`; else setContactError('Le numéro du livreur est momentanément indisponible.'); }}
+        onMessage={() => setShowChat(true)}
+        onCancel={course.can_cancel ? () => operation('cancel', false, null, true) : null} />
+        : <RechercheLivreurScreen course={presentedCourse} position={null} countryCode={course.country_code} onClose={returnHome} onCancel={course.can_cancel ? () => operation('cancel') : null}
+            guestPriceActions={{ identity: `guest:${access?.request_id}`, context: { ...course.relaunch, price: course.prix, revision: course.updated_at, currency: course.devise, waiting: course.decision_required, can_edit_search_price: course.can_edit_search_price }, execute: input => operation('retry_dispatch', false, input) }} />
+    )}
+    {error && view === 'track' && <p role="alert" className="fixed top-20 inset-x-4 z-[65] rounded-lg bg-amber-50 border border-amber-300 p-3 text-sm text-amber-950">{error}</p>}
+    {waiting && decisionKey !== dismissedDecision && <LivreurAnnulationDecisionModal course={presentedCourse}
+      onClose={() => setDismissedDecision(decisionKey)} onDecided={() => setDismissedDecision(decisionKey)}
+      guestActions={{ identity: `guest:${access?.request_id}`, context: { ...course.relaunch, price: course.prix, revision: course.updated_at, currency: course.devise, waiting: true },
+        relaunch: input => operation('retry_dispatch', false, input), cancel: () => operation('cancel') }} />}
+    {foundNotice && !waiting && <DriverFoundNotice name={course?.driver?.name || 'Votre livreur'} />}
+    {showChat && course?.assigned && !waiting && !course.delivered && chatTransport && <div role="dialog" aria-modal="true" aria-label="Discussion avec le livreur" className="fixed inset-0 z-[75] bg-black/60 flex items-center justify-center p-3"><div className="w-full max-w-lg max-h-[95dvh] overflow-auto"><button type="button" className="bg-white text-gray-900 rounded-lg px-4 py-3 mb-2" onClick={() => setShowChat(false)}>Revenir au suivi</button><ChatWindow key={access.request_id} courseId={`guest:${access.request_id}`} senderType="client" senderId="guest" senderName="Invité" transport={chatTransport} /><p className="text-white text-sm mt-2">Messages texte uniquement pour le moment.</p></div></div>}
+    {contactError && <div role="dialog" aria-modal="true" aria-label="Contact livreur" className="fixed inset-0 z-[80] bg-black/40 flex items-center justify-center p-4"><div className="bg-white rounded-lg p-5 max-w-sm"><p>{contactError}</p><button type="button" className="guest-secondary mt-4" onClick={() => setContactError('')}>Fermer</button></div></div>}
   </main>;
 }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, X, Navigation, Package, MapPin, Clock } from "lucide-react";
+import { ArrowLeft, Navigation, Package, MapPin, Clock } from "lucide-react";
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -108,6 +108,7 @@ export default function SuiviCourseFullscreen({ course, position, onClose, onCal
   const [commandeRestaurant, setCommandeRestaurant] = useState(null);
 
   useEffect(() => {
+    if (course.private_guest) { setCommandeRestaurant(null); return; }
     if (publicView || !course.commande_restaurant_id) {
       setCommandeRestaurant(null);
       return;
@@ -125,7 +126,7 @@ export default function SuiviCourseFullscreen({ course, position, onClose, onCal
         .catch(() => {});
     }, 15000);
     return () => { cancelled = true; clearInterval(interval); };
-  }, [course.commande_restaurant_id, publicView]);
+  }, [course.commande_restaurant_id, course.private_guest, publicView]);
 
   // Phase: "approche" (livreur va vers départ) ou "livraison" (livreur va vers arrivée)
   const isLivraison = ["en_livraison", "arrivee"].includes(course.statut);
@@ -142,6 +143,8 @@ export default function SuiviCourseFullscreen({ course, position, onClose, onCal
     const l = course._livreur;
     if (l?.latitude && l?.longitude) {
       setLivreurPos({ lat: l.latitude, lng: l.longitude });
+    } else if (course.private_guest) {
+      setLivreurPos(null);
     } else {
       // A pickup coordinate is not a live driver position.
       setLivreurPos(null);
@@ -160,6 +163,7 @@ export default function SuiviCourseFullscreen({ course, position, onClose, onCal
   // ── ETA unifié : useETACourse (ORS prioritaire, Haversine fallback) ──
   const activeTarget = (isLivraison || isColisRecupere) ? arrivee : depart;
   const etaHook = useETACourse({
+    allowRouteRequest: !course.private_guest,
     courseId: course.id,
     phase: (isLivraison || isColisRecupere) ? "livraison" : "recuperation",
     fromLat: terminal || publicView ? null : livreurPos?.lat ?? null,
@@ -228,7 +232,8 @@ export default function SuiviCourseFullscreen({ course, position, onClose, onCal
     return pts;
   }, [livreurPos, depart, arrivee]);
 
-  const hasLivreur = !!course.livreur_id && !!course.livreur_nom;
+  const hasLivreur = !!(course.livreur_id || course.assigned) && !!course.livreur_nom;
+  const requestCancel = () => { if (window.confirm('Confirmer l’annulation de cette course ?')) onCancel?.(); };
   const targetLabel = isLivraison ? "Destination" : "Point de récupération";
 
   return (
@@ -268,9 +273,9 @@ export default function SuiviCourseFullscreen({ course, position, onClose, onCal
             )}
           </motion.div>
         )}
-        {onClose && (
-          <button onClick={onClose} aria-label="Fermer le suivi" className="w-10 h-10 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center shadow-lg">
-            <X className="w-5 h-5 text-red-500" />
+        {onCancel && !isLivraison && !isColisRecupere && (
+          <button onClick={requestCancel} className="max-w-[45%] min-h-11 px-3 py-2 rounded-lg bg-white text-red-700 text-sm font-semibold shadow-lg">
+            Annuler la course
           </button>
         )}
         {!onClose && <div className="w-10" />}
@@ -443,7 +448,7 @@ export default function SuiviCourseFullscreen({ course, position, onClose, onCal
           {/* Bouton annuler */}
           {onCancel && !terminal && !isLivraison && !isColisRecupere && (
             <button
-              onClick={onCancel}
+              onClick={requestCancel}
               className="w-full mt-3 py-2.5 rounded-xl border border-red-200 text-red-600 text-sm font-bold active:scale-[0.98] transition-transform"
             >
               Annuler la course

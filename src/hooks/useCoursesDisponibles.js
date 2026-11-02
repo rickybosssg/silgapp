@@ -203,7 +203,7 @@ export function useCoursesDisponibles(livreurProfil) {
       );
       const byId = new Map();
       [...(all || []), ...(ecoIsolated || [])].forEach((course) => {
-        if (course?.id) byId.set(course.id, course);
+        if (course?.id) byId.set(course.id, preserveConfirmedCancellation(course));
       });
       return Array.from(byId.values()).filter(c => canSeeOperationalCourse(c, driverZone, zonePolicy.cities, zonePolicy.quartiers));
     }),
@@ -256,7 +256,19 @@ export function useCoursesDisponibles(livreurProfil) {
         if (event?.data?.country_code && event.data.country_code !== countryCode) return;
         refreshQueue.schedule();
       };
-      const unsubscribeCourses = base44.entities.CourseExterne.subscribe(refresh);
+      const unsubscribeCourses = base44.entities.CourseExterne.subscribe(event => {
+        const data = event?.data;
+        if (data?.country_code && data.country_code !== countryCode) return;
+        if (data?.id && (data.statut === 'annulee' || data.annulation_user_id)) {
+          preserveConfirmedCancellation(data);
+          // Remove immediately; an in-flight older read is fenced on completion.
+          queryClient.setQueriesData({ queryKey: ["courses-externes-disponibles", livreurId, countryCode] },
+            rows => Array.isArray(rows) ? rows.filter(row => row.id !== data.id) : rows);
+          queryClient.setQueriesData({ queryKey: ["eco-missions-disponibles", livreurId, countryCode] },
+            rows => Array.isArray(rows) ? rows.filter(row => !row.course_ids?.includes(data.id)) : rows);
+        }
+        refresh(event);
+      });
       try {
         const unsubscribeMissions = livreurEnterpriseId === null ? base44.entities.EcoMission.subscribe(refresh) : null;
         return () => { refreshQueue.stop(); unsubscribeCourses?.(); unsubscribeMissions?.(); };
@@ -301,7 +313,7 @@ export function useCoursesDisponibles(livreurProfil) {
   // Normalisation canonique : null/undefined/"" → null (réseau public).
   const eligibleCourses = useMemo(() => {
     if (cityLoading || cityError) return [];
-    const standardAndEcoCourses = courses.filter(course => {
+    const standardAndEcoCourses = courses.map(preserveConfirmedCancellation).filter(course => {
       if (course.country_code !== countryCode || !canSeeOperationalCourse(course, driverZone, zonePolicy.cities, zonePolicy.quartiers)) return false;
       // [ENTERPRISE] Isolation stricte : le livreur ne voit que les courses de son périmètre.
       const courseEnterpriseId = normalizeEnterpriseId(course.enterprise_id);

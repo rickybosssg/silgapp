@@ -1,0 +1,310 @@
+{
+  "androidVersion": "1.0.171",
+  "androidBuild": 178,
+  "iosParent": "f3442e39e4015239ca5e20e5664d5066d94d2426",
+  "androidApkSha256": "edb8e9dda1b3c8e20e08bd74df784c92db5b9bd1af52333d60f1d86b866565fc",
+  "androidSourceManifestSha256": "0c0c7fbe52a95c56ae1d8e9f5967c819fda4a75b7271226e78af02c2d17f40f1",
+  "files": [
+    {
+      "file": "src/App.jsx",
+      "sha256": "d2e80fd1d8c1f8e16115d4473493231ed528cbc9d519aae40687f076d754b3ac",
+      "textHashConvention": "LF (binary assets unchanged)",
+      "android178Sha256": "0dcb6622c6d2a56c2152b099477faeca74ac5d77fb6f52b5fdaaa11af2d18a00"
+    },
+    {
+      "file": "src/components/admin/DispatchConfigPanel.jsx",
+      "sha256": "02859cfbbb6937d43f1be5fd1a32a4741e3f7e8226d1ff38098d32da42940b2f",
+      "textHashConvention": "LF (binary assets unchanged)",
+      "android178Sha256": "ca45090a13c3c30ae642938f616f493f9890d744a50ba8ba70382c4371362c59"
+    },
+    {
+      "file": "src/components/admin/EcoDispatchSettings.jsx",
+      "sha256": "a7fb133d869f795c3787da819eb6d6d4f4c22abd9912cbdd79b70d018e758245",
+      "textHashConvention": "LF (binary assets unchanged)",
+      "android178Sha256": "a7fb133d869f795c3787da819eb6d6d4f4c22abd9912cbdd79b70d018e758245"
+    },
+    {
+      "file": "src/components/AppUpdateInvitation.jsx",
+      "sha256": "5b71a70564c14db9ab29870c384a8d8b23e0e96040e23c5ac393ef9662423b07",
+      "textHashConvention": "LF (binary assets unchanged)",
+      "android178Sha256": "5b71a70564c14db9ab29870c384a8d8b23e0e96040e23c5ac393ef9662423b07"
+    },
+    {
+      "file": "src/components/chat/ChatWindow.jsx",
+      "sha256": "8f60c0b6192f0758b63cbf6408fe7b306580af0b96df805add4fdcb7ab28e34f",
+      "textHashConvention": "LF (binary assets unchanged)",
+      "android178Sha256": "c1b854e485b51dcdd7009a872bfffe87fb5b78d4496b7b861350285c675399c0"
+    },
+    {
+      "file": "src/components/client/ClientDecisionNotice.jsx",
+      "sha256": "d59a59328f1cf8d5597b39401d858f0f443c9f4cf9c04902682229697209f59b",
+      "textHashConvention": "LF (binary assets unchanged)",
+      "android178Sha256": "d59a59328f1cf8d5597b39401d858f0f443c9f4cf9c04902682229697209f59b"
+    },
+    {
+      "file": "src/components/client/ClientRelaunchActions.jsx",
+      "sha256": "73f68b2474da61fe37e7db51a0b4232478769b23c62c37c38d1b07b0bd0f2596",
+      "textHashConvention": "LF (binary assets unchanged)",
+      "android178Sha256": "73f68b2474da61fe37e7db51a0b4232478769b23c62c37c38d1b07b0bd0f2596"
+    },
+    {
+      "file": "src/components/client/DriverFoundNotice.jsx",
+      "sha256": "728ed575cab3a6eb7e77dc41d8295dc319c358dadb0d5465f6b519c13272817f",
+      "textHashConvention": "LF (binary assets unchanged)",
+      "android178Sha256": "728ed575cab3a6eb7e77dc41d8295dc319c358dadb0d5465f6b519c13272817f"
+    },
+    {
+      "file": "src/components/client/EcranFinCourse.jsx",
+      "sha256": "2c299a00ce213460902cb349f17a6ad0f7894d59646daf3839aa3820af13e3dd",
+      "textHashConvention": "LF (binary assets unchanged)",
+      "android178Sha256": "89cce08079c96dcdaec14268031d4d2d02149b08c9e210afbff4e2c715b61932"
+    },
+    {
+      "file": "src/components/client/LivreurAnnulationDecisionModal.jsx",
+      "sha256": "737b1d5edb5eee15a1691dfa7099b2278e241068c77c023cf8f105ac305f0869",
+      "textHashConvention": "LF (binary assets unchanged)",
+      "android178Sha256": "a6bd48fcab5678862850ddb5eb4c47ab3580d3e353264756c78f16f9565525de"
+    },
+    {
+      "file": "src/components/client/LivreurCardModerne.jsx",
+      "sha256": "5ac31fbf814fb3ad23c28484663c64d5dee4c840cb3533245bd13123ab2a7008",
+      "textHashConvention": "LF (binary assets unchanged)",
+      "android178Sha256": "121a66f9bfa21131e3f686b445a916f4b8daaf5f1970000203224fad6c1ac778"
+    },
+    {
+      "file": "src/components/client/RechercheLivreurScreen.jsx",
+      "sha256": "133421a32edd33edf37aff926ed273b637280b55e57aabd3c3b5486cf4ad49fd",
+      "textHashConvention": "LF (binary assets unchanged)",
+      "android178Sha256": "626c51d98dd73cd5d1b411eeb06b44064bba340a735a01691b6f8e54302e2a44"
+    },
+    {
+      "file": "src/components/client/SearchActivityCounters.jsx",
+      "sha256": "f6528213d8058f2bfcfcf2b950362568aea7931b4cdbefc033202bc5081dbd28",
+      "textHashConvention": "LF (binary assets unchanged)",
+      "android178Sha256": "f6528213d8058f2bfcfcf2b950362568aea7931b4cdbefc033202bc5081dbd28"
+    },
+    {
+      "file": "src/components/client/SuiviCourseFullscreen.jsx",
+      "sha256": "a248c70652a29b641ab01f959dd57b53d30c2f8150ad2d1702e25723b087f7c7",
+      "textHashConvention": "LF (binary assets unchanged)",
+      "android178Sha256": "aff5aabd4de6d549c73a8de29512f5cb02c6b6042d337e78242470bd3b9bf31a"
+    },
+    {
+      "file": "src/components/client/SuivreCourseCard.jsx",
+      "sha256": "5c6dda3171d92f26095336ed890e8690660e8e1f2e786b389c0758c50932ca1a",
+      "textHashConvention": "LF (binary assets unchanged)",
+      "android178Sha256": "fed8caf5da51218eb013a8d79c285e4426d70d459e54989bd134be0f3bcd39d7"
+    },
+    {
+      "file": "src/components/client/VenusFloatingButton.jsx",
+      "sha256": "a85c0608409d170d5ea5337d538526ddf6add6fa2ef140dd06cbcdcebbe8112b",
+      "textHashConvention": "LF (binary assets unchanged)",
+      "android178Sha256": "2bc07bdb7f739c1ac1ddf26fa72462c9dba985b8089cdb942e74e361a6d30a2e"
+    },
+    {
+      "file": "src/components/courses/ProposedLivreursListV2.jsx",
+      "sha256": "f59e0a63f23b0d714e9dd0c6e4a9f6a872188d4af2b4cdcc038fbefdd7d9184f",
+      "textHashConvention": "LF (binary assets unchanged)",
+      "android178Sha256": "71e67470550b7e119726ebab5b12b631202ac079d6603e0a84b0b1d0d82979fb"
+    },
+    {
+      "file": "src/components/layout/AppLayout.jsx",
+      "sha256": "4c45651d0ef0ebb0479af87436fd01d7bf48d0801a60700a81f6ddf973db583d",
+      "textHashConvention": "LF (binary assets unchanged)",
+      "android178Sha256": "1cd2c953e8b35a2b2b1cbfb0ad29d4512d994f515f6d1d9befee43380a120f5d"
+    },
+    {
+      "file": "src/components/livreur/CourseEnAttenteModalExterne.jsx",
+      "sha256": "53b2985902217e137e8095fc9ac360fd37615c2f1e9f8ace0f7418ab16368789",
+      "textHashConvention": "LF (binary assets unchanged)",
+      "android178Sha256": "1a85067bc3def3ec3527c1b312ff2b2e60b00bd3e4e322501fbaeffb14c38ef9"
+    },
+    {
+      "file": "src/components/livreur/CoursesDisponibles.jsx",
+      "sha256": "325e9662429849116774f032bfc93eba93577e656e843ac415b9857960de1800",
+      "textHashConvention": "LF (binary assets unchanged)",
+      "android178Sha256": "3597c0bd0a865127105088f8e449fc5a6910ca7f8c669e826cd2859602f9cb2d"
+    },
+    {
+      "file": "src/components/livreur/EcoMissionCard.jsx",
+      "sha256": "e32480f753d6020669acfebcd932c223d66de80e1373e9ff95e01dc024b07b3e",
+      "textHashConvention": "LF (binary assets unchanged)",
+      "android178Sha256": "81861aa70280ffc501f18be4127a741cc25a67c2bfb452a8a132ea064e209560"
+    },
+    {
+      "file": "src/components/livreur/OnRouteProposalCard.jsx",
+      "sha256": "c4036413b3c53926053849bd0a7ffe5e931a186497a8ca047a6e4b458cc48465",
+      "textHashConvention": "LF (binary assets unchanged)",
+      "android178Sha256": "76a504582677a5c2bdf240279733683d9f4981c10ccdcadcff12d625bb993a07"
+    },
+    {
+      "file": "src/hooks/useClientCourseEvents.js",
+      "sha256": "1df6027c8af5b8dec57e2e44f88c9e4392f56b4d16af83da55ce1048b4efa1df",
+      "textHashConvention": "LF (binary assets unchanged)",
+      "android178Sha256": "1df6027c8af5b8dec57e2e44f88c9e4392f56b4d16af83da55ce1048b4efa1df"
+    },
+    {
+      "file": "src/hooks/useCoursesDisponibles.js",
+      "sha256": "71bf645cd9ee80344815158e1586f7de974989fe9a4bc161c22fc9e240595364",
+      "textHashConvention": "LF (binary assets unchanged)",
+      "android178Sha256": "1609569acb3add8f95252fb44cde0036d2e0b01d8e149596a570e6170bd617ff"
+    },
+    {
+      "file": "src/hooks/useETACourse.js",
+      "sha256": "e9e7731eec6d0ecbf04e90ace3d5891bfdf0a1fbdba0349c17f04c4f21b43df4",
+      "textHashConvention": "LF (binary assets unchanged)",
+      "android178Sha256": "5fdbf71a9144207589cdaacbe870255a1db0cd15baf03aaecbb929fd4a9d9400"
+    },
+    {
+      "file": "src/hooks/useForteDemande.js",
+      "sha256": "95ada02885b01274f0bd0ce2d6306a774160d110ea2dcf820a45622e7c86d047",
+      "textHashConvention": "LF (binary assets unchanged)",
+      "android178Sha256": "70439b85d8bf7d5c9cd429ed6db4b1c454e61ccdd89a75f945a6047b2da2b07b"
+    },
+    {
+      "file": "src/lib/appUpdatePolicy.js",
+      "sha256": "5347cd8b564b860665326b91203a8ea335a8c3ae8ec6acc2ec9c869ac70feec3",
+      "textHashConvention": "LF (binary assets unchanged)",
+      "android178Sha256": "5347cd8b564b860665326b91203a8ea335a8c3ae8ec6acc2ec9c869ac70feec3"
+    },
+    {
+      "file": "src/lib/availableCourseOffers.js",
+      "sha256": "5eccf3cf883fad1e93782a19d38f85baca4292f1c8672fbfb1d94eeae4c1f13c",
+      "textHashConvention": "LF (binary assets unchanged)",
+      "android178Sha256": "943de4acf1597efc9f261b90c1bf4387330e0fb4a583caffe0a8ac807b863d48"
+    },
+    {
+      "file": "src/lib/clientCourseAudio.js",
+      "sha256": "dd3dd0b0cc65015e617fa35e76ad7d2046444478898bd152c18509d629a81204",
+      "textHashConvention": "LF (binary assets unchanged)",
+      "android178Sha256": "dd3dd0b0cc65015e617fa35e76ad7d2046444478898bd152c18509d629a81204"
+    },
+    {
+      "file": "src/lib/clientCourseEvents.js",
+      "sha256": "280d3f97057f011971b640ac1f607f417bb0791911dc51550e311de0ab0f1aa2",
+      "textHashConvention": "LF (binary assets unchanged)",
+      "android178Sha256": "280d3f97057f011971b640ac1f607f417bb0791911dc51550e311de0ab0f1aa2"
+    },
+    {
+      "file": "src/lib/clientCourseOutcome.js",
+      "sha256": "cce8b781118c37875dda136a1a47c2f7a4e87fec9c5c6098ee6ff7de3d4cc136",
+      "textHashConvention": "LF (binary assets unchanged)",
+      "android178Sha256": "cce8b781118c37875dda136a1a47c2f7a4e87fec9c5c6098ee6ff7de3d4cc136"
+    },
+    {
+      "file": "src/lib/guestCoursePresentation.js",
+      "sha256": "f0d5ce941c3ee90217322968d9f20cf05bdd22213db2f14e1b2c8cc3b3d9020e",
+      "textHashConvention": "LF (binary assets unchanged)",
+      "android178Sha256": "f0d5ce941c3ee90217322968d9f20cf05bdd22213db2f14e1b2c8cc3b3d9020e"
+    },
+    {
+      "file": "src/lib/guestOrderClient.js",
+      "sha256": "53d0b2eb10c9feb0ef21574e6894847d6ad492fbc945a9ac5ae2140a9e6438ba",
+      "textHashConvention": "LF (binary assets unchanged)",
+      "android178Sha256": "53d0b2eb10c9feb0ef21574e6894847d6ad492fbc945a9ac5ae2140a9e6438ba"
+    },
+    {
+      "file": "src/pages/ClientExterneApp.jsx",
+      "sha256": "3344c8a30b2404e34166bdd9fea30688cf23e31a0858b883fbcf0d06f7ba60b0",
+      "textHashConvention": "LF (binary assets unchanged)",
+      "android178Sha256": "9f792f111365acc187a3b7145d08cb8d68d7219149aa07085f598fad2f6f5567"
+    },
+    {
+      "file": "src/pages/ClientSuiviCourse.jsx",
+      "sha256": "826dd17542c63facd33917146fd46d2e780872d884d4780c134c17e7e4b324fe",
+      "textHashConvention": "LF (binary assets unchanged)",
+      "android178Sha256": "60feecc04528a8cd367babf9a2079971b3596a96a37c33762349b62417d819ef"
+    },
+    {
+      "file": "src/pages/GuestOrderPage.jsx",
+      "sha256": "e96313025b407704fcfc72360139cff80cde65f298b98ea9fb5fdf6d3f808391",
+      "textHashConvention": "LF (binary assets unchanged)",
+      "android178Sha256": "e96313025b407704fcfc72360139cff80cde65f298b98ea9fb5fdf6d3f808391"
+    },
+    {
+      "file": "src/pages/GuestOrdersAdmin.jsx",
+      "sha256": "e67d5bafaa70aedb2bab2504d2b6ca62f5032a46ad4ea99feb544192d01ec5b4",
+      "textHashConvention": "LF (binary assets unchanged)",
+      "android178Sha256": "e67d5bafaa70aedb2bab2504d2b6ca62f5032a46ad4ea99feb544192d01ec5b4"
+    },
+    {
+      "file": "src/pages/LivreurExterneApp.jsx",
+      "sha256": "de53b625d60cada15072243990694d071d60e8d5a8a000c490155d4aaabdee49",
+      "textHashConvention": "LF (binary assets unchanged)",
+      "android178Sha256": "78a6989257a1060a2bf3268c6d760e5e4f86b728e107346fbaac380d7401b936"
+    },
+    {
+      "file": "base44/shared/clientDecisionView.js",
+      "sha256": "c2b8d48d5beb556807d4d79e7de70b0f6857d2aabebd8c7497bc2dab1027b8f8",
+      "textHashConvention": "LF (binary assets unchanged)"
+    },
+    {
+      "file": "base44/shared/courseSearchActivity.js",
+      "sha256": "27f2880017221d2b002175cb9ec4da92da2312d57406da836d2c499b23630e5e",
+      "textHashConvention": "LF (binary assets unchanged)"
+    },
+    {
+      "file": "base44/shared/coursePriceQuote.js",
+      "sha256": "2ff6d2541a3a35aac50bddcf6b66ebad6da5871aee27e324122f1948e9df9bd5",
+      "textHashConvention": "LF (binary assets unchanged)"
+    },
+    {
+      "file": "base44/shared/forteDemandeView.js",
+      "sha256": "a59940898d8bc0b2839b021e9cdef8df0524633ff989e856b4e4022e267113a2",
+      "textHashConvention": "LF (binary assets unchanged)"
+    },
+    {
+      "file": "public/sounds/client/SILGAPP_01_recherche_douce.mp3",
+      "sha256": "aec0dc502f300150768eb9b4b5f00cdba1728c46d99a5395f3f4546fb3aca90f",
+      "textHashConvention": "LF (binary assets unchanged)"
+    },
+    {
+      "file": "public/sounds/client/SILGAPP_02_acceptation_joyeuse.mp3",
+      "sha256": "a58421d200fb02e5bac86e3ed59aad5900a23fb74eedb87d7642cf77fca19a52",
+      "textHashConvention": "LF (binary assets unchanged)"
+    },
+    {
+      "file": "public/sounds/client/SILGAPP_03_refus_sobre.mp3",
+      "sha256": "a55118c1318a1ad8230f46c80cf98b7c452cff91ff3f7176e24e8a55eeade38c",
+      "textHashConvention": "LF (binary assets unchanged)"
+    },
+    {
+      "file": "tests/client-cancel-outcome-regression.mjs",
+      "sha256": "3b5f7f08fabd36147c0ce0946e87a146fb7672b5cfe1628669cfa7e7fc815773",
+      "textHashConvention": "LF (binary assets unchanged)"
+    },
+    {
+      "file": "tests/ios178-shared-regression.mjs",
+      "sha256": "a5df1bf30e959457ed32f212d70faa172a5fc904bbc0562e40ba40936010e723",
+      "textHashConvention": "LF (binary assets unchanged)"
+    },
+    {
+      "file": "docs/ios178-shared-transfer.md",
+      "sha256": "4c717c36708a8cc40a72b0b636c7fc2985cc85bfd83bae115efa3455895afea5",
+      "textHashConvention": "LF (binary assets unchanged)"
+    },
+    {
+      "file": "docs/silgapp-regression-inventory.md",
+      "sha256": "efe827160dc7d0d297057bed35a6d8b9eb296a1a2bdeb9053b1d6e6ddf114e04",
+      "textHashConvention": "LF (binary assets unchanged)"
+    }
+  ],
+  "checks": [
+    {
+      "name": "tests",
+      "status": 0
+    },
+    {
+      "name": "lint",
+      "status": 0
+    },
+    {
+      "name": "typecheck",
+      "status": 0
+    },
+    {
+      "name": "web-build",
+      "status": 0
+    }
+  ]
+}

@@ -802,3 +802,10 @@ Detailed policy, compatibility, costs and validation are recorded in
 - Préserver le delta des cinq fichiers vérifiés et les protections iOS GPS/session/suivi. Cache de livraison et mutex Éco avant Victory ; aucune répétition d’écriture métier pour actualiser l’affichage.
 - Les réponses getAllCoursesForLivreur directes/enveloppées sont validées ; refus et données malformées ne deviennent pas un succès vide.
 - Compteur Aujourd’hui, sonnerie sans carte et erreurs historiques restent des limites explicites. Aucun serveur ni droit modifié. La revue du74 reste préservée.
+# Android 178 shared-source transfer to iOS (2026-11-02)
+
+See `ios178-shared-transfer.md` and `ios178-transfer-manifest.json`. Full verified
+171-to-178 frontend delta merged over iOS f3442e39; iOS native and session/push
+adaptations retained. No backend deployment, App Store upload or physical iPhone
+test in this transfer. Real business flows remain to be checked on iOS.
+

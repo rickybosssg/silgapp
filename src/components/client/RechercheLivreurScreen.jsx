@@ -8,6 +8,9 @@ import "leaflet/dist/leaflet.css";
 import { haversineKm as haversine } from "@/lib/priceEstimate";
 import { base44 } from "@/api/base44Client";
 import { isExpressAwaitingDispatch } from "@/lib/expressTracking";
+import ClientRelaunchActions from './ClientRelaunchActions';
+import SearchActivityCounters from './SearchActivityCounters';
+import { useQueryClient } from '@tanstack/react-query';
 
 const DEPART_ICON = L.divIcon({
   html: '<div style="width:20px;height:20px;border-radius:50%;background:#3b82f6;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);"></div>',
@@ -30,19 +33,22 @@ const REASSURANCE_MESSAGES = [
   { emoji: "🎯", text: "Nous trouvons le livreur le plus proche." },
 ];
 
-export default function RechercheLivreurScreen({ course, position, countryCode, onClose }) {
+export default function RechercheLivreurScreen({ course, position, countryCode, onClose, onCancel = null, guestPriceActions = null }) {
+  const queryClient = useQueryClient();
   const awaitingExpressDispatch = isExpressAwaitingDispatch(course);
   const [msgIndex, setMsgIndex] = useState(0);
-  const [elapsedSec, setElapsedSec] = useState(0);
+  const [elapsedSec, setElapsedSec] = useState(null);
   const [nearbyLivreurs, setNearbyLivreurs] = useState([]);
-  const [notifiedCount, setNotifiedCount] = useState(0);
+  const [notifiedCount, setNotifiedCount] = useState(null);
+  const [nearbyLoaded, setNearbyLoaded] = useState(false);
   const [waveNotifiedCount, setWaveNotifiedCount] = useState(0);
   const mapRef = useRef(null);
 
-  const currentWave = course.dispatch_wave || 1;
+  const currentWave = course.private_guest ? course.dispatch_wave : course.dispatch_wave || 1;
 
   // ── Fetch notification counts from DispatchNotification entity ──
   useEffect(() => {
+    if (course.private_guest) { setNotifiedCount(course.notified_count ?? null); return; }
     let active = true;
     const fetchCounts = async () => {
       try {
@@ -59,7 +65,7 @@ export default function RechercheLivreurScreen({ course, position, countryCode, 
     fetchCounts();
     const interval = setInterval(fetchCounts, 5000);
     return () => { active = false; clearInterval(interval); };
-  }, [course.id, currentWave]);
+  }, [course.id, currentWave, course.private_guest, course.notified_count]);
 
   // Départ
   const depart = useMemo(() => ({
@@ -74,10 +80,10 @@ export default function RechercheLivreurScreen({ course, position, countryCode, 
 
   // Timer écoulé
   useEffect(() => {
-    const startTime = course.heure_sollicitation ? new Date(course.heure_sollicitation).getTime() : Date.now();
-    const interval = setInterval(() => {
-      setElapsedSec(Math.floor((Date.now() - startTime) / 1000));
-    }, 1000);
+    const startTime = Date.parse(course.heure_sollicitation || '');
+    const update = () => setElapsedSec(Number.isFinite(startTime) ? Math.max(0, Math.floor((Date.now() - startTime) / 1000)) : null);
+    update();
+    const interval = setInterval(update, 1000);
     return () => clearInterval(interval);
   }, [course.heure_sollicitation]);
 
@@ -91,6 +97,7 @@ export default function RechercheLivreurScreen({ course, position, countryCode, 
 
   // Fetch livreurs disponibles à proximité (anonymes)
   useEffect(() => {
+    if (course.private_guest) { setNearbyLivreurs([]); setNearbyLoaded(false); return; }
     if (!countryCode) return;
     let active = true;
     const fetchLivreurs = async () => {
@@ -109,6 +116,7 @@ export default function RechercheLivreurScreen({ course, position, countryCode, 
           return dist <= 5;
         });
         setNearbyLivreurs(nearby.slice(0, 12));
+        setNearbyLoaded(true);
       } catch (e) {
         console.warn("[RechercheLivreur] Erreur fetch livreurs:", e.message);
       }
@@ -116,21 +124,16 @@ export default function RechercheLivreurScreen({ course, position, countryCode, 
     fetchLivreurs();
     const interval = setInterval(fetchLivreurs, 10000); // refresh every 10s
     return () => { active = false; clearInterval(interval); };
-  }, [countryCode, depart.lat, depart.lng]);
+  }, [countryCode, depart.lat, depart.lng, course.private_guest]);
 
   // ETA estimation
   const etaText = useMemo(() => {
     if (awaitingExpressDispatch) return "Votre commande est conservée. Actualisation automatique en cours.";
-    const mins = Math.floor(elapsedSec / 60);
-    const secs = elapsedSec % 60;
-    if (mins === 0) return `≈ 1 min ${secs}s`;
-    if (mins < 2) return `≈ 2 min`;
-    if (currentWave <= 1) return "Un livreur est généralement trouvé en moins de 2 minutes";
-    if (currentWave === 2) return "Recherche élargie en cours...";
-    return "Nous continuons à chercher le meilleur livreur...";
-  }, [elapsedSec, currentWave, awaitingExpressDispatch]);
+    return "Recherche en cours. Le délai d’acceptation dépend des livreurs disponibles.";
+  }, [awaitingExpressDispatch]);
 
   const elapsedDisplay = useMemo(() => {
+    if (elapsedSec === null) return '—';
     const m = Math.floor(elapsedSec / 60);
     const s = elapsedSec % 60;
     return `${m}:${s.toString().padStart(2, "0")}`;
@@ -138,7 +141,7 @@ export default function RechercheLivreurScreen({ course, position, countryCode, 
 
   const msg = awaitingExpressDispatch
     ? { emoji: "", text: "Commande enregistrée. La recherche n’a pas encore démarré." }
-    : REASSURANCE_MESSAGES[msgIndex];
+    : { emoji: REASSURANCE_MESSAGES[msgIndex].emoji, text: 'Votre demande est en cours de recherche.' };
 
   return (
     <motion.div
@@ -148,7 +151,7 @@ export default function RechercheLivreurScreen({ course, position, countryCode, 
       className="fixed inset-0 z-50 bg-white flex flex-col"
     >
       {/* ── CARTE VIVANTE ── */}
-      <div className="flex-1 relative">
+      <div className="flex-1 min-h-[160px] relative">
         <MapContainer
           center={center}
           zoom={14}
@@ -181,7 +184,7 @@ export default function RechercheLivreurScreen({ course, position, countryCode, 
           {depart.lat && (
             <Marker position={[depart.lat, depart.lng]} icon={DEPART_ICON}>
               <Tooltip permanent direction="top" offset={[0, -12]} className="custom-tooltip">
-                Votre position
+                Point de récupération
               </Tooltip>
             </Marker>
           )}
@@ -197,12 +200,13 @@ export default function RechercheLivreurScreen({ course, position, countryCode, 
         </MapContainer>
 
         {/* Overlay header sur la carte */}
-        <div className="absolute top-0 left-0 right-0 z-[1000] flex items-center justify-between p-4 pt-[max(1rem,env(safe-area-inset-top))] bg-gradient-to-b from-black/30 to-transparent">
-          <div className="bg-white/90 backdrop-blur-sm rounded-xl px-3 py-2 shadow-lg">
+        <div className="absolute top-0 left-0 right-0 z-[1000] flex items-center justify-between gap-2 p-4 pt-[max(1rem,env(safe-area-inset-top))] bg-gradient-to-b from-black/30 to-transparent">
+          <div className="min-w-0 flex-1 bg-white/90 backdrop-blur-sm rounded-lg px-3 py-2 shadow-lg">
             <p className="text-[10px] text-gray-500 font-medium">Point de récupération</p>
-            <p className="text-sm font-bold text-gray-900 max-w-[200px] truncate">{course.adresse_depart}</p>
+            <p className="text-sm font-bold text-gray-900 truncate">{course.adresse_depart}</p>
           </div>
-          <button onClick={onClose} className="w-10 h-10 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center shadow-lg">
+          {onCancel && <button type="button" onClick={onCancel} className="max-w-[45%] min-h-11 rounded-lg px-3 py-2 bg-white text-sm font-semibold text-red-700">Annuler la course</button>}
+          <button title="Fermer le suivi sans annuler" aria-label="Fermer le suivi sans annuler" onClick={onClose} className="w-10 h-10 shrink-0 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center shadow-lg">
             <X className="w-5 h-5 text-gray-600" />
           </button>
         </div>
@@ -225,7 +229,7 @@ export default function RechercheLivreurScreen({ course, position, countryCode, 
         initial={{ y: 300 }}
         animate={{ y: 0 }}
         transition={{ type: "spring", stiffness: 300, damping: 30 }}
-        className="bg-white rounded-t-3xl shadow-2xl border-t border-gray-100"
+        className="max-h-[65dvh] overflow-y-auto bg-white rounded-t-3xl shadow-2xl border-t border-gray-100"
       >
         <div className="p-5 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
           {/* Poignée */}
@@ -249,6 +253,14 @@ export default function RechercheLivreurScreen({ course, position, countryCode, 
           </div>
 
           {/* Stats grid */}
+          <SearchActivityCounters course={course} />
+          <div className="mb-4">
+            {course.private_guest ? guestPriceActions && <ClientRelaunchActions searchMode {...guestPriceActions} />
+              : <ClientRelaunchActions searchMode identity={`course:${course.id}`} context={{ revision: course.updated_date }}
+                readContext={() => base44.functions.invoke('relaunchClientCourse', { action: 'context', course_id: course.id })}
+                execute={input => base44.functions.invoke('relaunchClientCourse', { ...input, course_id: course.id })}
+                onConfirmed={() => queryClient.invalidateQueries({ predicate: query => query.queryKey.some(key => typeof key === 'string' && /course/i.test(key)) })} />}
+          </div>
           <div className="grid grid-cols-3 gap-3 mb-4">
             {/* Temps écoulé */}
             <div className="bg-blue-50 rounded-2xl p-3 text-center">
@@ -259,13 +271,13 @@ export default function RechercheLivreurScreen({ course, position, countryCode, 
             {/* Livreurs notifiés */}
             <div className="bg-amber-50 rounded-2xl p-3 text-center">
               <Users className="w-5 h-5 text-amber-500 mx-auto mb-1" />
-              <p className="text-lg font-black text-gray-900">{notifiedCount}</p>
+              <p className="text-lg font-black text-gray-900">{notifiedCount ?? '—'}</p>
               <p className="text-[9px] text-gray-500 font-medium">notifiés</p>
             </div>
             {/* Disponibles */}
             <div className="bg-emerald-50 rounded-2xl p-3 text-center">
               <Bike className="w-5 h-5 text-emerald-500 mx-auto mb-1" />
-              <p className="text-lg font-black text-gray-900">{nearbyLivreurs.length}</p>
+              <p className="text-lg font-black text-gray-900">{nearbyLoaded ? nearbyLivreurs.length : '—'}</p>
               <p className="text-[9px] text-gray-500 font-medium">disponibles</p>
             </div>
           </div>

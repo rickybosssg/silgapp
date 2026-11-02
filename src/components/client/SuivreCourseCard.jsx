@@ -1,10 +1,12 @@
 import { Navigation, ChevronRight } from "lucide-react";
 import { getCourseStatusLabel } from "@/lib/courseStatuses";
+import { clientDecisionView } from '../../../base44/shared/clientDecisionView.js';
 
 export default function SuivreCourseCard({ course, onClick }) {
   if (!course) return null;
   const searching = ["nouvelle", "recherche_livreur"].includes(course.statut) && !course.livreur_id;
-  const subtitle = searching ? "Recherche d'un livreur" : getCourseStatusLabel(course.statut);
+  const decision = clientDecisionView(course);
+  const subtitle = decision.waiting ? decision.message : searching ? "Recherche d'un livreur" : getCourseStatusLabel(course.statut);
   return (
     <button type="button" data-testid="suivre-course-card" data-course-id={course.id}
       onClick={onClick}

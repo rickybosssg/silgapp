@@ -2,18 +2,32 @@ import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Star, MessageSquare, FileText, RotateCcw, X, CheckCircle2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
+import { clientCourseOutcome } from '@/lib/clientCourseOutcome';
 
 export default function EcranFinCourse({ course, onNoter, onRefaire, onFermer }) {
   const [show, setShow] = useState(false);
+  const outcome = clientCourseOutcome(course);
 
   useEffect(() => {
+    if (outcome !== 'delivered') return;
     // Vibration native Android
     if (navigator.vibrate) {
       navigator.vibrate([200, 100, 200, 100, 400]);
     }
     const t = setTimeout(() => setShow(true), 600);
     return () => clearTimeout(t);
-  }, []);
+  }, [outcome]);
+
+  if (outcome === 'cancelled') return (
+    <div role="dialog" aria-modal="true" aria-labelledby="course-cancelled-title"
+      className="fixed inset-0 z-[60] bg-white flex flex-col items-center justify-center px-6 text-center">
+      <X aria-hidden="true" className="w-16 h-16 text-gray-500 mb-6" />
+      <h2 id="course-cancelled-title" className="text-2xl font-black text-gray-900 mb-3">Course annulée</h2>
+      <p className="text-sm text-gray-600 mb-8">Cette course a été annulée.</p>
+      <button type="button" onClick={onFermer} className="px-6 py-3 rounded-lg bg-primary text-white font-semibold">Fermer</button>
+    </div>
+  );
+  if (outcome !== 'delivered') return null;
 
   return (
     <motion.div

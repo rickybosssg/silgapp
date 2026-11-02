@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { playNotificationSound } from "@/hooks/useSonEtVibration";
 import Sidebar from "./Sidebar";
@@ -33,6 +33,7 @@ function AppLayoutInner({ reseau }) {
     query.addEventListener('change', update);
     return () => query.removeEventListener('change', update);
   }, []);
+  const location = useLocation();
   const { windows } = useAdminCourseWindows();
   const hasWindows = windows.length > 0;
   const [notifCount, setNotifCount] = useState(0);
@@ -178,7 +179,7 @@ function AppLayoutInner({ reseau }) {
       </div>
 
       {/* Assistant VENUS — bouton flottant sur toutes les pages admin */}
-      {desktop && <VenusFloatingButton />}
+      {desktop && location.pathname !== '/admin/commandes-sans-compte' && <VenusFloatingButton />}
 
       {/* Mobile layout */}
       <div className="lg:hidden">

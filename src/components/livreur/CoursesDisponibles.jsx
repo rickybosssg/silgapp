@@ -8,6 +8,8 @@ import { getPrixAffichable } from "@/utils/getPrixAffichable";
 import { useCoursesDisponibles } from "@/hooks/useCoursesDisponibles";
 import EcoMissionCard from "@/components/livreur/EcoMissionCard";
 import { isEcoDeliveryCourse } from "@/lib/availableCourseOffers";
+import { displayedPriceQuote } from '../../../base44/shared/coursePriceQuote.js';
+import { searchAttempt } from '../../../base44/shared/courseSearchActivity.js';
 // Correction 2: AcceptConfirmationModal supprimé — acceptation en un seul clic
 
 function calculerDistance(lat1, lng1, lat2, lng2) {
@@ -51,6 +53,7 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
   // inFlight : course_ids dont l'appel est en cours (anti-concurrence)
   const vueSeenRef = useRef(new Set());
   const vueInFlightRef = useRef(new Set());
+  const feedRef = useRef(null);
 
   const livreurId = livreurProfil?.id;
   const livreurLat = livreurProfil?.latitude;
@@ -64,35 +67,30 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
   // Le backend reste idempotent (already_viewed: true) comme sécurité finale.
   // Le Set est VOLATILE : perdu au unmount → un appel post-remount est un no-op backend.
   useEffect(() => {
-    if (!livreurId || courses.length === 0) return;
+    if (!livreurId || !feedRef.current || typeof IntersectionObserver === 'undefined') return;
     const seen = vueSeenRef.current;
     const inFlight = vueInFlightRef.current;
-
-    for (const course of courses) {
-      const cid = course.id;
-      if (!cid) continue;
-      // Déjà marqué vue → skip
-      if (seen.has(cid)) continue;
-      // Appel déjà en cours pour cette course → anti-concurrence
-      if (inFlight.has(cid)) continue;
-
-      inFlight.add(cid);
-      base44.functions
-        .invoke("dispatchExterneAuto", {
-          action: "marquer_vue_course",
-          course_id: cid,
-        })
-        .then(() => {
-          // Succès → marquer comme vue définitivement pour cette session
-          seen.add(cid);
-        })
-        .catch(() => {
-          // Échec → ne PAS ajouter à seen : un prochain refetch pourra réessayer
-        })
-        .finally(() => {
-          inFlight.delete(cid);
-        });
-    }
+    const timers = new Map();
+    const observer = new IntersectionObserver(entries => {
+      for (const entry of entries) {
+        const element = entry.target, id = element.getAttribute('data-search-course'), attempt = element.getAttribute('data-search-attempt');
+        const key = `${id}:${attempt}`;
+        if (!entry.isIntersecting || entry.intersectionRatio < 0.5) { clearTimeout(timers.get(element)); timers.delete(element); continue; }
+        if (seen.has(key) || inFlight.has(key) || timers.has(element)) continue;
+        timers.set(element, setTimeout(() => {
+          timers.delete(element);
+          if (document.visibilityState !== 'visible' || seen.has(key) || inFlight.has(key)) return;
+          inFlight.add(key);
+          // One observation per visible offer attempt, not one per feed fetch.
+          base44.functions.invoke('courseSearchActivity', { action: 'view', course_id: id, attempt })
+            .then(raw => { if ((raw?.data ?? raw)?.success === true) { seen.add(key); return base44.functions.invoke('dispatchExterneAuto', { action: 'marquer_vue_course', course_id: id }); } })
+            .catch(() => { /* Missing measurements are reported as partial, never inferred from pushes. */ })
+            .finally(() => inFlight.delete(key));
+        }, 1000));
+      }
+    }, { threshold: 0.5 });
+    feedRef.current.querySelectorAll('[data-search-course]').forEach(el => observer.observe(el));
+    return () => { observer.disconnect(); for (const timer of timers.values()) clearTimeout(timer); };
   }, [courses, livreurId]);
 
   // Realtime invalidation is shared by the feed hook's mounted observers.
@@ -156,6 +154,7 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
     try {
       const res = await base44.functions.invoke("dispatchExterneAuto", {
         action: "accepter_course_v2",
+        ...displayedPriceQuote(course, getPrixAffichable(course)),
         course_id: course.id,
         livreur_id: livreurId,
       });
@@ -195,6 +194,7 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
         course_id: course.id,
         livreur_id: livreurId,
         raison: "Refusé depuis Courses disponibles",
+        search_attempt: searchAttempt(course),
       });
       const data = res?.data ?? res;
       if (data?.success !== true) {
@@ -255,7 +255,7 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
   }
 
   return (
-    <div className="space-y-3 rounded-lg bg-muted p-3">
+    <div ref={feedRef} className="space-y-3 rounded-lg bg-muted p-3">
       {locationRefreshRequired && <p role="status" className="text-sm text-foreground">Actualisez votre position GPS pour voir les offres des villes activées.</p>}
       <div className="flex items-center justify-between px-1 py-0.5">
         <div>
@@ -290,6 +290,8 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
         return (
         <div
           key={course.id}
+          data-search-course={course.id}
+          data-search-attempt={searchAttempt(course)}
           className="overflow-hidden rounded-lg border border-border bg-card shadow-[0_8px_22px_rgba(15,23,42,0.07)]"
         >
           <div className="p-4">

@@ -15,6 +15,7 @@ export default function LivreurCardModerne({ course, onCall, onMessage, onTrack,
 
   // Fetch full livreur entity + stats
   useEffect(() => {
+    if (course.private_guest) { setLivreur(null); setStats(null); return; }
     if (publicView || !course.livreur_id) return;
     let active = true;
     const fetchData = async () => {
@@ -45,7 +46,7 @@ export default function LivreurCardModerne({ course, onCall, onMessage, onTrack,
     };
     fetchData();
     return () => { active = false; };
-  }, [course.livreur_id, publicView]);
+  }, [course.livreur_id, course.private_guest, publicView]);
 
   // Ancienneté
   const anciennete = livreur?.created_date

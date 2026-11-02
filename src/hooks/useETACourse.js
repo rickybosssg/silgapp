@@ -39,6 +39,7 @@ function dureeDepuis(isoDate) {
  * @param {string} params.countryCode
  * @param {string} params.livreurId
  * @param {string} params.livreurLastUpdate - ISO date de derniere_position_date
+ * @param {boolean} [params.allowRouteRequest]
  * @returns {{ etaMinutes, distanceKm, isRoadBased, isStale, staleLabel, lastUpdate, phase }}
  */
 export function useETACourse({
@@ -51,6 +52,7 @@ export function useETACourse({
   countryCode,
   livreurId,
   livreurLastUpdate,
+  allowRouteRequest = true,
 }) {
   const [eta, setEta] = useState(null);
   const [distanceKm, setDistanceKm] = useState(null);
@@ -113,7 +115,7 @@ export function useETACourse({
     }
 
     // ── Appel ORS (si coords valides) ──
-    if (courseId || (fromLat && toLat)) {
+    if (allowRouteRequest && (courseId || (fromLat && toLat))) {
       try {
         const { base44 } = await import("@/api/base44Client");
         const res = await base44.functions.invoke("getRouteORS", {
@@ -154,7 +156,7 @@ export function useETACourse({
     setEta(mins);
     setDistanceKm(dist);
     setIsRoadBased(false);
-  }, [courseId, phase, fromLat, fromLng, toLat, toLng, countryCode, livreurId, isStaleWarn, isStaleCritical]);
+  }, [courseId, phase, fromLat, fromLng, toLat, toLng, countryCode, livreurId, isStaleWarn, isStaleCritical, allowRouteRequest]);
 
   // Recalculer quand les inputs changent
   useEffect(() => {

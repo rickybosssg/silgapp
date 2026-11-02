@@ -1,8 +1,12 @@
-import React, { useState } from "react";
-import { Search, X, AlertCircle, MapPin } from "lucide-react";
+import React, { useRef, useState } from "react";
+import { X, AlertCircle, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
+import { normalizeCourseFunctionResult } from '@/lib/courseFunctionResult';
+import ClientDecisionNotice from './ClientDecisionNotice';
+import ClientRelaunchActions from './ClientRelaunchActions';
+import { clientDecisionView } from '../../../base44/shared/clientDecisionView.js';
 
 /**
  * Modale affichée au client quand un livreur a annulé une course qu'il avait acceptée.
@@ -14,20 +18,23 @@ import { toast } from "sonner";
  * Elle est persistante : survit aux fermetures/rouvertures de l'app tant que
  * course.client_decision_attendue === true.
  */
-export default function LivreurAnnulationDecisionModal({ course, onDecided }) {
+export default function LivreurAnnulationDecisionModal({ course, onDecided, guestActions = null, onClose = null }) {
   const [loading, setLoading] = useState(false);
+  const pending = useRef(false);
 
-  if (!course || !course.client_decision_attendue) return null;
-
-  const motif = course.livreur_annulation_motif || "Motif non spécifié";
+  if (!clientDecisionView(course).waiting) return null;
 
   const handleDecide = async (action) => {
+    if (pending.current) return;
+    if (!guestActions && action === 'terminer_course' && !window.confirm('Confirmer l’annulation de cette course ?')) return;
+    pending.current = true;
     setLoading(true);
     try {
-      const res = await base44.functions.invoke("deciderApresAnnulationLivreur", {
+      const raw = guestActions ? await guestActions.cancel() : await base44.functions.invoke("deciderApresAnnulationLivreur", {
         course_id: course.id,
         action,
       });
+      const res = normalizeCourseFunctionResult(raw);
 
       if (res?.success) {
         toast.success(
@@ -46,6 +53,7 @@ export default function LivreurAnnulationDecisionModal({ course, onDecided }) {
       toast.error("Erreur réseau lors de la décision");
       console.error("[LivreurAnnulationDecisionModal]", err);
     } finally {
+      pending.current = false;
       setLoading(false);
     }
   };
@@ -55,7 +63,7 @@ export default function LivreurAnnulationDecisionModal({ course, onDecided }) {
       className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-4"
       style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(6px)" }}
     >
-      <div className="w-full max-w-sm bg-white rounded-3xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-300">
+      <div className="w-full max-w-sm max-h-[calc(100dvh-2rem)] bg-white rounded-3xl shadow-2xl overflow-y-auto animate-in slide-in-from-bottom duration-300">
 
         {/* Header coloré */}
         <div className="bg-gradient-to-r from-red-500 to-orange-500 px-6 pt-8 pb-6 text-center">
@@ -63,19 +71,16 @@ export default function LivreurAnnulationDecisionModal({ course, onDecided }) {
             <AlertCircle className="w-8 h-8 text-white" />
           </div>
           <h2 className="text-xl font-black text-white leading-tight">
-            Votre livreur a annulé la course
+            Votre course est en attente
           </h2>
           <p className="text-white/85 text-sm mt-1">
-            Votre livreur ne pourra plus effectuer cette livraison.
+            Choisissez la suite à donner à votre commande.
           </p>
         </div>
 
         {/* Motif */}
         <div className="px-6 py-4 border-b border-gray-100">
-          <div className="bg-red-50 rounded-xl p-3">
-            <p className="text-xs text-red-400 font-semibold mb-1">Motif</p>
-            <p className="text-sm text-gray-800 font-medium leading-relaxed">{motif}</p>
-          </div>
+          <ClientDecisionNotice course={course} />
         </div>
 
         {/* Détails course */}
@@ -94,14 +99,11 @@ export default function LivreurAnnulationDecisionModal({ course, onDecided }) {
             Que souhaitez-vous faire ?
           </p>
 
-          <Button
-            disabled={loading}
-            onClick={() => handleDecide("chercher_autre_livreur")}
-            className="w-full h-14 rounded-2xl bg-gradient-to-r from-primary to-red-600 text-white font-black text-base shadow-lg shadow-red-200 active:scale-95 transition-all flex items-center justify-center gap-3"
-          >
-            <Search className="w-5 h-5" />
-            Chercher un autre livreur
-          </Button>
+          <ClientRelaunchActions identity={guestActions?.identity || course.id} disabled={loading}
+            context={guestActions?.context || null}
+            readContext={guestActions ? null : () => base44.functions.invoke('relaunchClientCourse', { action: 'context', course_id: course.id })}
+            execute={guestActions ? guestActions.relaunch : input => base44.functions.invoke('relaunchClientCourse', { ...input, course_id: course.id })}
+            onConfirmed={() => { toast.success('Decision confirmee. Actualisation du suivi.'); onDecided?.('chercher_autre_livreur'); }} />
 
           <Button
             disabled={loading}
@@ -110,8 +112,9 @@ export default function LivreurAnnulationDecisionModal({ course, onDecided }) {
             className="w-full h-12 rounded-2xl border-2 border-gray-200 text-gray-600 font-bold text-sm active:scale-95 transition-all flex items-center justify-center gap-2 hover:bg-gray-50"
           >
             <X className="w-4 h-4" />
-            Terminer la course
+            Annuler la course
           </Button>
+          {onClose && <button type="button" className="w-full min-h-11 text-sm" disabled={loading} onClick={onClose}>Revenir au suivi</button>}
         </div>
 
         <p className="text-center text-xs text-gray-400 pb-5 px-6">

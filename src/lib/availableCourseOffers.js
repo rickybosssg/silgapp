@@ -1,11 +1,15 @@
 // Presentation only: CourseExterne owns delivery mode and money.
-const TERMINAL = new Set(['livree', 'annulee', 'completed', 'delivered', 'canceled']);
+const TERMINAL = new Set(['livree', 'annulee', 'terminee', 'completed', 'delivered', 'canceled', 'cancelled']);
+const terminal = course => TERMINAL.has(course?.statut) || !!course?.annulation_user_id;
 const enterprise = value => value == null || value === '' ? null : String(value).trim();
 export const isEcoDeliveryCourse = course => String(course?.delivery_mode || '').toLowerCase() === 'eco';
 const modifiedAt = record => Date.parse(record?.updated_date || record?.created_date || '') || 0;
 function currentRecord(visible, member) {
   if (!visible) return member;
   if (!member) return visible;
+  // A terminal observation cannot be undone by another feed/mission snapshot.
+  if (terminal(visible)) return visible;
+  if (terminal(member)) return member;
   const a = modifiedAt(visible), b = modifiedAt(member);
   if (a !== b) return a > b ? visible : member;
   // Keep an explicit Standard observation when conflicting versions are unknown.
@@ -20,6 +24,7 @@ export function selectAvailableCourseOffers({ courses = [], missions = [], count
       enterprise(course.enterprise_id) === enterprise(enterpriseId) && !blocked.has(course.id)) {
     byId.set(course.id, currentRecord(byId.get(course.id), course));
   }
+  const terminalIds = new Set([...byId.values()].filter(terminal).map(course => course.id));
   const missionById = new Map();
   for (const mission of missions) if (mission?.id) {
     const previous = missionById.get(mission.id);
@@ -33,8 +38,9 @@ export function selectAvailableCourseOffers({ courses = [], missions = [], count
     for (const member of mission.__available_courses || []) {
       if (!byId.has(member.id)) continue;
       const course = currentRecord(byId.get(member.id), member);
+      if (terminal(course)) terminalIds.add(course.id);
       if (course.country_code !== countryCode || enterprise(course.enterprise_id) !== enterprise(enterpriseId) ||
-          TERMINAL.has(course.statut) || course.livreur_id || course.accepted_by_livreur_id ||
+          terminal(course) || course.livreur_id || course.accepted_by_livreur_id ||
           (!isEcoDeliveryCourse(course) && (course.statut !== 'recherche_livreur' ||
             !['disponible_push', 'propose'].includes(course.dispatch_status)))) byId.delete(member.id);
       else byId.set(member.id, course);
@@ -45,18 +51,19 @@ export function selectAvailableCourseOffers({ courses = [], missions = [], count
     if (mission.status !== 'available' || mission.livreur_id || mission.country_code !== countryCode ||
         enterprise(mission.enterprise_id) !== null || !Array.isArray(mission.course_ids)) continue;
     const ids = mission.course_ids;
-    if (ids.length < 2 || new Set(ids).size !== ids.length || ids.some(id => !id || used.has(id) || blocked.has(id))) continue;
+    if (ids.length < 2 || new Set(ids).size !== ids.length || ids.some(id => !id || used.has(id) || blocked.has(id) || terminalIds.has(id))) continue;
     const linked = new Map((mission.__available_courses || []).map(course => [course.id, course]));
     const members = ids.map(id => currentRecord(byId.get(id), linked.get(id)));
     if (!members.every(course => course && isEcoDeliveryCourse(course) &&
         course.country_code === countryCode && enterprise(course.enterprise_id) === null &&
         course.eco_mission_id === mission.id && course.eco_status === 'grouped' &&
-        course.dispatch_status === 'en_attente' && !TERMINAL.has(course.statut) &&
+        course.dispatch_status === 'en_attente' && !terminal(course) &&
         !course.livreur_id && !course.accepted_by_livreur_id)) continue;
     ids.forEach(id => used.add(id));
     availableMissions.push({ ...mission, __available_courses: members });
   }
-  const individualCourses = [...byId.values()].filter(course => !used.has(course.id));
+  const individualCourses = [...byId.values()].filter(course => !used.has(course.id) &&
+    !terminal(course) && !course.livreur_id && !course.accepted_by_livreur_id);
   const offers = [
     ...individualCourses.map(course => ({ id: 'course:' + course.id, kind: 'course', courses: [course] })),
     ...availableMissions.map(mission => ({ id: 'mission:' + mission.id, kind: 'eco_mission', courses: mission.__available_courses })),

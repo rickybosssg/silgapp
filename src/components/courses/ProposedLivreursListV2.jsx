@@ -143,7 +143,8 @@ export default function ProposedLivreursListV2({ course }) {
 
   const acceptedId = course.livreur_id || course.accepted_by_livreur_id;
   const dispatchStatus = course?.dispatch_status;
-  const isTerminal = course?.statut === "annulee" || course?.statut === "livree";
+  const isCancelled = course?.statut === "annulee" || !!course?.annulation_user_id;
+  const isTerminal = isCancelled || course?.statut === "livree" || course?.statut === "terminee";
   const isExpiredPublication = isExpired && !isTerminal && !acceptedId && dispatchStatus !== "accepte" &&
     course.client_decision_attendue !== true && (dispatchStatus === "disponible_push" || dispatchStatus === "propose");
   const isDiffusing = !isExpiredPublication && !isTerminal && !acceptedId && course.client_decision_attendue !== true &&
@@ -160,6 +161,7 @@ export default function ProposedLivreursListV2({ course }) {
 
   // ── Assignation manuelle forcée ──
   const handleForceAssign = async (livreur) => {
+    if (isTerminal || assigningId) return;
     setAssigningId(livreur.id);
     try {
       const result = await base44.functions.invoke("assignerLivreurAdmin", {
@@ -196,7 +198,7 @@ export default function ProposedLivreursListV2({ course }) {
       <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-3">
         <p className="text-xs text-emerald-600 font-semibold flex items-center gap-1.5">
           <Users className="w-3.5 h-3.5 animate-pulse" />
-          Chargement du suivi...
+          {isTerminal ? "Chargement de l'historique..." : "Chargement de la diffusion..."}
         </p>
       </div>
     );
@@ -208,11 +210,11 @@ export default function ProposedLivreursListV2({ course }) {
       <div className="flex items-center justify-between">
         <p className="text-xs font-bold text-emerald-700 uppercase tracking-wider flex items-center gap-1.5">
           <Wifi className="w-3.5 h-3.5" />
-          {dispatchLabel}
+          {isTerminal ? "Historique de diffusion" : dispatchLabel}
         </p>
-        <span className="text-xs font-bold text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">
+        {!isTerminal && <span className="text-xs font-bold text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">
           {eligibleCount} disponibles récents
-        </span>
+        </span>}
       </div>
 
       {/* ── Stats temps réel ── */}
@@ -331,7 +333,7 @@ export default function ProposedLivreursListV2({ course }) {
         <div className="flex items-center gap-1.5 px-2.5 py-2.5 rounded-lg bg-gray-50 border border-gray-200">
           <XCircle className="w-4 h-4 text-gray-400" />
           <span className="text-xs font-bold text-gray-500">
-            Dispatch arrêté — course {course?.statut === "annulee" ? "annulée" : "livrée"}
+            Dispatch arrêté — course {isCancelled ? "annulée" : "terminée"}
           </span>
         </div>
       )}
@@ -343,7 +345,10 @@ export default function ProposedLivreursListV2({ course }) {
             <Eye className="w-3 h-3" />
             Activité ({allInteractedLivreurs.length})
           </p>
-          {(() => {
+          {isTerminal && <ul className="text-xs text-gray-600 space-y-1">
+            {allInteractedLivreurs.map(l => <li key={l.id}>{l.prenom} {l.nom} — {l._statut}</li>)}
+          </ul>}
+          {!isTerminal && (() => {
             const selectedLivreur = allInteractedLivreurs.find(l => l.id === selectedAssignId);
             const isAcceptedSelected = selectedLivreur && acceptedId && String(selectedLivreur.id) === String(acceptedId);
             return (

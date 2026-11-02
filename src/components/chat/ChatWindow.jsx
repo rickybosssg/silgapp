@@ -20,7 +20,7 @@ export default function ChatWindow(props) {
   return <CourseChatWindow key={`${props.courseId ? "course" : "conversation"}:${props.courseId || props.conversationId}:${props.senderType}:${props.senderId}`} {...props} />;
 }
 
-function CourseChatWindow({ courseId, conversationId, senderType, senderId, senderName, compact = false, contextInfo = null, fullHeight = false }) {
+function CourseChatWindow({ courseId, conversationId, senderType, senderId, senderName, compact = false, contextInfo = null, fullHeight = false, transport = null }) {
   const scopeId = courseId || conversationId;
   const scopeField = courseId ? "course_id" : "conversation_id";
   const [messages, setMessages] = useState([]);
@@ -39,31 +39,41 @@ function CourseChatWindow({ courseId, conversationId, senderType, senderId, send
   const [loadingOlder, setLoadingOlder] = useState(false);
   const olderScrollRef = useRef(null);
   const initializedRef = useRef(false);
+  const [transportError, setTransportError] = useState('');
+  const [readError, setReadError] = useState('');
+  const readPending = useRef(false);
+  const readRevision = useRef(0);
+  const retryAt = useRef(0);
+  const pendingMessage = useRef(null);
+  useEffect(() => { readRevision.current++; setMessages([]); knownIdsRef.current.clear(); pendingMessage.current = null; setTransportError(''); }, [courseId]);
 
   // ── Refetch réutilisable : charge les messages depuis la DB et fusionne avec l'état courant ──
   // Utilisé par : chargement initial, polling 5s, refetch foreground, refetch sur push.
   // La déduplication via getMessageKey garantit zéro doublon ni scintillement.
   const refetchMessages = useCallback(async () => {
     if (!scopeId) return;
+    if (transport && (readPending.current || Date.now() < retryAt.current)) return;
+    const revision = readRevision.current;
+    if (transport) readPending.current = true;
     try {
-      const msgs = await base44.entities.Message.filter({ [scopeField]: scopeId }, "-created_date", 100);
-      if (!initializedRef.current) {
-        setHasOlder(msgs.length === 100);
-        initializedRef.current = true;
-      }
+      const msgs = transport ? await transport.read() : await base44.entities.Message.filter({ [scopeField]: scopeId }, "-created_date", 100);
+      if (!transport && !initializedRef.current) { setHasOlder(msgs.length === 100); initializedRef.current = true; }
       const list = dedupeAndSortMessages(msgs || []);
-      const profiles = await buildSenderProfiles(base44, list);
+      const profiles = transport ? new Map() : await buildSenderProfiles(base44, list);
       const enriched = enrichMessagesWithProfiles(list, profiles);
+      if (revision !== readRevision.current) return;
+      if (transport) setReadError('');
       enriched.forEach(m => knownIdsRef.current.add(getMessageKey(m)));
       setMessages(prev => dedupeAndSortMessages([...prev, ...enriched]));
       if (document.visibilityState === 'visible' && list.length) {
         markChatRead(senderType, senderId, `${scopeField}:${scopeId}`, list[list.length - 1].created_date);
       }
-    } catch (_) {}
-  }, [scopeId, scopeField, senderType, senderId]);
+    } catch (e) { if (transport && revision === readRevision.current) { retryAt.current = Date.now() + Math.max(10000, e.retryAfterMs || 0); setReadError(e.message || 'Lecture indisponible.'); } }
+    finally { if (transport) readPending.current = false; }
+  }, [scopeId, scopeField, senderType, senderId, transport]);
 
   const loadOlder = async () => {
-    if (loadingOlder || !scopeId) return;
+    if (transport || loadingOlder || !scopeId) return;
     setLoadingOlder(true);
     try {
       const rows = await base44.entities.Message.filter({ [scopeField]: scopeId }, "-created_date", 100, messages.length);
@@ -88,7 +98,7 @@ function CourseChatWindow({ courseId, conversationId, senderType, senderId, send
 
   // Subscription temps réel + son notification (WebSocket = instantané)
   useEffect(() => {
-    if (!scopeId || !open) return;
+    if (!scopeId || !open || transport) return;
     const unsub = base44.entities.Message.subscribe((event) => {
       if (event.type === "create" && event.data?.[scopeField] === scopeId) {
         // Anti-doublon : vérifier le ref
@@ -106,7 +116,7 @@ function CourseChatWindow({ courseId, conversationId, senderType, senderId, send
       }
     });
     return () => unsub?.();
-  }, [scopeId, scopeField, open, senderType, senderId]);
+  }, [scopeId, scopeField, open, senderType, senderId, transport]);
 
   // ── Polling de sécurité 5s + refetch foreground + refetch sur push ──
   // Architecture : WebSocket (instantané) + polling 5s (filet) + foreground (resync) + push (rattrapage)
@@ -119,7 +129,7 @@ function CourseChatWindow({ courseId, conversationId, senderType, senderId, send
 
     const startPolling = () => {
       if (intervalId) return;
-      intervalId = setInterval(refetchMessages, 5000);
+      intervalId = setInterval(refetchMessages, transport ? 10000 : 5000);
     };
 
     const stopPolling = () => {
@@ -164,7 +174,7 @@ function CourseChatWindow({ courseId, conversationId, senderType, senderId, send
       window.removeEventListener("silgapp:chat_refetch", handlePushRefetch);
       stopPolling();
     };
-  }, [scopeId, scopeField, open, refetchMessages]);
+  }, [scopeId, scopeField, open, refetchMessages, transport]);
 
   // ── Correction scroll : scrollTop sur le conteneur du chat uniquement,
   //    JAMAIS scrollIntoView (qui fait défiler toute la page).
@@ -185,6 +195,16 @@ function CourseChatWindow({ courseId, conversationId, senderType, senderId, send
     sendingRef.current = true;
     setSending(true);
     try {
+      if (transport) {
+        const content = msgData.content;
+        if (pendingMessage.current && pendingMessage.current.content !== content) throw Error('Un envoi reste incertain. Vérifiez la conversation avant de modifier ce message.');
+        pendingMessage.current ||= { message_id: crypto.randomUUID(), content };
+        const result = await transport.send(pendingMessage.current);
+        if (!result?.message?.id) throw Error('Envoi non confirmé.');
+        setMessages(prev => mergeMessageList(prev, result.message));
+        pendingMessage.current = null; setInput(''); setTransportError('');
+        return true;
+      }
       const signature = JSON.stringify(msgData);
       if (pendingSendRef.current?.signature !== signature) {
         pendingSendRef.current = { signature, id: msgData.client_message_id || buildClientMessageId(scopeId, senderType, senderId) };
@@ -211,7 +231,7 @@ function CourseChatWindow({ courseId, conversationId, senderType, senderId, send
       pendingSendRef.current = null;
       return true;
     } catch (err) {
-      console.error("Erreur envoi message:", err);
+      if (transport) setTransportError(err.message || "Envoi non confirmé.");
       toast.error(err?.response?.data?.error || err?.message || "Message non envoyé");
       return false;
     } finally {
@@ -297,6 +317,8 @@ function CourseChatWindow({ courseId, conversationId, senderType, senderId, send
       </div>
 
       {/* Messages */}
+      {readError && <p role="alert" className="p-3 text-sm text-amber-100 bg-amber-950">{readError}</p>}
+      {transportError && <p role="alert" className="p-3 text-sm text-amber-100 bg-amber-950">{transportError}</p>}
       <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-3 bg-[#16191d]"
         onScroll={event => { const node = event.currentTarget;
           followLatestRef.current = node.scrollHeight - node.clientHeight - node.scrollTop < 80; }}>
@@ -328,17 +350,17 @@ function CourseChatWindow({ courseId, conversationId, senderType, senderId, send
         <RotateCcw className="w-4 h-4" /> Réessayer l'envoi du fichier
       </button>}
       <div className="p-2.5 bg-[#1f2429] border-t border-white/8 flex items-end gap-1.5 safe-area-bottom">
-        <AudioRecorder
+        {!transport && <AudioRecorder
           onSend={handleAudioSend}
           disabled={sending || uploadingPhoto}
           senderName={senderName}
-        />
-        <label className="cursor-pointer flex-shrink-0">
+        />}
+        {!transport && <label className="cursor-pointer flex-shrink-0">
           <input type="file" accept="image/*,video/*" onChange={handlePhotoSend} className="hidden" disabled={sending || uploadingPhoto || !!pendingMedia} />
           <div className="h-10 w-10 rounded-full flex items-center justify-center text-white/50 hover:text-[#00a86b] hover:bg-white/10 transition-colors">
             {uploadingPhoto ? <Loader2 className="w-5 h-5 animate-spin" /> : <ImagePlus className="w-5 h-5" />}
           </div>
-        </label>
+        </label>}
         <textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -350,6 +372,7 @@ function CourseChatWindow({ courseId, conversationId, senderType, senderId, send
         />
         <Button
           onClick={handleSend}
+          aria-label="Envoyer"
           disabled={sending || !input.trim()}
           className="h-11 w-11 sm:w-auto sm:min-w-[92px] rounded-full sm:rounded-xl bg-[#00a86b] hover:bg-[#00a86b]/90 shadow-md flex-shrink-0 disabled:opacity-60 gap-2 px-0 sm:px-4 font-black text-white"
         >

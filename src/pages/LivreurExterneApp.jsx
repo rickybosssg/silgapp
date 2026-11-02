@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
+import { displayedPriceQuote } from '../../base44/shared/coursePriceQuote.js';
 import { reconcilePickupRows, newestCourseRows } from '@/lib/confirmedPickupView';
 import { finaliserLivraisonSafe } from '@/lib/safeDeliveryFinalization';
 import { readLivreurCoursesResponse } from '@/lib/courseFunctionResult';
@@ -1280,8 +1281,10 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     if (fallbackAcceptingRef.current) return;
     fallbackAcceptingRef.current = true;
     try {
+      /** @type {{action: string, course_id: string, livreur_id: string, observed_price: number, observed_price_revision: number, pricing_mode?: string, manual_price?: number}} */
       let payload = {
         action: "accepter_course",
+        ...displayedPriceQuote(course),
         course_id: course.id,
         livreur_id: livreurProfil.id,
       };
