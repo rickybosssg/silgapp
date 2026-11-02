@@ -1,5 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.54';
 import { createGuestOrdersService } from '../../shared/guestOrders.js';
+import { relaunchClientCourse } from '../../shared/clientRelaunch.js';
+import { relaunchDependencies } from '../../shared/clientRelaunchDispatch.ts';
 import { createGuestStore } from '../../shared/guestOrderStore.js';
 import { failGuest, isGuestCourse, guestCanCancel } from '../../shared/guestOrderPolicy.js';
 import { cancelCourseTerminal, expireCancelledCourseOffers, updateActiveCourse } from '../../shared/courseTerminalGuard.ts';
@@ -39,6 +41,7 @@ export default async function(req: Request): Promise<Response> {
     };
     const service = createGuestOrdersService({
       store: createGuestStore(api), entities, publish, reference: genererReferenceCourse,
+      relaunch: (course: any, input: any) => relaunchClientCourse(relaunchDependencies(api), course, input),
       cancel: async (course: any, actor: string) => {
         const result = await cancelCourseTerminal(api, course.id, actor, 'client', (fresh: any) => {
           if (!isGuestCourse(fresh) || fresh.request_id !== course.request_id || fresh.country_code !== course.country_code || fresh.enterprise_id || !guestCanCancel(fresh)) failGuest('INCIDENT_ADMIN', 'Course modifiée : contactez le support.', 409);
