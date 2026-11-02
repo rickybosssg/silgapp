@@ -1,3 +1,5 @@
+import { readSearchActivity } from './courseSearchActivity.js';
+import { canEditSearchPrice } from './clientRelaunch.js';
 import {
   GUEST_PREFIX, GUEST_CAPACITY, GUEST_ACCESS_MS, validSecret, validRequest, sha256,
   failGuest, guestCreationEnabled, parseGuestLedger, guestAdminScope, guestSuperAdmin,
@@ -66,6 +68,10 @@ export function createGuestOrdersService(deps) {
   }
   async function view(entry, course) {
     const dto = guestCourseView(course, entry.currency);
+    dto.search_activity = null;
+    if (canEditSearchPrice(course) && entities.CourseSearchActivity) {
+      try { dto.search_activity = await readSearchActivity(entities, course); } catch { /* Keep unavailable distinct from zero. */ }
+    }
     let driverPosition = null;
     if (course.livreur_id && !['livree', 'annulee', 'terminee'].includes(course.statut) && entities.Livreur?.get) {
       try { driverPosition = guestDriverPosition(await entities.Livreur.get(course.livreur_id), course, now()); }
