@@ -225,7 +225,8 @@ export default async function(req) {
     if (action === 'accepter_course_v2') {
       const { pricing_mode, manual_price, override_pricing_mode } = body;
       const result = await withAuthRetry(req, 'accepterCourseV2', (b44: any) =>
-        accepterCourseV2(b44, course_id, livreur_id, { pricing_mode, manual_price, override_pricing_mode })
+        accepterCourseV2(b44, course_id, livreur_id, { pricing_mode, manual_price, override_pricing_mode,
+          ...(Object.hasOwn(body, 'observed_price') ? { observed_price: body.observed_price, observed_price_revision: body.observed_price_revision } : {}) })
       );
       return Response.json(result);
     }
@@ -430,6 +431,10 @@ export default async function(req) {
       const countryGuard = await verifierPaysCourseLivreur(base44, course, livreur_id, 'accepter_course');
       if (!countryGuard.ok) return Response.json(countryGuard.response, { status: countryGuard.status });
       const livreur = countryGuard.livreur;
+
+      const { acceptancePriceGuard } = await import('../../shared/coursePriceQuote.js');
+      const priceGuard = acceptancePriceGuard(course, body);
+      if (!priceGuard.ok) return Response.json(priceGuard);
 
       // [ENTERPRISE] Vérification backend : course.enterprise_id === livreur.enterprise_id
       const courseEntId = normalizeEnterpriseId(course.enterprise_id);
@@ -664,10 +669,14 @@ export default async function(req) {
       // la course QUE si dispatch_status est toujours 'propose' ou 'disponible_push'.
       // ⚠️ Ne pas filtrer livreur_id avec une chaîne vide : Base44 stocke aussi l'absence
       // de livreur avec null, ce qui empêchait toute acceptation de ces courses.
-      await base44.asServiceRole.entities.CourseExterne.updateMany(
-        { id: course_id, dispatch_status: { $in: ['propose', 'disponible_push'] } },
-        { $set: updateData }
+      const acceptanceClaim = await base44.asServiceRole.entities.CourseExterne.updateMany(
+        { id: course_id, updated_date: course.updated_date, statut: { $nin: ['annulee', 'livree', 'terminee'] },
+          annulation_user_id: { $in: [null, ''] }, client_decision_attendue: { $ne: true },
+          dispatch_status: { $in: ['propose', 'disponible_push'] }, livreur_id: { $in: [null, ''] },
+          accepted_by_livreur_id: { $in: [null, ''] }, ...priceGuard.filter },
+        { $set: { ...updateData, ...(!isManual ? priceGuard.patch : {}) } }
       );
+      if (Number(acceptanceClaim?.updated) !== 1) return Response.json({ success: false, accepted: false, reason: 'concurrent_update', error: 'La course a change. Actualisez puis confirmez le prix affiche.' }, { status: 409 });
 
       // ✅ Vérification post-update : confirmer que CE livreur détient bien le verrou
       const courseVerifie = await base44.asServiceRole.entities.CourseExterne.get(course_id);
@@ -917,8 +926,22 @@ export default async function(req) {
     // ─── 7. Valider le prix manuel côté client ────────────────────────────
     if (action === 'valider_prix_manuel') {
       const { accepted } = body;
+      const user = await base44.auth.me();
       const course = await base44.asServiceRole.entities.CourseExterne.get(course_id);
       if (!course) return Response.json({ error: 'Course introuvable' }, { status: 404 });
+      const { authorizeCourseOwnerWrite, updateOwnedCourse } = await import('../../shared/courseOwnerWrite.js');
+      await authorizeCourseOwnerWrite(base44.asServiceRole.entities, user, course);
+      if (typeof accepted !== 'boolean' || course.annulation_user_id ||
+          ['annulee', 'livree', 'terminee'].includes(course.statut) || course.heure_recuperation ||
+          course.pickup_confirmed_at || course.encours_comptabilise_at ||
+          course.manual_price_status !== 'pending_client_validation' || course.dispatch_status !== 'propose' ||
+          !course.proposed_by_livreur_id || course.livreur_id !== course.proposed_by_livreur_id ||
+          !Number.isFinite(Number(course.manual_price)) || Number(course.manual_price) <= 0) {
+        return Response.json({ success: false, error: 'Proposition incompatible. Actualisez la course.' }, { status: 409 });
+      }
+      const proposalFilter = { statut: course.statut, dispatch_status: 'propose', manual_price_status: 'pending_client_validation',
+        manual_price: course.manual_price, proposed_by_livreur_id: course.proposed_by_livreur_id,
+        livreur_id: course.livreur_id, annulation_user_id: { $in: [null, ''] } };
 
       const now = new Date().toISOString();
 
@@ -957,12 +980,14 @@ export default async function(req) {
         const commission = Math.round(prixManuel * (commissionPct / 100));
         const montantLivreur = prixManuel - commission;
 
-        const updated = await base44.asServiceRole.entities.CourseExterne.update(course_id, {
+        await updateOwnedCourse(base44.asServiceRole.entities, user, course, {
           manual_price_status: 'accepted', client_price_validated_at: now,
           statut: 'livreur_en_route', dispatch_status: 'accepte', heure_acceptation: acceptanceTime,
           prix_final: prixManuel, commission_silga: commission, montant_livreur: montantLivreur,
           ...lockFields, ...zeroCommissionFields(lockedCourse),
-        });
+          accepted_price: prixManuel, accepted_price_revision: Number(course.client_price_revision || 0),
+        }, proposalFilter);
+        const updated = await base44.asServiceRole.entities.CourseExterne.get(course_id);
         if (avantage) verifierCoherenceLock(updated, avantage);
 
         if (course.proposed_by_livreur_id) {
@@ -992,12 +1017,13 @@ export default async function(req) {
       } else {
         const livreurRefuseId = course.proposed_by_livreur_id;
 
-        await base44.asServiceRole.entities.CourseExterne.update(course_id, {
+        await updateOwnedCourse(base44.asServiceRole.entities, user, course, {
           manual_price_status: 'refused', client_price_refused_at: now,
           statut: 'recherche_livreur', dispatch_status: 'en_attente',
           livreur_id: '', livreur_nom: '', livreur_telephone: '',
           pricing_mode: 'automatic', manual_price: null, proposed_by_livreur_id: '',
-        });
+          accepted_by_livreur_id: '', accepted_at: null,
+        }, proposalFilter);
 
         if (livreurRefuseId) {
           await base44.asServiceRole.entities.Livreur.update(livreurRefuseId, { statut: 'disponible' });
@@ -1177,6 +1203,7 @@ export default async function(req) {
 
     return Response.json({ error: 'Action inconnue' }, { status: 400 });
   } catch (error) {
+    if (error?.course_write_public) return Response.json({ success: false, error: error.message }, { status: error.status });
     const isInfraError = isTransientInfrastructureError(error);
     const isAuthError = error.message?.includes(AUTH_ERROR_SIGNATURE);
     // 🛡️ Les erreurs auth et infra transitoires ont déjà été retentées par withAuthRetry.
