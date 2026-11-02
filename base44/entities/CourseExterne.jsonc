@@ -824,6 +824,48 @@
     "livreur_retrait_mission_id": {
       "type": "string",
       "description": "ID de la mission Eco rattach\u00e9e au moment du retrait. Utilis\u00e9 par reconcileMission pour recalculer la mission apr\u00e8s retrait."
+    },
+    "client_price_revision": {
+      "type": "number"
+    },
+    "client_relaunch_operation_id": {
+      "type": "string"
+    },
+    "client_relaunch_mode": {
+      "type": "string"
+    },
+    "client_relaunch_state": {
+      "type": "string"
+    },
+    "client_relaunch_lease_until": {
+      "type": "string"
+    },
+    "client_relaunch_at": {
+      "type": "string"
+    },
+    "client_relaunch_old_price": {
+      "type": "number"
+    },
+    "client_relaunch_price": {
+      "type": "number"
+    },
+    "client_relaunch_eco_ready": {
+      "type": "string"
+    },
+    "client_relaunch_publish_ready": {
+      "type": "string"
+    },
+    "accepted_price": {
+      "type": "number"
+    },
+    "accepted_price_revision": {
+      "type": "number"
+    },
+    "accepted_price_verified": {
+      "type": "boolean"
+    },
+    "accepted_price_quote_json": {
+      "type": "string"
     }
   },
   "required": [
@@ -834,7 +876,11 @@
   "rls": {
     "read": {},
     "create": {},
-    "update": {},
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
     "delete": {
       "user_condition": {
         "role": "admin"
