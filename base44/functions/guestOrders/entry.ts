@@ -2,7 +2,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.54';
 import { createGuestOrdersService } from '../../shared/guestOrders.js';
 import { relaunchClientCourse } from '../../shared/clientRelaunch.js';
 import { relaunchDependencies } from '../../shared/clientRelaunchDispatch.ts';
-import { createGuestStore } from '../../shared/guestOrderStore.js';
+import { selectGuestStorage } from '../../shared/guestStorageSelector.js';
 import { failGuest, isGuestCourse, guestCanCancel } from '../../shared/guestOrderPolicy.js';
 import { cancelCourseTerminal, expireCancelledCourseOffers, updateActiveCourse } from '../../shared/courseTerminalGuard.ts';
 import { publierCourseDansFil } from '../../shared/dispatchV2.ts';
@@ -43,7 +43,7 @@ export default async function(req: Request): Promise<Response> {
       return publierCourseDansFil(api, course);
     };
     const service = createGuestOrdersService({
-      store: createGuestStore(api), entities, publish, reference: genererReferenceCourse,
+      store: await selectGuestStorage(api), entities, publish, reference: genererReferenceCourse,
       relaunch: (course: any, input: any) => relaunchClientCourse(relaunchDependencies(api), course, input),
       cancel: async (course: any, actor: string) => {
         const result = await cancelCourseTerminal(api, course.id, actor, 'client', (fresh: any) => {
