@@ -1,0 +1,23 @@
+{
+  "name": "GuestOrderStoragePage",
+  "type": "object",
+  "properties": {
+    "scope": {
+      "type": "string"
+    },
+    "payload": {
+      "type": "string",
+      "maxLength": 4096
+    }
+  },
+  "required": [
+    "scope",
+    "payload"
+  ],
+  "rls": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false
+  }
+}
