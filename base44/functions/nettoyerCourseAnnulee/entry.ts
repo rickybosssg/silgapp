@@ -16,10 +16,9 @@ Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
 
-    // Vérifier que c'est un admin qui appelle (sauf si appelé par automation)
-    // Les automations n'ont pas de user context, donc on skip la vérification
+    // Absence de session ne prouve jamais l'identite d'une automation.
     const user = await base44.auth.me().catch(() => null);
-    if (user && user.role !== 'admin') {
+    if (!user || user.role !== 'admin') {
       return Response.json({ error: 'Unauthorized - Admin access required' }, { status: 401 });
     }
 
@@ -34,6 +33,10 @@ Deno.serve(async (req) => {
 
     if (!course) {
       return Response.json({ error: 'Course non trouvée' }, { status: 404 });
+    }
+    if ((user.country_code && user.country_code !== course.country_code)
+      || (user.enterprise_id && user.enterprise_id !== course.enterprise_id)) {
+      return Response.json({ error: 'Perimetre non autorise.' }, { status: 403 });
     }
 
     // Si la course est annulée et a un livreur assigné
