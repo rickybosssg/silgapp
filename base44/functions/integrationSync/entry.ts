@@ -44,8 +44,13 @@ Deno.serve(async (req) => {
 
     // ACTION 2 : Forcer refresh toutes les courses actives
     if (action === "refresh_active_courses") {
+      if (user.role !== 'admin') {
+        return Response.json({ error: 'Operation administrateur requise.' }, { status: 403 });
+      }
       const activeCourses = await base44.entities.CourseExterne.filter({
-        statut: { $nin: ["livree", "annulee"] }
+        statut: { $nin: ["livree", "annulee", "terminee"] },
+        ...(user.country_code ? { country_code: user.country_code } : {}),
+        ...(user.enterprise_id ? { enterprise_id: user.enterprise_id } : {}),
       });
 
       // Mettre à jour chaque course avec un timestamp pour forcer refresh
@@ -53,11 +58,14 @@ Deno.serve(async (req) => {
       for (const course of activeCourses) {
         try {
           // Ajouter un refresh timestamp pour trigger le cache
-          await base44.entities.CourseExterne.update(course.id, {
-            _refresh_timestamp: new Date().toISOString()
-          }).catch(() => null);
-          refreshed++;
-        } catch (_) {}
+          const result = await base44.entities.CourseExterne.updateMany({ id: course.id, updated_date: course.updated_date,
+            statut: course.statut, annulation_user_id: { $in: [null, ''] } }, {
+            $set: { _refresh_timestamp: new Date().toISOString() }
+          });
+          if (Number(result?.updated) === 1) refreshed++;
+        } catch (_) {
+          return Response.json({ success: false, refreshed, error: 'Actualisation partielle. Aucun nouvel essai automatique.' }, { status: 503 });
+        }
       }
 
       return Response.json({
