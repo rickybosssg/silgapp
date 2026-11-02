@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 import { normalizePhone } from '../../shared/phoneUtils.ts';
+import { authorizeCourseOwnerWrite, updateOwnedCourse } from '../../shared/courseOwnerWrite.js';
 
 Deno.serve(async (req) => {
   try {
@@ -10,7 +11,8 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { action, phone, course_id } = await req.json();
+    const body = await req.json();
+    const { action, phone, course_id } = body;
 
     // Action 1: Normaliser un numéro
     if (action === "normalize") {
@@ -50,6 +52,9 @@ Deno.serve(async (req) => {
         return Response.json({ error: "course_id requis" }, { status: 400 });
       }
 
+      const entities = base44.asServiceRole.entities;
+      const course = await entities.CourseExterne.get(course_id);
+      await authorizeCourseOwnerWrite(entities, user, course);
       // Générer un token unique
       const token = crypto.randomUUID();
 
@@ -58,7 +63,7 @@ Deno.serve(async (req) => {
       const trackingLink = `${baseUrl}/suivi-public/${token}`;
 
       // Mettre à jour la course
-      await base44.entities.CourseExterne.update(course_id, {
+      await updateOwnedCourse(entities, user, course, {
         tracking_token: token,
         tracking_link: trackingLink,
         tracking_shared_at: new Date().toISOString()
@@ -77,9 +82,11 @@ Deno.serve(async (req) => {
         return Response.json({ error: "course_id requis" }, { status: 400 });
       }
 
-      const course = await base44.entities.CourseExterne.get(course_id);
+      const entities = base44.asServiceRole.entities;
+      const course = await entities.CourseExterne.get(course_id);
+      await authorizeCourseOwnerWrite(entities, user, course);
       if (course) {
-        await base44.entities.CourseExterne.update(course_id, {
+        await updateOwnedCourse(entities, user, course, {
           tracking_opened_count: (course.tracking_opened_count || 0) + 1
         });
       }
@@ -90,6 +97,6 @@ Deno.serve(async (req) => {
     return Response.json({ error: "Action non reconnue" }, { status: 400 });
 
   } catch (error) {
-    return Response.json({ error: error.message }, { status: 500 });
+    return Response.json({ error: error.course_write_public ? error.message : 'Operation non confirmee.' }, { status: error.course_write_public ? error.status : 500 });
   }
 });
