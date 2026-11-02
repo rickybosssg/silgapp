@@ -14,6 +14,7 @@ import { resolveCourseParticipantUserIds } from '../../shared/conversationSecuri
 import { figerCommissionAcceptation, evaluerAvantageCommission } from '../../shared/commissionAvantage.ts';
 import { tauxCommissionEffectif, champsLockCommission, verifierCoherenceLock, zeroCommissionFields } from '../../shared/commissionLock.ts';
 import { normalizeEnterpriseId } from '../../shared/enterpriseFinance.ts';
+import { recordSearchActivity, searchAttempt } from '../../shared/courseSearchActivity.js';
 
 // 🔖 Redéploiement forcé — 2026-08-14-simplified-3 — rappel T+5min re-notifie les mêmes livreurs libres
 console.log(`[DISPATCH_EXTERNE_AUTO] 🔖 dispatchV2 bundle version: ${DISPATCH_V2_BUNDLE_VERSION}`);
@@ -775,8 +776,25 @@ export default async function(req) {
         return Response.json({ success: true, message: 'Course déjà prise par un autre' });
       }
 
+      let measuredOffer = false;
+      if (parsedBody?.search_attempt === searchAttempt(course)) {
+        try {
+          const offers = await base44.asServiceRole.entities.DispatchNotification.filter({ course_id, livreur_id }, '-date_notification', 1);
+          const since = Date.parse(course.client_relaunch_at || course.created_date || '');
+          measuredOffer = !!offers[0] && Number.isFinite(since) && Date.parse(offers[0].date_notification || '') >= since;
+        } catch { /* Refusal remains independent of optional measurement. */ }
+      }
       // 🚫 Marquer le livreur comme refusé définitif (exclusion permanente, survit au reset de cycle)
       await marquerRefuse(base44, course_id, livreur_id, raison || 'Refusé');
+      try {
+        const actor = await base44.auth.me();
+        const driver = await base44.asServiceRole.entities.Livreur.get(livreur_id);
+        if (measuredOffer && actor?.email && driver?.user_email === actor.email && driver.country_code === course.country_code
+          && normalizeEnterpriseId(driver.enterprise_id) === normalizeEnterpriseId(course.enterprise_id)
+          && normalizeEnterpriseId(actor.enterprise_id || actor.data?.enterprise_id) === normalizeEnterpriseId(course.enterprise_id)) {
+          await recordSearchActivity(base44.asServiceRole.entities, course, livreur_id, 'refusal');
+        }
+      } catch { console.warn('[SEARCH_ACTIVITY] Refusal confirmed, measurement unavailable'); }
       console.log(`[DISPATCH] 🚫 Livreur ${livreur_id} marqué comme refusé — course ${course_id}`);
 
       // 🧹 Marquer les notifications "nouvelle_course" comme lues pour ce livreur (bulk)
