@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { authorizeCourseOwnerWrite, updateOwnedCourse } from '../../shared/courseOwnerWrite.js';
 
 Deno.serve(async (req) => {
   try {
@@ -16,13 +17,19 @@ Deno.serve(async (req) => {
     }
 
     // Récupérer la course
-    const courses = await base44.entities.CourseExterne.filter({ id: course_id });
+    const entities = base44.asServiceRole.entities;
+    const courses = await entities.CourseExterne.filter({ id: course_id });
     const course = courses[0];
 
     if (!course) {
       return Response.json({ error: 'Course non trouvée' }, { status: 404 });
     }
 
+    await authorizeCourseOwnerWrite(entities, user, course);
+    if (['livree', 'annulee', 'terminee'].includes(course.statut) || course.annulation_user_id
+      || course.heure_recuperation || course.pickup_confirmed_at || course.encours_comptabilise_at) {
+      return Response.json({ error: 'Cette course ne peut plus etre annulee ici.' }, { status: 409 });
+    }
     // Vérifier que la course est en attente de validation de prix manuel
     if (course.pricing_mode !== 'manual' || course.manual_price_status !== 'pending_client_validation') {
       return Response.json({
@@ -31,11 +38,13 @@ Deno.serve(async (req) => {
     }
 
     // Annuler la course
-    await base44.entities.CourseExterne.update(course_id, {
+    await updateOwnedCourse(entities, user, course, {
       statut: 'annulee',
       dispatch_status: 'expire',
       manual_price_status: 'refused',
-    });
+      annulation_user_id: user.id,
+    }, { statut: course.statut, pricing_mode: 'manual', manual_price_status: 'pending_client_validation',
+      livreur_id: course.livreur_id ?? null, annulation_user_id: { $in: [null, ''] } });
 
     // Libérer le livreur
     if (course.livreur_id) {
@@ -68,6 +77,6 @@ Deno.serve(async (req) => {
     });
 
   } catch (error) {
-    return Response.json({ error: error.message }, { status: 500 });
+    return Response.json({ error: error.course_write_public ? error.message : 'Annulation non confirmee.' }, { status: error.course_write_public ? error.status : 500 });
   }
 });
