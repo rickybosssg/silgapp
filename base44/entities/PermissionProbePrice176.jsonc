@@ -1,0 +1,46 @@
+{
+  "name": "PermissionProbePrice176",
+  "type": "object",
+  "properties": {
+    "label": {
+      "type": "string",
+      "enum": [
+        "synthetic-A",
+        "synthetic-B"
+      ]
+    },
+    "owner_fixture": {
+      "type": "string"
+    },
+    "probe_value": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "label",
+    "owner_fixture",
+    "probe_value"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
