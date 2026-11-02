@@ -7,12 +7,14 @@ import { failGuest, isGuestCourse, guestCanCancel } from '../../shared/guestOrde
 import { cancelCourseTerminal, expireCancelledCourseOffers, updateActiveCourse } from '../../shared/courseTerminalGuard.ts';
 import { publierCourseDansFil } from '../../shared/dispatchV2.ts';
 import { genererReferenceCourse } from '../../shared/venusCourseReference.ts';
+import { guestDiagnostic } from '../../shared/guestDiagnostic.js';
 
 export default async function(req: Request): Promise<Response> {
   const headers = { 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-App-Id' };
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers });
   if (req.method !== 'POST') return Response.json({ error: 'Méthode non autorisée.' }, { status: 405, headers });
+  const diagnostic = guestDiagnostic();
   try {
     const reader = req.body?.getReader();
     const decoder = new TextDecoder();
@@ -30,7 +32,8 @@ export default async function(req: Request): Promise<Response> {
     let body;
     try { body = JSON.parse(text); } catch { return Response.json({ error: 'Requête invalide.' }, { status: 400, headers }); }
     if (!body || Array.isArray(body) || typeof body !== 'object') return Response.json({ error: 'Requête invalide.' }, { status: 400, headers });
-    const api = createClientFromRequest(req);
+    diagnostic.setAction(body.action);
+    const api = diagnostic.wrap(createClientFromRequest(req));
     const entities = api.asServiceRole.entities;
     const publish = async (course: any) => {
       if (!isGuestCourse(course) || course.enterprise_id || course.client_user_email || course.annulation_user_id || ['livree', 'annulee', 'terminee'].includes(course.statut)) failGuest('SCOPE', 'Publication refusée.', 409);
@@ -80,7 +83,7 @@ export default async function(req: Request): Promise<Response> {
     const status = known ? error.status : Number.isInteger(upstreamStatus) && upstreamStatus >= 400 && upstreamStatus <= 599 ? upstreamStatus : 503;
     const code = known ? error.code : status === 429 ? 'RATE_LIMITED' : 'TEMPORARILY_UNAVAILABLE';
     if (status === 429) Object.assign(headers, { 'Retry-After': '30' });
-    console.warn('[guestOrders]', { diagnostic_id, code, status });
+    console.warn('[guestOrders]', { diagnostic_id, code, status, ...diagnostic.fields(error) });
     return Response.json({ success: false, code, error: known ? error.message : status === 429
       ? 'Service trop sollicité. Attendez avant de réessayer.'
       : 'Service indisponible. Conservez votre tentative et réessayez le suivi.', diagnostic_id }, { status, headers });
