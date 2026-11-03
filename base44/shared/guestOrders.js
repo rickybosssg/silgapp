@@ -37,9 +37,18 @@ export function createGuestOrdersService(deps) {
     if (rows.length > 500) failGuest('CATALOG_LIMIT', 'Catalogue trop important. Contactez le support.', 503);
     const phoneCountries = await entities.Country.filter({ actif: true }, 'nom', 101);
     if (phoneCountries.length > 100) failGuest('CATALOG_LIMIT', 'Catalogue de pays indisponible.', 503);
+    // ── Forte Demande (invité) — source de vérité unique : Country.forte_demande_active ──
+    // Même condition d'affichage que le client connecté (useForteDemande) :
+    // forte_demande_client_actif && forte_demande_active. Information uniquement,
+    // aucun prix n'est modifié automatiquement.
     return { country: { code: c.code, nom: c.nom, devise: c.devise, devise_symbole: c.devise_symbole, indicatif: c.indicatif, prix_minimum: c.prix_minimum },
       phone_countries: phoneCountries.map(p => ({ code: p.code, nom: p.nom, indicatif: p.indicatif, actif: p.actif, phone_min_length: p.phone_min_length, phone_max_length: p.phone_max_length, phone_pattern: p.phone_pattern })),
-      quartiers: rows.map(q => ({ id: q.id, nom: q.nom, ville: q.ville, ville_operationnelle: q.ville_operationnelle })) };
+      quartiers: rows.map(q => ({ id: q.id, nom: q.nom, ville: q.ville, ville_operationnelle: q.ville_operationnelle })),
+      forte_demande: {
+        active: c.forte_demande_client_actif === true && c.forte_demande_active === true,
+        titre: c.forte_demande_titre || "🔥 FORTE DEMANDE EN COURS",
+        message: c.forte_demande_message || "Plusieurs commandes sont en cours. Proposez un prix attractif pour augmenter vos chances de trouver rapidement un livreur.",
+      } };
   }
   async function credentials(body, action = false) {
     if (!validRequest(body.request_id) || !validSecret(body[action ? 'action_token' : 'read_token'])) failGuest('ACCESS_DENIED', 'Accès privé invalide.', 403);
