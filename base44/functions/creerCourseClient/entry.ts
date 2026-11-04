@@ -277,6 +277,19 @@ export default async function(req: Request): Promise<Response> {
     cleanData.statut = 'nouvelle';
     cleanData.dispatch_status = 'en_attente';
 
+    // ── Garde-fou prix : aucune course client ne peut être créée sans prix ──
+    // Le formulaire doit toujours fournir un prix (saisi par le client ou estimé
+    // automatiquement). Le multi-colis est tarifié par colis ultérieurement.
+    // Garde backend : couvre aussi les anciens APK qui ne valident pas côté client.
+    const isMultiColisCourse = cleanData.is_multi_colis === true || Number(cleanData.nb_colis || 1) > 1;
+    const hasUsablePrice = Number(cleanData.prix_propose_client) > 0 || Number(cleanData.prix_estimate) > 0;
+    if (!isMultiColisCourse && !hasUsablePrice) {
+      return Response.json(
+        { error: 'Prix manquant : la course ne peut pas être créée sans prix. Saisissez un prix pour votre course.' },
+        { status: 400 }
+      );
+    }
+
     const ecoFields = await prepareEcoCreationFields(base44, {
       ...cleanData,
       delivery_mode: requestedDeliveryMode,

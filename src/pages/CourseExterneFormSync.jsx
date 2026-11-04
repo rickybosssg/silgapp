@@ -649,41 +649,11 @@ export default function CourseExterneFormSync() {
       expediteurTel,
     });
 
-    // ── Calcul prix — SOURCE UNIQUE : formData._tarifGrandOuaga (déjà calculé par CourseStepForm) ──
+    // ── Calcul prix — calculé APRÈS résolution GPS (voir bloc suivant) ──
     // AUCUN re-appel ORS ici : le résultat est réutilisé depuis CourseStepForm.
     let prixEstime = 0;
     let distanceTarifaireKm = null;
     let distanceTarifaireSource = null;
-    if (
-      formData.gps_depart_lat && formData.gps_depart_lng &&
-      formData.gps_arrivee_lat && formData.gps_arrivee_lng
-    ) {
-      if (isPaysTarificationGrandOuaga(courseCountryCode)) {
-        // Grand Ouaga : utiliser le résultat déjà calculé par CourseStepForm (ORS + cache)
-        const tarif = formData._tarifGrandOuaga;
-        if (tarif) {
-          prixEstime = tarif.prix || 0;
-          distanceTarifaireKm = tarif.distanceKm;
-          distanceTarifaireSource = tarif.distanceSource;
-        }
-        // Si pas de résultat pré-calculé (reload, deep link), fallback Haversine local
-        if (!tarif || prixEstime === 0) {
-          const distance = haversineKm(
-            formData.gps_depart_lat, formData.gps_depart_lng,
-            formData.gps_arrivee_lat, formData.gps_arrivee_lng
-          );
-          prixEstime = Math.max(Math.round(distance * 100), prixMinimum);
-          distanceTarifaireSource = "haversine_fallback";
-        }
-      } else {
-        const distance = haversineKm(
-          formData.gps_depart_lat, formData.gps_depart_lng,
-          formData.gps_arrivee_lat, formData.gps_arrivee_lng
-        );
-        // Source tarifaire unique : Country.prix_minimum (jamais codé en dur)
-        prixEstime = Math.max(Math.round(distance * 100), prixMinimum);
-      }
-    }
 
     // Pour "recevoir" : la destination = position du client destinataire (jamais inconnue)
     const adresseArrivee = isRecevoir
@@ -747,6 +717,38 @@ export default function CourseExterneFormSync() {
       source: formData.gps_arrivee_source || null,
     });
 
+    // ── Calcul prix — SOURCE UNIQUE : formData._tarifGrandOuaga (déjà calculé par CourseStepForm) ──
+    // Utilise les coordonnées RÉSOLUES (exact → quartier), identiques à celles
+    // envoyées dans la course. Sinon, une sélection par quartier uniquement
+    // (formData.gps_* vide) laissait l'estimation à 0 et la course partait sans prix.
+    if (departGps?.lat && departGps?.lng && arriveeGps?.lat && arriveeGps?.lng) {
+      if (isPaysTarificationGrandOuaga(courseCountryCode)) {
+        // Grand Ouaga : utiliser le résultat déjà calculé par CourseStepForm (ORS + cache)
+        const tarif = formData._tarifGrandOuaga;
+        if (tarif) {
+          prixEstime = tarif.prix || 0;
+          distanceTarifaireKm = tarif.distanceKm;
+          distanceTarifaireSource = tarif.distanceSource;
+        }
+        // Si pas de résultat pré-calculé (reload, deep link), fallback Haversine local
+        if (!tarif || prixEstime === 0) {
+          const distance = haversineKm(
+            departGps.lat, departGps.lng,
+            arriveeGps.lat, arriveeGps.lng
+          );
+          prixEstime = Math.max(Math.round(distance * 100), prixMinimum);
+          distanceTarifaireSource = "haversine_fallback";
+        }
+      } else {
+        const distance = haversineKm(
+          departGps.lat, departGps.lng,
+          arriveeGps.lat, arriveeGps.lng
+        );
+        // Source tarifaire unique : Country.prix_minimum (jamais codé en dur)
+        prixEstime = Math.max(Math.round(distance * 100), prixMinimum);
+      }
+    }
+
     // ── Gestion des ambiguïtés : ne jamais choisir silencieusement ──
     if (departGps?.ambiguous) {
       const names = departGps.suggestions.map(s => s.nom).join(", ");
@@ -784,6 +786,15 @@ export default function CourseExterneFormSync() {
         setIsSubmitting(false);
         return;
       }
+    }
+
+    // ── Garde-fou prix nul : aucune course ne peut partir sans prix ──
+    // Si le client n'a pas saisi de prix ET que l'estimation est à 0
+    // (GPS non résolu, tarif indisponible), on bloque avant le récapitulatif.
+    if (!isMulti && (Number(formData.prix_propose) || 0) <= 0 && prixEstime <= 0) {
+      toast.error("Le prix de la course est obligatoire. Saisissez un prix avant de continuer.");
+      setIsSubmitting(false);
+      return;
     }
 
     // Pour multi-colis : résumé des destinataires
