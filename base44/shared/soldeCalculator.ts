@@ -53,7 +53,7 @@ function processTimeline(
   baseSoldeInitial: number,
   rawCreditSurplus: number,
   events: { type: 'commission' | 'payment'; date: string; amount: number; encours_comptabilise_at?: string | null }[]
-): { solde: number; creditSurplus: number; consumedCredit: number; totalCommissions: number; totalPaye: number } {
+): { solde: number; soldeBrut: number; creditSurplus: number; consumedCredit: number; totalCommissions: number; totalPaye: number } {
   let balance = baseSoldeInitial;
   let totalCommissions = 0;
   let totalPaye = 0;
@@ -86,6 +86,9 @@ function processTimeline(
 
   return {
     solde,
+    // Dû réel avant application du crédit de surplus. Sert aux décisions
+    // « ce paiement règle-t-il une dette ? » — jamais le solde capé.
+    soldeBrut: rawSolde,
     creditSurplus: rawCreditSurplus,
     consumedCredit: 0,
     totalCommissions,
@@ -98,6 +101,7 @@ function processTimeline(
  */
 export async function calculerSoldeLivreur(base44: any, livreurId: string): Promise<{
   solde: number;
+  soldeBrut: number;
   creditDisponible: number;
   creditSurplus: number;
   consumedCredit: number;
@@ -105,7 +109,7 @@ export async function calculerSoldeLivreur(base44: any, livreurId: string): Prom
   totalPaye: number;
 }> {
   if (!livreurId) {
-    return { solde: 0, creditDisponible: 0, creditSurplus: 0, consumedCredit: 0, totalCommissions: 0, totalPaye: 0 };
+    return { solde: 0, soldeBrut: 0, creditDisponible: 0, creditSurplus: 0, consumedCredit: 0, totalCommissions: 0, totalPaye: 0 };
   }
 
   // 0. Récupérer le livreur
@@ -116,7 +120,7 @@ export async function calculerSoldeLivreur(base44: any, livreurId: string): Prom
 
   // Cut-off comptable obligatoire — si pas de base définie, aucun dû reconnu
   if (!baseDate) {
-    return { solde: 0, creditDisponible: 0, creditSurplus: 0, totalCommissions: 0, totalPaye: 0 };
+    return { solde: 0, soldeBrut: 0, creditDisponible: 0, creditSurplus: 0, consumedCredit: 0, totalCommissions: 0, totalPaye: 0 };
   }
 
   // 1. Courses livrées (par livreur_financier_id ET livreur_id, dédupliquées)
@@ -185,13 +189,13 @@ export async function calculerSoldeLivreur(base44: any, livreurId: string): Prom
   ];
 
   // 4. Traiter chronologiquement
-  const { solde, creditSurplus, consumedCredit, totalCommissions, totalPaye } = processTimeline(
+  const { solde, soldeBrut, creditSurplus, consumedCredit, totalCommissions, totalPaye } = processTimeline(
     baseSoldeInitial,
     rawCreditSurplus,
     events
   );
 
-  return { solde, creditDisponible: 0, creditSurplus, consumedCredit, totalCommissions, totalPaye };
+  return { solde, soldeBrut, creditDisponible: 0, creditSurplus, consumedCredit, totalCommissions, totalPaye };
 }
 
 /**
@@ -200,7 +204,7 @@ export async function calculerSoldeLivreur(base44: any, livreurId: string): Prom
 export async function calculerSoldesLivreursBatch(
   base44: any,
   countryCode: string | null
-): Promise<Record<string, { solde: number; creditDisponible: number; creditSurplus: number; consumedCredit: number; totalCommissions: number; totalPaye: number }>> {
+): Promise<Record<string, { solde: number; soldeBrut: number; creditDisponible: number; creditSurplus: number; consumedCredit: number; totalCommissions: number; totalPaye: number }>> {
   // 1. Toutes les courses livrées du pays
   const coursesFilter = countryCode
     ? { statut: 'livree', country_code: countryCode }
@@ -296,11 +300,11 @@ export async function calculerSoldesLivreursBatch(
   allIds.forEach(id => {
     const base = livreursAvecBase[id];
     if (!base) {
-      result[id] = { solde: 0, creditDisponible: 0, creditSurplus: 0, totalCommissions: 0, totalPaye: 0 };
+      result[id] = { solde: 0, soldeBrut: 0, creditDisponible: 0, creditSurplus: 0, totalCommissions: 0, totalPaye: 0 };
       return;
     }
 
-    const { solde, creditSurplus, consumedCredit, totalCommissions, totalPaye } = processTimeline(
+    const { solde, soldeBrut, creditSurplus, consumedCredit, totalCommissions, totalPaye } = processTimeline(
       base.soldeInitial,
       creditSurplusMap[id] || 0,
       eventsByDriver[id] || []
@@ -308,6 +312,7 @@ export async function calculerSoldesLivreursBatch(
 
     result[id] = {
       solde,
+      soldeBrut,
       creditDisponible: 0,
       creditSurplus: creditSurplus,
       consumedCredit,

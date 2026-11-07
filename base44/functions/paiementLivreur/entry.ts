@@ -59,7 +59,11 @@ Deno.serve(async (req) => {
     // ── Recalculer le solde depuis les sources financières ──
     // montant_du_silga = projection = somme des commissions non payées
     const resultatSolde = await recalculerSoldeLivreur(base44, livreur_id);
-    const ancienSolde = resultatSolde.solde;
+    // Dû RÉEL avant paiement = solde brut (commissions − paiements), SANS le crédit
+    // de surplus appliqué en cap. Utiliser le solde capé créait un nouveau crédit
+    // pour un paiement qui réglait simplement une dette (incident 07/11/2026 :
+    // dû 300 réglé → 300 de crédit de surplus, dette toujours affichée).
+    const ancienSolde = Number(resultatSolde.soldeBrut ?? resultatSolde.solde) || 0;
 
     // ── Déterminer les courses concernées et le type de paiement ──
     let coursesConcernees: string[] = [];
@@ -101,7 +105,10 @@ Deno.serve(async (req) => {
     //    Ex: dû 1300, paiement 2000 → credit_surplus += 700, dû = 0.
     const surplusCree = Math.max(0, montant - ancienSolde);
     const nouveauSolde = Math.max(0, ancienSolde - montant);
-    const ancienCreditSurplus = Number(livreur.credit_surplus) || 0;
+    // Relire le crédit juste avant écriture : la valeur lue en début de requête
+    // peut avoir été consommée entre-temps (verifierEncoursLivreur).
+    const livreurActuel = await base44.asServiceRole.entities.Livreur.get(livreur_id).catch(() => livreur);
+    const ancienCreditSurplus = Number(livreurActuel?.credit_surplus) || 0;
     const nouveauCreditSurplus = ancienCreditSurplus + surplusCree;
 
     // ── Créer l'enregistrement PaiementSilgapp (TRAÇABILITÉ OBLIGATOIRE) ──
