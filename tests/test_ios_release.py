@@ -26,26 +26,31 @@ class IOSReleaseTests(unittest.TestCase):
                                       "ios-signed-v1.0.60-b67")
         self.assertEqual(result["version"], "1.0.60")
 
-    def test_new_candidate_versions_match_and_signing_stays_blocked_pending_recheck(self):
+    def test_archive_candidate_uses_owner_confirmed_testflight_without_claiming_distribution(self):
         reviewed = json.loads((ROOT / "ios/release-settings.json").read_text())
         pending_fixture = copy.deepcopy(reviewed)
         pending_fixture["app_store_connect_confirmed"] = False
         with self.assertRaisesRegex(ValueError, "owner confirmation"):
-            ios.validate_release(pending_fixture, pending_fixture["source_commit"], "ios-signed-v1.0.63-b70")
-        approved_fixture = copy.deepcopy(reviewed)
-        approved_fixture["app_store_connect_confirmed"] = True
-        self.assertEqual(ios.validate_release(approved_fixture, approved_fixture["source_commit"],
-                                              "ios-signed-v1.0.63-b70")["build"], "70")
-        self.assertEqual(reviewed["marketing_version"], "1.0.63")
-        self.assertEqual(reviewed["build_number"], "70")
-        self.assertEqual(reviewed["latest_app_store_build"], "69")
-        self.assertEqual(reviewed["latest_app_store_version"], "1.0.62")
+            ios.validate_release(pending_fixture, pending_fixture["source_commit"], "ios-signed-v1.0.68-b77")
+        self.assertTrue(reviewed["app_store_connect_confirmed"])
+        self.assertEqual(ios.validate_release(reviewed, reviewed["source_commit"],
+                                             "ios-signed-v1.0.68-b77")["build"], "77")
+        self.assertEqual(reviewed["source_commit"], "457fd95b787b3e496a0cf99c3d40fd2796fb6ee5")
+        self.assertEqual(reviewed["marketing_version"], "1.0.68")
+        self.assertEqual(reviewed["build_number"], "77")
+        self.assertEqual(reviewed["latest_app_store_build"], "76")
+        self.assertEqual(reviewed["latest_app_store_version"], "1.0.67")
         self.assertTrue(reviewed["app_store_connect_recheck_required_before_submission"])
         evidence = reviewed["app_store_connect_evidence"]
-        self.assertEqual(evidence["source"], "app_store_connect_ui_read_only")
-        self.assertTrue(evidence["all_pages_checked"])
-        self.assertEqual(evidence["highest_uploaded_build"], "69")
-        self.assertIn("recheck before authorized build", evidence["scope"])
+        self.assertEqual(evidence["source"], "owner_supplied_testflight_screenshot_and_explicit_confirmation")
+        self.assertTrue(evidence["highest_uploaded_build_owner_confirmed"])
+        self.assertFalse(evidence["all_pages_checked"])
+        self.assertIsNone(evidence["distribution_version"])
+        self.assertIsNone(evidence["distribution_state"])
+        self.assertIsNone(evidence["proposed_version_absent_at_check"])
+        self.assertEqual(evidence["highest_uploaded_build"], "76")
+        self.assertIn("Archive/export only", reviewed["candidate_status"])
+        # Archive script overrides App Release only; do not change the Debug/native source defaults.
         project = (ROOT / "ios/App/App.xcodeproj/project.pbxproj").read_text()
         self.assertEqual(project.count("MARKETING_VERSION = 1.0.63;"), 2)
         self.assertEqual(project.count("CURRENT_PROJECT_VERSION = 70;"), 2)
