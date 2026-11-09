@@ -8,6 +8,10 @@ import CourseTimeline from "./CourseTimeline";
 import LivreurCardModerne from "./LivreurCardModerne";
 import RestaurantParallelTracking from "./RestaurantParallelTracking";
 import { base44 } from "@/api/base44Client";
+import { useQuery } from "@tanstack/react-query";
+import { useClientCommerceProfile } from "@/hooks/useClientCommerce";
+import { COMMERCE_CLIENT_MIGRATION_ENABLED, clientCommerceQueryKey, clientCommercePollingInterval, readClientRestaurantOrder } from "@/lib/commerceClientMigration";
+import { CommerceReadError } from "@/components/client/CommerceReadFeedback";
 import { useETACourse } from "@/hooks/useETACourse";
 import { CARTO_TILE_URL, CARTO_TILE_CONFIG } from "@/lib/cartTiles";
 import { getCourseStatusLabel } from "@/lib/courseStatuses";
@@ -105,9 +109,25 @@ export default function SuiviCourseFullscreen({ course, position, onClose, onCal
 
   // ── Restaurant : fetch CommandeRestaurant si la course est liée à une commande restaurant ──
   const isRestaurantCourse = !!course.commande_restaurant_id;
-  const [commandeRestaurant, setCommandeRestaurant] = useState(null);
+  const [legacyCommandeRestaurant, setCommandeRestaurant] = useState(null);
+  const secureRestaurantRead = COMMERCE_CLIENT_MIGRATION_ENABLED && isRestaurantCourse && !publicView && !course.private_guest;
+  const commerceClient = useClientCommerceProfile(secureRestaurantRead);
+  const restaurantQuery = useQuery({
+    queryKey: [...clientCommerceQueryKey(commerceClient.context, { type: "restaurant", action: "orders", secure: true }), "tracking", course.id, course.commande_restaurant_id],
+    queryFn: ({ signal }) => readClientRestaurantOrder(base44, commerceClient.context, { orderId: course.commande_restaurant_id, courseId: course.id, signal }),
+    enabled: secureRestaurantRead && !!commerceClient.context,
+    retry: false,
+    refetchInterval: query => clientCommercePollingInterval(query),
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
+  const commandeRestaurant = COMMERCE_CLIENT_MIGRATION_ENABLED
+    ? (secureRestaurantRead && !restaurantQuery.isError ? restaurantQuery.data : null)
+    : legacyCommandeRestaurant;
 
   useEffect(() => {
+    if (COMMERCE_CLIENT_MIGRATION_ENABLED) return;
     if (course.private_guest) { setCommandeRestaurant(null); return; }
     if (publicView || !course.commande_restaurant_id) {
       setCommandeRestaurant(null);
@@ -355,6 +375,9 @@ export default function SuiviCourseFullscreen({ course, position, onClose, onCal
           {/* ── SUIVI PARALLÈLE RESTAURANT (style Glovo) ── */}
           {isRestaurantCourse && (
             <div className="mb-3">
+              {secureRestaurantRead && (commerceClient.error || restaurantQuery.isError) && <CommerceReadError message="Le suivi de préparation du restaurant est indisponible." onRetry={() => commerceClient.error ? commerceClient.retry() : restaurantQuery.refetch()} isRetrying={restaurantQuery.isFetching} />}
+              {secureRestaurantRead && (commerceClient.isLoading || restaurantQuery.isLoading) && <p role="status" className="mb-2 text-sm text-gray-500">Chargement de la préparation...</p>}
+              {secureRestaurantRead && !commerceClient.isLoading && !commerceClient.error && restaurantQuery.isSuccess && !restaurantQuery.data && <p className="mb-2 text-sm text-gray-500">Aucun suivi de préparation accessible pour cette commande.</p>}
               <RestaurantParallelTracking
                 course={course}
                 commande={commandeRestaurant}

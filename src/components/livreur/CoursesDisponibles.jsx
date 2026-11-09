@@ -164,7 +164,7 @@ export default function CoursesDisponibles({ livreurProfil, onAcceptSuccess, onN
         toast.success("Course acceptée !");
         queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles"] });
         queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
-        if (onAcceptSuccess) onAcceptSuccess();
+        if (onAcceptSuccess) onAcceptSuccess({ key: `course:${course.id}`, receipt: data });
       } else if (data?.reason === "deja_en_course") {
         toast.error("Vous avez déjà une course en cours. Terminez-la avant d'en accepter une nouvelle.");
       } else if (data?.already_taken || data?.reason === "already_taken" || data?.accepted === false) {

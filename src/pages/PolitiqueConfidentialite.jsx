@@ -65,7 +65,7 @@ export default function PolitiqueConfidentialite() {
           />
           <DataItem
             title="Photos (livreurs uniquement)"
-            desc="Photo de profil, photo CNIB (carte d'identité), photo du véhicule — pour la validation du compte"
+            desc="Photo de profil, photo de la pièce d'identité, photo du véhicule — pour la validation du compte"
             sensible={true}
           />
           <DataItem

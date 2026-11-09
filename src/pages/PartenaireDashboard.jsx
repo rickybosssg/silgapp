@@ -18,6 +18,8 @@ import { logoutPersistent } from "@/lib/authPersistence";
 import { registerPushToken, consumePendingNotificationData } from "@/lib/notifications";
 import { usePushTokenRetry } from "@/hooks/usePushTokenRetry";
 
+import { COMMERCE_OWNER_MIGRATION_ENABLED, ownerMigrationActive, createOwnerCommerce } from "@/lib/commerceOwnerMigration";
+
 function returnToRoleSelection() {
   try {
     localStorage.setItem("silgapp_force_role_selection", "true");
@@ -25,11 +27,14 @@ function returnToRoleSelection() {
   window.location.reload();
 }
 
-export default function PartenaireDashboard() {
+export default function PartenaireDashboard({ commerceMigrationEnabled = COMMERCE_OWNER_MIGRATION_ENABLED }) {
   const [user, setUser] = useState(null);
   const [tab, setTab] = useState("home");
   const [pendingConversationId, setPendingConversationId] = useState(null);
   const queryClient = useQueryClient();
+  const ownerEnabled = ownerMigrationActive(commerceMigrationEnabled,user);
+  const ownerContext = ownerEnabled ? {enabled:true,userId:user.id} : null;
+  const ownerApi = () => createOwnerCommerce({sdk:base44,actorId:user.id});
 
   useEffect(() => {
     base44.auth.me().then(u => {
@@ -59,24 +64,26 @@ export default function PartenaireDashboard() {
     return () => window.removeEventListener("silgapp:notification-opened", handleMessageNotification);
   }, []);
 
-  const { data: maBoutique, isLoading: loadingBoutique } = useQuery({
-    queryKey: ["ma-boutique", user?.id],
+  const { data: maBoutique, isLoading: loadingBoutique, error: boutiqueError } = useQuery({
+    queryKey: ["ma-boutique", user?.id, ownerEnabled ? "server-owner" : "legacy"],
     queryFn: async () => {
-      const list = await base44.entities.Boutique.filter({ partenaire_id: user.id });
+      const list = ownerEnabled ? await ownerApi().allEstablishments("boutique") : await base44.entities.Boutique.filter({ partenaire_id: user.id });
       return list?.[0] || null;
     },
     enabled: !!user?.id,
-    refetchInterval: 15000,
+    refetchInterval: ownerEnabled ? 60000 : 15000,
+    retry: ownerEnabled ? false : undefined,
   });
 
-  const { data: monRestaurant, isLoading: loadingRestaurant } = useQuery({
-    queryKey: ["mon-restaurant", user?.id],
+  const { data: monRestaurant, isLoading: loadingRestaurant, error: restaurantError } = useQuery({
+    queryKey: ["mon-restaurant", user?.id, ownerEnabled ? "server-owner" : "legacy"],
     queryFn: async () => {
-      const list = await base44.entities.Restaurant.filter({ partenaire_id: user.id });
+      const list = ownerEnabled ? await ownerApi().allEstablishments("restaurant") : await base44.entities.Restaurant.filter({ partenaire_id: user.id });
       return list?.[0] || null;
     },
     enabled: !!user?.id,
-    refetchInterval: 15000,
+    refetchInterval: ownerEnabled ? 60000 : 15000,
+    retry: ownerEnabled ? false : undefined,
   });
 
   const { data: maPharmacie, isLoading: loadingPharmacie } = useQuery({
@@ -99,12 +106,16 @@ export default function PartenaireDashboard() {
   // Query commandes avant les retours conditionnels (Rules of Hooks)
   const cmdEntityName = etablissementType === "restaurant" ? "CommandeRestaurant" : "CommandeBoutique";
   const cmdIdField = etablissementType === "restaurant" ? "restaurant_id" : "boutique_id";
-  const { data: commandes = [] } = useQuery({
-    queryKey: ["commandes", etablissementType, etablissement?.id],
-    queryFn: () => base44.entities[cmdEntityName].filter({ [cmdIdField]: etablissement.id }, "-created_date", 100),
+  const { data: orderPage, error: ordersError } = useQuery({
+    queryKey: ["commandes", etablissementType, etablissement?.id, ownerEnabled ? "server-owner" : "legacy",user?.id],
+    queryFn: async () => ownerEnabled
+      ? ownerApi().orders(etablissementType,etablissement.id)
+      : {rows:await base44.entities[cmdEntityName].filter({ [cmdIdField]: etablissement.id }, "-created_date", 100),hasMore:false},
     enabled: !!etablissement?.id && !hasPharmacie,
-    refetchInterval: 10000,
+    refetchInterval: ownerEnabled ? 60000 : 10000,
+    retry: ownerEnabled ? false : undefined,
   });
+  const commandes = orderPage?.rows || [];
 
   // ── Pour les pharmacies : conversations & courses en temps réel ──
   const { data: pharmaConversations = [] } = useQuery({
@@ -232,6 +243,10 @@ export default function PartenaireDashboard() {
     );
   }
 
+  if (ownerEnabled && (boutiqueError || restaurantError)) {
+    return <div role="alert" className="p-6 space-y-3"><p>Impossible de verifier vos etablissements. Une erreur ne signifie pas que vous devez en creer un nouveau.</p><button onClick={() => {queryClient.invalidateQueries({queryKey:["ma-boutique"]});queryClient.invalidateQueries({queryKey:["mon-restaurant"]});}}>Actualiser</button></div>;
+  }
+
   if (!hasEtablissement) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-6">
@@ -283,12 +298,12 @@ export default function PartenaireDashboard() {
             <button onClick={async () => { try { await logoutPersistent(); } catch { window.alert("La déconnexion n’a pas pu être enregistrée. Réessayez."); } }} className="text-sm text-muted-foreground underline">Se déconnecter</button>
           </div>
           {tab === "boutique_form" && (
-            <EtablissementForm type="boutique" partenaireId={user.id} userEmail={user.email} isAdmin={user?.role === 'admin'}
+            <EtablissementForm ownerCommerce={ownerContext} type="boutique" partenaireId={user.id} userEmail={user.email} isAdmin={user?.role === 'admin'}
               onSaved={() => { setTab("home"); queryClient.invalidateQueries({ queryKey: ["ma-boutique"] }); }}
               onCancel={() => setTab("home")} />
           )}
           {tab === "restaurant_form" && (
-            <EtablissementForm type="restaurant" partenaireId={user.id} userEmail={user.email} isAdmin={user?.role === 'admin'}
+            <EtablissementForm ownerCommerce={ownerContext} type="restaurant" partenaireId={user.id} userEmail={user.email} isAdmin={user?.role === 'admin'}
               onSaved={() => { setTab("home"); queryClient.invalidateQueries({ queryKey: ["mon-restaurant"] }); }}
               onCancel={() => setTab("home")} />
           )}
@@ -399,11 +414,12 @@ export default function PartenaireDashboard() {
         {tab === "home" && (
           <div className="space-y-4">
             <SilgappLiveStats countryCode={etablissement?.pays_code} />
-            <PartenaireHome etablissement={etablissement} etablissementType={etablissementType} onNavigate={setTab} />
+            <PartenaireHome ownerCommerce={ownerContext} etablissement={etablissement} etablissementType={etablissementType} onNavigate={setTab} />
           </div>
         )}
-        {tab === "commandes" && !hasPharmacie && <CommandesManager type={etablissementType} etablissementId={etablissement.id} />}
-        {tab === "produits" && !hasPharmacie && <ProduitsManager type={etablissementType} etablissementId={etablissement.id} />}
+        {ownerEnabled && (ordersError || orderPage?.hasMore) && <p role="status" className="p-3 text-sm text-amber-700">{ordersError ? "Lecture des commandes indisponible." : "Les indicateurs de commandes concernent une liste partielle."}</p>}
+            {tab === "commandes" && !hasPharmacie && <CommandesManager ownerCommerce={ownerContext} countryCode={etablissement.pays_code} type={etablissementType} etablissementId={etablissement.id} />}
+        {tab === "produits" && !hasPharmacie && <ProduitsManager type={etablissementType} etablissementId={etablissement.id} ownerCommerce={ownerContext} />}
         {tab === "livraisons" && hasPharmacie && <PharmacieLivraisons pharmacieId={etablissement.id} pharmacieNom={etablissement.nom} onNavigate={setTab} />}
         {tab === "messages" && (
           <div className="bg-white rounded-2xl border border-black/5 shadow-[0_8px_24px_rgba(15,23,42,0.06)] overflow-hidden h-[calc(100dvh-180px)]">
@@ -414,7 +430,7 @@ export default function PartenaireDashboard() {
         {tab === "statistiques" && <ComptabilitePartenaire type={etablissementType} etablissement={etablissement} />}
         {tab === "revenus" && <ComptabilitePartenaire type={etablissementType} etablissement={etablissement} />}
         {tab === "infos" && (
-          <EtablissementForm type={etablissementType} existing={etablissement} partenaireId={user.id} userEmail={user.email} isAdmin={user?.role === 'admin'}
+          <EtablissementForm ownerCommerce={ownerContext} type={etablissementType} existing={etablissement} partenaireId={user.id} userEmail={user.email} isAdmin={user?.role === 'admin'}
             onSaved={() => queryClient.invalidateQueries({ queryKey: hasPharmacie ? ["ma-pharmacie"] : etablissementType === "boutique" ? ["ma-boutique"] : ["mon-restaurant"] })} />
         )}
       </div>

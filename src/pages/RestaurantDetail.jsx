@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
-import { useQuery } from "@tanstack/react-query";
+import { useClientCommerceProfile, useClientCommercePage } from "@/hooks/useClientCommerce";
+import { COMMERCE_CLIENT_MIGRATION_ENABLED } from "@/lib/commerceClientMigration";
+import { CommerceReadError, CommercePageFeedback } from "@/components/client/CommerceReadFeedback";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, UtensilsCrossed, MapPin, Plus, Minus, ShoppingCart, Loader2, Clock, X, Camera, Play } from "lucide-react";
 import CheckoutModal from "@/components/boutique/CheckoutModal";
@@ -9,35 +11,30 @@ import MediaGallery, { getMediaList } from "@/components/media/MediaGallery";
 export default function RestaurantDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [clientProfil, setClientProfil] = useState(null);
+  const client = useClientCommerceProfile();
+  const clientProfil = client.profile;
   const [cart, setCart] = useState([]);
   const [showCheckout, setShowCheckout] = useState(false);
   const [galleryProduct, setGalleryProduct] = useState(null);
   const visitTrackedRef = useRef(false);
 
-  useEffect(() => {
-    base44.auth.me().then(u => {
-      if (u?.email) {
-        base44.entities.ClientExterne.filter({ user_email: u.email })
-          .then(c => setClientProfil(c?.[0] || null))
-          .catch(() => {});
-      }
-    }).catch(() => {});
-  }, []);
-
-  const { data: restaurant, isLoading } = useQuery({
-    queryKey: ["restaurant", id],
-    queryFn: () => base44.entities.Restaurant.get(id),
-    enabled: !!id,
-  });
-
-  const { data: plats = [] } = useQuery({
-    queryKey: ["plats-restaurant", id],
-    queryFn: () => base44.entities.PlatRestaurant.filter({ restaurant_id: id, disponible: true, actif: true }, "-created_date", 200),
-    enabled: !!id,
-  });
+  const establishmentQuery = useClientCommercePage(client.context, "restaurant", "catalogue", id, !!id);
+  const restaurant = establishmentQuery.rows[0];
+  const isLoading = establishmentQuery.isLoading;
+  const productsQuery = useClientCommercePage(client.context, "restaurant", "products", id, !!restaurant?.id);
+  const plats = productsQuery.rows;
 
   useEffect(() => {
+    setCart([]);
+    setShowCheckout(false);
+    setGalleryProduct(null);
+    visitTrackedRef.current = false;
+  }, [id, clientProfil?.id, clientProfil?.country_code]);
+
+  useEffect(() => {
+    // The server projection intentionally excludes counters. Do not overwrite them
+    // with a fabricated zero; a secure visit endpoint is still a rollout blocker.
+    if (COMMERCE_CLIENT_MIGRATION_ENABLED) return;
     if (!restaurant?.id || visitTrackedRef.current) return;
     const key = `silgapp_visit_restaurant_${restaurant.id}`;
     const today = new Date().toISOString().slice(0, 10);
@@ -69,6 +66,8 @@ export default function RestaurantDetail() {
   const total = cart.reduce((s, i) => s + i.prix * i.quantite, 0);
   const cartCount = cart.reduce((s, i) => s + i.quantite, 0);
 
+  if (client.error) return <div className="min-h-screen bg-gray-50 p-4 pt-[calc(1rem+max(env(safe-area-inset-top),28px))]"><CommerceReadError message="Impossible de charger votre profil client." onRetry={client.retry} /><button onClick={() => navigate("/client/restaurants")} className="mt-3 text-sm underline">Retour</button></div>;
+  if (establishmentQuery.isError) return <div className="min-h-screen bg-gray-50 p-4 pt-[calc(1rem+max(env(safe-area-inset-top),28px))]"><CommerceReadError message="Impossible de charger cet établissement." onRetry={() => establishmentQuery.refetch()} isRetrying={establishmentQuery.isFetching} /><button onClick={() => navigate("/client/restaurants")} className="mt-3 text-sm underline">Retour</button></div>;
   if (isLoading || !clientProfil) return <div className="min-h-screen bg-gray-50 flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-orange-500" /></div>;
   if (!restaurant) return <div className="min-h-screen bg-gray-50 flex items-center justify-center"><p className="text-gray-500">Restaurant introuvable</p></div>;
 
@@ -83,7 +82,7 @@ export default function RestaurantDetail() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
-      <div className="bg-gradient-to-r from-orange-500 to-amber-600 text-white px-4 py-4 sticky top-0 z-20">
+      <div className="bg-gradient-to-r from-orange-500 to-amber-600 text-white px-4 pb-4 pt-[calc(1rem+max(env(safe-area-inset-top),28px))] sticky top-0 z-20">
         <div className="max-w-lg mx-auto flex items-center gap-3">
           <button onClick={() => navigate("/client/restaurants")} className="text-white/80 hover:text-white p-1"><ArrowLeft className="w-6 h-6" /></button>
           <div className="flex-1">
@@ -124,7 +123,8 @@ export default function RestaurantDetail() {
               <p className="text-sm font-bold text-red-600">Fermé actuellement — commande impossible</p>
             </div>
           )}
-          {plats.length === 0 && <p className="text-sm text-gray-500 text-center py-8">Aucun plat disponible</p>}
+          {productsQuery.isLoading && <div role="status" className="py-6 text-center text-sm text-gray-500">Chargement du menu...</div>}
+          {!productsQuery.isLoading && !productsQuery.isError && !productsQuery.hasNextPage && plats.length === 0 && <p className="text-sm text-gray-500 text-center py-8">Aucun plat disponible</p>}
           {Object.entries(platsByCategorie).map(([cat, items]) => (
             <div key={cat} className="mb-4">
               <p className="text-xs font-bold text-gray-500 uppercase mb-2">{categorieLabels[cat] || cat}</p>
@@ -188,6 +188,7 @@ export default function RestaurantDetail() {
               </div>
             </div>
           ))}
+          <CommercePageFeedback query={productsQuery} message="Impossible de charger tout le menu." />
         </div>
       </div>
 

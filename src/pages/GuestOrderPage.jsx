@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { clientCourseOutcome } from '@/lib/clientCourseOutcome';
+import { GUEST_ACCESS_UNAVAILABLE, nextGuestDraft, readGuestStart } from '@/lib/guestAccessRecovery';
 import { useNavigate } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -125,7 +126,7 @@ export default function GuestOrderPage({ call: suppliedCall, storage: suppliedSt
           if (result.course) { setCourse(current => reconcileGuestCourse(current, result.course)); setPending(false); }
           else setError(result.message || 'Création encore en vérification.');
         }
-      } catch (e) { if (token === generation.current) setError(`Actualisation momentanément indisponible. ${e.message}`); }
+      } catch (e) { if (token === generation.current) setError(e.code === 'ACCESS_DENIED' ? GUEST_ACCESS_UNAVAILABLE : `Actualisation momentanément indisponible. ${e.message}`); }
     })();
     return () => { generation.current++; catalogGeneration.current++; window.removeEventListener('focus', readConfig); };
   }, [call, storage]);
@@ -169,25 +170,21 @@ export default function GuestOrderPage({ call: suppliedCall, storage: suppliedSt
     if (lock.current || !config?.enabled) return;
     lock.current = true; setBusy(true); setError('');
     const token = generation.current;
+    ++trackingSequence.current;
     try {
       const saved = await storage.read();
       if (saved && !saved.draft_rejected) {
-        let latest;
-        try { latest = await call('track', { request_id: saved.request_id, read_token: saved.read_token }); }
-        catch (e) {
-          if (e.code === 'ACCESS_DENIED' && Number.isFinite(Date.parse(saved.expires_at)) && Date.parse(saved.expires_at) <= Date.now()) latest = { expired: true };
-          else throw e;
-        }
+        const latest = await readGuestStart(call, saved);
         if (token !== generation.current) return;
-        if (!latest.expired && (!latest.course || !['livree', 'annulee', 'terminee'].includes(latest.course.statut))) {
+        if (!latest.accessUnavailable && (!latest.course || !['livree', 'annulee', 'terminee'].includes(latest.course.statut))) {
           setAccess(saved); setCourse(latest.course || null); setPending(!latest.course); setView('track');
           setError('Une commande est encore en cours. Retrouvez son suivi avant de recommander.'); return;
         }
-        const { previous: older = [], ...last } = saved;
-        const archive = [...older, { ...last, reference: latest.course?.reference || saved.reference }];
-        await storage.save({ ...newGuestAccess(saved.device_token), draft: { ...emptyDraft, confirmed: false }, draft_rejected: true, previous: archive });
+        const next = nextGuestDraft(saved, latest, newGuestAccess, emptyDraft);
+        await storage.save(next);
         if (token !== generation.current) return;
-        submit.reset(); setPrevious(archive); setAccess(null); setCourse(null); setPending(false); setDraft(emptyDraft); setCatalog(null);
+        submit.reset(); setPrevious(next.previous); setAccess(null); setCourse(null); setPending(false); setDraft(emptyDraft); setCatalog(null);
+        if (latest.accessUnavailable) setError(GUEST_ACCESS_UNAVAILABLE);
       }
       if (token === generation.current) {
         setView('form');
@@ -304,7 +301,7 @@ export default function GuestOrderPage({ call: suppliedCall, storage: suppliedSt
       <header className="guest-header"><button type="button" title="Retour à l’accueil" aria-label="Retour à l’accueil" onClick={() => { if (review) setReview(false); else returnHome(); }} className="guest-icon"><ArrowLeft className="h-5 w-5" /></button><span className="guest-brand"><img src="/silgapp-notification-blue.png" alt="" />SILGAPP</span></header>
       {view !== 'home' && <div className="guest-intro"><p className="guest-eyebrow">{view === 'track' ? 'SUIVI PRIVÉ' : 'SANS COMPTE'}</p><h1>{view === 'track' ? 'Votre livraison' : 'Votre commande'}</h1></div>}
       {error && <p role="alert" className="guest-notice">{error}</p>}
-      {view === 'home' ? <GuestClientHome enabled={config?.enabled === true} loading={!config} course={course} onOrder={startOrder} onTrack={() => setView('track')} onLogin={() => setLoginPrompt(true)} previous={previous} onPrevious={openPrevious} /> : course && view === 'track' ? <section aria-label="Suivi privé">
+      {view === 'home' ? <GuestClientHome adCountries={config?.countries || []} enabled={config?.enabled === true} loading={!config} course={course} onOrder={startOrder} onTrack={() => setView('track')} onLogin={() => setLoginPrompt(true)} previous={previous} onPrevious={openPrevious} /> : course && view === 'track' ? <section aria-label="Suivi privé">
         <h2 className="guest-eyebrow">{course.reference || 'Votre course'}</h2>
         <p className="guest-status"><CheckCircle2 aria-hidden="true" />{clientCourseOutcome(course) === 'cancelled' ? 'Course annulée' : clientDecisionView(course).waiting ? 'En attente de votre décision' : course.assigned && ['livreur_en_route', 'client_contacte'].includes(course.statut) ? 'Livreur trouvé' : getCourseStatusLabel(course.statut)}</p>
         <ClientDecisionNotice course={course} />

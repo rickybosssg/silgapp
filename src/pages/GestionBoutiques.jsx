@@ -1,3 +1,5 @@
+import { COMMERCE_ADMIN_MIGRATION_ENABLED } from '@/lib/commerceAdminMigration';
+import CommerceAdminSurface from '@/components/admin/CommerceAdminSurface';
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -6,7 +8,7 @@ import { useNavigate } from "react-router-dom";
 import EtablissementForm from "@/components/partenaire/EtablissementForm";
 import PartenaireDetailDialog from "@/components/admin/PartenaireDetailDialog";
 
-export default function GestionBoutiques() {
+function LegacyGestionBoutiques() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [editing, setEditing] = useState(null);
@@ -116,4 +118,10 @@ export default function GestionBoutiques() {
       />
     </div>
   );
+}
+export default function GestionBoutiques(props={}) {
+  const enabled=props.commerceMigrationEnabled ?? COMMERCE_ADMIN_MIGRATION_ENABLED;
+  if(enabled!==true)return <LegacyGestionBoutiques {...props} />;
+  
+  return <CommerceAdminSurface context={props.commerceAdminContext} type={"boutique"} mode="catalogue" parentId={undefined} onClose={props.onClose} />;
 }

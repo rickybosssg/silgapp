@@ -1,5 +1,7 @@
 import { silgappLogo } from "@/lib/iosBranding";
 import React, { useState, useEffect, useRef } from "react";
+import { discoverAuthCommerce } from '@/lib/commerceAuthDiscovery';
+import { COMMERCE_OWNER_MIGRATION_ENABLED } from '@/lib/commerceOwnerMigration';
 import { useNavigate, useLocation } from "react-router-dom";
 import { base44, detectedToken } from "@/api/base44Client";
 import { APP_PUBLIC_URL, BASE44_APP_ID } from "@/lib/app-params";
@@ -218,7 +220,7 @@ async function resetPasswordWithToken(resetToken, newPassword) {
  * - base44Client lit localStorage au moment de createClient()
  * - detectedToken permet de savoir si un token a été trouvé
  */
-export default function AuthGate({ children, onLivreur, onClient, onPartenaire }) {
+export default function AuthGate({ children, onLivreur, onClient, onPartenaire, commerceMigrationEnabled = COMMERCE_OWNER_MIGRATION_ENABLED }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [state, setState] = useState("loading");
@@ -386,11 +388,7 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
             effectiveRole = "client";
             base44.auth.updateMe({ silgapp_role: "client" }).catch(() => {});
           } else {
-            const [boutiques, restaurants, pharmacies] = await Promise.all([
-              base44.entities.Boutique.filter({ user_email: user.email }).catch(() => []),
-              base44.entities.Restaurant.filter({ user_email: user.email }).catch(() => []),
-              base44.entities.Pharmacie.filter({ user_email: user.email }).catch(() => []),
-            ]);
+            const [boutiques, restaurants, pharmacies] = await discoverAuthCommerce(base44, user, commerceMigrationEnabled);
             if (!mounted) return;
             if ((boutiques?.length > 0) || (restaurants?.length > 0) || (pharmacies?.length > 0)) {
               effectiveRole = "partenaire";
@@ -466,11 +464,7 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
 
       if (effectiveRole === "partenaire") {
         // Vérifier le statut de validation de l'établissement
-        const [bqs, rts, phs] = await Promise.all([
-          base44.entities.Boutique.filter({ user_email: user.email }).catch(() => []),
-          base44.entities.Restaurant.filter({ user_email: user.email }).catch(() => []),
-          base44.entities.Pharmacie.filter({ user_email: user.email }).catch(() => []),
-        ]);
+        const [bqs, rts, phs] = await discoverAuthCommerce(base44, user, commerceMigrationEnabled);
         if (!mounted) return;
         const etab = bqs?.[0] || rts?.[0] || phs?.[0];
         if (etab) {
@@ -494,10 +488,10 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
 
     check().catch((error) => {
       console.error("[AuthGate] Echec verification auth:");
-      if (mounted) setState("unauthenticated");
+      if (mounted) setState(error?.message === "OWNER_DISCOVERY_UNAVAILABLE" ? "commerce_discovery_error" : "unauthenticated");
     });
     return () => { mounted = false; };
-  }, [authRetry]);
+  }, [authRetry, commerceMigrationEnabled]);
 
   const handleEmailSubmit = async (event) => {
     event.preventDefault();
@@ -597,11 +591,15 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
     );
   }
 
+  if (state === "commerce_discovery_error") {
+    return <div role="alert" className="p-6 space-y-4"><h1>Verification de votre etablissement indisponible</h1><p>Nous ne pouvons pas confirmer vos etablissements ou leur validation. Cela ne signifie pas que vous devez en creer un nouveau.</p><button type="button" onClick={()=>{setState("loading");setAuthRetry(value=>value+1);}}>Reessayer la verification</button></div>;
+  }
+
   if (state === "unauthenticated") {
     return (
-      <div className="silgapp-auth-screen min-h-screen bg-primary-light px-5 py-7 flex items-center justify-center dark:bg-[#07111f]">
-        <div className="w-full max-w-sm overflow-hidden rounded-[28px] border border-white/80 bg-white shadow-[0_24px_70px_rgba(0,122,255,0.18)] dark:border-slate-700 dark:bg-slate-950">
-          <div className="relative overflow-hidden bg-primary-dark px-6 pb-7 pt-8 text-white silgapp-relief-surface">
+      <div className="silgapp-auth-screen min-h-screen bg-slate-50 px-4 py-8 sm:py-12 flex items-center justify-center dark:bg-[#07111f]">
+        <div className="w-full max-w-md overflow-hidden rounded-[28px] border border-slate-200/80 bg-white shadow-[0_16px_60px_-24px_rgba(15,23,42,0.25)] dark:border-slate-700 dark:bg-slate-950">
+          <div className="relative overflow-hidden bg-slate-950 px-6 pb-8 pt-8 sm:px-8 text-white">
             <div className="absolute right-[-45px] top-[-55px] h-40 w-40 rounded-full bg-cyan-300/15" />
             <div className="absolute bottom-[-70px] left-[-45px] h-44 w-44 rounded-full bg-blue-300/10" />
             <div className="relative">
@@ -617,7 +615,7 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
                 </div>
               </div>
               <p className="text-xs font-bold uppercase text-cyan-200">SILGAPP</p>
-              <h1 className="mt-1 text-2xl font-bold text-white silgapp-relief-text">
+              <h1 className="mt-2 text-3xl font-bold tracking-tight text-white">
                 {authMode === "register"
                   ? "Créer un compte"
                   : authMode === "verify"
@@ -642,7 +640,7 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
             </div>
           </div>
 
-          <div className="space-y-5 px-6 py-6">
+          <div className="space-y-6 px-5 py-7 sm:px-8 sm:py-8">
           {authMode === "login" && <SocialLoginButtons disabled={loginLoading} onPendingChange={value => {
             if (value && submitting.current) return false;
             socialSubmitting.current = value;
@@ -654,16 +652,16 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
           }} />}
           <form onSubmit={handleEmailSubmit} className="space-y-4">
             <label className="block">
-              <span className="mb-1.5 block text-xs font-bold text-slate-700 dark:text-slate-200">Adresse e-mail</span>
+              <span className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Adresse e-mail</span>
               <div className="relative">
-                <Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-blue-300" />
+                <Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <input
                   type="email"
                   autoComplete="email"
                   required
                   value={loginForm.email}
                   onChange={(event) => setLoginForm((form) => ({ ...form, email: event.target.value }))}
-                  className="w-full rounded-xl border border-slate-700 bg-[#0b1220] py-3.5 pl-11 pr-4 text-sm text-white caret-white outline-none placeholder:text-slate-400 focus:border-cyan-400 focus:ring-4 focus:ring-blue-500/15"
+                  className="w-full min-h-12 rounded-xl border border-slate-200 bg-slate-50/50 py-3.5 pl-11 pr-4 text-base text-slate-950 caret-blue-700 outline-none placeholder:text-slate-500 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                   placeholder="nom@exemple.com"
                 />
               </div>
@@ -671,16 +669,16 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
 
             {authMode !== "reset_request" ? (
               <label className="block">
-                <span className="mb-1.5 block text-xs font-bold text-slate-700 dark:text-slate-200">{authMode === "reset_confirm" ? "Nouveau mot de passe" : "Mot de passe"}</span>
+                <span className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">{authMode === "reset_confirm" ? "Nouveau mot de passe" : "Mot de passe"}</span>
                 <div className="relative">
-                  <Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-blue-300" />
+                  <Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                   <input
                     type="password"
                     autoComplete={authMode === "reset_confirm" || authMode === "register" ? "new-password" : "current-password"}
                     required
                     value={loginForm.password}
                     onChange={(event) => setLoginForm((form) => ({ ...form, password: event.target.value }))}
-                    className="w-full rounded-xl border border-slate-700 bg-[#0b1220] py-3.5 pl-11 pr-4 text-sm text-white caret-white outline-none placeholder:text-slate-400 focus:border-cyan-400 focus:ring-4 focus:ring-blue-500/15"
+                    className="w-full min-h-12 rounded-xl border border-slate-200 bg-slate-50/50 py-3.5 pl-11 pr-4 text-base text-slate-950 caret-blue-700 outline-none placeholder:text-slate-500 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                     placeholder={authMode === "reset_confirm" ? "Nouveau mot de passe" : "Mot de passe"}
                   />
                 </div>
@@ -689,16 +687,16 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
 
             {authMode === "register" || authMode === "reset_confirm" ? (
               <label className="block">
-                <span className="mb-1.5 block text-xs font-bold text-slate-700 dark:text-slate-200">Confirmer le mot de passe</span>
+                <span className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Confirmer le mot de passe</span>
                 <div className="relative">
-                  <Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-blue-300" />
+                  <Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                   <input
                     type="password"
                     autoComplete="new-password"
                     required
                     value={loginForm.confirmPassword}
                     onChange={(event) => setLoginForm((form) => ({ ...form, confirmPassword: event.target.value }))}
-                    className="w-full rounded-xl border border-slate-700 bg-[#0b1220] py-3.5 pl-11 pr-4 text-sm text-white caret-white outline-none placeholder:text-slate-400 focus:border-cyan-400 focus:ring-4 focus:ring-blue-500/15"
+                    className="w-full min-h-12 rounded-xl border border-slate-200 bg-slate-50/50 py-3.5 pl-11 pr-4 text-base text-slate-950 caret-blue-700 outline-none placeholder:text-slate-500 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                     placeholder={authMode === "reset_confirm" ? "Confirmer le nouveau mot de passe" : "Confirmer le mot de passe"}
                   />
                 </div>
@@ -752,7 +750,7 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
             <button
               type="submit"
               disabled={loginLoading || socialPending}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3.5 font-bold text-white shadow-lg shadow-primary/20 transition hover:bg-primary-dark active:scale-[0.98] disabled:opacity-70 silgapp-relief"
+              className="flex min-h-14 w-full items-center justify-center gap-2 rounded-xl bg-blue-700 px-4 py-3.5 font-semibold text-white shadow-md shadow-blue-900/10 transition-colors hover:bg-blue-800 focus-visible:outline focus-visible:outline-4 focus-visible:outline-blue-200 disabled:opacity-70"
             >
               {loginLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
               {authMode === "register"
@@ -771,7 +769,7 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
               <button
                 type="button"
                 onClick={() => switchAuthMode("reset_request")}
-                className="w-full text-sm font-semibold text-primary hover:text-primary-dark"
+                className="min-h-11 w-full rounded-lg text-sm font-semibold text-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 hover:text-primary-dark"
               >
                 Mot de passe oublié ?
               </button>
@@ -787,7 +785,7 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
                     .then(() => setLoginInfo("Nouveau code envoyé. Vérifiez votre email."))
                     .catch((error) => setLoginError(error?.message || "Impossible de renvoyer le code."));
                 }}
-                className="w-full text-sm font-semibold text-primary"
+                className="min-h-11 w-full rounded-lg text-sm font-semibold text-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600"
               >
                 Renvoyer le code
               </button>
@@ -800,7 +798,7 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
             <button
               type="button"
               onClick={() => switchAuthMode("login")}
-              className="w-full text-sm font-semibold text-primary"
+              className="min-h-11 w-full rounded-lg text-sm font-semibold text-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600"
             >
               Retour à la connexion
             </button>
@@ -808,7 +806,7 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
             <button
               type="button"
               onClick={() => switchAuthMode(authMode === "login" ? "register" : "login")}
-              className="w-full text-sm font-semibold text-primary"
+              className="min-h-11 w-full rounded-lg text-sm font-semibold text-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600"
             >
               {authMode === "login" ? "Créer un nouveau compte" : "J'ai déjà un compte"}
             </button>

@@ -4,6 +4,8 @@ import { useClientCourseEvents } from '@/hooks/useClientCourseEvents';
 import { base44 } from "@/api/base44Client";
 import { createScopedRefreshQueue } from "@/lib/scopedRefreshQueue";
 import { logoutPersistent } from "@/lib/authPersistence";
+import { COMMERCE_CLIENT_MIGRATION_ENABLED, clientCommerceQueryKey, clientCommercePollingInterval, readAllClientCommerceRows } from "@/lib/commerceClientMigration";
+import { CommerceReadError } from "@/components/client/CommerceReadFeedback";
 import { useNavigate } from "react-router-dom";
 import { openCreatedExpressCourse, reconcileCreatedExpressCourse } from '@/lib/expressTracking';
 import { extractLocalPhone } from "@/lib/phoneUtils";
@@ -28,6 +30,7 @@ import CourseAnnuleeRelanceDialog from "@/components/client/CourseAnnuleeRelance
 import LivreurAnnulationDecisionModal from "@/components/client/LivreurAnnulationDecisionModal";
 import { clientDecisionView } from '../../base44/shared/clientDecisionView.js';
 import VenusFloatingButton from "@/components/client/VenusFloatingButton";
+import ClientServiceFloaters from "@/components/client/ClientServiceFloaters";
 import LiveCounterBadge from "@/components/ui/LiveCounterBadge";
 import SilgappLiveStats from "@/components/shared/SilgappLiveStats";
 import MessagesPage from "@/components/chat/MessagesPage";
@@ -181,26 +184,34 @@ export default function ClientExterneApp() {
     await Promise.all(unread.map(n => base44.entities.Notification.update(n.id, { lue: true }).catch(() => null)));
   };
 
+  const secureCommerce = COMMERCE_CLIENT_MIGRATION_ENABLED;
+  const commerceContext = useMemo(() => ({ profile: clientProfil, userId, userEmail: clientProfil?.user_email }), [clientProfil, userId]);
+  const commerceReady = !!userId && !!clientProfil?.id && !!clientProfil?.country_code && !sessionExpired;
+
   // ── Partenaires (boutiques + restaurants) pour la carte client — filtrés par pays ──
   const partenaireFilter = clientProfil?.country_code
     ? { pays_code: clientProfil.country_code, actif: true }
     : { actif: true };
-  const { data: boutiquesCarte = [] } = useQuery({
-    queryKey: ["boutiques-carte-client", clientProfil?.country_code],
-    queryFn: () => base44.entities.Boutique.filter(partenaireFilter),
-    initialData: [],
-    enabled: !!clientProfil?.country_code,
+  const boutiquesCarteQuery = useQuery({
+    queryKey: secureCommerce ? [...clientCommerceQueryKey(commerceContext, { type: "boutique", action: "catalogue", secure: true }), "complete-map"] : ["boutiques-carte-client", clientProfil?.country_code],
+    queryFn: ({ signal }) => secureCommerce ? readAllClientCommerceRows(base44, commerceContext, { type: "boutique", action: "catalogue", secure: true }, { signal }) : base44.entities.Boutique.filter(partenaireFilter),
+    initialData: secureCommerce ? undefined : [],
+    enabled: secureCommerce ? commerceReady : !!clientProfil?.country_code,
     staleTime: 120000,
-    refetchInterval: 300000,
+    refetchInterval: secureCommerce ? query => clientCommercePollingInterval(query, 300000) : 300000,
+    ...(secureCommerce ? { retry: false, refetchIntervalInBackground: false, refetchOnReconnect: false } : {}),
   });
-  const { data: restaurantsCarte = [] } = useQuery({
-    queryKey: ["restaurants-carte-client", clientProfil?.country_code],
-    queryFn: () => base44.entities.Restaurant.filter(partenaireFilter),
-    initialData: [],
-    enabled: !!clientProfil?.country_code,
+  const boutiquesCarte = secureCommerce && boutiquesCarteQuery.isError ? [] : (boutiquesCarteQuery.data || []);
+  const restaurantsCarteQuery = useQuery({
+    queryKey: secureCommerce ? [...clientCommerceQueryKey(commerceContext, { type: "restaurant", action: "catalogue", secure: true }), "complete-map"] : ["restaurants-carte-client", clientProfil?.country_code],
+    queryFn: ({ signal }) => secureCommerce ? readAllClientCommerceRows(base44, commerceContext, { type: "restaurant", action: "catalogue", secure: true }, { signal }) : base44.entities.Restaurant.filter(partenaireFilter),
+    initialData: secureCommerce ? undefined : [],
+    enabled: secureCommerce ? commerceReady : !!clientProfil?.country_code,
     staleTime: 120000,
-    refetchInterval: 300000,
+    refetchInterval: secureCommerce ? query => clientCommercePollingInterval(query, 300000) : 300000,
+    ...(secureCommerce ? { retry: false, refetchIntervalInBackground: false, refetchOnReconnect: false } : {}),
   });
+  const restaurantsCarte = secureCommerce && restaurantsCarteQuery.isError ? [] : (restaurantsCarteQuery.data || []);
   const { data: pharmaciesCarte = [] } = useQuery({
     queryKey: ["pharmacies-carte-client", clientProfil?.country_code],
     queryFn: () => base44.entities.Pharmacie.filter(partenaireFilter),
@@ -215,25 +226,29 @@ export default function ClientExterneApp() {
     ...pharmaciesCarte.map(p => ({ ...p, _type: "pharmacie" })),
   ], [boutiquesCarte, restaurantsCarte, pharmaciesCarte]);
 
-  const { data: commandesBoutiqueClient = [] } = useQuery({
-    queryKey: ["commandes-boutique-client-active", clientProfil?.id],
-    queryFn: () => base44.entities.CommandeBoutique.filter({ client_id: clientProfil.id }, "-created_date", 50),
-    enabled: !!clientProfil?.id,
-    refetchInterval: 60000,
+  const commandesBoutiqueQuery = useQuery({
+    queryKey: secureCommerce ? [...clientCommerceQueryKey(commerceContext, { type: "boutique", action: "orders", secure: true }), "complete-active"] : ["commandes-boutique-client-active", clientProfil?.id],
+    queryFn: ({ signal }) => secureCommerce ? readAllClientCommerceRows(base44, commerceContext, { type: "boutique", action: "orders", secure: true }, { signal }) : base44.entities.CommandeBoutique.filter({ client_id: clientProfil.id }, "-created_date", 50),
+    enabled: secureCommerce ? commerceReady : !!clientProfil?.id,
+    refetchInterval: secureCommerce ? query => clientCommercePollingInterval(query) : 60000,
+    ...(secureCommerce ? { retry: false, refetchIntervalInBackground: false, refetchOnReconnect: false } : {}),
   });
+  const commandesBoutiqueClient = commandesBoutiqueQuery.data || [];
 
-  const { data: commandesRestaurantClient = [] } = useQuery({
-    queryKey: ["commandes-restaurant-client-active", clientProfil?.id],
-    queryFn: () => base44.entities.CommandeRestaurant.filter({ client_id: clientProfil.id }, "-created_date", 50),
-    enabled: !!clientProfil?.id,
-    refetchInterval: 60000,
+  const commandesRestaurantQuery = useQuery({
+    queryKey: secureCommerce ? [...clientCommerceQueryKey(commerceContext, { type: "restaurant", action: "orders", secure: true }), "complete-active"] : ["commandes-restaurant-client-active", clientProfil?.id],
+    queryFn: ({ signal }) => secureCommerce ? readAllClientCommerceRows(base44, commerceContext, { type: "restaurant", action: "orders", secure: true }, { signal }) : base44.entities.CommandeRestaurant.filter({ client_id: clientProfil.id }, "-created_date", 50),
+    enabled: secureCommerce ? commerceReady : !!clientProfil?.id,
+    refetchInterval: secureCommerce ? query => clientCommercePollingInterval(query) : 60000,
+    ...(secureCommerce ? { retry: false, refetchIntervalInBackground: false, refetchOnReconnect: false } : {}),
   });
+  const commandesRestaurantClient = commandesRestaurantQuery.data || [];
 
   // ── Realtime : refresh immédiat des commandes client ──
   // Le polling 60s reste le fallback de sécurité. La subscription déclenche
   // un refresh quand une commande est créée/modifiée (statut, livreur, etc.).
   useEffect(() => {
-    if (!clientProfil?.id) return;
+    if (secureCommerce || !clientProfil?.id) return;
     const unsubBoutique = base44.entities.CommandeBoutique.subscribe(() => {
       queryClient.invalidateQueries({ queryKey: ["commandes-boutique-client-active"] });
     });
@@ -241,12 +256,16 @@ export default function ClientExterneApp() {
       queryClient.invalidateQueries({ queryKey: ["commandes-restaurant-client-active"] });
     });
     return () => { unsubBoutique(); unsubRestaurant(); };
-  }, [clientProfil?.id, queryClient]);
+  }, [secureCommerce, clientProfil?.id, queryClient]);
 
+  const commandesReadError = secureCommerce && (commandesBoutiqueQuery.isError || commandesRestaurantQuery.isError);
+  const commandesReadLoading = secureCommerce && (!commerceReady || commandesBoutiqueQuery.isLoading || commandesRestaurantQuery.isLoading);
+  const catalogueReadError = secureCommerce && (boutiquesCarteQuery.isError || restaurantsCarteQuery.isError);
   const commandesActivesCount = useMemo(() => {
+    if (commandesReadError || commandesReadLoading) return null;
     const active = new Set(["commande_envoyee", "commande_recue", "paiement_verification", "paiement_valide", "en_preparation", "prete_recuperation", "livreur_assigne", "commande_recuperee", "en_livraison"]);
     return [...commandesBoutiqueClient, ...commandesRestaurantClient].filter(c => active.has(c.statut)).length;
-  }, [commandesBoutiqueClient, commandesRestaurantClient]);
+  }, [commandesBoutiqueClient, commandesRestaurantClient, commandesReadError, commandesReadLoading]);
   // ── ÉTAT DÉRIVÉ POUR LES PUBLICITÉS — détection des moments d'affichage ──
   // Course en recherche de livreur (nouvelle ou recherche_livreur, sans livreur assigné)
   const courseEnRecherche = useMemo(() =>
@@ -312,7 +331,7 @@ export default function ClientExterneApp() {
   const coursePrincipale = useMemo(() =>
     coursesActives.find(c => c.id === suiviCourseId) || courseAssignee || courseEnRecherche || coursesActives[0] || null
   , [coursesActives, courseEnRecherche, courseAssignee, suiviCourseId]);
-  useClientCourseEvents(coursePrincipale);
+  useClientCourseEvents(coursePrincipale, courseLivreData);
   const cancelDisplayedPending = useRef(false);
   async function cancelDisplayedCourse(course, confirmed = false) {
     if (!course?.id || cancelDisplayedPending.current) return;
@@ -1145,7 +1164,7 @@ export default function ClientExterneApp() {
 
       {/* ── COURSE ACTIVE UNIQUE — bannière flottante ─────── */}
       {coursesActives.length === 1 && (
-        <div className="fixed top-[calc(max(env(safe-area-inset-top),28px)+0.75rem)] left-3 right-3 z-50">
+        <div data-client-floating-protected className="fixed top-[calc(max(env(safe-area-inset-top),28px)+0.75rem)] left-3 right-3 z-50">
           <div
             className="bg-[#1f2429]/95 backdrop-blur-md rounded-2xl shadow-xl border border-[#00a86b]/20 overflow-hidden cursor-pointer active:scale-[0.98] transition-transform"
             onClick={() => navigate("/client/suivi", { state: { course_id: coursesActives[0].id } })}
@@ -1186,7 +1205,7 @@ export default function ClientExterneApp() {
 
       {/* ── MULTI-COURSES — bannière compacte + sélecteur ─────── */}
       {coursesActives.length > 1 && (
-        <div className="fixed top-[calc(max(env(safe-area-inset-top),28px)+0.75rem)] left-3 right-3 z-50">
+        <div data-client-floating-protected className="fixed top-[calc(max(env(safe-area-inset-top),28px)+0.75rem)] left-3 right-3 z-50">
           <div
             className="bg-[#1f2429]/95 backdrop-blur-md rounded-2xl shadow-xl border border-[#00a86b]/20 overflow-hidden cursor-pointer active:scale-[0.98] transition-transform"
             onClick={() => setShowMultiCourseSelector(true)}
@@ -1222,7 +1241,7 @@ export default function ClientExterneApp() {
         </div>
       )}
 
-      <div className="px-4 pb-[calc(5rem+env(safe-area-inset-bottom))]" style={{ paddingTop: `calc(max(env(safe-area-inset-top), 28px) + ${coursesActives.length > 0 ? 104 : 16}px)` }}>
+      <div data-client-service-content className="px-4" style={{ paddingTop: `calc(max(env(safe-area-inset-top), 28px) + ${coursesActives.length > 0 ? 104 : 16}px)`, paddingBottom: coursePrincipale ? "calc(13rem + env(safe-area-inset-bottom))" : "calc(6rem + env(safe-area-inset-bottom))" }}>
         <div className="max-w-lg mx-auto space-y-4">
 
           {/* ── ONGLETS PROMO ─────────────────────── */}
@@ -1399,6 +1418,7 @@ export default function ClientExterneApp() {
                     <Inbox className="w-5 h-5 text-white" />
                   </div>
                   <span className="text-[10px] font-semibold text-gray-600">Recevoir</span>
+                  <span className="text-[9px] text-gray-500">Recevoir un colis</span>
                 </button>
 
                 <button
@@ -1453,6 +1473,8 @@ export default function ClientExterneApp() {
               {/* ── RACCOURCIS ────────────────────── */}
               <div className="bg-white rounded-2xl border border-black/5 shadow-[0_8px_24px_rgba(15,23,42,0.06)] p-4">
                 <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-3">Accès rapide</p>
+                {commandesReadError && <CommerceReadError message="Le nombre de commandes actives est indisponible." onRetry={() => { commandesBoutiqueQuery.refetch(); commandesRestaurantQuery.refetch(); }} isRetrying={commandesBoutiqueQuery.isFetching || commandesRestaurantQuery.isFetching} />}
+                {commandesReadLoading && <p role="status" className="mb-2 text-xs text-gray-500">Chargement des commandes...</p>}
                 <div className="grid grid-cols-4 gap-2">
                   {[
                     { icon: <Package className="w-5 h-5" />, label: "Courses",   color: "text-blue-600",   bg: "bg-blue-50",   action: () => navigate("/client/suivi") },
@@ -1486,6 +1508,10 @@ export default function ClientExterneApp() {
                       <span className="text-[10px] font-semibold text-gray-600">{item.label}</span>
                     </button>
                   ))}
+                </div>
+                <div className="mt-3 pt-3 border-t border-gray-100 flex items-center gap-3" data-client-venus-access>
+                  <VenusFloatingButton inline hidden={expressOpen} />
+                  <div><p className="text-sm font-bold text-gray-800">Vénus</p><p className="text-xs text-gray-500">Votre assistante</p></div>
                 </div>
               </div>
 
@@ -1551,12 +1577,16 @@ export default function ClientExterneApp() {
               <ArrowLeft className="w-5 h-5" />
             </Button>
           </div>
+          {catalogueReadError && <CommerceReadError message="Certains commerces ne peuvent pas être affichés sur la carte." onRetry={() => { boutiquesCarteQuery.refetch(); restaurantsCarteQuery.refetch(); }} isRetrying={boutiquesCarteQuery.isFetching || restaurantsCarteQuery.isFetching} />}
+          {secureCommerce && (boutiquesCarteQuery.isLoading || restaurantsCarteQuery.isLoading) && <p role="status" className="p-2 text-sm text-gray-500">Chargement des commerces...</p>}
           <div className="flex-1 relative">
             <ModernMap
               position={position}
               livreursProches={livreursProches}
               courseActive={coursesActives.find(c => ["livreur_en_route","colis_recupere","en_livraison"].includes(c.statut)) || null}
               partenaires={partenairesCarte}
+              onMapReady={undefined}
+              onMarkerClick={undefined}
             />
           </div>
         </div>
@@ -1575,7 +1605,10 @@ export default function ClientExterneApp() {
       )}
 
 
-      <VenusFloatingButton hidden={expressOpen} />
+      <ClientServiceFloaters
+        onNavigate={navigate}
+        hidden={expressOpen || showProfilModal || showMap || showMessages || showNotificationsPanel || showRecherche || showSuiviFullscreen || showMultiCourseSelector || showAcceptanceAnim || !!courseLivreId || !!courseANoter || !!courseAnnuleeRelance || !!courseDecisionClient || ongletActif === "promo"}
+      />
 
       {/* ── COURSE ANNULÉE AUTO — proposer relance ou terminer ── */}
       {courseAnnuleeRelance && (
@@ -1675,10 +1708,12 @@ export default function ClientExterneApp() {
 
       {/* ── BARRE DE SUIVI PERSISTANTE — en bas de l'écran ── */}
       {coursePrincipale && !showRecherche && !showSuiviFullscreen && !showMultiCourseSelector && (
-        <SuiviBarreFlottante
-          course={coursePrincipale}
-          onClick={() => setShowSuiviFullscreen(true)}
-        />
+        <div data-client-floating-protected>
+          <SuiviBarreFlottante
+            course={coursePrincipale}
+            onClick={() => setShowSuiviFullscreen(true)}
+          />
+        </div>
       )}
 
       {/* ── SÉLECTEUR MULTI-COURSES — liste compacte des courses actives ── */}

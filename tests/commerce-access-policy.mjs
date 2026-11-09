@@ -1,0 +1,17 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {accessShop,adminFor,shopPatch,productPatch,commissionPatch,moderationPatch} from '../base44/shared/commerceAccess.js';
+const owner={id:'u',email:'u@example.test',role:'user'};const shop={id:'s',partenaire_id:'u',pays_code:'BF'};
+test('country scope cannot be supplied in editable shop data',()=>assert.throws(()=>shopPatch('boutique',{pays_code:'CI'}),/FORBIDDEN_FIELD/));
+test('optional owner profile mismatch blocks rather than overrides shop',()=>assert.throws(()=>accessShop(owner,shop,{id:'p',user_email:owner.email,country_code:'CI'}),/OWNER_COUNTRY_FORBIDDEN/));
+test('missing country fails closed',()=>assert.throws(()=>accessShop(owner,{...shop,pays_code:undefined}),/COUNTRY_REQUIRED/));
+test('country admin missing country fails closed',()=>assert.throws(()=>adminFor({role:'admin',admin_type:'pays'},'BF'),/TRUSTED_ADMIN_SCOPE_REQUIRED/));
+test('unknown admin scope does not inherit historical global default',()=>assert.throws(()=>adminFor({role:'admin'},'BF'),/TRUSTED_ADMIN_SCOPE_REQUIRED/));
+test('restaurant editable preparation time preserved',()=>assert.equal(shopPatch('restaurant',{temps_preparation_min:30}).temps_preparation_min,30));
+test('product patch has no parent or moderation writable fields',()=>{for(const k of ['boutique_id','restaurant_id','actif','validation','valide_par','devise'])assert.throws(()=>productPatch({[k]:'x'}),/FORBIDDEN_FIELD/);});
+test('free catalogue historical price remains allowed',()=>assert.equal(productPatch({nom:'free',prix:0},true).prix,0));
+test('non finite numbers rejected',()=>{for(const prix of [NaN,Infinity,'10',-1])assert.throws(()=>productPatch({prix}));});
+test('media arrays validate every URL',()=>assert.throws(()=>productPatch({photos_urls:'["https://example.test/good","file:///private"]'}),/INVALID_MEDIA_URL/));
+test('coordinates bounded',()=>assert.throws(()=>shopPatch('boutique',{latitude:91}),/INVALID_NUMBER/));
+test('clear explicit commission allowed for in-country admin',()=>assert.equal(commissionPatch({role:'admin',admin_type:'pays',id:'u',country_code:'BF'},shop,{commission_pct:null},{user_id:'u',scope:'pays',country_code:'BF',expires_at:'2099-01-01T00:00:00Z'}).commission_pct,null));
+test('moderation rejects forged signed metadata',()=>assert.throws(()=>moderationPatch({id:'u',role:'admin',admin_type:'global'},shop,{action:'valider',valide_par:'forged'},'now',false,{user_id:'u',scope:'global',expires_at:'2099-01-01T00:00:00Z'}),/FORBIDDEN_FIELD/));

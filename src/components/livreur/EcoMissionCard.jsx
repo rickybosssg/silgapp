@@ -68,7 +68,7 @@ export default function EcoMissionCard({ mission, availableCourses, livreurProfi
         queryClient.invalidateQueries({ queryKey: ["eco-missions-disponibles"] });
         queryClient.invalidateQueries({ queryKey: ["eco-mission-active"] });
         queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
-        onAcceptSuccess?.();
+        onAcceptSuccess?.({ key: `mission:${mission.id}`, receipt: data });
       } else {
         // ── Traduire les codes d'erreur en messages compréhensibles ──
         const reasonMessages = {

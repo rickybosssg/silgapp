@@ -102,7 +102,7 @@ export default function LivreurRegistrationForm({ user, onComplete }) {
     }
 
     if (!cnibRecto || !cnibVerso) {
-      setError("Les photos CNIB recto et verso sont obligatoires.");
+      setError("Les photos recto et verso de la pièce d'identité sont obligatoires.");
       return;
     }
 
@@ -115,8 +115,8 @@ export default function LivreurRegistrationForm({ user, onComplete }) {
     try {
       // Upload SÉQUENTIEL (pas Promise.all) — évite la surcharge et les timeouts
       const photoUrl = await uploadFile(photoProfil, "photo profil");
-      const rectoUrl = await uploadFile(cnibRecto, "CNIB recto");
-      const versoUrl = await uploadFile(cnibVerso, "CNIB verso");
+      const rectoUrl = await uploadFile(cnibRecto, "Pièce d'identité recto");
+      const versoUrl = await uploadFile(cnibVerso, "Pièce d'identité verso");
       setUploadProgress("");
 
       // Créer le profil livreur
@@ -177,7 +177,7 @@ export default function LivreurRegistrationForm({ user, onComplete }) {
     const c = accentMap[accent] || accentMap.purple;
     return (
       <div className="space-y-2">
-        <Label className="text-xs font-semibold text-gray-600">
+        <Label className="text-sm font-medium text-slate-700">
           {label} {required && <span className="text-red-500">*</span>}
         </Label>
         {value ? (
@@ -187,20 +187,20 @@ export default function LivreurRegistrationForm({ user, onComplete }) {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-gray-700 truncate">{value.name}</p>
-              <p className="text-[10px] text-gray-400">{(value.size / 1024).toFixed(0)} KB · Prêt ✓</p>
+              <p className="text-xs text-slate-500">{(value.size / 1024).toFixed(0)} KB · Prêt ✓</p>
             </div>
-            <button type="button" onClick={() => onChange(null)} className="text-xs text-red-500 font-semibold hover:text-red-700 px-2 py-1 rounded-lg hover:bg-red-50">
+            <button type="button" onClick={() => onChange(null)} className="min-h-11 text-xs text-red-700 font-semibold hover:text-red-800 px-3 py-2 rounded-lg hover:bg-red-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600">
               Retirer
             </button>
           </div>
         ) : (
-          <label className={`flex flex-col items-center justify-center gap-2 p-5 rounded-2xl border-2 border-dashed border-gray-200 ${c.hover} hover:bg-gray-50/50 cursor-pointer transition-all group`}>
-            <div className={`w-12 h-12 rounded-2xl ${c.bg} flex items-center justify-center group-hover:scale-110 transition-transform`}>
+          <label className={`flex flex-col items-center justify-center gap-2 p-5 rounded-2xl border border-dashed border-slate-300 focus-within:ring-4 focus-within:ring-blue-100 focus-within:border-blue-600 ${c.hover} hover:bg-gray-50/50 cursor-pointer transition-all group`}>
+            <div className={`w-12 h-12 rounded-2xl ${c.bg} flex items-center justify-center motion-safe:group-hover:scale-105 motion-safe:transition-transform`}>
               <Icon className={`w-5 h-5 ${c.text}`} />
             </div>
             <span className="text-sm font-semibold text-gray-600">Cliquez pour sélectionner</span>
-            <span className="text-[10px] text-gray-400">JPG, PNG ou WebP — compression auto</span>
-            <input type="file" accept="image/*" className="hidden" onChange={e => onChange(e.target.files?.[0] || null)} />
+            <span className="text-xs text-slate-500">JPG, PNG ou WebP — compression auto</span>
+            <input type="file" accept="image/*" className="sr-only" onChange={e => onChange(e.target.files?.[0] || null)} />
           </label>
         )}
       </div>
@@ -208,42 +208,42 @@ export default function LivreurRegistrationForm({ user, onComplete }) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-7 rounded-[28px] border border-slate-200/80 bg-white p-5 shadow-[0_16px_60px_-24px_rgba(15,23,42,0.25)] sm:p-8">
       {/* ── Header premium ── */}
-      <div className="text-center">
-        <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-red-500 to-orange-500 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-red-500/30">
-          <Camera className="w-10 h-10 text-white" />
+      <div className="border-b border-slate-100 pb-7 text-left">
+        <div className="w-14 h-14 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center mb-4">
+          <Camera className="w-7 h-7 text-blue-700" />
         </div>
-        <h2 className="text-2xl font-black text-gray-900">Demande compte livreur</h2>
-        <p className="text-sm text-gray-500 mt-1">Votre demande sera vérifiée par SILGAPP</p>
+        <h2 className="text-2xl font-bold tracking-tight text-slate-950">Demande compte livreur</h2>
+        <p className="text-sm leading-relaxed text-slate-600 mt-2">Votre demande sera vérifiée par SILGAPP</p>
       </div>
 
       {/* ── Section : Identité ── */}
-      <section className="space-y-4">
+      <section className="space-y-4 rounded-2xl border border-slate-200/80 bg-slate-50/50 p-4 sm:p-5">
         <div className="flex items-center gap-2">
-          <div className="w-1 h-5 rounded-full bg-red-500" />
-          <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wide">Identité</h3>
+          <div className="w-1 h-5 rounded-full bg-blue-600" />
+          <h3 className="text-sm font-bold text-slate-900 tracking-wide">Identité</h3>
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-4">
           <div>
-            <Label className="text-xs font-semibold text-gray-600">Nom <span className="text-red-500">*</span></Label>
-            <Input value={form.nom} onChange={e => setForm({ ...form, nom: e.target.value })} placeholder="Ex: Ouédraogo" className="mt-1.5 h-12 rounded-xl text-sm" required />
+            <Label className="text-sm font-medium text-slate-700">Nom <span className="text-red-500">*</span></Label>
+            <Input value={form.nom} onChange={e => setForm({ ...form, nom: e.target.value })} placeholder="Ex: Ouédraogo" className="mt-2 h-12 rounded-xl border-slate-200 bg-white text-base text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-blue-600 focus:ring-blue-600/20" required />
           </div>
           <div>
-            <Label className="text-xs font-semibold text-gray-600">Prénom <span className="text-red-500">*</span></Label>
-            <Input value={form.prenom} onChange={e => setForm({ ...form, prenom: e.target.value })} placeholder="Ex: Ibrahim" className="mt-1.5 h-12 rounded-xl text-sm" required />
+            <Label className="text-sm font-medium text-slate-700">Prénom <span className="text-red-500">*</span></Label>
+            <Input value={form.prenom} onChange={e => setForm({ ...form, prenom: e.target.value })} placeholder="Ex: Ibrahim" className="mt-2 h-12 rounded-xl border-slate-200 bg-white text-base text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-blue-600 focus:ring-blue-600/20" required />
           </div>
         </div>
       </section>
 
       {/* ── Section : Contact ── */}
-      <section className="space-y-4">
+      <section className="space-y-4 rounded-2xl border border-slate-200/80 bg-slate-50/50 p-4 sm:p-5">
         <div className="flex items-center gap-2">
           <div className="w-1 h-5 rounded-full bg-blue-500" />
-          <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wide">Contact</h3>
+          <h3 className="text-sm font-bold text-slate-900 tracking-wide">Contact</h3>
         </div>
         <div>
-          <Label className="text-xs font-semibold text-gray-600 flex items-center gap-1.5">
+          <Label className="text-sm font-medium text-slate-700 flex items-center gap-1.5">
             <Phone className="w-3.5 h-3.5" /> Téléphone WhatsApp <span className="text-red-500">*</span>
           </Label>
           <div className="relative mt-1.5">
@@ -253,16 +253,16 @@ export default function LivreurRegistrationForm({ user, onComplete }) {
             <Input
               type="tel" value={form.telephone} onChange={e => setForm({ ...form, telephone: e.target.value })}
               placeholder="XX XX XX XX"
-              className="h-12 rounded-xl text-sm font-mono tracking-wider pl-14" required
+              className="h-12 rounded-xl border-slate-200 bg-white text-base text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-blue-600 focus:ring-blue-600/20 font-mono tracking-wider pl-14" required
             />
           </div>
         </div>
         <div>
-          <Label className="text-xs font-semibold text-gray-600">Pays</Label>
+          <Label className="text-sm font-medium text-slate-700">Pays</Label>
           <div className="relative mt-1.5">
             <select
               value={form.country_code} onChange={e => setForm({ ...form, country_code: e.target.value })}
-              className="w-full h-12 rounded-xl border border-gray-200 bg-white px-3 pr-8 text-sm font-medium appearance-none cursor-pointer focus:ring-2 focus:ring-red-200 focus:border-red-400 outline-none"
+              className="w-full h-12 rounded-xl border border-slate-200 bg-white px-3 pr-8 text-base text-slate-900 shadow-sm font-medium appearance-none cursor-pointer focus:ring-4 focus:ring-blue-100 focus:border-blue-600 outline-none"
             >
               {SILGAPP_COUNTRIES.map(c => (
                 <option key={c.code} value={c.code}>{c.flag} {c.name} (+{c.dial})</option>
@@ -271,17 +271,17 @@ export default function LivreurRegistrationForm({ user, onComplete }) {
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none text-xs">▼</span>
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-4">
           <div>
-            <Label className="text-xs font-semibold text-gray-600 flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5" /> Ville</Label>
-            <Input value={form.ville} onChange={e => setForm({ ...form, ville: e.target.value })} placeholder="Ex: Ouagadougou" className="mt-1.5 h-12 rounded-xl text-sm" />
+            <Label className="text-sm font-medium text-slate-700 flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5" /> Ville</Label>
+            <Input value={form.ville} onChange={e => setForm({ ...form, ville: e.target.value })} placeholder="Ex: Ouagadougou" className="mt-2 h-12 rounded-xl border-slate-200 bg-white text-base text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-blue-600 focus:ring-blue-600/20" />
           </div>
           <SmartAddressInput
             countryCode={form.country_code}
             value={form.quartier}
             label="Quartier"
             placeholder="Commencez par le nom du quartier..."
-            inputClassName="h-12 rounded-xl text-sm"
+            inputClassName="h-12 rounded-xl border-slate-200 bg-white text-base text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-blue-600 focus:ring-blue-600/20"
             onChange={(text, location) =>
               setForm((previous) => ({
                 ...previous,
@@ -294,14 +294,14 @@ export default function LivreurRegistrationForm({ user, onComplete }) {
       </section>
 
       {/* ── Section : Documents ── */}
-      <section className="space-y-4">
+      <section className="space-y-4 rounded-2xl border border-slate-200/80 bg-slate-50/50 p-4 sm:p-5">
         <div className="flex items-center gap-2">
-          <div className="w-1 h-5 rounded-full bg-green-500" />
-          <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wide">Documents</h3>
+          <div className="w-1 h-5 rounded-full bg-blue-600" />
+          <h3 className="text-sm font-bold text-slate-900 tracking-wide">Documents</h3>
         </div>
         <FileUploadField label="Photo de profil" value={photoProfil} onChange={setPhotoProfil} icon={Camera} required accent="purple" />
-        <FileUploadField label="CNIB — Recto" value={cnibRecto} onChange={setCnibRecto} icon={Upload} required accent="blue" />
-        <FileUploadField label="CNIB — Verso" value={cnibVerso} onChange={setCnibVerso} icon={Upload} required accent="blue" />
+        <FileUploadField label="Pièce d'identité — Recto" value={cnibRecto} onChange={setCnibRecto} icon={Upload} required accent="blue" />
+        <FileUploadField label="Pièce d'identité — Verso" value={cnibVerso} onChange={setCnibVerso} icon={Upload} required accent="blue" />
       </section>
 
       {error && (
@@ -313,7 +313,7 @@ export default function LivreurRegistrationForm({ user, onComplete }) {
 
       <Button
         type="submit" disabled={loading}
-        className="w-full h-14 rounded-2xl bg-gradient-to-r from-red-500 to-orange-500 hover:opacity-90 text-white font-bold text-base shadow-lg shadow-red-500/30"
+        className="w-full min-h-14 h-auto py-4 rounded-xl bg-blue-700 hover:bg-blue-800 text-white font-semibold text-base shadow-md shadow-blue-900/10 focus-visible:ring-4 focus-visible:ring-blue-200 disabled:opacity-60"
       >
         {loading ? (
           <span className="flex flex-col items-center gap-1">

@@ -1,3 +1,4 @@
+import { clientDecisionView } from './clientDecisionView.js';
 export const GUEST_PREFIX = 'guest-v1:';
 export const GUEST_CONTROL_KEY = 'GUEST_ORDERS_V1';
 export const GUEST_CAPACITY = 200;
@@ -99,6 +100,9 @@ export function guestCanCancel(course) {
 
 // Never return course IDs, contact/account/financial internals, dispatch IDs or access hashes.
 export function guestCourseView(course, currency) {
+  const decision = clientDecisionView(course);
+  let notifiedCount = null;
+  try { const ids = JSON.parse(course.dispatch_notified_ids); if (Array.isArray(ids)) notifiedCount = new Set(ids).size; } catch { /* No fabricated count. */ }
   const point = (lat, lng) => Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 ? { lat, lng } : null;
   return {
     reference: course.reference || course.reference_course || null,
@@ -108,10 +112,21 @@ export function guestCourseView(course, currency) {
     depart_position: point(course.gps_depart_lat, course.gps_depart_lng),
     arrivee_position: point(course.gps_arrivee_lat, course.gps_arrivee_lng),
     prix: Number.isFinite(course.prix_final) ? course.prix_final : course.prix_propose_client,
-    devise: currency, created_at: course.created_date || null,
+    devise: currency, created_at: course.created_date || null, updated_at: course.updated_date || null,
     pickup_at: course.heure_recuperation || course.pickup_confirmed_at || null,
     delivered_at: course.heure_livraison || course.delivery_confirmed_at || null,
-    decision_required: course.client_decision_attendue === true,
+    decision_required: decision.waiting,
+    decision_reason: decision.reason,
+    decision_kind: decision.kind,
+    relaunch: { operation_id: course.client_relaunch_operation_id || null, state: course.client_relaunch_state || null,
+      mode: course.client_relaunch_mode || null, price: course.client_relaunch_price ?? null },
+    price_revision: Number(course.client_price_revision || 0),
+    country_code: course.country_code,
+    search_at: course.client_relaunch_at || course.heure_sollicitation || course.created_date || null,
+    accepted_at: course.heure_acceptation || course.accepted_at || null,
+    decision_event: course.livreur_retrait_operation_id || course.livreur_retrait_at || null,
+    dispatch_wave: Number.isFinite(course.dispatch_wave) ? course.dispatch_wave : null,
+    notified_count: notifiedCount,
     price_decision_required: course.manual_price_status === 'pending_client_validation',
     can_cancel: guestCanCancel(course),
     delivered: course.statut === 'livree',

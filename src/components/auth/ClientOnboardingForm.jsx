@@ -78,16 +78,16 @@ export default function ClientOnboardingForm({ user, onComplete }) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
-      <div className="mb-6 text-center">
-        <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-2xl bg-accent/10">
-          <User className="h-8 w-8 text-accent" />
+    <form onSubmit={handleSubmit} className="space-y-5 rounded-[28px] border border-slate-200/80 bg-white p-5 sm:p-8 shadow-[0_16px_60px_-24px_rgba(15,23,42,0.25)]">
+      <div className="mb-6 border-b border-slate-100 pb-6 text-left">
+        <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-blue-100 bg-blue-50">
+          <User className="h-7 w-7 text-blue-700" />
         </div>
-        <h2 className="text-xl font-black text-foreground">Créer votre profil client</h2>
+        <h2 className="text-2xl font-bold tracking-tight text-slate-950">Créer votre profil client</h2>
         <p className="mt-1 text-sm text-muted-foreground">Remplissez vos informations</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-4">
         <div className="space-y-1.5">
           <Label className="text-sm font-semibold">
             Nom <span className="text-red-500">*</span>
@@ -96,7 +96,7 @@ export default function ClientOnboardingForm({ user, onComplete }) {
             value={form.nom}
             onChange={(e) => setForm({ ...form, nom: e.target.value })}
             placeholder="Nom"
-            className="h-12 rounded-xl"
+            className="h-12 rounded-xl border-slate-200 bg-white text-base text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-blue-600 focus:ring-blue-600/20"
             required
           />
         </div>
@@ -106,7 +106,7 @@ export default function ClientOnboardingForm({ user, onComplete }) {
             value={form.prenom}
             onChange={(e) => setForm({ ...form, prenom: e.target.value })}
             placeholder="Prénom"
-            className="h-12 rounded-xl"
+            className="h-12 rounded-xl border-slate-200 bg-white text-base text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-blue-600 focus:ring-blue-600/20"
           />
         </div>
       </div>
@@ -158,7 +158,7 @@ export default function ClientOnboardingForm({ user, onComplete }) {
           value={form.ville}
           onChange={(e) => setForm({ ...form, ville: e.target.value })}
           placeholder="Votre ville"
-          className="h-12 rounded-xl"
+          className="h-12 rounded-xl border-slate-200 bg-white text-base text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-blue-600 focus:ring-blue-600/20"
         />
       </div>
 
@@ -167,7 +167,7 @@ export default function ClientOnboardingForm({ user, onComplete }) {
         value={form.quartier}
         label="Quartier / Adresse"
         placeholder="Commencez par le nom du quartier..."
-        inputClassName="h-12 rounded-xl text-sm"
+        inputClassName="h-12 rounded-xl border-slate-200 bg-white text-base text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-blue-600 focus:ring-blue-600/20"
         onChange={(text, location) =>
           setForm((previous) => ({
             ...previous,
@@ -189,7 +189,7 @@ export default function ClientOnboardingForm({ user, onComplete }) {
       <Button
         type="submit"
         disabled={loading}
-        className="h-14 w-full rounded-2xl bg-gradient-to-r from-accent to-green-600 text-base font-bold text-white shadow-lg shadow-accent/20"
+        className="min-h-14 h-auto py-4 w-full rounded-xl bg-blue-700 hover:bg-blue-800 text-base font-semibold text-white shadow-md shadow-blue-900/10 focus-visible:ring-4 focus-visible:ring-blue-200"
       >
         {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "Créer mon compte client"}
       </Button>

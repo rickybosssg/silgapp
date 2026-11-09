@@ -57,15 +57,15 @@ export default function RoleSelection({ onPartenaire }) {
 
   if (step === "choix") {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-6">
-        <div className="w-full max-w-md space-y-8">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4 py-8 sm:py-12">
+        <div className="w-full max-w-lg space-y-8">
           <div className="text-center space-y-3">
             <img
               src={silgappLogo("https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/962cfba1f_IMG-20260819-WA0003.jpg")}
               alt="SILGAPP"
               className="w-20 h-20 rounded-2xl object-cover mx-auto shadow-lg"
             />
-            <h1 className="text-2xl font-black text-foreground">Bienvenue sur SILGAPP</h1>
+            <h1 className="text-3xl font-bold tracking-tight text-slate-950">Bienvenue sur SILGAPP</h1>
             <p className="text-muted-foreground">Comment souhaitez-vous utiliser l'application ?</p>
           </div>
 
@@ -88,17 +88,17 @@ export default function RoleSelection({ onPartenaire }) {
 
             <button
               onClick={handlePartenaire}
-              className="w-full p-6 rounded-3xl border-2 border-purple-300/30 bg-gradient-to-br from-purple-50 to-violet-50 hover:border-purple-500 hover:shadow-lg transition-all text-left group"
+              className="w-full p-5 sm:p-6 rounded-2xl border border-purple-300/30 bg-gradient-to-br from-purple-50 to-violet-50 hover:border-purple-500 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600 transition-colors text-left group"
             >
               <div className="flex items-center gap-4">
                 <div className="w-14 h-14 rounded-2xl bg-purple-100 flex items-center justify-center group-hover:bg-purple-200 transition-colors">
                   <Store className="w-7 h-7 text-purple-600" />
                 </div>
                 <div className="flex-1">
-                  <p className="font-black text-lg text-foreground">Partenaire</p>
+                  <p className="font-bold text-lg tracking-tight text-foreground">Partenaire</p>
                   <p className="text-sm text-muted-foreground">Boutique, Restaurant ou Pharmacie</p>
                 </div>
-                <ArrowRight className="w-5 h-5 text-purple-600 opacity-0 group-hover:opacity-100 transition-all" />
+                <ArrowRight className="w-5 h-5 text-purple-600 opacity-70 group-hover:opacity-100 transition-opacity shrink-0" />
               </div>
             </button>
           </div>
@@ -109,7 +109,7 @@ export default function RoleSelection({ onPartenaire }) {
 
   if (step === "client_form") {
     return (
-      <div className="min-h-screen bg-background p-6">
+      <div className="min-h-screen bg-slate-50 px-3 py-6 sm:px-6 sm:py-10">
         <div className="max-w-lg mx-auto">
           <ClientOnboarding clientProfil={null} onComplete={handleClientComplete} onBack={() => setStep("choix")} />
         </div>
@@ -119,9 +119,9 @@ export default function RoleSelection({ onPartenaire }) {
 
   if (step === "livreur_form") {
     return (
-      <div className="min-h-screen bg-background p-6">
+      <div className="min-h-screen bg-slate-50 px-3 py-6 sm:px-6 sm:py-10">
         <div className="max-w-lg mx-auto">
-          <button onClick={() => setStep("choix")} className="flex items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-foreground mb-6">
+          <button onClick={() => setStep("choix")} className="flex min-h-11 items-center gap-2 rounded-xl px-3 text-sm font-semibold text-slate-600 hover:bg-white hover:text-slate-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 mb-4">
             <ArrowLeft className="w-4 h-4" /> Retour
           </button>
           <LivreurRegistrationForm user={user} onComplete={handleLivreurComplete} />
@@ -155,21 +155,21 @@ function RoleButton({ onClick, icon: Icon, title, subtitle, color }) {
   return (
     <button
       onClick={onClick}
-      className={`w-full p-6 rounded-3xl border-2 ${
+      className={`w-full p-5 sm:p-6 rounded-2xl border ${
         isAccent
-          ? "border-accent/20 bg-gradient-to-br from-accent/5 to-green-50 hover:border-accent"
-          : "border-primary/20 bg-gradient-to-br from-primary/5 to-red-50 hover:border-primary"
-      } hover:shadow-lg transition-all text-left group`}
+          ? "border-slate-200 bg-white hover:border-blue-500"
+          : "border-slate-200 bg-white hover:border-blue-500"
+      } hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600 transition-colors text-left group`}
     >
       <div className="flex items-center gap-4">
         <div className={`w-14 h-14 rounded-2xl ${isAccent ? "bg-accent/10 group-hover:bg-accent/20" : "bg-primary/10 group-hover:bg-primary/20"} flex items-center justify-center transition-colors`}>
           <Icon className={`w-7 h-7 ${isAccent ? "text-accent" : "text-primary"}`} />
         </div>
         <div className="flex-1">
-          <p className="font-black text-lg text-foreground">{title}</p>
+          <p className="font-bold text-lg tracking-tight text-foreground">{title}</p>
           <p className="text-sm text-muted-foreground">{subtitle}</p>
         </div>
-        <ArrowRight className={`w-5 h-5 ${isAccent ? "text-accent" : "text-primary"} opacity-0 group-hover:opacity-100 transition-all`} />
+        <ArrowRight className={`w-5 h-5 ${isAccent ? "text-accent" : "text-primary"} opacity-70 group-hover:opacity-100 transition-opacity shrink-0`} />
       </div>
     </button>
   );
@@ -177,7 +177,7 @@ function RoleButton({ onClick, icon: Icon, title, subtitle, color }) {
 
 function DoneScreen({ tone, title, message, support }) {
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-6">
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4 py-8 sm:py-12">
       <div className="text-center space-y-4 max-w-sm">
         <div className={`w-16 h-16 rounded-2xl ${tone === "accent" ? "bg-accent/10" : "bg-secondary/20"} flex items-center justify-center mx-auto`}>
           <CheckCircle className={`w-8 h-8 ${tone === "accent" ? "text-accent" : "text-secondary"}`} />

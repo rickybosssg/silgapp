@@ -181,18 +181,18 @@ function EtapeProfil({ clientProfil, onSuccess, onBack }) {
     }
   };
 
-  const inputClass = "w-full h-12 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 placeholder-slate-400 shadow-sm outline-none transition-all focus:border-blue-500 focus:ring-4 focus:ring-blue-100";
-  const labelClass = "text-[11px] font-black uppercase tracking-[0.14em] text-slate-600 mb-1.5 block";
+  const inputClass = "w-full min-w-0 h-12 rounded-xl border border-slate-200 bg-white px-4 text-base font-medium text-slate-900 placeholder-slate-400 shadow-sm outline-none transition-colors focus:border-blue-600 focus:ring-4 focus:ring-blue-100";
+  const labelClass = "text-sm font-medium text-slate-700 mb-2 block";
 
   return (
-    <div className="fixed inset-0 bg-gradient-to-br from-blue-50 via-white to-emerald-50/30 flex items-center justify-center p-3 z-50 overflow-y-auto">
-      <div className="max-w-md w-full my-4 rounded-[1.75rem] bg-white shadow-2xl shadow-blue-950/10 border border-white overflow-hidden">
+    <div className="fixed inset-0 bg-slate-50 flex items-start justify-center px-3 py-6 sm:py-10 z-50 overflow-y-auto overscroll-contain">
+      <div className="max-w-lg w-full my-auto shrink-0 rounded-[28px] bg-white shadow-[0_16px_60px_-24px_rgba(15,23,42,0.25)] border border-slate-200/80">
         {/* Header — dégradé bleu SILGAPP avec relief */}
-        <div className="relative bg-gradient-to-br from-primary-dark via-primary to-primary-dark px-6 py-7 text-white silgapp-relief-surface">
+        <div className="relative overflow-hidden rounded-t-[27px] bg-slate-950 px-5 pb-7 pt-20 sm:px-7 text-white">
           {onBack && (
             <button
               onClick={onBack}
-              className="absolute left-4 top-4 z-10 flex items-center gap-1.5 rounded-xl bg-white/10 hover:bg-white/20 px-3 py-1.5 text-xs font-bold text-white backdrop-blur transition-colors"
+              className="absolute left-5 top-4 z-10 min-h-11 flex items-center gap-1.5 rounded-xl bg-white/10 hover:bg-white/20 px-3 py-2 text-sm font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-white transition-colors"
             >
               <ArrowLeft className="w-4 h-4" /> Retour
             </button>
@@ -200,11 +200,11 @@ function EtapeProfil({ clientProfil, onSuccess, onBack }) {
           <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-white/10" />
           <div className="absolute -left-12 bottom-0 h-28 w-28 rounded-full bg-sky-300/20" />
           <div className="relative flex items-center gap-4">
-            <div className="w-16 h-16 rounded-3xl bg-white/15 border border-white/20 flex items-center justify-center shadow-lg shadow-primary/20 silgapp-relief">
-              <User className="w-8 h-8 text-white" />
+            <div className="w-12 h-12 shrink-0 rounded-2xl bg-blue-500/20 border border-blue-300/20 flex items-center justify-center">
+              <User className="w-6 h-6 text-blue-100" />
             </div>
             <div>
-              <h2 className="text-xl font-black leading-tight text-white">Créez votre profil client</h2>
+              <h2 className="text-2xl font-bold tracking-tight leading-tight text-white">Créez votre profil client</h2>
               <p className="text-sm leading-relaxed text-blue-100 mt-0.5">
                 Ces informations serviront pour vos courses et livraisons.
               </p>
@@ -212,7 +212,7 @@ function EtapeProfil({ clientProfil, onSuccess, onBack }) {
           </div>
         </div>
 
-        <div className="p-5 sm:p-6 space-y-4">
+        <div className="p-4 sm:p-7 space-y-5">
           {/* Carte info */}
           <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-4 flex items-start gap-3">
             <div className="w-10 h-10 rounded-xl bg-white text-blue-700 flex items-center justify-center shadow-sm shrink-0">
@@ -227,10 +227,10 @@ function EtapeProfil({ clientProfil, onSuccess, onBack }) {
           </div>
 
           {/* Section : Pays */}
-          <div className="rounded-2xl border border-slate-100 bg-slate-50/50 p-4 space-y-3">
+          <div className="rounded-2xl border border-slate-200/80 bg-slate-50/50 p-4 sm:p-5 space-y-4">
             <div className="flex items-center gap-2">
               <Globe className="w-4 h-4 text-blue-600" />
-              <span className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-600">Pays</span>
+              <span className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-600">Pays</span>
             </div>
             <CountrySelect
               value={countryCode}
@@ -247,12 +247,12 @@ function EtapeProfil({ clientProfil, onSuccess, onBack }) {
           </div>
 
           {/* Section : Identité */}
-          <div className="rounded-2xl border border-slate-100 bg-slate-50/50 p-4 space-y-3">
+          <div className="rounded-2xl border border-slate-200/80 bg-slate-50/50 p-4 sm:p-5 space-y-4">
             <div className="flex items-center gap-2">
               <User className="w-4 h-4 text-blue-600" />
-              <span className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-600">Identité</span>
+              <span className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-600">Identité</span>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-4">
               <div>
                 <label className={labelClass}>Nom *</label>
                 <input
@@ -275,11 +275,11 @@ function EtapeProfil({ clientProfil, onSuccess, onBack }) {
           </div>
 
           {/* Section : Téléphone */}
-          <div className="rounded-2xl border border-slate-100 bg-slate-50/50 p-4 space-y-3">
+          <div className="rounded-2xl border border-slate-200/80 bg-slate-50/50 p-4 sm:p-5 space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Phone className="w-4 h-4 text-blue-600" />
-                <span className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-600">Téléphone WhatsApp</span>
+                <span className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-600">Téléphone WhatsApp</span>
               </div>
               {paysSelectionne && (
                 <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">
@@ -287,7 +287,7 @@ function EtapeProfil({ clientProfil, onSuccess, onBack }) {
                 </span>
               )}
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-col min-[400px]:flex-row gap-2">
               <div className="h-12 rounded-xl border border-slate-200 bg-slate-50 px-3 flex items-center gap-2 text-sm font-black text-slate-800 shrink-0 shadow-sm">
                 <Phone className="w-4 h-4 text-blue-600" />
                 {paysSelectionne ? `${paysSelectionne.emoji_flag || ""} ${paysSelectionne.indicatif}` : "—"}
@@ -300,7 +300,7 @@ function EtapeProfil({ clientProfil, onSuccess, onBack }) {
                   ? "X".repeat(phoneMaxLen).replace(/(.{2})/g, "$1 ").trim()
                   : "Sélectionnez un pays"}
                 disabled={!countryCode}
-                className={`${inputClass} flex-1 tracking-widest font-mono disabled:bg-slate-50 disabled:text-slate-400`}
+                className={`${inputClass} flex-auto tracking-widest font-mono disabled:bg-slate-50 disabled:text-slate-400`}
               />
             </div>
             {telAffiche.length > 0 && paysSelectionne && (
@@ -314,10 +314,10 @@ function EtapeProfil({ clientProfil, onSuccess, onBack }) {
           </div>
 
           {/* Section : Localisation */}
-          <div className="rounded-2xl border border-slate-100 bg-slate-50/50 p-4 space-y-3">
+          <div className="rounded-2xl border border-slate-200/80 bg-slate-50/50 p-4 sm:p-5 space-y-4">
             <div className="flex items-center gap-2">
               <Home className="w-4 h-4 text-blue-600" />
-              <span className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-600">Localisation</span>
+              <span className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-600">Localisation</span>
             </div>
             <div>
               <label className={labelClass}>Ville *</label>
@@ -333,7 +333,7 @@ function EtapeProfil({ clientProfil, onSuccess, onBack }) {
               value={quartier}
               label="Quartier / Adresse *"
               placeholder="Commencez par le nom du quartier..."
-              inputClassName="h-12 rounded-xl text-sm"
+              inputClassName="h-12 rounded-xl border-slate-200 bg-white text-base text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-blue-600 focus:ring-blue-600/20"
               onChange={(text, location) => {
                 if (location?.ville) setVille(location.ville);
                 setQuartier(location?.quartier || location?.label || text);
@@ -344,7 +344,7 @@ function EtapeProfil({ clientProfil, onSuccess, onBack }) {
           {/* Champ code promo */}
           {!clientProfil?.code_promo_utilise && (
             <div className="rounded-2xl border border-amber-100 bg-amber-50/50 p-4 space-y-2">
-              <label className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-600 flex items-center gap-2">
+              <label className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-600 flex items-center gap-2">
                 <Gift className="w-4 h-4 text-amber-600" />
                 Code promo optionnel
               </label>
@@ -356,7 +356,7 @@ function EtapeProfil({ clientProfil, onSuccess, onBack }) {
                   verifierCodePromo(val);
                 }}
                 placeholder="ex: AISSA100"
-                className={`w-full h-12 rounded-xl border px-4 text-sm font-mono font-bold tracking-widest focus:outline-none focus:ring-2 transition-all ${
+                className={`w-full h-12 rounded-xl border px-4 text-base font-mono font-semibold tracking-widest focus:outline-none focus:ring-2 transition-all ${
                   codePromoStatut === "valide" ? "border-green-400 bg-green-50 text-green-700 focus:ring-green-200" :
                   codePromoStatut === "invalide" ? "border-red-300 bg-red-50 focus:ring-red-200" :
                   "border-slate-200 bg-white text-slate-900 focus:ring-blue-100 focus:border-blue-500"
@@ -378,11 +378,11 @@ function EtapeProfil({ clientProfil, onSuccess, onBack }) {
         </div>
 
         {/* Bouton — sticky en bas, toujours accessible sur petit écran */}
-        <div className="sticky bottom-0 bg-white/95 backdrop-blur-md border-t border-slate-100 px-5 sm:px-6 py-4">
+        <div className="rounded-b-[27px] bg-white border-t border-slate-100 px-5 sm:px-6 py-4">
           <button
             onClick={handleSave}
             disabled={loading || !peutSauvegarder}
-            className="w-full h-14 rounded-2xl bg-gradient-to-r from-primary to-primary-dark text-white font-black text-base shadow-lg shadow-primary/20 active:scale-[0.98] transition-all disabled:opacity-40 disabled:shadow-none flex items-center justify-center gap-2 silgapp-relief"
+            className="w-full min-h-14 h-auto py-4 rounded-xl bg-blue-700 hover:bg-blue-800 text-white font-semibold text-base shadow-md shadow-blue-900/10 focus-visible:outline focus-visible:outline-4 focus-visible:outline-blue-200 transition-colors disabled:opacity-40 disabled:shadow-none flex items-center justify-center gap-2"
           >
             {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />}
             {loading ? "Sauvegarde..." : "Valider et continuer"}

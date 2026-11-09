@@ -63,8 +63,8 @@ function LivreurDetailModal({ livreur, onClose, onValider, onRefuser, processing
   const docsOk = !!livreur.photo_url && !!livreur.photo_cnib_recto_url && !!livreur.photo_cnib_verso_url;
   const docsManquants = [];
   if (!livreur.photo_url) docsManquants.push("Photo du livreur");
-  if (!livreur.photo_cnib_recto_url) docsManquants.push("CNIB Recto");
-  if (!livreur.photo_cnib_verso_url) docsManquants.push("CNIB Verso");
+  if (!livreur.photo_cnib_recto_url) docsManquants.push("Pièce d'identité Recto");
+  if (!livreur.photo_cnib_verso_url) docsManquants.push("Pièce d'identité Verso");
 
   return (
     <>
@@ -116,9 +116,9 @@ function LivreurDetailModal({ livreur, onClose, onValider, onRefuser, processing
               <div className="grid grid-cols-2 gap-2">
                 <DocBadge url={livreur.photo_url} label="Photo livreur" icon={Camera}
                   color={{ bg: "bg-blue-50", border: "border-blue-200", text: "text-blue-700" }} />
-                <DocBadge url={livreur.photo_cnib_recto_url} label="CNIB Recto" icon={FileText}
+                <DocBadge url={livreur.photo_cnib_recto_url} label="Pièce d'identité Recto" icon={FileText}
                   color={{ bg: "bg-indigo-50", border: "border-indigo-200", text: "text-indigo-700" }} />
-                <DocBadge url={livreur.photo_cnib_verso_url} label="CNIB Verso" icon={FileText}
+                <DocBadge url={livreur.photo_cnib_verso_url} label="Pièce d'identité Verso" icon={FileText}
                   color={{ bg: "bg-purple-50", border: "border-purple-200", text: "text-purple-700" }} />
                 <DocBadge url={livreur.photo_moto_url} label="Photo Moto" icon={Car}
                   color={{ bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-700" }} />
@@ -131,8 +131,8 @@ function LivreurDetailModal({ livreur, onClose, onValider, onRefuser, processing
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {[
                   { url: livreur.photo_url, label: "Photo", icon: Camera },
-                  { url: livreur.photo_cnib_recto_url, label: "CNIB Recto", icon: FileText },
-                  { url: livreur.photo_cnib_verso_url, label: "CNIB Verso", icon: FileText },
+                  { url: livreur.photo_cnib_recto_url, label: "Pièce d'identité Recto", icon: FileText },
+                  { url: livreur.photo_cnib_verso_url, label: "Pièce d'identité Verso", icon: FileText },
                   { url: livreur.photo_moto_url, label: "Moto", icon: Car },
                 ].filter(d => d.url).map((doc, i) => (
                   <button key={i}
@@ -368,8 +368,8 @@ export default function DemandesLivreursAdmin() {
                     {/* Récap docs rapide */}
                     <div className="flex items-center gap-3 text-xs">
                       <DocMiniStatus url={livreur.photo_url} label="Photo" />
-                      <DocMiniStatus url={livreur.photo_cnib_recto_url} label="CNIB R°" />
-                      <DocMiniStatus url={livreur.photo_cnib_verso_url} label="CNIB V°" />
+                      <DocMiniStatus url={livreur.photo_cnib_recto_url} label="Pièce d'identité R°" />
+                      <DocMiniStatus url={livreur.photo_cnib_verso_url} label="Pièce d'identité V°" />
                       <DocMiniStatus url={livreur.photo_moto_url} label="Moto" />
                     </div>
 

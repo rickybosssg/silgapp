@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,8 @@ import { toast } from "sonner";
 import PartenaireLocalisation from "@/components/partenaire/PartenaireLocalisation";
 import SmartAddressInput from "@/components/location/SmartAddressInput";
 import { useActiveCountries } from "@/lib/countryService";
+
+import { createOwnerCommerce, browserCommerceIntents, ownerCreationScope } from "@/lib/commerceOwnerMigration";
 
 // Compression image avant upload (max 800px, JPEG 0.7) — Correction 1
 function compressImage(file) {
@@ -33,7 +35,8 @@ function compressImage(file) {
   });
 }
 
-export default function EtablissementForm({ type, existing, partenaireId, userEmail, onSaved, onCancel, isAdmin }) {
+export default function EtablissementForm({ type, existing = undefined, partenaireId, userEmail, onSaved, onCancel = undefined, isAdmin, ownerCommerce = null }) {
+  const serverOwner = ownerCommerce?.enabled === true && !!ownerCommerce.userId && !isAdmin && ["boutique","restaurant"].includes(type);
   const isRestaurant = type === "restaurant";
   const isPharmacie = type === "pharmacie";
   const { countries } = useActiveCountries();
@@ -66,6 +69,8 @@ export default function EtablissementForm({ type, existing, partenaireId, userEm
   }, [countries]);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const savePending = useRef(false);
+  const [saveUncertain, setSaveUncertain] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const handleLogoUpload = async (e) => {
@@ -91,7 +96,18 @@ export default function EtablissementForm({ type, existing, partenaireId, userEm
   const telValide = !form.telephone || telDigits.length === paysDigits;
   const telDepotValide = !form.telephone_depot || (form.telephone_depot.replace(/\D/g, "").length === paysDigits);
 
-  const handleSave = async () => {
+  useEffect(() => {
+    if(!serverOwner || existing?.id)return;
+    try {
+      const entry=browserCommerceIntents().read(ownerCreationScope(ownerCommerce.userId,type));
+      if(entry){setForm(f=>({...f,...entry.data}));setSaveUncertain(entry.status!=="rejected");}
+    } catch(error){setSaveUncertain(true);toast?.error?.(error.message);}
+  },[serverOwner,ownerCommerce?.userId,type,existing?.id]);
+
+  const handleSave = async (reconcile=false) => {
+    if(reconcile && (!serverOwner || existing?.id))return;
+    if(reconcile && !confirm("Cette reprise peut finaliser la creation initiale avec la meme proposition et le meme identifiant enregistres. Continuer ?"))return;
+    if (savePending.current || uploading || (saveUncertain && !reconcile)) return;
     // Validation des champs obligatoires — feedback visible
     if (!form.nom) {
       toast?.error?.("Le nom de l'établissement est obligatoire");
@@ -109,35 +125,63 @@ export default function EtablissementForm({ type, existing, partenaireId, userEm
       toast?.error?.(`Numéro Mobile Money invalide : ${paysDigits} chiffres requis pour ${paysConfig?.nom || "ce pays"}`);
       return;
     }
+    savePending.current = true;
     setSaving(true);
+    let writeStarted = false;
     try {
-      const data = { ...form, partenaire_id: partenaireId, user_email: userEmail };
+      if(serverOwner) {
+        const api=createOwnerCommerce({sdk:base44,actorId:ownerCommerce.userId,intents:existing?.id ? undefined : browserCommerceIntents()});
+        await api.saveShop({type,existing,data:form,reconcile});
+        setSaveUncertain(false);toast?.success?.("Enregistrement confirme");onSaved?.();return;
+      }
+      const me = await base44.auth.me();
+      if (!me?.id || (!isAdmin && me.id !== partenaireId) || (isAdmin && me.role !== "admin")) throw new Error("Compte non autorisé.");
+      const ownerFields = ["nom", "logo_url", "description", "categorie", "specialite", "pays_code", "ville", "quartier", "adresse", "latitude", "longitude", "telephone", "telephone_depot", "horaires", "temps_preparation_min", "ouvert"];
+      const editable = isAdmin ? form : Object.fromEntries(ownerFields.filter(key => key in form).map(key => [key, form[key]]));
+      const data = { ...editable, partenaire_id: partenaireId, user_email: userEmail };
+      if (!isAdmin) {
+        // Never resend administrator-owned fields from a stale profile.
+        for (const key of ["commission_pct", "validation", "statut_validation", "actif", "valide_par", "valide_at", "motif_refus", "creation_directe", "creation_admin_notifiee", "nb_visites", "derniere_visite_at", "montant_du_silga"]) delete data[key];
+        if (existing?.id) {
+          const current = await base44.entities[isPharmacie ? "Pharmacie" : isRestaurant ? "Restaurant" : "Boutique"].get(existing.id);
+          if (current?.partenaire_id !== me.id) throw new Error("Cet établissement ne vous appartient pas.");
+          if (["refuse", "suspendu"].includes(current.validation)) throw new Error("Cet établissement est indisponible.");
+        }
+      }
       if (!existing?.id) {
         // Création — en attente de validation sauf si admin
-        if (!isAdmin) {
+        if (!isAdmin && type !== "boutique") {
           data.validation = "en_attente";
           data.actif = false;
         } else {
           data.validation = "valide";
-          data.actif = form.actif !== false;
+          data.actif = isAdmin ? form.actif !== false : true;
+          if (!isAdmin && type === "boutique") {
+            data.statut_validation = "valide";
+            data.creation_directe = true;
+            data.creation_admin_notifiee = false;
+          }
         }
-      } else {
+      } else if (isAdmin) {
         data.actif = form.actif !== false;
       }
       const entityName = isPharmacie ? "Pharmacie" : isRestaurant ? "Restaurant" : "Boutique";
-      if (existing?.id) {
-        await base44.entities[entityName].update(existing.id, data);
-      } else {
-        await base44.entities[entityName].create(data);
-      }
+      writeStarted = true;
+      const raw = existing?.id ? await base44.entities[entityName].update(existing.id, data) : await base44.entities[entityName].create(data);
+      const saved = raw?.data ?? raw;
+      if (!saved?.id || saved.partenaire_id !== partenaireId || (existing?.id && saved.id !== existing.id)) throw new Error("Enregistrement non confirmé");
+      if (!existing?.id && !isAdmin && type === "boutique" && (saved.creation_directe !== true || saved.creation_admin_notifiee !== false || saved.actif !== true || saved.validation !== "valide")) throw new Error("Activation ou notification administrateur non confirmée");
       toast?.success?.(`${typeLabel} ${existing ? "modifié" : "créé"} avec succès`);
       onSaved?.();
     } catch (err) {
       console.error("Erreur création établissement:", err);
       const msg = err?.response?.data?.detail || err?.message || "Erreur lors de l'enregistrement";
-      toast?.error?.(msg);
+      setSaveUncertain(serverOwner ? err?.uncertain!==false : writeStarted);
+      toast?.error?.(writeStarted ? "Enregistrement non confirmé. Revenez à votre espace et actualisez avant de réessayer pour éviter un doublon." : msg);
+    } finally {
+      savePending.current = false;
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   const typeLabel = isPharmacie ? "Pharmacie" : isRestaurant ? "Restaurant" : "Boutique";
@@ -221,21 +265,21 @@ export default function EtablissementForm({ type, existing, partenaireId, userEm
 
           <div>
             <Label className="text-xs font-semibold text-gray-600">Nom de l'établissement *</Label>
-            <Input value={form.nom} onChange={e => set("nom", e.target.value)} placeholder={`Ex: ${typeLabel} ${typeIcon}`} className="mt-1.5 h-12 rounded-xl text-sm font-medium" />
+            <Input disabled={serverOwner && saveUncertain} value={form.nom} onChange={e => set("nom", e.target.value)} placeholder={`Ex: ${typeLabel} ${typeIcon}`} className="mt-1.5 h-12 rounded-xl text-sm font-medium" />
           </div>
           <div>
             <Label className="text-xs font-semibold text-gray-600">Description</Label>
-            <Textarea value={form.description} onChange={e => set("description", e.target.value)} placeholder="Décrivez votre établissement en quelques mots..." className="mt-1.5 rounded-xl text-sm" rows={3} />
+            <Textarea disabled={serverOwner && saveUncertain} value={form.description} onChange={e => set("description", e.target.value)} placeholder="Décrivez votre établissement en quelques mots..." className="mt-1.5 rounded-xl text-sm" rows={3} />
           </div>
           {isRestaurant ? (
             <div>
               <Label className="text-xs font-semibold text-gray-600">Spécialité culinaire</Label>
-              <Input value={form.specialite || ""} onChange={e => set("specialite", e.target.value)} placeholder="Ex: Africain, Fast-food, Grillades" className="mt-1.5 h-12 rounded-xl text-sm" />
+              <Input disabled={serverOwner && saveUncertain} value={form.specialite || ""} onChange={e => set("specialite", e.target.value)} placeholder="Ex: Africain, Fast-food, Grillades" className="mt-1.5 h-12 rounded-xl text-sm" />
             </div>
           ) : isPharmacie ? null : (
             <div>
               <Label className="text-xs font-semibold text-gray-600">Catégorie</Label>
-              <Input value={form.categorie || ""} onChange={e => set("categorie", e.target.value)} placeholder="Ex: Alimentation, Mode, Électronique" className="mt-1.5 h-12 rounded-xl text-sm" />
+              <Input disabled={serverOwner && saveUncertain} value={form.categorie || ""} onChange={e => set("categorie", e.target.value)} placeholder="Ex: Alimentation, Mode, Électronique" className="mt-1.5 h-12 rounded-xl text-sm" />
             </div>
           )}
         </section>
@@ -250,7 +294,7 @@ export default function EtablissementForm({ type, existing, partenaireId, userEm
             <div>
               <Label className="text-xs font-semibold text-gray-600">Pays *</Label>
               <div className="relative mt-1.5">
-                <select value={form.pays_code || ""} onChange={e => set("pays_code", e.target.value)} className="w-full h-12 rounded-xl border border-gray-200 bg-white px-3 pr-8 text-sm font-medium appearance-none cursor-pointer focus:ring-2 focus:ring-purple-200 focus:border-purple-400 outline-none">
+                <select disabled={serverOwner && (!!existing?.id || saveUncertain)} value={form.pays_code || ""} onChange={e => set("pays_code", e.target.value)} className="w-full h-12 rounded-xl border border-gray-200 bg-white px-3 pr-8 text-sm font-medium appearance-none cursor-pointer focus:ring-2 focus:ring-purple-200 focus:border-purple-400 outline-none">
                   <option value="" disabled>Sélectionnez votre pays</option>
                   {countries.map(p => <option key={p.code} value={p.code}>{p.emoji_flag || ""} {p.nom}</option>)}
                 </select>
@@ -259,7 +303,7 @@ export default function EtablissementForm({ type, existing, partenaireId, userEm
             </div>
             <div>
               <Label className="text-xs font-semibold text-gray-600">Ville</Label>
-              <Input value={form.ville || ""} onChange={e => set("ville", e.target.value)} placeholder="Ex: Ouagadougou" className="mt-1.5 h-12 rounded-xl text-sm" />
+              <Input disabled={serverOwner && saveUncertain} value={form.ville || ""} onChange={e => set("ville", e.target.value)} placeholder="Ex: Ouagadougou" className="mt-1.5 h-12 rounded-xl text-sm" />
             </div>
           </div>
           <SmartAddressInput
@@ -341,12 +385,12 @@ export default function EtablissementForm({ type, existing, partenaireId, userEm
           </div>
           <div>
             <Label className="text-xs font-semibold text-gray-600">Horaires d'ouverture</Label>
-            <Input value={form.horaires || ""} onChange={e => set("horaires", e.target.value)} placeholder="Ex: Lun-Sam: 8h-20h" className="mt-1.5 h-12 rounded-xl text-sm" />
+            <Input disabled={serverOwner && saveUncertain} value={form.horaires || ""} onChange={e => set("horaires", e.target.value)} placeholder="Ex: Lun-Sam: 8h-20h" className="mt-1.5 h-12 rounded-xl text-sm" />
           </div>
           {isRestaurant && (
             <div>
               <Label className="text-xs font-semibold text-gray-600">Temps de préparation (minutes)</Label>
-              <Input type="number" value={form.temps_preparation_min || 30} onChange={e => set("temps_preparation_min", parseInt(e.target.value) || 30)} className="mt-1.5 h-12 rounded-xl text-sm" />
+              <Input disabled={serverOwner && saveUncertain} type="number" value={form.temps_preparation_min || 30} onChange={e => set("temps_preparation_min", parseInt(e.target.value) || 30)} className="mt-1.5 h-12 rounded-xl text-sm" />
             </div>
           )}
         </section>
@@ -385,14 +429,18 @@ export default function EtablissementForm({ type, existing, partenaireId, userEm
           {isAdmin && (
             <div>
               <Label className="text-xs font-semibold text-gray-600">Commission (%) — laisser vide pour défaut</Label>
-              <Input type="number" value={form.commission_pct ?? ""} onChange={e => set("commission_pct", e.target.value ? parseInt(e.target.value) : null)} placeholder="Ex: 10" className="mt-1.5 h-12 rounded-xl text-sm" />
+              <Input disabled={serverOwner && saveUncertain} type="number" value={form.commission_pct ?? ""} onChange={e => set("commission_pct", e.target.value ? parseInt(e.target.value) : null)} placeholder="Ex: 10" className="mt-1.5 h-12 rounded-xl text-sm" />
             </div>
           )}
         </section>
 
         {/* ── Actions ── */}
+        {saveUncertain && <p role="alert" className="text-sm text-red-600">Enregistrement non confirmé. Revenez à votre espace et actualisez avant de réessayer.</p>}
+        {serverOwner && saveUncertain && !existing?.id && <p className="text-xs text-amber-700">Cette reprise peut finaliser la création initiale avec la proposition et le même identifiant enregistrés. Aucune nouvelle intention ne sera créée.</p>}
+          {serverOwner && saveUncertain && !existing?.id && <Button disabled={saving || uploading} onClick={() => handleSave(true)}>Reprendre la même création enregistrée</Button>}
+        {serverOwner && existing?.id && <p className="text-xs text-slate-600">Le pays de cet etablissement ne peut pas etre modifie dans ce formulaire.</p>}
         <div className="flex gap-3 pt-2 border-t border-gray-100">
-          <Button onClick={handleSave} disabled={saving || !form.nom} className={`flex-1 h-13 py-3.5 rounded-2xl bg-gradient-to-r ${accentColor} hover:opacity-90 text-white font-bold text-sm shadow-lg`}>
+          <Button onClick={() => handleSave(false)} disabled={saving || uploading || saveUncertain || !form.nom} className={`flex-1 h-13 py-3.5 rounded-2xl bg-gradient-to-r ${accentColor} hover:opacity-90 text-white font-bold text-sm shadow-lg`}>
             {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />} Enregistrer
           </Button>
           {onCancel && <Button variant="outline" onClick={onCancel} className="h-13 px-4 rounded-2xl border-gray-200"><X className="w-5 h-5" /> Annuler</Button>}

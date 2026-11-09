@@ -1,3 +1,5 @@
+import { ownerReadScope } from '@/lib/commerceOwnerReadView';
+import { OwnerFinanceReadView } from './CommerceOwnerReadView';
 import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -19,7 +21,7 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 
-export default function PartenaireHome({ etablissement, etablissementType, onNavigate, messageBadge = 0 }) {
+function LegacyPartenaireHome({ etablissement, etablissementType, onNavigate, messageBadge = 0 }) {
   const isRestaurant = etablissementType === "restaurant";
   const isPharmacie = etablissementType === "pharmacie";
   const entityName = isRestaurant ? "CommandeRestaurant" : "CommandeBoutique";
@@ -266,4 +268,10 @@ function QuickStat({ icon: Icon, value, label, color, bg }) {
       <p className="text-[9px] text-gray-400 font-medium mt-0.5">{label}</p>
     </div>
   );
+}
+export default function PartenaireHome(props) {
+  if(props.ownerCommerce?.enabled!==true || props.etablissementType==='pharmacie') return <LegacyPartenaireHome {...props} />;
+  let scope;
+  try {scope=ownerReadScope(props.ownerCommerce,props.etablissementType,props.etablissement?.id,props.etablissement?.pays_code);} catch {return <p role="alert">Perimetre proprietaire indisponible. Aucune donnee affichee.</p>;}
+  return <div className="space-y-4"><h1 className="font-bold">{props.etablissement.nom}</h1><p>Accueil securise en qualification. Valeurs enregistrees, pas un solde recalcule.</p><nav>{['produits','commandes','infos'].map(tab=><button className="p-3" key={tab} type="button" onClick={()=>props.onNavigate(tab)}>{tab}</button>)}</nav><OwnerFinanceReadView key={JSON.stringify(scope)} scope={scope} /></div>;
 }

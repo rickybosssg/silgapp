@@ -1,0 +1,11 @@
+import test from 'node:test';import assert from 'node:assert/strict';import { readCommercePage,manageCommerceRecord } from '../src/lib/commerceGateway.js';
+test('read preserves empty result and pagination marker separately',async()=>{const r=await readCommercePage(async(name)=>{assert.equal(name,'readCommerce');return {data:{success:true,rows:[],has_more:true,next_offset:10}};},{action:'catalogue'});assert.equal(r.rows.length,0);assert.equal(r.hasMore,true);});
+for(const response of [null,{}, {success:false,rows:[],has_more:false},{data:{success:true,rows:[],has_more:false},status:403},{success:true,rows:null,has_more:false},{success:true,rows:[]}])test('malformed/refused read never becomes empty success '+JSON.stringify(response),async()=>assert.rejects(readCommercePage(async()=>response,{})));
+test('write confirms matching record',async()=>{const r=await manageCommerceRecord(async()=>({success:true,record:{id:'p'}}),{action:'update_product',product_id:'p'});assert.equal(r.record.id,'p');});
+test('write wrong record rejected',async()=>assert.rejects(manageCommerceRecord(async()=>({success:true,record:{id:'wrong'}}),{action:'update_product',product_id:'p'})));
+test('delete receipt must match product',async()=>assert.rejects(manageCommerceRecord(async()=>({success:true,deleted:true,id:'other'}),{action:'delete_product',product_id:'p'})));
+test('network failure is one invocation and no retry',async()=>{let calls=0;await assert.rejects(manageCommerceRecord(async()=>{calls++;throw Error('network');},{action:'create_product'}));assert.equal(calls,1);});
+test('uncertain outcome propagated',async()=>{await assert.rejects(manageCommerceRecord(async()=>({success:false,error:'WRITE_OUTCOME_UNCERTAIN',uncertain:true}),{action:'create_product'}),error=>error.uncertain===true);});
+
+test('resolved 403 preserves status for scoped polling stop',async()=>assert.rejects(readCommercePage(async()=>({status:403,data:{success:false,error:'FORBIDDEN',uncertain:false}}),{}),e=>e.status===403&&e.uncertain===false));
+test('response body cannot invent an HTTP status',async()=>assert.rejects(readCommercePage(async()=>({success:false,error:'FORBIDDEN',status:403}),{}),e=>e.status===undefined));

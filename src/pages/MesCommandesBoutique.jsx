@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useClientCommerceProfile, useClientCommercePage } from "@/hooks/useClientCommerce";
+import { CommerceReadError, CommercePageFeedback } from "@/components/client/CommerceReadFeedback";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Loader2, MessageCircle, Package, Store, UtensilsCrossed } from "lucide-react";
-import { base44 } from "@/api/base44Client";
 import ChatWindow from "@/components/chat/ChatWindow";
 
 const STATUTS = {
@@ -29,33 +29,17 @@ const STATUTS_SUIVI_ACTIF = new Set([
 
 export default function MesCommandesBoutique() {
   const navigate = useNavigate();
-  const [clientProfil, setClientProfil] = useState(null);
+  const client = useClientCommerceProfile(true, false); // Legacy history did not require a country; secure reads still do.
+  const clientProfil = client.profile;
   const [chatOpenId, setChatOpenId] = useState(null);
 
-  useEffect(() => {
-    base44.auth.me().then(user => {
-      if (user?.email) {
-        base44.entities.ClientExterne.filter({ user_email: user.email })
-          .then(rows => setClientProfil(rows?.[0] || null))
-          .catch(() => {});
-      }
-    }).catch(() => {});
-  }, []);
+  const boutiqueQuery = useClientCommercePage(client.context, "boutique", "orders", undefined, true, { pollInterval: 60000, legacyPollInterval: 10000 });
+  const restaurantQuery = useClientCommercePage(client.context, "restaurant", "orders", undefined, true, { pollInterval: 60000, legacyPollInterval: 10000 });
+  const { rows: commandesBoutique, isLoading: loadingB } = boutiqueQuery;
+  const { rows: commandesRestaurant, isLoading: loadingR } = restaurantQuery;
+  useEffect(() => { setChatOpenId(null); }, [clientProfil?.id, clientProfil?.country_code]);
 
-  const { data: commandesBoutique = [], isLoading: loadingB } = useQuery({
-    queryKey: ["mes-commandes-boutique", clientProfil?.id],
-    queryFn: () => base44.entities.CommandeBoutique.filter({ client_id: clientProfil.id }, "-created_date", 50),
-    enabled: !!clientProfil?.id,
-    refetchInterval: 10000,
-  });
-
-  const { data: commandesRestaurant = [], isLoading: loadingR } = useQuery({
-    queryKey: ["mes-commandes-restaurant", clientProfil?.id],
-    queryFn: () => base44.entities.CommandeRestaurant.filter({ client_id: clientProfil.id }, "-created_date", 50),
-    enabled: !!clientProfil?.id,
-    refetchInterval: 10000,
-  });
-
+  if (client.error) return <div className="min-h-screen bg-gray-50 p-4"><CommerceReadError message="Impossible de charger votre profil client." onRetry={client.retry} /><button onClick={() => navigate("/")} className="mt-3 text-sm underline">Retour</button></div>;
   if (!clientProfil || loadingB || loadingR) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -81,7 +65,7 @@ export default function MesCommandesBoutique() {
       </div>
 
       <div className="max-w-lg mx-auto px-4 py-4 space-y-3">
-        {allCommandes.length === 0 && (
+        {!boutiqueQuery.isError && !restaurantQuery.isError && !boutiqueQuery.hasNextPage && !restaurantQuery.hasNextPage && allCommandes.length === 0 && (
           <div className="text-center py-12">
             <Package className="w-12 h-12 text-gray-300 mx-auto mb-3" />
             <p className="text-sm text-gray-500">Aucune commande pour le moment</p>
@@ -164,6 +148,8 @@ export default function MesCommandesBoutique() {
             </div>
           );
         })}
+        {(boutiqueQuery.isError || boutiqueQuery.hasNextPage) && <div className="space-y-2"><p className="text-xs font-bold text-gray-600">Commandes boutiques</p><CommercePageFeedback query={boutiqueQuery} message="Impossible de charger toutes les commandes boutiques." /></div>}
+        {(restaurantQuery.isError || restaurantQuery.hasNextPage) && <div className="space-y-2"><p className="text-xs font-bold text-gray-600">Commandes restaurants</p><CommercePageFeedback query={restaurantQuery} message="Impossible de charger toutes les commandes restaurants." /></div>}
       </div>
     </div>
   );

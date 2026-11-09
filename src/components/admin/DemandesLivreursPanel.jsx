@@ -126,13 +126,13 @@ export default function DemandesLivreursAdmin() {
                     {livreur.photo_cnib_recto_url && (
                       <a href={livreur.photo_cnib_recto_url} target="_blank" rel="noreferrer" className="flex items-center gap-2 p-2.5 rounded-xl bg-blue-50 border border-blue-200 hover:bg-blue-100 transition-colors">
                         <FileText className="w-4 h-4 text-blue-600" />
-                        <span className="text-sm font-semibold text-blue-700">CNIB Recto</span>
+                        <span className="text-sm font-semibold text-blue-700">Pièce d'identité Recto</span>
                       </a>
                     )}
                     {livreur.photo_cnib_verso_url && (
                       <a href={livreur.photo_cnib_verso_url} target="_blank" rel="noreferrer" className="flex items-center gap-2 p-2.5 rounded-xl bg-purple-50 border border-purple-200 hover:bg-purple-100 transition-colors">
                         <FileText className="w-4 h-4 text-purple-600" />
-                        <span className="text-sm font-semibold text-purple-700">CNIB Verso</span>
+                        <span className="text-sm font-semibold text-purple-700">Pièce d'identité Verso</span>
                       </a>
                     )}
                   </div>

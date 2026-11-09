@@ -170,12 +170,12 @@ export default function CourseEnAttenteModalExterne({
         ...displayedPriceQuote(course),
       });
       const data = res;
-      if (data?.already_accepted) { stopUrgentCourseAlert("course-accepted"); onAccepter(); return; }
+      if (data?.already_accepted) { stopUrgentCourseAlert("course-accepted"); onAccepter(false, { key: `course:${course.id}`, receipt: data }); return; }
       if (data?.already_taken || data?.reason === "already_taken") { stopUrgentCourseAlert("course-already-taken"); setCourseDejaPrise(true); return; }
       if (data?.expired) { stopUrgentCourseAlert("course-expired"); setCourseExpiree(true); return; }
       if (data?.success && data?.accepted !== false) {
         stopUrgentCourseAlert("course-accepted");
-        onAccepter(); // admin_manuel : pas de validation client, prix saisi à la livraison
+        onAccepter(false, { key: `course:${course.id}`, receipt: data }); // admin_manuel : pas de validation client, prix saisi à la livraison
       } else if (data?.already_taken || data?.reason === "already_taken") {
         alert("Cette course vient d'être prise par un autre livreur.");
       } else {
@@ -204,14 +204,14 @@ export default function CourseEnAttenteModalExterne({
       // CORRECTION : already_accepted = requête concurrente du même livreur déjà traitée
       if (data?.already_accepted) {
         stopUrgentCourseAlert("course-accepted");
-        onAccepter();
+        onAccepter(false, { key: `course:${course.id}`, receipt: data });
         return;
       }
       if (data?.already_taken || data?.reason === "already_taken") { stopUrgentCourseAlert("course-already-taken"); setCourseDejaPrise(true); return; }
       if (data?.expired) { stopUrgentCourseAlert("course-expired"); setCourseExpiree(true); return; }
       if (data?.success && data?.accepted !== false) {
         stopUrgentCourseAlert("course-accepted");
-        onAccepter();
+        onAccepter(false, { key: `course:${course.id}`, receipt: data });
       } else if (data?.already_taken || data?.reason === "already_taken") {
         alert("Cette course vient d'être prise par un autre livreur.");
       } else {
@@ -244,7 +244,7 @@ export default function CourseEnAttenteModalExterne({
       if (data?.already_accepted) {
         stopUrgentCourseAlert("course-accepted-manual");
         setShowManualPriceModal(false);
-        onAccepter(true); // pending_client_validation = true (mode manuel)
+        onAccepter(true, { key: `course:${course.id}`, receipt: data }); // pending_client_validation = true (mode manuel)
         return;
       }
       if (data?.already_taken || data?.reason === "already_taken") { stopUrgentCourseAlert("course-already-taken"); setCourseDejaPrise(true); return; }
@@ -252,7 +252,7 @@ export default function CourseEnAttenteModalExterne({
       if (data?.success && data?.accepted !== false) {
         stopUrgentCourseAlert("course-accepted-manual");
         setShowManualPriceModal(false);
-        onAccepter(data?.pending_client_validation === true);
+        onAccepter(data?.pending_client_validation === true, { key: `course:${course.id}`, receipt: data });
       } else if (data?.already_taken || data?.reason === "already_taken") {
         alert("Cette course vient d'être prise par un autre livreur.");
       } else {

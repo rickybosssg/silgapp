@@ -179,8 +179,8 @@ export default function LivreurMesInfosModal({ livreurProfil, onSave }) {
       <div className="space-y-3">
         <label className="block text-xs font-semibold text-gray-500">Autres photos</label>
         <PhotoPicker label=" Photo du moyen de déplacement" value={photoMoto} onChange={setPhotoMoto} />
-        <PhotoPicker label=" CNIB Recto" value={cnibRecto} onChange={setCnibRecto} />
-        <PhotoPicker label=" CNIB Verso" value={cnibVerso} onChange={setCnibVerso} />
+        <PhotoPicker label=" Pièce d'identité Recto" value={cnibRecto} onChange={setCnibRecto} />
+        <PhotoPicker label=" Pièce d'identité Verso" value={cnibVerso} onChange={setCnibVerso} />
       </div>
 
       <button

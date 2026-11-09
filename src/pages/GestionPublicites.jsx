@@ -55,7 +55,7 @@ const DUREES_MIN = [3, 5, 10, 15];
 const defaultForm = {
   titre: "", description: "", type_media: "image", media_url: "",
   lien_whatsapp: "", lien_telephone: "", lien_url: "",
-  cible: "tous", format: "carrousel", actif: true,
+  cible: "tous", format: "carrousel", actif: true, visible_invites: false,
   moment_affichage: "ouverture_app", moments_personnalises: [],
   duree_min_affichage: 5, fermable_immediatement: false,
   limite_affichage: "une_fois_par_course",
@@ -158,6 +158,7 @@ export default function GestionPublicites() {
       cible: pub.cible || "tous",
       format: pub.format || "carrousel",
       actif: pub.actif !== false,
+      visible_invites: pub.visible_invites === true,
       moment_affichage: editMoment,
       moments_personnalises: editMomentsPerso,
       duree_min_affichage: pub.duree_min_affichage ?? 5,
@@ -347,6 +348,10 @@ export default function GestionPublicites() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
+            <div className="rounded-xl border p-3 space-y-2">
+              <label className="flex items-start gap-3 text-sm font-semibold"><input type="checkbox" checked={form.visible_invites === true} onChange={e => setForm(prev => ({ ...prev, visible_invites: e.target.checked }))} />Visible aussi par les invités</label>
+              <p className="text-xs text-gray-600">Rend le contenu de cette annonce public sans compte, selon le pays choisi. Uniquement les carrousels clients/tous diffusés à l'ouverture. Aucun message au numéro de livraison. Les statistiques invitées restent indisponibles tant que leur protection serveur n'est pas activée.</p>
+            </div>
             {/* Format + Cible */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">

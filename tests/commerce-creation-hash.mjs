@@ -1,0 +1,6 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {createHash,webcrypto}from'node:crypto';
+import {canonicalCommercePayload,hashCommerceCreation}from'../base44/shared/commerceCreationHash.js';
+if(!globalThis.crypto)globalThis.crypto=webcrypto;
+test('canonical keys recursively stable without changing arrays',async()=>{const a={patch:{prix:100,nom:'x'},actor_id:'a',list:[2,1]};const b={list:[2,1],actor_id:'a',patch:{nom:'x',prix:100}};assert.equal(canonicalCommercePayload(a),canonicalCommercePayload(b));assert.equal(await hashCommerceCreation(a),createHash('sha256').update(canonicalCommercePayload(a)).digest('hex'));});
+test('hash binds actor parent operation country and price',async()=>{const base={actor_id:'a',parent_id:'shop',operation:'create_product',country_code:'BF',patch:{prix:10}};const original=await hashCommerceCreation(base);for(const changed of [{...base,actor_id:'b'},{...base,parent_id:'other'},{...base,operation:'create_establishment'},{...base,country_code:'CI'},{...base,patch:{prix:11}}])assert.notEqual(await hashCommerceCreation(changed),original);});
+test('non JSON values cannot be silently omitted from hash',()=>{for(const v of [undefined,NaN,Infinity,()=>0,new Date(),{x:undefined}])assert.throws(()=>canonicalCommercePayload(v),/CANONICAL_PAYLOAD_INVALID/);});

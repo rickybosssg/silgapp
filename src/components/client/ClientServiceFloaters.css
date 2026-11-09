@@ -1,0 +1,8 @@
+.client-service-floater{position:fixed;z-index:35;display:flex;align-items:center;justify-content:center;gap:8px;min-height:52px;padding:10px 12px;border:2px solid rgba(255,255,255,.85);border-radius:18px;box-shadow:0 6px 20px rgba(26,36,58,.25);font-weight:750;line-height:1.2;white-space:nowrap;touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab}
+.client-service-floater:active{cursor:grabbing}.client-service-floater:focus-visible{outline:3px solid #172554;outline-offset:3px}
+.client-service-floater[data-service="boutique"]{background:#6252df;color:#fff}
+.client-service-floater[data-service="restaurant"]{background:#ffab23;color:#3c2400}
+.client-service-floater svg{flex-shrink:0;pointer-events:none}.client-service-floater span{pointer-events:none}
+.client-floater-instructions{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+.client-floater-safe-insets{position:fixed;inset:0;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+

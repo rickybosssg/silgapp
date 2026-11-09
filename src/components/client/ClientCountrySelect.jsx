@@ -2,6 +2,15 @@ import React, { useState } from "react";
 import { ChevronDown, Check, Loader2 } from "lucide-react";
 import { usePaysActifs } from "@/components/international/CountrySelector";
 import { cn } from "@/lib/utils";
+import { getCountryConfig } from "@/lib/phoneUtils";
+
+// Presentation only: use the exact country, never borrow another country's dial code.
+export function countryDialLabel(country) {
+  const digits = (value) => String(value || "").replace(/\D/g, "");
+  const dial = digits(country?.indicatif) || digits(getCountryConfig(country?.code)?.dial);
+  return dial ? `(+${dial})` : "";
+}
+
 
 /**
  * Sélecteur de pays fermé par défaut, 100% dynamique (Country entity).
@@ -41,10 +50,10 @@ export default function ClientCountrySelect({ value, onChange, disabled = false 
             Chargement...
           </span>
         ) : selected ? (
-          <span className="flex items-center gap-2 text-gray-900">
-            <span className="text-lg">{selected.emoji_flag}</span>
-            <span className="font-semibold">{selected.nom}</span>
-            <span className="text-gray-500 font-medium">(+{String(selected.indicatif || "").replace("+", "")})</span>
+          <span className="flex min-w-0 items-center gap-2 text-gray-900">
+            <span className="text-lg flex-shrink-0">{selected.emoji_flag}</span>
+            <span className="min-w-0 truncate font-semibold">{selected.nom}</span>
+            <span className="flex-shrink-0 text-gray-500 font-medium">{countryDialLabel(selected)}</span>
           </span>
         ) : (
           <span className="text-gray-400">Sélectionnez votre pays</span>
@@ -72,7 +81,7 @@ export default function ClientCountrySelect({ value, onChange, disabled = false 
               >
                 <span className="text-lg flex-shrink-0">{p.emoji_flag}</span>
                 <span className="flex-1 font-semibold">{p.nom}</span>
-                <span className="text-gray-500 text-xs font-medium">(+{String(p.indicatif || "").replace("+", "")})</span>
+                <span className="flex-shrink-0 text-gray-500 text-xs font-medium">{countryDialLabel(p)}</span>
                 {value === p.code && <Check className="w-4 h-4 text-primary flex-shrink-0" />}
               </button>
             ))}

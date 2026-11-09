@@ -1,3 +1,5 @@
+import { COMMERCE_ADMIN_MIGRATION_ENABLED } from '@/lib/commerceAdminMigration';
+import CommerceAdminSurface from '@/components/admin/CommerceAdminSurface';
 import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -16,7 +18,7 @@ const VALIDATION_LABELS = {
   suspendu: { label: "Suspendu", color: "text-orange-600", bg: "bg-orange-50", border: "border-orange-200" },
 };
 
-export default function PartenaireDetailDialog({ open, etablissement, type, onClose }) {
+function LegacyPartenaireDetailDialog({ open = undefined, etablissement = undefined, type = undefined, onClose = undefined }) {
   const queryClient = useQueryClient();
   const [commission, setCommission] = useState("");
   const [motif, setMotif] = useState("");
@@ -300,4 +302,17 @@ export default function PartenaireDetailDialog({ open, etablissement, type, onCl
       </div>
     </div>
   );
+}
+
+/**
+ * @param {Parameters<typeof LegacyPartenaireDetailDialog>[0] & {
+ *   commerceMigrationEnabled?: boolean,
+ *   commerceAdminContext?: { sessionId: string, countryCode: string }
+ * }} [props]
+ */
+export default function PartenaireDetailDialog(props={}) {
+  const enabled=props.commerceMigrationEnabled ?? COMMERCE_ADMIN_MIGRATION_ENABLED;
+  if(enabled!==true || props.type === "pharmacie")return <LegacyPartenaireDetailDialog {...props} />;
+  if(!props.open)return null;
+  return <CommerceAdminSurface context={props.commerceAdminContext} type={props.type} mode="detail" parentId={props.etablissement?.id} onClose={props.onClose} />;
 }

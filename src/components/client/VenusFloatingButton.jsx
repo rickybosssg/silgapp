@@ -145,6 +145,7 @@ export default function VenusFloatingButton({ forcedCountryCode = null, embedded
       <motion.button
         data-venus-floating="true"
         ref={buttonRef}
+        aria-label="Ouvrir Vénus"
         aria-hidden={hidden}
         tabIndex={hidden ? -1 : 0}
         drag={!embedded && !inline}
@@ -164,6 +165,7 @@ export default function VenusFloatingButton({ forcedCountryCode = null, embedded
         className={embedded ? "relative shrink-0 flex items-center justify-center w-9 h-9 rounded-full overflow-hidden border border-white" : "fixed z-[60] flex items-center justify-center w-16 h-16 rounded-full shadow-2xl overflow-hidden border-4 border-white cursor-grab active:cursor-grabbing"}
         style={{
           position: (embedded || inline) ? 'relative' : 'fixed',
+          zIndex: (embedded || inline) ? 'auto' : 60,
           flexShrink: 0,
           visibility: hidden ? "hidden" : "visible",
           pointerEvents: hidden ? "none" : "auto",
@@ -263,3 +265,4 @@ export default function VenusFloatingButton({ forcedCountryCode = null, embedded
     </>
   );
 }
+

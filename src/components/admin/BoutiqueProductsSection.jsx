@@ -1,3 +1,5 @@
+import { COMMERCE_ADMIN_MIGRATION_ENABLED } from '@/lib/commerceAdminMigration';
+import CommerceAdminSurface from '@/components/admin/CommerceAdminSurface';
 import React, { useState, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -9,7 +11,8 @@ const VALIDATION_LABELS = {
   refuse: { label: "Refusé", color: "text-red-600", bg: "bg-red-50", border: "border-red-200", dot: "bg-red-500" },
 };
 
-export default function BoutiqueProductsSection({ boutiqueId }) {
+/** @param {{ boutiqueId?: string }} props */
+function LegacyBoutiqueProductsSection({ boutiqueId }) {
   const queryClient = useQueryClient();
   const [actionLoading, setActionLoading] = useState(null);
   const pendingRef = useRef(false);
@@ -192,4 +195,18 @@ export default function BoutiqueProductsSection({ boutiqueId }) {
       )}
     </section>
   );
+}
+
+/**
+ * @param {Parameters<typeof LegacyBoutiqueProductsSection>[0] & {
+ *   commerceMigrationEnabled?: boolean,
+ *   commerceAdminContext?: { sessionId: string, countryCode: string },
+ *   onClose?: () => void
+ * }} [props]
+ */
+export default function BoutiqueProductsSection(props={}) {
+  const enabled=props.commerceMigrationEnabled ?? COMMERCE_ADMIN_MIGRATION_ENABLED;
+  if(enabled!==true)return <LegacyBoutiqueProductsSection {...props} />;
+
+  return <CommerceAdminSurface context={props.commerceAdminContext} type={"boutique"} mode="products" parentId={props.boutiqueId} onClose={props.onClose} />;
 }

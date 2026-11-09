@@ -1,3 +1,4 @@
+import { useDriverAcceptanceAudio } from "@/hooks/useDriverAcceptanceAudio";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { displayedPriceQuote } from '../../base44/shared/coursePriceQuote.js';
 import { reconcilePickupRows, newestCourseRows } from '@/lib/confirmedPickupView';
@@ -414,6 +415,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
   // ─── Notifications push ───────────────────────────────────────────────────
   const livreurId = livreurProfil?.id;
+  const playAcceptanceAudio = useDriverAcceptanceAudio(livreurId, activeTab);
   const livreurEmail = livreurProfil?.user_email;
   const [notificationCourseId, setNotificationCourseId] = useState(null);
   const [notificationCourseCandidate, setNotificationCourseCandidate] = useState(null);
@@ -1234,7 +1236,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   }, [onboardingTermine, sessionExpired, livreurProfil?.statut, livreurProfil?.id, gpsActif]);
 
   // ─── Mutations courses ────────────────────────────────────────────────────
-  const handleAccepter = (isPendingPrixManuel = false) => {
+  const handleAccepter = (isPendingPrixManuel = false, acceptanceEvent = null) => {
+    if (!isPendingPrixManuel) playAcceptanceAudio(acceptanceEvent);
     setNotificationCourseCandidate(null);
     setNotificationCourseId(null);
     setCourseProposeeDirecte(null);
@@ -1310,7 +1313,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       const data = res;
       if (data?.success && data?.accepted !== false) {
         stopUrgentCourseAlert("fallback-accepted");
-        handleAccepter(data?.pending_client_validation === true);
+        handleAccepter(data?.pending_client_validation === true, { key: `course:${course.id}`, receipt: data });
       } else if (data?.already_taken || data?.reason === "already_taken") {
         toast.error("Cette course vient d'être prise par un autre livreur.");
       } else if (data?.expired) {
@@ -1695,6 +1698,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
           <OnRouteProposalCard
             proposal={topProposal}
             livreurProfil={livreurProfil}
+            onAcceptSuccess={playAcceptanceAudio}
             onDismiss={() =>
               setDismissedProposalIds(prev => new Set([...prev, topProposal.proposal_id]))
             }
@@ -2009,7 +2013,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
                 course: data.course,
               });
             }}
-            onAcceptSuccess={() => {
+            onAcceptSuccess={(acceptanceEvent) => {
+              playAcceptanceAudio(acceptanceEvent);
               setActiveTab("courses");
               statutMutation.mutate("en_course");
             }}

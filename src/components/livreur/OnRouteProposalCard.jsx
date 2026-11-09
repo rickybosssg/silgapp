@@ -33,7 +33,7 @@ import { toast } from "sonner";
  * - Désactive les boutons automatiquement
  * - Le backend empêche toute acceptation tardive (vérification expires_at)
  */
-export default function OnRouteProposalCard({ proposal, livreurProfil, onDismiss }) {
+export default function OnRouteProposalCard({ proposal, livreurProfil, onDismiss, onAcceptSuccess }) {
   const queryClient = useQueryClient();
   const [responding, setResponding] = useState(false);
   const [secondsRemaining, setSecondsRemaining] = useState(proposal?.seconds_remaining || 0);
@@ -86,6 +86,7 @@ export default function OnRouteProposalCard({ proposal, livreurProfil, onDismiss
         queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
         queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles"] });
         queryClient.invalidateQueries({ queryKey: ["eco-mission-active"] });
+        onAcceptSuccess?.({ key: `course:${proposal.course_id || proposal.proposal_id}`, receipt: res });
         onDismiss?.();
       } else if (res?.reason === "proposal_expired") {
         toast.error("Cette proposition a expiré.");

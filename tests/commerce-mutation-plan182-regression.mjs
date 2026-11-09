@@ -1,0 +1,12 @@
+import test from 'node:test';import assert from 'node:assert/strict';import { planCommerceMutation,confirmCommerceClaim } from '../base44/shared/commerceMutationPlan.js';
+const request={request_id:'req',actor_id:'owner',scope_id:'shop',operation:'create_product',payload_hash:'sha256-bound-by-server'};
+const journal={...request,id:'journal',revision:2,state:'ready'};
+test('no journal cannot silently execute or bootstrap',()=>assert.equal(planCommerceMutation(null,request,true).decision,'blocked'));
+test('authorization is required even for a completed result',()=>assert.equal(planCommerceMutation({...journal,state:'completed',result_id:'p'},request,false).decision,'deny'));
+for(const key of Object.keys(request))test('reused request with mismatched '+key+' denied',()=>assert.equal(planCommerceMutation(journal,{...request,[key]:'other'},true).decision,'deny'));
+test('ready requires exact revision CAS, never grants execution by planning alone',()=>{const p=planCommerceMutation(journal,request,true);assert.equal(p.decision,'claim_required');assert.deepEqual(p.compare,{id:'journal',revision:2,state:'ready'});assert.equal(p.may_execute_mutation,false);assert.equal(confirmCommerceClaim(p,1),true);for(const count of [0,2,undefined,'1',null])assert.equal(confirmCommerceClaim(p,count),false);});
+for(const state of ['running','uncertain','failed','unknown','expired'])test(state+' is never retried automatically',()=>assert.equal(planCommerceMutation({...journal,state},request,true).decision,'reconcile'));
+test('expired lease is not a proof that previous write did not happen',()=>assert.equal(planCommerceMutation({...journal,state:'running',expires_at:'2000-01-01'},request,true).decision,'reconcile'));
+test('completed matching request only replays receipt with a fresh authorized read',()=>{const p=planCommerceMutation({...journal,state:'completed',result_id:'p'},request,true);assert.equal(p.decision,'replay_receipt');assert.equal(p.result_id,'p');assert.equal(p.requires_authorized_result_read,true);assert.equal(confirmCommerceClaim(p,1),false);});
+test('completed without receipt reconciles instead of re-executing',()=>assert.equal(planCommerceMutation({...journal,state:'completed'},request,true).decision,'reconcile'));
+test('invalid revision cannot claim',()=>assert.equal(planCommerceMutation({...journal,revision:-1},request,true).decision,'blocked'));

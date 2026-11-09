@@ -5,7 +5,7 @@ import { retryDelayMs, withRequestDeadline } from './guestTrackingState';
 export const GUEST_STORAGE_KEY = 'silgapp_guest_order_v1';
 const GUEST_COUNTRY_KEY = 'silgapp_guest_country_v1';
 const secret = () => [...crypto.getRandomValues(new Uint8Array(32))].map(v => v.toString(16).padStart(2, '0')).join('');
-const correctableDraftCodes = new Set(['PHONE_INVALID', 'PRICE_INVALID', 'QUARTIER_INVALID', 'COUNTRY_INVALID', 'CONFIRMATION_REQUIRED', 'CONSENT_INVALID', 'DISABLED']);
+const correctableDraftCodes = new Set(['PHONE_INVALID', 'PRICE_INVALID', 'QUARTIER_INVALID', 'COUNTRY_INVALID', 'CONFIRMATION_REQUIRED', 'CONSENT_INVALID', 'DISABLED', 'DEVICE_LIMIT']);
 
 export function guestDraftCanBeCorrected(error) {
   return correctableDraftCodes.has(error?.code);

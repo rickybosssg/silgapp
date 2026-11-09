@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
-import { useQuery } from "@tanstack/react-query";
+import { useClientCommerceProfile, useClientCommercePage } from "@/hooks/useClientCommerce";
+import { COMMERCE_CLIENT_MIGRATION_ENABLED } from "@/lib/commerceClientMigration";
+import { CommerceReadError, CommercePageFeedback } from "@/components/client/CommerceReadFeedback";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, MapPin, Plus, Minus, ShoppingCart, Loader2, Package, Clock, X, Camera, Play } from "lucide-react";
 import CheckoutModal from "@/components/boutique/CheckoutModal";
@@ -9,35 +11,30 @@ import MediaGallery, { getMediaList } from "@/components/media/MediaGallery";
 export default function BoutiqueDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [clientProfil, setClientProfil] = useState(null);
+  const client = useClientCommerceProfile();
+  const clientProfil = client.profile;
   const [cart, setCart] = useState([]);
   const [showCheckout, setShowCheckout] = useState(false);
   const [galleryProduct, setGalleryProduct] = useState(null);
   const visitTrackedRef = useRef(false);
 
-  useEffect(() => {
-    base44.auth.me().then(u => {
-      if (u?.email) {
-        base44.entities.ClientExterne.filter({ user_email: u.email })
-          .then(c => setClientProfil(c?.[0] || null))
-          .catch(() => {});
-      }
-    }).catch(() => {});
-  }, []);
-
-  const { data: boutique, isLoading } = useQuery({
-    queryKey: ["boutique", id],
-    queryFn: () => base44.entities.Boutique.get(id),
-    enabled: !!id,
-  });
-
-  const { data: produits = [] } = useQuery({
-    queryKey: ["produits-boutique", id],
-    queryFn: () => base44.entities.ProduitBoutique.filter({ boutique_id: id, disponible: true, actif: true }, "-created_date", 200),
-    enabled: !!id,
-  });
+  const establishmentQuery = useClientCommercePage(client.context, "boutique", "catalogue", id, !!id);
+  const boutique = establishmentQuery.rows[0];
+  const isLoading = establishmentQuery.isLoading;
+  const productsQuery = useClientCommercePage(client.context, "boutique", "products", id, !!boutique?.id);
+  const produits = productsQuery.rows;
 
   useEffect(() => {
+    setCart([]);
+    setShowCheckout(false);
+    setGalleryProduct(null);
+    visitTrackedRef.current = false;
+  }, [id, clientProfil?.id, clientProfil?.country_code]);
+
+  useEffect(() => {
+    // The server projection intentionally excludes counters. Do not overwrite them
+    // with a fabricated zero; a secure visit endpoint is still a rollout blocker.
+    if (COMMERCE_CLIENT_MIGRATION_ENABLED) return;
     if (!boutique?.id || visitTrackedRef.current) return;
     const key = `silgapp_visit_boutique_${boutique.id}`;
     const today = new Date().toISOString().slice(0, 10);
@@ -69,6 +66,8 @@ export default function BoutiqueDetail() {
   const total = cart.reduce((s, i) => s + i.prix * i.quantite, 0);
   const cartCount = cart.reduce((s, i) => s + i.quantite, 0);
 
+  if (client.error) return <div className="min-h-screen bg-gray-50 p-4 pt-[calc(1rem+max(env(safe-area-inset-top),28px))]"><CommerceReadError message="Impossible de charger votre profil client." onRetry={client.retry} /><button onClick={() => navigate("/client/boutiques")} className="mt-3 text-sm underline">Retour</button></div>;
+  if (establishmentQuery.isError) return <div className="min-h-screen bg-gray-50 p-4 pt-[calc(1rem+max(env(safe-area-inset-top),28px))]"><CommerceReadError message="Impossible de charger cet établissement." onRetry={() => establishmentQuery.refetch()} isRetrying={establishmentQuery.isFetching} /><button onClick={() => navigate("/client/boutiques")} className="mt-3 text-sm underline">Retour</button></div>;
   if (isLoading || !clientProfil) return <div className="min-h-screen bg-gray-50 flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
   if (!boutique) return <div className="min-h-screen bg-gray-50 flex items-center justify-center"><p className="text-gray-500">Boutique introuvable</p></div>;
 
@@ -76,7 +75,7 @@ export default function BoutiqueDetail() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
-      <div className="bg-gradient-to-r from-primary to-red-700 text-white px-4 py-3 sticky top-0 z-20">
+      <div className="bg-gradient-to-r from-primary to-red-700 text-white px-4 pb-3 pt-[calc(.75rem+max(env(safe-area-inset-top),28px))] sticky top-0 z-20">
         <div className="max-w-lg mx-auto flex items-center gap-3">
           <button onClick={() => navigate("/client/boutiques")} className="text-white/80 hover:text-white p-2.5 -ml-2 rounded-xl hover:bg-white/10 transition-colors"><ArrowLeft className="w-6 h-6" /></button>
           <div className="flex-1">
@@ -114,8 +113,9 @@ export default function BoutiqueDetail() {
               <p className="text-sm font-bold text-red-600">Fermé actuellement — commande impossible</p>
             </div>
           )}
+          {productsQuery.isLoading && <div role="status" className="py-6 text-center text-sm text-gray-500">Chargement des produits...</div>}
           <div className="space-y-2">
-            {produits.length === 0 && <p className="text-sm text-gray-500 text-center py-8">Aucun produit disponible</p>}
+            {!productsQuery.isLoading && !productsQuery.isError && !productsQuery.hasNextPage && produits.length === 0 && <p className="text-sm text-gray-500 text-center py-8">Aucun produit disponible</p>}
             {produits.map(p => {
               const inCart = cart.find(i => i.id === p.id);
               const mediaList = getMediaList(p);
@@ -172,6 +172,7 @@ export default function BoutiqueDetail() {
                 </div>
               );
             })}
+            <CommercePageFeedback query={productsQuery} message="Impossible de charger tous les produits." />
           </div>
         </div>
       </div>

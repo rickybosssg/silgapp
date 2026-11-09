@@ -1,3 +1,5 @@
+import { ownerReadScope } from '@/lib/commerceOwnerReadView';
+import { OwnerOrdersReadView } from './CommerceOwnerReadView';
 import React, { useMemo, useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -100,7 +102,7 @@ function LivreurCompactCard({ livreur }) {
   );
 }
 
-export default function CommandesManager({ type, etablissementId, etablissementNom }) {
+function LegacyCommandesManager({ type, etablissementId, etablissementNom }) {
   const isRestaurant = type === "restaurant";
   const theme = isRestaurant
     ? { active: "bg-orange-600 text-white shadow-sm", spinner: "text-orange-500" }
@@ -442,4 +444,10 @@ export default function CommandesManager({ type, etablissementId, etablissementN
       )}
     </div>
   );
+}
+export default function CommandesManager(props) {
+  if(props.ownerCommerce?.enabled!==true ) return <LegacyCommandesManager {...props} />;
+  let scope;
+  try {scope=ownerReadScope(props.ownerCommerce,props.type,props.etablissementId,props.countryCode);} catch {return <p role="alert">Perimetre proprietaire indisponible. Aucune donnee affichee.</p>;}
+  return <div className="space-y-4"><OwnerOrdersReadView key={JSON.stringify(scope)} scope={scope} /></div>;
 }

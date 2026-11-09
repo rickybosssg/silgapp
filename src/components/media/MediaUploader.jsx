@@ -52,7 +52,7 @@ function compressImage(file) {
  * MediaUploader — gestion multi-photos + vidéo côté partenaire.
  * Props: photos (array), videoUrl (string), onChange({ photos, video_url })
  */
-export default function MediaUploader({ photos = [], videoUrl = "", onChange }) {
+export default function MediaUploader({ photos = [], videoUrl = "", onChange, onBusyChange = (_busy) => {}, disabled = false }) {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [uploadingVideo, setUploadingVideo] = useState(false);
   const [error, setError] = useState("");
@@ -64,6 +64,7 @@ export default function MediaUploader({ photos = [], videoUrl = "", onChange }) 
   };
 
   const handleAddPhotos = async (e) => {
+    if (disabled || uploadingPhoto || uploadingVideo) return;
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
     setError("");
@@ -72,12 +73,14 @@ export default function MediaUploader({ photos = [], videoUrl = "", onChange }) 
     }
 
     setUploadingPhoto(true);
+    onBusyChange(true);
     try {
       // Upload séquentiel (évite timeouts/crashes sur Android — voir dead_ends)
       const newUrls = [];
       for (const file of files.slice(0, MAX_PHOTOS - photos.length)) {
         const compressed = await compressImage(file);
         const { file_url } = await base44.integrations.Core.UploadFile({ file: compressed });
+        if (!file_url) throw new Error("Photo non confirmée");
         newUrls.push(file_url);
       }
       notifyChange([...photos, ...newUrls], videoUrl);
@@ -85,15 +88,18 @@ export default function MediaUploader({ photos = [], videoUrl = "", onChange }) 
       setError("Erreur lors de l'upload d'une photo");
     }
     setUploadingPhoto(false);
+    onBusyChange(false);
     if (photoInputRef.current) photoInputRef.current.value = "";
   };
 
   const handleDeletePhoto = (idx) => {
+    if (disabled || uploadingPhoto || uploadingVideo) return;
     const newPhotos = photos.filter((_, i) => i !== idx);
     notifyChange(newPhotos, videoUrl);
   };
 
   const handleAddVideo = async (e) => {
+    if (disabled || uploadingPhoto || uploadingVideo) return;
     const file = e.target.files?.[0];
     if (!file) return;
     setError("");
@@ -104,6 +110,7 @@ export default function MediaUploader({ photos = [], videoUrl = "", onChange }) 
     }
 
     setUploadingVideo(true);
+    onBusyChange(true);
     try {
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
       notifyChange(photos, file_url);
@@ -111,10 +118,12 @@ export default function MediaUploader({ photos = [], videoUrl = "", onChange }) 
       setError("Erreur lors de l'upload de la vidéo");
     }
     setUploadingVideo(false);
+    onBusyChange(false);
     if (videoInputRef.current) videoInputRef.current.value = "";
   };
 
   const handleDeleteVideo = () => {
+    if (disabled || uploadingPhoto || uploadingVideo) return;
     notifyChange(photos, "");
   };
 
@@ -146,7 +155,7 @@ export default function MediaUploader({ photos = [], videoUrl = "", onChange }) 
             <button
               type="button"
               onClick={() => photoInputRef.current?.click()}
-              disabled={uploadingPhoto}
+              disabled={disabled || uploadingPhoto || uploadingVideo}
               className="w-20 h-20 rounded-xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center text-gray-400 hover:border-purple-300 hover:text-purple-400 transition-colors flex-shrink-0"
             >
               {uploadingPhoto ? (
@@ -166,7 +175,7 @@ export default function MediaUploader({ photos = [], videoUrl = "", onChange }) 
             multiple
             onChange={handleAddPhotos}
             className="hidden"
-            disabled={uploadingPhoto}
+            disabled={disabled || uploadingPhoto || uploadingVideo}
           />
         </div>
       </div>
@@ -190,7 +199,7 @@ export default function MediaUploader({ photos = [], videoUrl = "", onChange }) 
             <button
               type="button"
               onClick={() => videoInputRef.current?.click()}
-              disabled={uploadingVideo}
+              disabled={disabled || uploadingPhoto || uploadingVideo}
               className="w-full h-20 rounded-xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center text-gray-400 hover:border-purple-300 hover:text-purple-400 transition-colors"
             >
               {uploadingVideo ? (
@@ -209,7 +218,7 @@ export default function MediaUploader({ photos = [], videoUrl = "", onChange }) 
             accept="video/*"
             onChange={handleAddVideo}
             className="hidden"
-            disabled={uploadingVideo}
+            disabled={disabled || uploadingPhoto || uploadingVideo}
           />
         </div>
       </div>

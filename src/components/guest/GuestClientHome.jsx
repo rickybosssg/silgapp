@@ -1,9 +1,10 @@
 import React from 'react';
 import { User, Package, ChevronRight, Inbox, Car, Store, UtensilsCrossed, Clock, Bell, MessageCircle, ShieldCheck } from 'lucide-react';
 import SuivreCourseCard from '@/components/client/SuivreCourseCard';
+import GuestAds from '@/components/guest/GuestAds';
 
 /** Client home presentation only. No authenticated hook, profile or entity query. */
-export default function GuestClientHome({ enabled, loading = false, course, onOrder, onTrack, onLogin, previous = [], onPrevious }) {
+export default function GuestClientHome({ enabled, loading = false, course, onOrder, onTrack, onLogin, previous = [], onPrevious, adCountries = [] }) {
   return <div className="guest-home space-y-4">
     <div className="relative overflow-hidden rounded-3xl p-5 border border-white/20 bg-[#0879e8] shadow-[0_18px_45px_rgba(0,122,255,0.24)]">
       <div className="absolute inset-x-0 bottom-0 h-1 bg-white/25" />
@@ -15,6 +16,7 @@ export default function GuestClientHome({ enabled, loading = false, course, onOr
     {course && <SuivreCourseCard course={course} onClick={onTrack} />}
     <div className="grid grid-cols-4 gap-2">{[{ Icon: Inbox, label: 'Recevoir', color: 'bg-[#30b85a]' }, { Icon: Car, label: 'Déplacement', color: 'bg-[#147dbc]' }, { Icon: Store, label: 'Boutiques', color: 'bg-[#5856d6]' }, { Icon: UtensilsCrossed, label: 'Restaurants', color: 'bg-[#ac5b12]' }].map(({ Icon, label, color }) => <button key={label} type="button" onClick={onLogin} className="min-w-0 flex flex-col items-center gap-2 py-3 bg-white border border-gray-200 rounded-lg"><span className={`h-10 w-10 rounded-lg flex items-center justify-center text-white ${color}`}><Icon className="h-5 w-5" /></span><span className="text-[10px] font-semibold text-gray-600 break-words text-center">{label}</span></button>)}</div>
     <section className="border-y border-gray-200 py-4"><h2 className="text-xs font-bold text-gray-600 mb-3">Accès rapide</h2><div className="grid grid-cols-4 gap-2">{[{ Icon: Package, label: 'Courses', action: course ? onTrack : onOrder }, { Icon: Clock, label: 'Historique', action: onLogin }, { Icon: Bell, label: 'Notifications', action: onLogin }, { Icon: MessageCircle, label: 'Messages', action: onLogin }].map(({ Icon, label, action }) => <button key={label} type="button" onClick={action} className="flex flex-col items-center gap-2 min-w-0 py-3"><Icon className="h-5 w-5 text-blue-600" /><span className="text-[10px] text-gray-600 break-words">{label}</span></button>)}</div></section>
+    <GuestAds countries={adCountries} />
     {previous.length > 0 && <section className="guest-actions"><h2 className="text-sm font-semibold">Suivis conservés sur cet appareil</h2>{previous.map(entry => <button type="button" key={entry.request_id} className="guest-secondary" onClick={() => onPrevious(entry)}>{entry.reference || 'Suivi précédent'}</button>)}</section>}
   </div>;
 }
