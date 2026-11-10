@@ -31,13 +31,20 @@ export async function readEventMusicSingleton(entity, validateReturnedUrl = (_ur
     for (const entry of state.entries) {
       const key = JSON.stringify([entry.actor, entry.requestId]);
       if (seen.has(key) || entry.action !== 'upload' || typeof entry.actor !== 'string' || !entry.actor || !eventMusicRequestValid(entry.requestId) ||
-          !/^[a-f0-9]{64}$/.test(entry.hash) || !eventMusicRevisionValid(entry.expectedRevision) || !['pending', 'complete'].includes(entry.status) ||
+          !/^[a-f0-9]{64}$/.test(entry.hash) || !eventMusicRevisionValid(entry.expectedRevision) || !['pending', 'complete', 'abandoned'].includes(entry.status) ||
           typeof entry.label !== 'string' || !entry.label.trim() || entry.label !== entry.label.trim() || entry.label.length > 60 || /[\x00-\x1f\x7f]/.test(entry.label) ||
           !['audio/mpeg', 'audio/wav'].includes(entry.mime) || !Number.isInteger(entry.sizeBytes) || entry.sizeBytes < 12 || entry.sizeBytes > 3 * 1024 * 1024 ||
           !Number.isInteger(entry.durationMs) || entry.durationMs < 200 || entry.durationMs > 30000) throw Error();
       seen.add(key);
+      if (entry.status === 'abandoned') {
+        const a = entry.abandon;
+        if (!a || typeof a.actor !== 'string' || !a.actor || !eventMusicRequestValid(a.requestId) || !eventMusicRevisionValid(a.expectedRevision)) throw Error();
+        const recoveryKey = JSON.stringify([a.actor, a.requestId]);
+        if (seen.has(recoveryKey)) throw Error();
+        seen.add(recoveryKey);
+      } else if (entry.abandon !== undefined) throw Error();
       if (entry.status === 'pending') { if (pending) throw Error(); pending = true; }
-      else {
+      else if (entry.status === 'complete') {
         const track = tracks.find(item => item.id === `asset_${entry.hash}`);
         if (!track || track.label !== entry.label || track.mime !== entry.mime || track.sizeBytes !== entry.sizeBytes || track.durationMs !== entry.durationMs) throw Error();
       }
@@ -52,3 +59,10 @@ export const eventMusicConfiguration = row => row ? {
 export const eventMusicCasFilter = row => ({ id: row.id, cle: EVENT_MUSIC_CONFIG_KEY, revision: row.revision, selections: row.selections, receipts: row.receipts,
   ...(row.tracks !== undefined ? { tracks: row.tracks } : {}), ...(row.upload_state !== undefined ? { upload_state: row.upload_state } : {}),
 });
+
+export function eventMusicPublicConfiguration(row) {
+  const config = eventMusicConfiguration(row);
+  const selected = new Set(Object.values(config.selections));
+  const tracks = (config.tracks || []).filter(track => selected.has(track.id));
+  return { revision: config.revision, selections: config.selections, ...(tracks.length ? { tracks } : {}) };
+}

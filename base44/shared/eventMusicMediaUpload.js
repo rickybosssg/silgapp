@@ -48,10 +48,13 @@ export async function uploadEventMusicMedia({ entity, user, input, bytes, upload
   if (previous) {
     if (previous.hash !== hash || previous.expectedRevision !== input.expected_revision || previous.label !== label || previous.mime !== media.mime ||
         previous.sizeBytes !== media.bytes.length || previous.durationMs !== media.durationMs) fail('REQUEST_ID_CONFLICT');
+    if (previous.status === 'abandoned') fail('UPLOAD_ABANDONED');
     if (previous.status !== 'complete') fail('UPLOAD_PENDING');
     return { success: true, configuration: eventMusicConfiguration(row), writable: !row.uploadPending, upload_enabled: !row.uploadPending,
       uploaded_track: row.parsedTracks.find(track => track.id === `asset_${hash}`), replayed: true };
   }
+  if (row.parsedUploadState.entries.some(e => e.abandon?.actor === user.id && e.abandon.requestId === input.request_id)) fail('REQUEST_ID_CONFLICT');
+  if (row.parsedUploadState.entries.some(e => e.hash === hash && e.status === 'abandoned')) fail('UPLOAD_HASH_UNCERTAIN');
   if (row.parsedReceipts.some(receipt => receipt.actor === user.id && receipt.request_id === input.request_id)) fail('REQUEST_ID_CONFLICT');
   if (row.uploadPending) fail('UPLOAD_PENDING');
   if (row.revision !== input.expected_revision) fail('REVISION_CONFLICT');

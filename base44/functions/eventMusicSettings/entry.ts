@@ -24,7 +24,7 @@ Deno.serve(async (req) => {
     }
     raw += decoder.decode(); input = JSON.parse(raw);
   } catch { return Response.json({ success: false, error: 'REQUEST_INVALID' }, { status: 400 }); }
-  if (!input || !['public', 'status', 'save', 'upload'].includes(input.action)) return Response.json({ success: false, error: 'ACTION_INVALID' }, { status: 400 });
+  if (!input || !['public', 'status', 'save', 'upload', 'abandon_upload'].includes(input.action)) return Response.json({ success: false, error: 'ACTION_INVALID' }, { status: 400 });
   try {
     const api = createClientFromRequest(req);
     let user = null;
