@@ -1,0 +1,72 @@
+{
+  "name": "CommercePaymentProof",
+  "type": "object",
+  "properties": {
+    "provenance": {
+      "type": "string",
+      "enum": [
+        "server_private_upload_v1"
+      ]
+    },
+    "state": {
+      "type": "string",
+      "enum": [
+        "ready"
+      ]
+    },
+    "actor_user_id": {
+      "type": "string"
+    },
+    "client_id": {
+      "type": "string"
+    },
+    "merchant_owner_id": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "boutique",
+        "restaurant"
+      ]
+    },
+    "parent_id": {
+      "type": "string"
+    },
+    "country_code": {
+      "type": "string"
+    },
+    "upload_request_id": {
+      "type": "string"
+    },
+    "file_uri": {
+      "type": "string"
+    },
+    "mime_type": {
+      "type": "string"
+    },
+    "byte_size": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "provenance",
+    "state",
+    "actor_user_id",
+    "client_id",
+    "merchant_owner_id",
+    "type",
+    "parent_id",
+    "country_code",
+    "upload_request_id",
+    "file_uri",
+    "mime_type",
+    "byte_size"
+  ],
+  "rls": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false
+  }
+}

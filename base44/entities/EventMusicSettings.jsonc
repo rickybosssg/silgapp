@@ -1,0 +1,43 @@
+{
+  "name": "EventMusicSettings",
+  "type": "object",
+  "properties": {
+    "cle": {
+      "type": "string",
+      "enum": [
+        "EVENT_MUSIC_V1"
+      ]
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "selections": {
+      "type": "string"
+    },
+    "receipts": {
+      "type": "string",
+      "default": "[]"
+    },
+    "tracks": {
+      "type": "string",
+      "default": "[]"
+    },
+    "upload_state": {
+      "type": "string",
+      "default": "{\"entries\":[]}"
+    }
+  },
+  "required": [
+    "cle",
+    "revision",
+    "selections",
+    "receipts"
+  ],
+  "rls": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false
+  }
+}
