@@ -139,9 +139,9 @@ test('actual dashboard hook survives automatic tab return, stops navigation/back
   slots.forEach(s=>s?.cleanup?.());assert.equal(controllers[1].disposed,true);assert.equal(Object.keys(listeners).length,0);
   await Promise.resolve();
 });
-test('client search uses the same approved excerpt, acceptance and refusal keep their distinct original files', async () => {
+test('client tracking search, acceptance and refusal use the requested 11-second ringtone', async () => {
   const sounds=[];globalThis.document={visibilityState:'visible'};globalThis.Audio=class {constructor(src){sounds.push(src);}addEventListener(){}pause(){}async play(){}};
   const {playClientCourseAudio,stopClientCourseAudio}=await import('../src/lib/clientCourseAudio.js');
-  try { await playClientCourseAudio('search');await playClientCourseAudio('acceptance');await playClientCourseAudio('refusal');assert.deepEqual(sounds,[APPROVED_COURSE_EXCERPT.url,'/sounds/client/SILGAPP_02_acceptation_joyeuse.mp3','/sounds/client/SILGAPP_03_refus_sobre.mp3']); }
+  try { await playClientCourseAudio('search');await playClientCourseAudio('acceptance');await playClientCourseAudio('refusal');assert.deepEqual(sounds,Array(3).fill('/sounds/shared/SILGAPP_sonnerie_suivi_11s.mp3')); }
   finally {stopClientCourseAudio();delete globalThis.document;delete globalThis.Audio;}
 });

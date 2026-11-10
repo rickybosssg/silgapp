@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Link, useNavigate } from "react-router-dom";
@@ -12,6 +12,22 @@ import { usePaysActifs } from "@/components/international/CountrySelector.jsx";
 import AdminPaysDialog from "@/components/admin/AdminPaysDialog.jsx";
 import DemoAccessManager from "@/components/admin/DemoAccessManager.jsx";
 import AudioTranscriptionSettings from "@/components/admin/AudioTranscriptionSettings.jsx";
+import EventMusicSettings from "@/components/admin/EventMusicSettings.jsx";
+import { isEventMusicAdmin } from "../../base44/shared/eventMusicContract.js";
+
+// Keep visibility aligned with the server; this never replaces server authorization.
+export function EventMusicAdminPanel({ api = base44 }) {
+  const [identity, setIdentity] = useState(null);
+  useEffect(() => {
+    let active = true;
+    setIdentity(null);
+    Promise.resolve().then(() => api.auth.me()).then(user => {
+      if (active) setIdentity({ api, user });
+    }).catch(() => { if (active) setIdentity(null); });
+    return () => { active = false; };
+  }, [api]);
+  return identity?.api === api && isEventMusicAdmin(identity.user) ? <EventMusicSettings api={api} /> : null;
+}
 
 export default function AdminGlobal() {
   const queryClient = useQueryClient();
@@ -137,6 +153,7 @@ export default function AdminGlobal() {
 
   return (
     <div className="p-4 lg:p-6 space-y-5 max-w-7xl mx-auto">
+      <EventMusicAdminPanel />
       <AudioTranscriptionSettings />
 
       {/* ── HERO HEADER ──────────────────────────────── */}

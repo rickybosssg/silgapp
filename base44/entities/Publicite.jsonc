@@ -2,6 +2,7 @@
   "name": "Publicite",
   "type": "object",
   "properties": {
+    "visible_invites": { "type": "boolean", "default": false, "description": "Diffusion publique explicite sur accueil invite (carrousel ouverture uniquement). Absence = non." },
     "titre": {
       "type": "string",
       "description": "Titre de la publicit\u00e9"

@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { clientCourseOutcome } from '@/lib/clientCourseOutcome';
+import { canStartGuestOrder, assertGuestOrderCapability, GUEST_SINGLE_ORDER_NOTICE } from '@/lib/guestOrderCapability';
+import { guestSessionTransaction, guestSavedEntries, rememberGuestReceipt } from '@/lib/guestOrderSession';
 import { GUEST_ACCESS_UNAVAILABLE, nextGuestDraft, readGuestStart } from '@/lib/guestAccessRecovery';
 import { useNavigate } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
@@ -56,6 +58,7 @@ export default function GuestOrderPage({ call: suppliedCall, storage: suppliedSt
   const storage = useRef(suppliedStorage || guestStorage()).current;
   const submit = useRef(createGuestSubmission(call, storage)).current;
   const [config, setConfig] = useState(null);
+  const [sessionReady, setSessionReady] = useState(false);
   const [catalog, setCatalog] = useState(null);
   const [draft, setDraft] = useState(emptyDraft);
   const [access, setAccess] = useState(null);
@@ -65,7 +68,9 @@ export default function GuestOrderPage({ call: suppliedCall, storage: suppliedSt
   const [review, setReview] = useState(false);
   const [pending, setPending] = useState(false);
   const [view, setView] = useState('home');
+  const [adCountry, setAdCountry] = useState('');
   const [previous, setPrevious] = useState([]);
+  const [draftRequestId, setDraftRequestId] = useState(null);
   const [loginPrompt, setLoginPrompt] = useState(false);
   const [dismissedDecision, setDismissedDecision] = useState('');
   const [foundNotice, setFoundNotice] = useState(false);
@@ -82,23 +87,34 @@ export default function GuestOrderPage({ call: suppliedCall, storage: suppliedSt
   const lock = useRef(false);
   const generation = useRef(0);
   const catalogGeneration = useRef(0);
+  const configSequence = useRef(0);
   const trackingSequence = useRef(0);
   const nextReadAt = useRef(0);
   const retryNotBefore = useRef(0);
   const [catalogBusy, setCatalogBusy] = useState(false);
   const [catalogError, setCatalogError] = useState('');
+  async function refreshConfig() {
+    const token = generation.current, sequence = ++configSequence.current;
+    const closed = { enabled: false, countries: [], unavailable: true };
+    const value = await call('config').catch(() => closed);
+    if (token !== generation.current || sequence !== configSequence.current) return closed;
+    setConfig(value);
+    return value;
+  }
   useEffect(() => {
     const token = ++generation.current;
     const sequence = ++trackingSequence.current;
-    const readConfig = () => call('config').then(value => { if (token === generation.current) setConfig(value); return value; }).catch(() => { const closed = { enabled: false, countries: [], unavailable: true }; if (token === generation.current) setConfig(closed); return closed; });
+    const readConfig = () => refreshConfig();
     const settingsPromise = readConfig();
     window.addEventListener('focus', readConfig);
     (async () => {
       try {
         const saved = await storage.read();
         if (token !== generation.current) return;
+        setSessionReady(true);
         if (saved) {
-          setPrevious(saved.previous || []);
+          setPrevious(guestSavedEntries(saved));
+          if (saved.draft_rejected) setDraftRequestId(saved.request_id);
           if (saved.draft_rejected === true) {
             try {
               const recovered = await call('track', { request_id: saved.request_id, read_token: saved.read_token });
@@ -123,13 +139,30 @@ export default function GuestOrderPage({ call: suppliedCall, storage: suppliedSt
           if (saved.last_course?.reference && typeof saved.last_course.statut === 'string') setCourse(saved.last_course);
           const result = await call('track', { request_id: saved.request_id, read_token: saved.read_token });
           if (token !== generation.current || sequence !== trackingSequence.current) return;
-          if (result.course) { setCourse(current => reconcileGuestCourse(current, result.course)); setPending(false); }
+          if (result.course) {
+            const stored = await rememberGuestReceipt(storage, saved.request_id, result);
+            if (token !== generation.current || sequence !== trackingSequence.current) return;
+            setPrevious(guestSavedEntries(stored));
+            setCourse(current => reconcileGuestCourse(current, result.course)); setPending(false);
+          }
           else setError(result.message || 'Création encore en vérification.');
         }
       } catch (e) { if (token === generation.current) setError(e.code === 'ACCESS_DENIED' ? GUEST_ACCESS_UNAVAILABLE : `Actualisation momentanément indisponible. ${e.message}`); }
     })();
     return () => { generation.current++; catalogGeneration.current++; window.removeEventListener('focus', readConfig); };
   }, [call, storage]);
+
+  // Reuse the guest's existing country choice, without an advertising-only selector.
+  // Missing or unreadable choice stays global-only; never invent a country.
+  useEffect(() => {
+    if (view !== 'home') return;
+    let current = true;
+    setAdCountry('');
+    Promise.resolve().then(() => storage.readCountry ? storage.readCountry() : '')
+      .then(code => { if (current) setAdCountry(typeof code === 'string' ? code : ''); })
+      .catch(() => { if (current) setAdCountry(''); });
+    return () => { current = false; };
+  }, [storage, view]);
 
   async function loadCatalog(code, remember = false) {
     const token = ++catalogGeneration.current;
@@ -146,54 +179,79 @@ export default function GuestOrderPage({ call: suppliedCall, storage: suppliedSt
     lock.current = true; setBusy(true); setError('');
     const token = generation.current;
     try {
-      const saved = await storage.read();
-      if (saved?.draft_rejected) await storage.save({ ...saved, draft: { ...emptyDraft, confirmed: false } });
+      await guestSessionTransaction(storage, async () => {
+        const saved = await storage.read();
+        if (saved?.draft_rejected && saved.request_id === draftRequestId) await storage.save({ ...saved, draft: { ...emptyDraft, confirmed: false } });
+      });
       if (token === generation.current) { setDraft(emptyDraft); setCatalog(null); setReview(false); setView('home'); }
     } catch (e) { if (token === generation.current) setError(e.message); }
     finally { if (token === generation.current) { lock.current = false; setBusy(false); } }
   }
   function returnHome() {
     setView('home');
-    const token = generation.current;
-    call('config').then(value => { if (token === generation.current) setConfig(value); }).catch(() => { if (token === generation.current) setConfig({ enabled: false, countries: [], unavailable: true }); });
+    refreshConfig();
   }
   async function openPrevious(entry) {
     if (lock.current) return;
     lock.current = true; setBusy(true); setError('');
+    setShowChat(false); setFoundNotice(false); setContactError(''); setDismissedDecision('');
+    setAccess(entry); setCourse(entry.last_course || null); setPending(!entry.last_course); setView('track');
     const token = generation.current;
     const sequence = ++trackingSequence.current;
-    try { const result = await call('track', { request_id: entry.request_id, read_token: entry.read_token }); if (token === generation.current && sequence === trackingSequence.current && result.course) { setAccess(entry); setCourse(current => reconcileGuestCourse(current, result.course)); setView('track'); } }
-    catch (e) { if (token === generation.current) setError(e.message); }
+    nextReadAt.current = 0; retryNotBefore.current = 0;
+    try {
+      const result = await call('track', { request_id: entry.request_id, read_token: entry.read_token });
+      if (token !== generation.current || sequence !== trackingSequence.current) return;
+      const stored = await rememberGuestReceipt(storage, entry.request_id, result);
+      if (token !== generation.current || sequence !== trackingSequence.current) return;
+      setPrevious(guestSavedEntries(stored));
+      if (result.course) { setCourse(current => reconcileGuestCourse(current, result.course)); setPending(false); }
+      else { setPending(true); setError(result.message || 'Création encore en vérification.'); }
+    } catch (e) { if (token === generation.current && sequence === trackingSequence.current) setError(e.message); }
     finally { if (token === generation.current) { lock.current = false; setBusy(false); } }
   }
   async function startOrder() {
-    if (lock.current || !config?.enabled) return;
+    if (lock.current || !config?.enabled || !sessionReady) return;
     lock.current = true; setBusy(true); setError('');
     const token = generation.current;
     ++trackingSequence.current;
     try {
-      const saved = await storage.read();
-      if (saved && !saved.draft_rejected) {
-        const latest = await readGuestStart(call, saved);
-        if (token !== generation.current) return;
-        if (!latest.accessUnavailable && (!latest.course || !['livree', 'annulee', 'terminee'].includes(latest.course.statut))) {
-          setAccess(saved); setCourse(latest.course || null); setPending(!latest.course); setView('track');
-          setError('Une commande est encore en cours. Retrouvez son suivi avant de recommander.'); return;
+      const settings = await refreshConfig();
+      if (token !== generation.current) return;
+      let resetForm = false;
+      const prepared = await guestSessionTransaction(storage, async () => {
+        let saved = await storage.read();
+        assertGuestOrderCapability(settings, guestSavedEntries(saved));
+        if (saved && !saved.draft_rejected) {
+          const latest = await readGuestStart(call, saved);
+          if (token !== generation.current) return null;
+          // A separate active course requires explicit server capability above.
+          // An uncertain creation still keeps its original request and capabilities.
+          if (!latest.accessUnavailable && !latest.course) {
+            setAccess(saved); setCourse(null); setPending(true); setView('track');
+            setError('Une création doit encore être vérifiée. Retrouvez son suivi avant de recommander.');
+            return null;
+          }
+          resetForm = true;
+          saved = nextGuestDraft(saved, latest, newGuestAccess, emptyDraft);
+          await storage.save(saved);
+          if (latest.accessUnavailable) setError(GUEST_ACCESS_UNAVAILABLE);
+        } else if (!saved) {
+          saved = { ...newGuestAccess(), draft: { ...emptyDraft, confirmed: false }, draft_rejected: true, previous: [] };
+          await storage.save(saved);
         }
-        const next = nextGuestDraft(saved, latest, newGuestAccess, emptyDraft);
-        await storage.save(next);
+        return saved;
+      });
+      if (!prepared || token !== generation.current) return;
+      submit.reset(); setPrevious(guestSavedEntries(prepared)); setDraftRequestId(prepared.request_id);
+      setAccess(null); setCourse(null); setPending(false); setShowChat(false); setFoundNotice(false); setContactError('');
+      setView('form');
+      if (resetForm) { setDraft(emptyDraft); setCatalog(null); }
+      if (resetForm || !draft.country_code || !catalog) {
+        const remembered = storage.readCountry ? await storage.readCountry() : '';
         if (token !== generation.current) return;
-        submit.reset(); setPrevious(next.previous); setAccess(null); setCourse(null); setPending(false); setDraft(emptyDraft); setCatalog(null);
-        if (latest.accessUnavailable) setError(GUEST_ACCESS_UNAVAILABLE);
-      }
-      if (token === generation.current) {
-        setView('form');
-        if (!draft.country_code || !catalog || (saved && !saved.draft_rejected)) {
-          const remembered = storage.readCountry ? await storage.readCountry() : '';
-          if (token !== generation.current) return;
-          const selected = preferredGuestCountry(config.countries, remembered);
-          if (selected) await loadCatalog(selected);
-        }
+        const selected = preferredGuestCountry(settings.countries, remembered);
+        if (selected) await loadCatalog(selected);
       }
     } catch (e) { if (token === generation.current) setError(e.message); }
     finally { if (token === generation.current) { lock.current = false; setBusy(false); } }
@@ -204,24 +262,31 @@ export default function GuestOrderPage({ call: suppliedCall, storage: suppliedSt
     lock.current = true; setBusy(true); setError('');
     const token = generation.current;
     const sequence = ++trackingSequence.current;
+    let requestId = access?.request_id;
     if (action === 'track') nextReadAt.current = Date.now() + 8000;
     try {
       let result;
       if (action === 'create') {
-        result = await submit({ ...draft, telephone: normalizeGuestPhone(draft.telephone, phoneCountry), invitation_consent: false, prix: Number(draft.prix) });
+        result = await submit({ ...draft, telephone: normalizeGuestPhone(draft.telephone, phoneCountry), invitation_consent: false, prix: Number(draft.prix) }, view === 'form' ? draftRequestId : access?.request_id, view === 'form', async saved => {
+          const settings = await refreshConfig();
+          if (token !== generation.current) throw Object.assign(new Error('Vérification interrompue. Votre tentative est conservée.'), { draftRejected: true });
+          assertGuestOrderCapability(settings, guestSavedEntries(saved));
+        });
         const saved = await storage.read();
-        if (token === generation.current) { setAccess(saved); setReview(false); setView('track'); }
+        requestId = result?.local_request_id;
+        const createdAccess = guestSavedEntries(saved).find(entry => entry.request_id === requestId);
+        if (!createdAccess) throw Error('Suivi local non confirmé. Conservez la tentative et actualisez avant de recommencer.');
+        if (token === generation.current) { setAccess(createdAccess); setPrevious(guestSavedEntries(saved)); setReview(false); setView('track'); }
       } else if (action === 'track') result = await call('track', { request_id: access.request_id, read_token: access.read_token });
       else {
         if (!confirmed && action !== 'retry_dispatch' && !window.confirm(action === 'cancel' ? 'Annuler définitivement cette commande ?' : 'Refuser les invitations à créer un compte ?')) return;
         result = await call(action, { request_id: access.request_id, action_token: access.action_token, ...(action === 'consent' ? { consent: false } : {}), ...(relaunchInput || {}) });
       }
       if (token !== generation.current || sequence !== trackingSequence.current || !result) return;
-      if (result.course && Number.isFinite(Date.parse(result.expires_at))) {
-        const stored = await storage.read();
-        if (stored && (action === 'create' || stored.request_id === access?.request_id)) await storage.save({ ...stored, expires_at: result.expires_at, reference: result.course.reference,
-          last_course: reconcileGuestCourse(stored.last_course, result.course) });
-        if (token !== generation.current) return;
+      if (result.course && requestId) {
+        const stored = await rememberGuestReceipt(storage, requestId, result);
+        if (token !== generation.current || sequence !== trackingSequence.current) return;
+        setPrevious(guestSavedEntries(stored));
       }
       if (result.course) { setCourse(current => reconcileGuestCourse(current, result.course)); setPending(false); retryNotBefore.current = 0; }
       else { setPending(true); setError(result.message || 'Résultat non confirmé. Vérifiez le suivi.'); }
@@ -240,10 +305,12 @@ export default function GuestOrderPage({ call: suppliedCall, storage: suppliedSt
           if (e.code === 'DISABLED') setConfig(value => value ? { ...value, enabled: false } : value);
           return;
         }
+        if (action === 'create' && e.code === 'SESSION_CHANGED') { setReview(false); setView('home'); return; }
         // A lost response keeps the durable attempt and locks the original draft.
         if (action === 'create') {
           const saved = await storage.read().catch(() => null);
-          if (token === generation.current && saved) { setAccess(saved); setPending(true); setReview(false); setView('track'); }
+          const uncertain = guestSavedEntries(saved).find(entry => entry.request_id === draftRequestId);
+          if (token === generation.current && uncertain) { setAccess(uncertain); setCourse(uncertain.last_course || null); setPending(true); setReview(false); setView('track'); }
         }
       }
     } finally { if (token === generation.current) { lock.current = false; setBusy(false); } }
@@ -251,7 +318,7 @@ export default function GuestOrderPage({ call: suppliedCall, storage: suppliedSt
   const operationRef = useRef(operation);
   operationRef.current = operation;
   useEffect(() => {
-    if (!access || !course || ['livree', 'annulee', 'terminee'].includes(course.statut)) return;
+    if (view !== 'track' || !access || !course || ['livree', 'annulee', 'terminee'].includes(course.statut)) return;
     const refresh = () => { if (document.visibilityState === 'visible' && navigator.onLine !== false && !lock.current) void operationRef.current('track', true); };
     const resume = () => { nextReadAt.current = 0; refresh(); };
     const timer = setInterval(refresh, 8000);
@@ -262,7 +329,7 @@ export default function GuestOrderPage({ call: suppliedCall, storage: suppliedSt
       if (disposed) handle.remove(); else subscription = handle;
     }).catch(() => {});
     return () => { disposed = true; subscription?.remove(); clearInterval(timer); document.removeEventListener('visibilitychange', resume); window.removeEventListener('online', resume); };
-  }, [access?.request_id, course?.statut]);
+  }, [access?.request_id, course?.statut, view]);
   useEffect(() => {
     if (courseEvent?.kind !== 'acceptance') return;
     setFoundNotice(true);
@@ -285,8 +352,10 @@ export default function GuestOrderPage({ call: suppliedCall, storage: suppliedSt
   const phoneCountry = phoneCountries.find(c => c.code === draft.phone_country_code);
   const phoneDial = String(phoneCountry?.indicatif || '').replace(/\D/g, '');
   const amount = value => value == null ? '—' : Number(value).toLocaleString('fr-FR');
+  const canStartNewOrder = sessionReady && canStartGuestOrder(config, previous);
   function prepareReview(event) {
     event.preventDefault(); setError('');
+    if (!canStartNewOrder) { setError(GUEST_SINGLE_ORDER_NOTICE); return; }
     if (!catalog || !draft.depart_id || !draft.arrivee_id || !draft.telephone.trim() || !Number.isSafeInteger(Number(draft.prix)) || Number(draft.prix) <= 0 || Number(draft.prix) < Number(catalog.country.prix_minimum)) {
       setError('Vérifiez les quartiers, le téléphone et le prix minimum du pays.'); return;
     }
@@ -301,7 +370,7 @@ export default function GuestOrderPage({ call: suppliedCall, storage: suppliedSt
       <header className="guest-header"><button type="button" title="Retour à l’accueil" aria-label="Retour à l’accueil" onClick={() => { if (review) setReview(false); else returnHome(); }} className="guest-icon"><ArrowLeft className="h-5 w-5" /></button><span className="guest-brand"><img src="/silgapp-notification-blue.png" alt="" />SILGAPP</span></header>
       {view !== 'home' && <div className="guest-intro"><p className="guest-eyebrow">{view === 'track' ? 'SUIVI PRIVÉ' : 'SANS COMPTE'}</p><h1>{view === 'track' ? 'Votre livraison' : 'Votre commande'}</h1></div>}
       {error && <p role="alert" className="guest-notice">{error}</p>}
-      {view === 'home' ? <GuestClientHome adCountries={config?.countries || []} enabled={config?.enabled === true} loading={!config} course={course} onOrder={startOrder} onTrack={() => setView('track')} onLogin={() => setLoginPrompt(true)} previous={previous} onPrevious={openPrevious} /> : course && view === 'track' ? <section aria-label="Suivi privé">
+      {view === 'home' ? <GuestClientHome adCountry={draft.country_code || course?.country_code || adCountry} adCountries={config?.countries || []} enabled={config?.enabled === true} canOrder={canStartNewOrder} loading={!config || !sessionReady} course={course} onOrder={startOrder} onTrack={() => setView('track')} onLogin={() => setLoginPrompt(true)} previous={previous.filter(entry => entry.request_id !== access?.request_id)} onPrevious={openPrevious} /> : course && view === 'track' ? <section aria-label="Suivi privé">
         <h2 className="guest-eyebrow">{course.reference || 'Votre course'}</h2>
         <p className="guest-status"><CheckCircle2 aria-hidden="true" />{clientCourseOutcome(course) === 'cancelled' ? 'Course annulée' : clientDecisionView(course).waiting ? 'En attente de votre décision' : course.assigned && ['livreur_en_route', 'client_contacte'].includes(course.statut) ? 'Livreur trouvé' : getCourseStatusLabel(course.statut)}</p>
         <ClientDecisionNotice course={course} />
@@ -313,6 +382,7 @@ export default function GuestOrderPage({ call: suppliedCall, storage: suppliedSt
         {course.statut !== 'annulee' && !clientDecisionView(course).waiting && <div className="guest-timeline py-4"><CourseTimeline statut={course.statut} typeCourse="expedier" /></div>}
         {course.pickup_at && <p>Récupération : {new Date(course.pickup_at).toLocaleString('fr-FR')}</p>}
         <div className="guest-actions"><button type="button" className="guest-secondary" disabled={busy} onClick={() => operation('track')}><RefreshCw className="h-4 w-4" />Actualiser</button>
+        <button type="button" disabled={busy || !canStartNewOrder} className="guest-secondary" onClick={startOrder}>Nouvelle course</button>
         {course.can_cancel && <button type="button" disabled={busy} className="guest-danger" onClick={() => operation('cancel')}>Annuler la commande</button>}
         {course.decision_required && <ClientRelaunchActions identity={`guest:${access.request_id}`} disabled={busy}
           context={{ ...course.relaunch, price: course.prix, revision: course.updated_at, currency: course.devise, waiting: course.decision_required }}
@@ -337,7 +407,7 @@ export default function GuestOrderPage({ call: suppliedCall, storage: suppliedSt
       {loginPrompt && <div role="dialog" aria-modal="true" aria-label="Connexion requise" className="guest-modal"><div className="guest-review"><h2>Connectez-vous à votre espace</h2><p className="guest-muted">Cette rubrique nécessite un compte. Vous pouvez continuer à commander sans compte.</p><div className="guest-actions mt-5"><button type="button" className={button} onClick={goToLogin}>Se connecter</button><button type="button" className="guest-secondary" onClick={() => setLoginPrompt(false)}>Continuer sans compte</button></div></div></div>}
       {review && <div role="dialog" aria-modal="true" aria-labelledby="guest-review-title" className="guest-modal"><div className="guest-review">
         <p className="guest-eyebrow">DERNIÈRE VÉRIFICATION</p><h2 id="guest-review-title">Confirmer votre commande</h2><GuestRoute depart={catalog.quartiers.find(q => q.id === draft.depart_id)?.nom} arrivee={catalog.quartiers.find(q => q.id === draft.arrivee_id)?.nom} /><div className="guest-total"><span>Prix proposé</span><strong>{amount(draft.prix)} {currency}</strong></div><p className="guest-contact"><Phone className="h-4 w-4 shrink-0" aria-hidden="true" />+{normalizeGuestPhone(draft.telephone, phoneCountry)}</p>
-        <div className="guest-actions"><button type="button" disabled={busy} className={button} onClick={() => operation('create')}>Confirmer la commande</button><button type="button" disabled={busy} className="guest-secondary" onClick={() => setReview(false)}>Modifier</button></div>
+        <div className="guest-actions"><button type="button" disabled={busy || !canStartNewOrder} className={button} onClick={() => operation('create')}>Confirmer la commande</button><button type="button" disabled={busy} className="guest-secondary" onClick={() => setReview(false)}>Modifier</button></div>
       </div></div>}
     </div>
     {!isolatedMap && view === 'track' && course && !waiting && !['livree', 'annulee', 'terminee'].includes(course.statut) && (

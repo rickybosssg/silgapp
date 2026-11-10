@@ -1,4 +1,5 @@
 import React from "react";
+import { metricRows, attributionSpend, metricCount } from "./metaAdsMetrics.js";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import MetaAdsCampaignActions from "./MetaAdsCampaignActions";
@@ -18,7 +19,7 @@ function DetailRow({ label, value }) {
   return (
     <div className="flex justify-between items-center py-1.5 border-b border-slate-50 last:border-0">
       <span className="text-xs text-slate-500">{label}</span>
-      <span className="text-xs font-semibold text-slate-800 text-right">{value || "—"}</span>
+      <span className="text-xs font-semibold text-slate-800 text-right">{value ?? "—"}</span>
     </div>
   );
 }
@@ -26,10 +27,10 @@ function DetailRow({ label, value }) {
 export default function MetaAdsCampaignDetail({ campaign, attribution, config, onClose }) {
   if (!campaign) return null;
 
-  const attr = (attribution?.campaigns || []).find(c => c.campaign_name === campaign.name) || {};
+  const attr = metricRows(attribution?.campaigns).find(c => c.campaign_name === campaign.name) || {};
   const statusInfo = STATUS_BADGES[campaign.status] || { label: campaign.status, cls: "bg-slate-100 text-slate-600" };
-  const countries = (() => { try { return JSON.parse(campaign.country_codes || "[]"); } catch { return []; } })();
-  const creativeIds = (() => { try { return JSON.parse(campaign.creative_ids || "[]"); } catch { return []; } })();
+  const countries = (() => { try { const parsed = JSON.parse(campaign.country_codes || "[]"); return Array.isArray(parsed) ? parsed.filter(c => typeof c === "string") : []; } catch { return []; } })();
+  const creativeIds = (() => { try { const parsed = JSON.parse(campaign.creative_ids || "[]"); return Array.isArray(parsed) ? parsed : []; } catch { return []; } })();
 
   return (
     <Dialog open={!!campaign} onOpenChange={(v) => !v && onClose()}>
@@ -67,17 +68,17 @@ export default function MetaAdsCampaignDetail({ campaign, attribution, config, o
         {/* Performance Meta */}
         <div>
           <h4 className="text-xs font-bold text-slate-700 mb-1 mt-3">Performance Meta</h4>
-          <DetailRow label="Dépense Meta" value={attr.meta_spend ? `${Math.round(attr.meta_spend * 600).toLocaleString()} F (≈ $${attr.meta_spend.toFixed(2)})` : "0 F"} />
-          <DetailRow label="Clics Meta" value={attr.meta_clicks || 0} />
-          <DetailRow label="Installations attribuées" value={attr.installs || 0} />
-          <DetailRow label="Inscriptions" value={attr.signups || 0} />
+          <DetailRow label="Dépense Meta" value={attributionSpend(attr.meta_spend)} />
+          <DetailRow label="Clics Meta" value={metricCount(attr.meta_clicks)} />
+          <DetailRow label="Installations attribuées" value={metricCount(attr.installs)} />
+          <DetailRow label="Inscriptions" value={metricCount(attr.signups)} />
         </div>
 
         {/* Conversion SILGAPP */}
         <div>
           <h4 className="text-xs font-bold text-slate-700 mb-1 mt-3">Conversion SILGAPP</h4>
-          <DetailRow label="Premières courses" value={attr.first_courses || 0} />
-          <DetailRow label="Courses livrées (≥2)" value={attr.second_courses || 0} />
+          <DetailRow label="Premières courses" value={metricCount(attr.first_courses)} />
+          <DetailRow label="Courses livrées (≥2)" value={metricCount(attr.second_courses)} />
           <DetailRow label="Revenus attribués" value={attr.revenue != null ? `${Math.round(attr.revenue).toLocaleString()} F` : "—"} />
           <DetailRow label="Commission attribuée" value={attr.commission != null ? `${Math.round(attr.commission).toLocaleString()} F` : "—"} />
           <DetailRow label="CPI (coût/install)" value={attr.cpi ? `${Math.round(attr.cpi * 600).toLocaleString()} F` : "—"} />

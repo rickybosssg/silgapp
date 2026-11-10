@@ -1,0 +1,9 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {metricNumber,spendUsd,spendFcfa,sumMetric,metricRows,metricUsd,attributionSpend} from '../src/components/meta-ads/metaAdsMetrics.js';
+test('Meta metrics missing and malformed stay unknown',()=>{for(const v of [null,undefined,'',' ','abc',NaN,Infinity,{},true])assert.equal(metricNumber(v),null);assert.equal(spendUsd({}),null);assert.equal(metricUsd(null),'Donnée indisponible');});
+test('Meta current producer contract and legacy preserve zero',()=>{assert.equal(spendUsd({spend_usd:0,spend:42}),0);assert.equal(spendFcfa({spend_usd:0,spend_fcfa:0}),0);assert.equal(spendUsd({spend_usd:'1.25'}),1.25);assert.equal(spendFcfa({spend_usd:1.25,spend_fcfa:750}),750);assert.equal(spendUsd({spend:1.25}),1.25);assert.equal(spendFcfa({spend:1.25}),750);});
+test('Meta aggregation numeric not concatenation and missing not zero',()=>{assert.equal(sumMetric([{spend_usd:'1.25'},{spend_usd:'2.5'}],spendUsd),3.75);for(const rows of [undefined,null,{},[null],[{}]])assert.equal(sumMetric(rows,spendUsd),null);assert.equal(sumMetric([],spendUsd),0);assert.deepEqual(metricRows([null,{},3]),[{}]);});
+test('Meta detail formats numeric strings without toFixed crash',()=>{assert.match(attributionSpend('1.25'),/750/);assert.equal(attributionSpend(undefined),'—');assert.match(attributionSpend(0),/0 F/);});
+import {readFileSync} from 'node:fs';
+test('Meta detail guards JSON collections and preserves zero',()=>{const source=readFileSync(new URL('../src/components/meta-ads/MetaAdsCampaignDetail.jsx',import.meta.url),'utf8');assert.match(source,/value \?\?/);assert.match(source,/JSON.parse\(campaign.creative_ids[\s\S]*?Array.isArray\(parsed\)/);assert.match(source,/JSON.parse\(campaign.country_codes[\s\S]*?Array.isArray\(parsed\)/);assert.doesNotMatch(source,/meta_spend\.toFixed/);});

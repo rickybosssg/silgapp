@@ -14,6 +14,7 @@ import { restoreTokenFromCookie, syncTokenFromPreferences } from '@/lib/authPers
 import { trackAppInstall } from '@/lib/trackInstall';
 import IOSAppStoreBanner from './components/IOSAppStoreBanner.jsx';
 import AppUpdateInvitation from './components/AppUpdateInvitation.jsx';
+import EventMusicBootstrap from './components/audio/EventMusicBootstrap.jsx';
 
 // LoadingScreen défini IMMÉDIATEMENT avant lazy loading
 const LoadingScreen = () => <SplashScreen />;
@@ -550,6 +551,7 @@ function AppWithProviders() {
   return (
     <QueryClientProvider client={queryClientInstance}>
       <App />
+      <EventMusicBootstrap />
       <IOSAppStoreBanner />
       <AppUpdateInvitation />
       <Diag500Panel />

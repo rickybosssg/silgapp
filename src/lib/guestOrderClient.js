@@ -1,3 +1,5 @@
+import { withGuestSessionLock, guestSessionTransaction } from './guestOrderSession';
+import { Capacitor } from '@capacitor/core';
 import { Preferences } from '@capacitor/preferences';
 import { base44 } from '@/api/base44Client';
 import { retryDelayMs, withRequestDeadline } from './guestTrackingState';
@@ -5,7 +7,7 @@ import { retryDelayMs, withRequestDeadline } from './guestTrackingState';
 export const GUEST_STORAGE_KEY = 'silgapp_guest_order_v1';
 const GUEST_COUNTRY_KEY = 'silgapp_guest_country_v1';
 const secret = () => [...crypto.getRandomValues(new Uint8Array(32))].map(v => v.toString(16).padStart(2, '0')).join('');
-const correctableDraftCodes = new Set(['PHONE_INVALID', 'PRICE_INVALID', 'QUARTIER_INVALID', 'COUNTRY_INVALID', 'CONFIRMATION_REQUIRED', 'CONSENT_INVALID', 'DISABLED', 'DEVICE_LIMIT']);
+const correctableDraftCodes = new Set(['PHONE_INVALID', 'PRICE_INVALID', 'QUARTIER_INVALID', 'COUNTRY_INVALID', 'CONFIRMATION_REQUIRED', 'CONSENT_INVALID', 'DISABLED', 'DEVICE_LIMIT', 'DUPLICATE_ACTIVE']);
 
 export function guestDraftCanBeCorrected(error) {
   return correctableDraftCodes.has(error?.code);
@@ -18,6 +20,7 @@ export function newGuestAccess(deviceToken = secret()) {
 // Separate from account/session storage. Never put these capabilities in URLs, cookies or logs.
 export function guestStorage(adapter = Preferences) {
   return {
+    transaction: work => withGuestSessionLock(work, Capacitor.isNativePlatform()),
     async readCountry() { return (await adapter.get({ key: GUEST_COUNTRY_KEY })).value || ''; },
     async saveCountry(code) { await adapter.set({ key: GUEST_COUNTRY_KEY, value: code }); },
     async read() {
@@ -79,18 +82,25 @@ export function guestApi(api = base44) {
 export function createGuestSubmission(call, storage, makeAccess = newGuestAccess) {
   let busy = false;
   let attempt = null;
-  const submit = async draft => {
+  const submit = async (draft, expectedRequestId, requireDraft = false, beforeNewSubmission = null) => {
     if (busy) return null;
     busy = true;
     try {
-      if (!attempt) attempt = await storage.read();
+      return await guestSessionTransaction(storage, async () => {
+      const latest = await storage.read();
+      if (expectedRequestId && (latest?.request_id !== expectedRequestId || (requireDraft && latest.draft_rejected !== true))) throw Object.assign(new Error('Une autre fenêtre a changé la commande. Revenez à l’accueil avant de confirmer.'), { code: 'SESSION_CHANGED' });
+      // Validate under the same session lock, before altering a new draft.
+      // Replaying an uncertain original request must retain its capabilities.
+      if ((!latest || latest.draft_rejected === true) && beforeNewSubmission) await beforeNewSubmission(latest);
+      attempt = latest;
       if (!attempt) attempt = { ...makeAccess(), draft: { ...draft, confirmed: true } };
       else if (attempt.draft_rejected === true) attempt = { ...attempt, draft: { ...draft, confirmed: true } };
       attempt.draft_rejected = false;
       await storage.save(attempt); // Verify persistence again after a failed storage attempt.
       try {
         const { request_id, read_token, action_token, device_token, draft: confirmedDraft } = attempt;
-        return await call('create', { request_id, read_token, action_token, device_token, draft: confirmedDraft });
+        const result = await call('create', { request_id, read_token, action_token, device_token, draft: confirmedDraft });
+        return { ...result, local_request_id: request_id };
       } catch (error) {
         if (guestDraftCanBeCorrected(error)) {
           // Keep the same capabilities and request ID, including across reopening.
@@ -101,6 +111,7 @@ export function createGuestSubmission(call, storage, makeAccess = newGuestAccess
         }
         throw error;
       }
+      });
     } finally { busy = false; }
   };
   return Object.assign(submit, { reset() { if (busy) throw Error('Vérification en cours.'); attempt = null; } });

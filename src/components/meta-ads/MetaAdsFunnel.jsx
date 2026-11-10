@@ -1,7 +1,8 @@
 import React from "react";
+import { sumMetric, metricCount as fmtN } from "./metaAdsMetrics.js";
 import { Megaphone, MousePointerClick, Smartphone, UserPlus, Package, Truck, Repeat } from "lucide-react";
 
-function FunnelStep({ icon: Icon, label, value, sub, isLast }) {
+function FunnelStep({ icon: Icon, label, value, sub = null, isLast = false }) {
   return (
     <div className="flex items-center gap-2.5 flex-1 min-w-0">
       <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center flex-shrink-0">
@@ -18,18 +19,14 @@ function FunnelStep({ icon: Icon, label, value, sub, isLast }) {
 }
 
 export default function MetaAdsFunnel({ insights, attribution }) {
-  const last7 = insights?.last_7_days || [];
-  const clicks = last7.reduce((sum, d) => sum + (d.clicks || 0), 0);
-  const impressions = last7.reduce((sum, d) => sum + (d.impressions || 0), 0);
-
-  const campaignStats = attribution?.campaigns || [];
-  const installs = campaignStats.reduce((s, c) => s + (c.installs || 0), 0);
-  const signups = campaignStats.reduce((s, c) => s + (c.signups || 0), 0);
-  const firstCourses = campaignStats.reduce((s, c) => s + (c.first_courses || 0), 0);
-  const secondCourses = campaignStats.reduce((s, c) => s + (c.second_courses || 0), 0);
-
-  // null/undefined → "—" (donnée absente). 0 → "0" (donnée réelle = zéro).
-  const fmtN = (v) => v != null ? v.toLocaleString() : "—";
+  const last7 = insights?.last_7_days;
+  const clicks = sumMetric(last7, d => d.clicks);
+  const impressions = sumMetric(last7, d => d.impressions);
+  const campaignStats = attribution?.campaigns;
+  const installs = sumMetric(campaignStats, c => c.installs);
+  const signups = sumMetric(campaignStats, c => c.signups);
+  const firstCourses = sumMetric(campaignStats, c => c.first_courses);
+  const secondCourses = sumMetric(campaignStats, c => c.second_courses);
 
   return (
     <div className="bg-white rounded-xl border p-3 md:p-4">

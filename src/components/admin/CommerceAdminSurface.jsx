@@ -5,7 +5,8 @@ import {commerceAdminScope,createCommerceAdmin} from '@/lib/commerceAdminMigrati
 import {financeRecordedNumber} from '@/lib/commerceFinancePreview';
 
 export default function CommerceAdminSurface(props) {
-  if(!props.context)return <AdminCountrySelection {...props} />;
+  // Background notifications must not mount the dedicated country-selection form.
+  if(!props.context)return props.mode==='popup'?null:<AdminCountrySelection {...props} />;
   let scope;
   try {scope=commerceAdminScope(props.context);} catch {return <p role="alert">Administration commerce indisponible : session et pays doivent être sélectionnés explicitement. Aucun accès global déduit du profil.</p>;}
   if(props.type==='pharmacie')return <p role="alert">La pharmacie ne fait pas partie de ce parcours commerce sécurisé.</p>;

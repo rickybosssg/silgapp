@@ -809,3 +809,10 @@ See `ios178-shared-transfer.md` and `ios178-transfer-manifest.json`. Full verifi
 adaptations retained. No backend deployment, App Store upload or physical iPhone
 test in this transfer. Real business flows remain to be checked on iOS.
 
+
+## Android187 shared-source transfer to iOS (2026-11-10)
+- Port reviewed Android187 frontend changes: resilient Meta Ads metrics; 11-second event music and admin settings; guest multicourse client, guest advertising parity, and admin surface correction.
+- Preserve iOS native/session/push configuration and dependencies. Identity-document viewer correction remains deferred as requested.
+- Publicite.visible_invites schema mirrors Android187; no backend deployment is implied.
+- Validation: 113 targeted regression tests pass; guest advertising schema suite 8/8 passes; lint, typecheck and production web build pass. No physical iPhone validation.
+- Archive only: no Apple upload, submission or publication. Recheck processing builds before upload.
