@@ -1,3 +1,4 @@
+import { assertGuestReservation } from './guestMultiOrderGuard.js';
 import { readSearchActivity } from './courseSearchActivity.js';
 import { canEditSearchPrice } from './clientRelaunch.js';
 import { clientDecisionView } from './clientDecisionView.js';
@@ -21,7 +22,8 @@ export function createGuestOrdersService(deps) {
     try {
       const control = await store.policy();
       const allowed = guestCreationEnabled(control) ? await countries(control) : [];
-      return { enabled: guestCreationEnabled(control) && allowed.length > 0, countries: allowed };
+      return { enabled: guestCreationEnabled(control) && allowed.length > 0, countries: allowed,
+        multi_orders_supported: guestCreationEnabled(control) && allowed.length > 0 };
     } catch { return { enabled: false, countries: [], unavailable: true }; }
   }
   async function country(code) {
@@ -133,12 +135,13 @@ export function createGuestOrdersService(deps) {
       // Recovery never writes another course or repeats publication, even with creation disabled.
       return track(body);
     }
-    // Resolve only this device capability's earlier pending attempts. A terminal
-    // receipt frees the active slot, never reopens or deletes the previous course.
+    // Reconcile only this device's attempts. Independent confirmed courses may
+    // coexist; uncertain writes are recovered read-only, never replayed.
     const olderEntries = store.deviceEntries ? await store.deviceEntries(deviceHash)
       : parseGuestLedger(registry).filter(e => e.device_hash === deviceHash && !e.closed_at);
     for (const older of olderEntries) {
       const course = await findCourse(older);
+      if (course && !older.course_id) await receipt(older, course);
       if (course && ['livree', 'annulee', 'terminee'].includes(course.statut)) {
         if (store.changeEntry) await store.changeEntry(older.request_id, current => {
           if (!current.closed_at) current.closed_at = new Date(now()).toISOString();
@@ -183,7 +186,7 @@ export function createGuestOrdersService(deps) {
         if (existing.read_hash !== readHash || existing.action_hash !== actionHash || existing.device_hash !== deviceHash || existing.fingerprint !== fingerprint) failGuest('REQUEST_CONFLICT', 'Cette tentative correspond à une autre commande.', 409);
         return { value: false };
       }
-      if (ledger.some(e => e.device_hash === deviceHash && !e.closed_at)) failGuest('DEVICE_LIMIT', 'Une commande est déjà en cours sur cet appareil. Retrouvez son suivi.', 409);
+      assertGuestReservation(ledger, entry);
       if (ledger.length >= GUEST_CAPACITY) failGuest('CAPACITY', 'Commandes sans compte temporairement indisponibles.', 503);
       if (ledger.filter(e => e.phone === checked.telephone && e.country_code === c.code && now() - Date.parse(e.created_at) < 3600000).length >= 10) failGuest('RATE_LIMIT', 'Trop de demandes rapprochées. Réessayez plus tard ou contactez le support.', 429);
       ledger.push(entry);

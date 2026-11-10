@@ -1,3 +1,4 @@
+import { assertGuestReservation } from './guestMultiOrderGuard.js';
 import { createGuestIndexTransactions, createGuestStorageIndex } from './guestStorageIndex.js';
 import { failGuest, sha256, guestCreationEnabled, GUEST_CONTROL_KEY } from './guestOrderPolicy.js';
 
@@ -47,14 +48,20 @@ export function createGuestIndexedRegistry({ roots, pages, now = () => Date.now(
       const grant = await get(`grant:${entry.request_id}`);
       if (grant && !identityMatches(grant, entry)) failGuest('REQUEST_CONFLICT', 'Tentative incompatible.', 409);
       const active = await get(`device:${entry.device_hash}`) || [];
-      if (active.length) failGuest('DEVICE_LIMIT', 'Une commande est deja en cours sur cet appareil. Retrouvez son suivi.', 409);
+      const activeEntries = [];
+      for (const id of active) {
+        const older = await get(`request:${id}`);
+        if (!older || older.device_hash !== entry.device_hash) throw Error('GUEST_INDEX_DEVICE_INVALID');
+        activeEntries.push(older);
+      }
+      assertGuestReservation(activeEntries, entry);
       const instant = now();
       const phone = recent(await get(phoneKey) || [], instant);
       const countryKey = `country:${entry.country_code}`;
       const country = recent(await get(countryKey) || [], instant);
       if (phone.length >= 10 || (!grant && country.length >= 30)) failGuest('RATE_LIMIT', 'Trop de demandes. Reessayez plus tard ou contactez le support.', 429);
       const stamp = new Date(instant).toISOString();
-      const writes = [[`request:${entry.request_id}`, entry], [`device:${entry.device_hash}`, [entry.request_id]], [phoneKey, [...phone, stamp]]];
+      const writes = [[`request:${entry.request_id}`, entry], [`device:${entry.device_hash}`, [...active, entry.request_id]], [phoneKey, [...phone, stamp]]];
       if (!grant) writes.push([`grant:${entry.request_id}`, { request_id: entry.request_id, fingerprint: entry.fingerprint, read_hash: entry.read_hash, action_hash: entry.action_hash, device_hash: entry.device_hash, country_code: entry.country_code, at: stamp }], [countryKey, [...country, stamp]]);
       return { writes, value: true };
     });
