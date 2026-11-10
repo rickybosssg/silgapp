@@ -1,4 +1,4 @@
-name: Prepare authorized iOS submission
+name: Submit authorized iOS submission
 on:
   push:
     branches: ['ios-submit-1.0.68-b77']
@@ -13,7 +13,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - name: Prepare exact Apple version77 and verify metadata
+      - name: Submit exact approved version77 for Apple review
         env:
           APP_STORE_CONNECT_API_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_API_PRIVATE_KEY }}
-        run: python3 scripts/ios_prepare_review77.py
+        run: python3 scripts/ios_submit_review77.py
