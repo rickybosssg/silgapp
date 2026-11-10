@@ -164,6 +164,11 @@
     "annonceur_contact": {
       "type": "string",
       "description": "Contact de l'annonceur"
+    },
+    "visible_invites": {
+      "type": "boolean",
+      "default": false,
+      "description": "Diffusion publique explicite sur accueil invite (carrousel ouverture uniquement). Absence = non."
     }
   },
   "required": [
