@@ -1,4 +1,4 @@
-name: Inspect authorized iOS submission
+name: Prepare authorized iOS submission
 on:
   push:
     branches: ['ios-submit-1.0.68-b77']
@@ -6,47 +6,14 @@ on:
 permissions:
   contents: read
 jobs:
-  inspect:
+  prepare:
     runs-on: macos-15
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - name: Read minimal Apple release metadata without changes
+      - name: Prepare exact Apple version77 and verify metadata
         env:
           APP_STORE_CONNECT_API_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_API_PRIVATE_KEY }}
-        run: |
-          python3 - <<'PY'
-          import sys,os,json,tempfile,urllib.request,urllib.error
-          from pathlib import Path
-          sys.path.insert(0,"scripts")
-          import ios_appstore_upload as auth
-          def get(path):
-              req=urllib.request.Request("https://api.appstoreconnect.apple.com/v1/"+path,headers={"Authorization":"Bearer "+token})
-              try:
-                  with urllib.request.urlopen(req,timeout=45) as r:return json.load(r)
-              except urllib.error.HTTPError as e:return {"error_status":e.code}
-          with tempfile.TemporaryDirectory() as d:
-              p=Path(d)/"key.p8"
-              p.write_text(os.environ.pop("APP_STORE_CONNECT_API_PRIVATE_KEY").strip()+"\n")
-              p.chmod(0o600)
-              token=auth.access_token(p)
-              vs=get("apps/6782046749/appStoreVersions?filter[platform]=IOS&limit=20")
-              print("VERSIONS",json.dumps([{"id":v["id"],**{k:v["attributes"].get(k) for k in ("versionString","appStoreState","releaseType","copyright")}} for v in vs.get("data",[])]))
-              if "error_status" in vs:print("VERSION_ERROR",vs["error_status"])
-              b=get("builds/06282ea5-7770-4c4f-aa4e-c63d7e284b68").get("data",{})
-              print("BUILD",json.dumps({"id":b.get("id"),**{k:b.get("attributes",{}).get(k) for k in ("version","processingState","usesNonExemptEncryption","expired")}}))
-              for v in vs.get("data",[]):
-                  if v["attributes"]["versionString"] in ("1.0.67","1.0.68"):
-                      vid=v["id"]
-                      loc=get("appStoreVersions/"+vid+"/appStoreVersionLocalizations")
-                      print("LOCALIZATIONS",vid,json.dumps([{"id":l["id"],"locale":l["attributes"]["locale"],"present":{k:bool(l["attributes"].get(k)) for k in ("description","keywords","supportUrl","marketingUrl","whatsNew")}} for l in loc.get("data",[])]))
-                      print("BUILD_REL",vid,json.dumps(get("appStoreVersions/"+vid+"/relationships/build").get("data")))
-                      detail=get("appStoreVersions/"+vid+"/appStoreReviewDetail")
-                      item=detail.get("data") or {}
-                      a=item.get("attributes",{})
-                      print("REVIEW_DETAIL",vid,json.dumps({"id":item.get("id"),"demoAccountRequired":a.get("demoAccountRequired"),"present":{k:bool(a.get(k)) for k in ("demoAccountName","demoAccountPassword","contactFirstName","contactLastName","contactPhone","contactEmail","notes")}}))
-              rs=get("apps/6782046749/reviewSubmissions?limit=10")
-              print("REVIEW_SUBMISSIONS",json.dumps([{"id":r["id"],"state":r["attributes"].get("state"),"platform":r["attributes"].get("platform")} for r in rs.get("data",[])]))
-          PY
+        run: python3 scripts/ios_prepare_review77.py
