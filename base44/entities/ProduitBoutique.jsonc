@@ -4,7 +4,7 @@
   "properties": {
     "boutique_id": {
       "type": "string",
-      "description": "ID de la boutique propri\u00e9taire"
+      "description": "ID de la boutique propriétaire"
     },
     "nom": {
       "type": "string"
@@ -14,7 +14,7 @@
     },
     "photo_url": {
       "type": "string",
-      "description": "Photo principale (r\u00e9trocompatibilit\u00e9)"
+      "description": "Photo principale (rétrocompatibilité)"
     },
     "photos_urls": {
       "type": "string",
@@ -22,7 +22,7 @@
     },
     "video_url": {
       "type": "string",
-      "description": "URL de la courte vid\u00e9o du produit"
+      "description": "URL de la courte vidéo du produit"
     },
     "prix": {
       "type": "number"
@@ -33,7 +33,7 @@
     },
     "categorie": {
       "type": "string",
-      "description": "Cat\u00e9gorie de produit"
+      "description": "Catégorie de produit"
     },
     "disponible": {
       "type": "boolean",
@@ -59,7 +59,7 @@
     },
     "valide_par": {
       "type": "string",
-      "description": "Email admin ayant valid\u00e9/refus\u00e9"
+      "description": "Email admin ayant validé/refusé"
     },
     "valide_at": {
       "type": "string",
@@ -71,5 +71,11 @@
     "boutique_id",
     "nom",
     "prix"
-  ]
+  ],
+  "rls": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false
+  }
 }

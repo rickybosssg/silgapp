@@ -4,7 +4,7 @@
   "properties": {
     "restaurant_id": {
       "type": "string",
-      "description": "ID du restaurant propri\u00e9taire"
+      "description": "ID du restaurant propriétaire"
     },
     "nom": {
       "type": "string"
@@ -14,7 +14,7 @@
     },
     "photo_url": {
       "type": "string",
-      "description": "Photo principale (r\u00e9trocompatibilit\u00e9)"
+      "description": "Photo principale (rétrocompatibilité)"
     },
     "photos_urls": {
       "type": "string",
@@ -22,7 +22,7 @@
     },
     "video_url": {
       "type": "string",
-      "description": "URL de la courte vid\u00e9o du plat"
+      "description": "URL de la courte vidéo du plat"
     },
     "prix": {
       "type": "number"
@@ -55,5 +55,11 @@
     "restaurant_id",
     "nom",
     "prix"
-  ]
+  ],
+  "rls": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false
+  }
 }

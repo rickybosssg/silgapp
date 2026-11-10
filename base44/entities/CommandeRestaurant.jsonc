@@ -33,7 +33,7 @@
         "GH",
         "MA"
       ],
-      "description": "Code pays \u2014 isolation stricte"
+      "description": "Code pays — isolation stricte"
     },
     "items": {
       "type": "string",
@@ -82,7 +82,7 @@
     },
     "course_id": {
       "type": "string",
-      "description": "ID de la CourseExterne cr\u00e9\u00e9e quand pr\u00eate (ou en avance si dispatch anticip\u00e9)"
+      "description": "ID de la CourseExterne créée quand prête (ou en avance si dispatch anticipé)"
     },
     "partenaire_id": {
       "type": "string",
@@ -99,17 +99,21 @@
     },
     "preparation_time_minutes": {
       "type": "number",
-      "description": "Temps de pr\u00e9paration estim\u00e9 par le restaurant (5, 10, 15, 20 ou 30 min). Saisi au passage en en_preparation. Si d\u00e9fini, la CourseExterne est cr\u00e9\u00e9e en avance avec dispatch_status=en_attente et le dispatch est d\u00e9clench\u00e9 automatiquement au bon moment (dispatch_at)."
+      "description": "Temps de préparation estimé par le restaurant (5, 10, 15, 20 ou 30 min). Saisi au passage en en_preparation. Si défini, la CourseExterne est créée en avance avec dispatch_status=en_attente et le dispatch est déclenché automatiquement au bon moment (dispatch_at)."
     },
     "estimated_ready_at": {
       "type": "string",
       "format": "date-time",
-      "description": "Heure estim\u00e9e \u00e0 laquelle la commande sera pr\u00eate = heure_debut_preparation + preparation_time_minutes."
+      "description": "Heure estimée à laquelle la commande sera prête = heure_debut_preparation + preparation_time_minutes."
     },
     "dispatch_at": {
       "type": "string",
       "format": "date-time",
-      "description": "Heure \u00e0 laquelle le dispatch doit \u00eatre d\u00e9clench\u00e9 = estimated_ready_at - ETA_livreur - marge. L'automation dispatchAnticipeRestaurant bascule la course de en_attente vers disponible_push quand now >= dispatch_at."
+      "description": "Heure à laquelle le dispatch doit être déclenché = estimated_ready_at - ETA_livreur - marge. L'automation dispatchAnticipeRestaurant bascule la course de en_attente vers disponible_push quand now >= dispatch_at."
+    },
+    "commerce_payment_proof_id": {
+      "type": "string",
+      "description": "Protected private payment proof reference set by the commerce server."
     }
   },
   "required": [
@@ -118,5 +122,11 @@
     "pays_code",
     "total",
     "statut"
-  ]
+  ],
+  "rls": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false
+  }
 }

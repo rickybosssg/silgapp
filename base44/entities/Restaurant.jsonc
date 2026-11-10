@@ -15,7 +15,7 @@
     },
     "specialite": {
       "type": "string",
-      "description": "Sp\u00e9cialit\u00e9 culinaire (ex: africain, fast-food)"
+      "description": "Spécialité culinaire (ex: africain, fast-food)"
     },
     "pays_code": {
       "type": "string",
@@ -30,7 +30,7 @@
         "NE",
         "GH"
       ],
-      "description": "Code pays \u2014 isolation stricte"
+      "description": "Code pays — isolation stricte"
     },
     "ville": {
       "type": "string"
@@ -40,22 +40,22 @@
     },
     "adresse": {
       "type": "string",
-      "description": "Adresse pr\u00e9cise de l'\u00e9tablissement (g\u00e9olocalis\u00e9e)"
+      "description": "Adresse précise de l'établissement (géolocalisée)"
     },
     "latitude": {
       "type": "number",
-      "description": "Position GPS FIXE de l'\u00e9tablissement (enregistr\u00e9e manuellement)"
+      "description": "Position GPS FIXE de l'établissement (enregistrée manuellement)"
     },
     "longitude": {
       "type": "number",
-      "description": "Position GPS FIXE de l'\u00e9tablissement (enregistr\u00e9e manuellement)"
+      "description": "Position GPS FIXE de l'établissement (enregistrée manuellement)"
     },
     "telephone": {
       "type": "string"
     },
     "telephone_depot": {
       "type": "string",
-      "description": "Num\u00e9ro Orange Money pour d\u00e9p\u00f4t paiement"
+      "description": "Numéro Orange Money pour dépôt paiement"
     },
     "horaires": {
       "type": "string",
@@ -64,7 +64,7 @@
     "temps_preparation_min": {
       "type": "number",
       "default": 30,
-      "description": "Temps estim\u00e9 de pr\u00e9paration en minutes"
+      "description": "Temps estimé de préparation en minutes"
     },
     "ouvert": {
       "type": "boolean",
@@ -73,7 +73,7 @@
     "actif": {
       "type": "boolean",
       "default": false,
-      "description": "Restaurant actif sur la plateforme (true seulement apr\u00e8s validation admin)"
+      "description": "Restaurant actif sur la plateforme (true seulement après validation admin)"
     },
     "validation": {
       "type": "string",
@@ -92,7 +92,7 @@
     },
     "valide_par": {
       "type": "string",
-      "description": "Email admin ayant valid\u00e9/refus\u00e9"
+      "description": "Email admin ayant validé/refusé"
     },
     "valide_at": {
       "type": "string",
@@ -101,7 +101,11 @@
     },
     "statut_validation": {
       "type": "string",
-      "enum": ["en_attente", "valide", "refuse"],
+      "enum": [
+        "en_attente",
+        "valide",
+        "refuse"
+      ],
       "default": "en_attente",
       "description": "Statut de validation administrateur"
     },
@@ -122,20 +126,26 @@
     "montant_du_silga": {
       "type": "number",
       "default": 0,
-      "description": "Montant d\u00fb \u00e0 SILGAPP (commissions)"
+      "description": "Montant dû à SILGAPP (commissions)"
     },
     "partenaire_id": {
       "type": "string",
-      "description": "User ID du partenaire propri\u00e9taire"
+      "description": "User ID du partenaire propriétaire"
     },
     "user_email": {
       "type": "string",
-      "description": "Email du partenaire propri\u00e9taire"
+      "description": "Email du partenaire propriétaire"
     }
   },
   "required": [
     "nom",
     "pays_code",
     "partenaire_id"
-  ]
+  ],
+  "rls": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false
+  }
 }

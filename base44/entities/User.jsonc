@@ -1,27 +1,28 @@
 {
-  "name": "User",
   "type": "object",
+  "name": "User",
   "properties": {
     "role": {
       "type": "string",
+      "description": "Rôle de l'utilisateur",
       "enum": [
         "admin",
         "user"
       ],
-      "default": "user",
-      "description": "R\u00f4le de l'utilisateur"
+      "default": "user"
     },
     "admin_type": {
       "type": "string",
+      "description": "Type d'admin : global (tous les pays) ou pays (un seul pays)",
       "enum": [
         "global",
         "pays"
       ],
-      "default": "global",
-      "description": "Type d'admin : global (tous les pays) ou pays (un seul pays)"
+      "default": "global"
     },
     "country_code": {
       "type": "string",
+      "description": "Code pays ISO de l'admin pays (ex: BF, CI). Vide si admin global.",
       "enum": [
         "BF",
         "CI",
@@ -31,29 +32,32 @@
         "ML",
         "GN",
         "NE"
-      ],
-      "description": "Code pays ISO de l'admin pays (ex: BF, CI). Vide si admin global."
+      ]
     },
     "silgapp_role": {
       "type": "string",
+      "description": "Rôle métier SILGAPP persistant en base de données. Définit le dashboard affiché : client, livreur, partenaire, agent_saisie (accès limité au formulaire de création de course admin), ou admin_entreprise (dashboard entreprise privé). Indépendant du cache/localStorage — survit à la désinstallation et au changement d'appareil.",
       "enum": [
         "client",
         "livreur",
         "partenaire",
         "agent_saisie",
         "admin_entreprise"
-      ],
-      "description": "R\u00f4le m\u00e9tier SILGAPP persistant en base de donn\u00e9es. D\u00e9finit le dashboard affich\u00e9 : client, livreur, partenaire, agent_saisie (acc\u00e8s limit\u00e9 au formulaire de cr\u00e9ation de course admin), ou admin_entreprise (dashboard entreprise priv\u00e9). Ind\u00e9pendant du cache/localStorage \u2014 survit \u00e0 la d\u00e9sinstallation et au changement d'appareil."
+      ]
     },
     "can_create_admin_course": {
       "type": "boolean",
-      "default": false,
-      "description": "Permission d\u00e9di\u00e9e : autorise cet utilisateur \u00e0 cr\u00e9er des courses administratives via /admin/creer-course, SANS lui donner le r\u00f4le admin complet. V\u00e9rifi\u00e9e c\u00f4t\u00e9 backend dans creerCourseAdmin. Doit \u00eatre d\u00e9finie par un admin (pas auto-modifiable par l'utilisateur)."
+      "description": "Permission dédiée : autorise cet utilisateur à créer des courses administratives via /admin/creer-course, SANS lui donner le rôle admin complet. Vérifiée côté backend dans creerCourseAdmin. Doit être définie par un admin (pas auto-modifiable par l'utilisateur).",
+      "default": false
     },
     "enterprise_id": {
       "type": "string",
-      "default": null,
-      "description": "ID financier IMMUABLE de l'entreprise \u00e0 laquelle cet utilisateur est rattach\u00e9. Null = utilisateur du r\u00e9seau public SILGAPP. R\u00e9solu c\u00f4t\u00e9 backend UNIQUEMENT (jamais fourni par le frontend). Un Admin Entreprise ne peut pas changer son enterprise_id. Un Super Admin SILGAPP n'a pas d'enterprise_id (null = r\u00e9seau public). Permet la RLS pour isoler les donn\u00e9es par entreprise. DEFAULT null obligatoire \u2014 sans cette valeur explicite, la RLS CourseExterne (data.enterprise_id = {{user.data.enterprise_id}}) ne r\u00e9sout pas vers null pour les users publics, rendant les courses publiques invisibles."
+      "description": "ID financier IMMUABLE de l'entreprise à laquelle cet utilisateur est rattaché. Null = utilisateur du réseau public SILGAPP. Résolu côté backend UNIQUEMENT (jamais fourni par le frontend). Un Admin Entreprise ne peut pas changer son enterprise_id. Un Super Admin SILGAPP n'a pas d'enterprise_id (null = réseau public). Permet la RLS pour isoler les données par entreprise. DEFAULT null obligatoire — sans cette valeur explicite, la RLS CourseExterne (data.enterprise_id = {{user.data.enterprise_id}}) ne résout pas vers null pour les users publics, rendant les courses publiques invisibles.",
+      "default": null
     }
-  }
+  },
+  "required": [
+    "country_code",
+    "silgapp_role"
+  ]
 }

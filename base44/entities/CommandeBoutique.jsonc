@@ -32,7 +32,7 @@
         "NE",
         "GH"
       ],
-      "description": "Code pays \u2014 isolation stricte"
+      "description": "Code pays — isolation stricte"
     },
     "items": {
       "type": "string",
@@ -81,7 +81,7 @@
     },
     "course_id": {
       "type": "string",
-      "description": "ID de la CourseExterne cr\u00e9\u00e9e quand pr\u00eate"
+      "description": "ID de la CourseExterne créée quand prête"
     },
     "partenaire_id": {
       "type": "string",
@@ -95,6 +95,10 @@
     },
     "motif_annulation": {
       "type": "string"
+    },
+    "commerce_payment_proof_id": {
+      "type": "string",
+      "description": "Protected private payment proof reference set by the commerce server."
     }
   },
   "required": [
@@ -103,5 +107,11 @@
     "pays_code",
     "total",
     "statut"
-  ]
+  ],
+  "rls": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false
+  }
 }
