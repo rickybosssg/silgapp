@@ -1,0 +1,29 @@
+{
+  "name": "TEST_LoyaltySDK198_Control_20261112",
+  "type": "object",
+  "properties": {
+    "label": {
+      "type": "string"
+    },
+    "state": {
+      "type": "string"
+    },
+    "claim": {
+      "type": "string"
+    },
+    "revision": {
+      "type": "number"
+    }
+  },
+  "rls": {
+    "create": false,
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": false,
+    "delete": false
+  },
+  "required": []
+}

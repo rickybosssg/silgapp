@@ -1,0 +1,51 @@
+{
+  "name": "PharmacyReplyCycleReceipt",
+  "type": "object",
+  "properties": {
+    "replyMessageId": {
+      "type": "string"
+    },
+    "replyDigest": {
+      "type": "string"
+    },
+    "actorId": {
+      "type": "string"
+    },
+    "conversationId": {
+      "type": "string"
+    },
+    "establishmentId": {
+      "type": "string"
+    },
+    "country": {
+      "type": "string"
+    },
+    "enterpriseId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "incomingIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "replyMessageId",
+    "replyDigest",
+    "actorId",
+    "conversationId",
+    "establishmentId",
+    "country",
+    "incomingIds"
+  ],
+  "rls": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false
+  }
+}

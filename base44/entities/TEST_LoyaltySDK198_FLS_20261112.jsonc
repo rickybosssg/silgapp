@@ -1,0 +1,59 @@
+{
+  "name": "TEST_LoyaltySDK198_FLS_20261112",
+  "type": "object",
+  "properties": {
+    "label": {
+      "type": "string"
+    },
+    "ordinary": {
+      "type": "string"
+    },
+    "protected_value": {
+      "type": "string",
+      "rls": {
+        "read": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "write": false
+      }
+    },
+    "revision": {
+      "type": "number"
+    },
+    "winner": {
+      "type": "string"
+    },
+    "protected_object": {
+      "type": "object",
+      "rls": {
+        "read": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "write": false
+      }
+    }
+  },
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": false
+  },
+  "required": []
+}

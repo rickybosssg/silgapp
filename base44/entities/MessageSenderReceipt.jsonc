@@ -1,0 +1,34 @@
+{
+  "name": "MessageSenderReceipt",
+  "type": "object",
+  "properties": {
+    "message_id": {
+      "type": "string"
+    },
+    "digest": {
+      "type": "string"
+    },
+    "actor_id": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string",
+      "enum": [
+        "sender-v1",
+        "sender-v2"
+      ]
+    }
+  },
+  "required": [
+    "message_id",
+    "digest",
+    "actor_id",
+    "version"
+  ],
+  "rls": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false
+  }
+}
