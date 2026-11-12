@@ -1,0 +1,107 @@
+{
+  "name": "ClientLoyaltyEvidence",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "string",
+      "rls": {
+        "write": false
+      },
+      "enum": [
+        "closed-ledger-v1"
+      ]
+    },
+    "epoch_id": {
+      "type": "string",
+      "rls": {
+        "write": false
+      }
+    },
+    "proof_id": {
+      "type": "string",
+      "rls": {
+        "write": false
+      }
+    },
+    "kind": {
+      "type": "string",
+      "rls": {
+        "write": false
+      },
+      "enum": [
+        "admission",
+        "origin",
+        "delivery",
+        "admin_unlinked"
+      ]
+    },
+    "subject_type": {
+      "type": "string",
+      "rls": {
+        "write": false
+      },
+      "enum": [
+        "Livreur",
+        "CourseExterne",
+        "CommandeBoutique",
+        "CommandeRestaurant",
+        "Conversation"
+      ]
+    },
+    "subject_id": {
+      "type": "string",
+      "rls": {
+        "write": false
+      }
+    },
+    "country_code": {
+      "type": "string",
+      "rls": {
+        "write": false
+      }
+    },
+    "issued_at": {
+      "type": "string",
+      "rls": {
+        "write": false
+      },
+      "format": "date-time"
+    },
+    "actor_user_id": {
+      "type": "string",
+      "rls": {
+        "write": false
+      }
+    },
+    "beneficiary_user_id": {
+      "type": "string",
+      "rls": {
+        "write": false
+      }
+    },
+    "payload_json": {
+      "type": "string",
+      "rls": {
+        "write": false
+      }
+    }
+  },
+  "required": [
+    "version",
+    "epoch_id",
+    "proof_id",
+    "kind",
+    "subject_type",
+    "subject_id",
+    "country_code",
+    "issued_at",
+    "actor_user_id",
+    "payload_json"
+  ],
+  "rls": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false
+  }
+}
