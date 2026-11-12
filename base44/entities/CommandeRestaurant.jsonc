@@ -33,7 +33,7 @@
         "GH",
         "MA"
       ],
-      "description": "Code pays — isolation stricte"
+      "description": "Code pays \u2014 isolation stricte"
     },
     "items": {
       "type": "string",
@@ -82,7 +82,7 @@
     },
     "course_id": {
       "type": "string",
-      "description": "ID de la CourseExterne créée quand prête (ou en avance si dispatch anticipé)"
+      "description": "ID de la CourseExterne cr\u00e9\u00e9e quand pr\u00eate (ou en avance si dispatch anticip\u00e9)"
     },
     "partenaire_id": {
       "type": "string",
@@ -99,21 +99,121 @@
     },
     "preparation_time_minutes": {
       "type": "number",
-      "description": "Temps de préparation estimé par le restaurant (5, 10, 15, 20 ou 30 min). Saisi au passage en en_preparation. Si défini, la CourseExterne est créée en avance avec dispatch_status=en_attente et le dispatch est déclenché automatiquement au bon moment (dispatch_at)."
+      "description": "Temps de pr\u00e9paration estim\u00e9 par le restaurant (5, 10, 15, 20 ou 30 min). Saisi au passage en en_preparation. Si d\u00e9fini, la CourseExterne est cr\u00e9\u00e9e en avance avec dispatch_status=en_attente et le dispatch est d\u00e9clench\u00e9 automatiquement au bon moment (dispatch_at)."
     },
     "estimated_ready_at": {
       "type": "string",
       "format": "date-time",
-      "description": "Heure estimée à laquelle la commande sera prête = heure_debut_preparation + preparation_time_minutes."
+      "description": "Heure estim\u00e9e \u00e0 laquelle la commande sera pr\u00eate = heure_debut_preparation + preparation_time_minutes."
     },
     "dispatch_at": {
       "type": "string",
       "format": "date-time",
-      "description": "Heure à laquelle le dispatch doit être déclenché = estimated_ready_at - ETA_livreur - marge. L'automation dispatchAnticipeRestaurant bascule la course de en_attente vers disponible_push quand now >= dispatch_at."
+      "description": "Heure \u00e0 laquelle le dispatch doit \u00eatre d\u00e9clench\u00e9 = estimated_ready_at - ETA_livreur - marge. L'automation dispatchAnticipeRestaurant bascule la course de en_attente vers disponible_push quand now >= dispatch_at."
     },
     "commerce_payment_proof_id": {
       "type": "string",
       "description": "Protected private payment proof reference set by the commerce server."
+    },
+    "prix_livraison_propose": {
+      "type": "number",
+      "description": "Prix de livraison propose par le client, distinct du total produits et payable directement au livreur."
+    },
+    "workflow_livraison": {
+      "type": "string",
+      "enum": [
+        "client_price_v1"
+      ],
+      "description": "Contrat serveur additif pour les nouvelles commandes avec prix livraison client. Absent sur les commandes historiques."
+    },
+    "devise": {
+      "type": "string",
+      "description": "Devise Country attestee lors de la confirmation client. Aucun defaut ni conversion des commandes historiques."
+    },
+    "loyalty_identity_version": {
+      "type": "number",
+      "enum": [
+        1
+      ],
+      "description": "Optional prospective native client proof v1. Server writes only; see reader-contract.md.",
+      "rls": {
+        "write": false
+      }
+    },
+    "loyalty_identity_beneficiary_user_id": {
+      "type": "string",
+      "description": "Optional prospective native client proof v1. Server writes only; see reader-contract.md.",
+      "rls": {
+        "write": false
+      }
+    },
+    "loyalty_identity_client_profile_id": {
+      "type": "string",
+      "description": "Optional prospective native client proof v1. Server writes only; see reader-contract.md.",
+      "rls": {
+        "write": false
+      }
+    },
+    "loyalty_identity_country_code": {
+      "type": "string",
+      "pattern": "^[A-Z]{2}$",
+      "description": "Optional prospective native client proof v1. Server writes only; see reader-contract.md.",
+      "rls": {
+        "write": false
+      }
+    },
+    "loyalty_identity_attested_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Optional prospective native client proof v1. Server writes only; see reader-contract.md.",
+      "rls": {
+        "write": false
+      }
+    },
+    "loyalty_identity_source_kind": {
+      "type": "string",
+      "enum": [
+        "direct",
+        "order",
+        "pharmacy"
+      ],
+      "description": "Optional prospective native client proof v1. Server writes only; see reader-contract.md.",
+      "rls": {
+        "write": false
+      }
+    },
+    "loyalty_identity_source_id": {
+      "type": "string",
+      "description": "Optional prospective native client proof v1. Server writes only; see reader-contract.md.",
+      "rls": {
+        "write": false
+      }
+    },
+    "loyalty_identity_pharmacy_id": {
+      "type": "string",
+      "description": "Optional prospective native client proof v1. Server writes only; see reader-contract.md.",
+      "rls": {
+        "write": false
+      }
+    },
+    "partner_alert_ack_at": {
+      "type": "string",
+      "format": "date-time",
+      "rls": {
+        "write": false
+      }
+    },
+    "partner_alert_ack_by": {
+      "type": "string",
+      "rls": {
+        "write": false
+      }
+    },
+    "partner_alert_request_id": {
+      "type": "string",
+      "rls": {
+        "write": false
+      }
     }
   },
   "required": [

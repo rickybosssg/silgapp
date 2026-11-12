@@ -333,6 +333,76 @@
     "silga_score_anomalies": {
       "type": "string",
       "description": "JSON: tableau des anomalies d\u00e9tect\u00e9es lors du calcul (ex: score \u00e9lev\u00e9 mais taux d'annulation \u00e9lev\u00e9, score faible par manque de donn\u00e9es). Pour audit et calibration."
+    },
+    "driver_integrity_version": {
+      "type": "string",
+      "rls": {
+        "write": false
+      },
+      "description": "Server-only additive driver admission evidence; absence is not an authorization."
+    },
+    "driver_integrity_profile_id": {
+      "type": "string",
+      "rls": {
+        "write": false
+      },
+      "description": "Server-only additive driver admission evidence; absence is not an authorization."
+    },
+    "driver_integrity_native_user_id": {
+      "type": "string",
+      "rls": {
+        "write": false
+      },
+      "description": "Server-only additive driver admission evidence; absence is not an authorization."
+    },
+    "driver_integrity_subject_email": {
+      "type": "string",
+      "rls": {
+        "write": false
+      },
+      "description": "Server-only additive driver admission evidence; absence is not an authorization."
+    },
+    "driver_integrity_country_code": {
+      "type": "string",
+      "rls": {
+        "write": false
+      },
+      "description": "Server-only additive driver admission evidence; absence is not an authorization."
+    },
+    "driver_integrity_tenant_key": {
+      "type": "string",
+      "rls": {
+        "write": false
+      },
+      "description": "Server-only additive driver admission evidence; absence is not an authorization."
+    },
+    "driver_integrity_admission": {
+      "type": "string",
+      "rls": {
+        "write": false
+      },
+      "description": "Server-only additive driver admission evidence; absence is not an authorization."
+    },
+    "driver_integrity_revision": {
+      "type": "string",
+      "rls": {
+        "write": false
+      },
+      "description": "Server-only additive driver admission evidence; absence is not an authorization."
+    },
+    "driver_integrity_attested_at": {
+      "type": "string",
+      "rls": {
+        "write": false
+      },
+      "description": "Server-only additive driver admission evidence; absence is not an authorization."
+    },
+    "driver_integrity_source": {
+      "type": "string",
+      "rls": {
+        "write": false
+      },
+      "description": "Server-only additive driver admission evidence; absence is not an authorization."
     }
   },
   "required": [

@@ -160,6 +160,68 @@
       ],
       "default": "app",
       "description": "Origine du message"
+    },
+    "partner_alert_ack_by": {
+      "type": "string",
+      "rls": {
+        "write": false
+      }
+    },
+    "partner_alert_reply_id": {
+      "type": "string",
+      "rls": {
+        "write": false
+      }
+    },
+    "partner_alert_reply_digest": {
+      "type": "string",
+      "rls": {
+        "write": false
+      }
+    },
+    "partner_alert_cycle_intent": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "string",
+          "enum": [
+            "pharmacy-cycle-v1"
+          ]
+        },
+        "actorId": {
+          "type": "string"
+        },
+        "establishmentId": {
+          "type": "string"
+        },
+        "country": {
+          "type": "string"
+        },
+        "enterpriseId": {
+          "type": "null"
+        },
+        "conversationId": {
+          "type": "string"
+        },
+        "incomingIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "version",
+        "actorId",
+        "establishmentId",
+        "country",
+        "enterpriseId",
+        "conversationId",
+        "incomingIds"
+      ],
+      "rls": {
+        "write": false
+      }
     }
   },
   "required": [

@@ -113,6 +113,72 @@
     "venus_pending_course": {
       "type": "string",
       "description": "JSON: donnees de course en cours de collecte par Venus (avant creation)"
+    },
+    "loyalty_identity_version": {
+      "type": "number",
+      "enum": [
+        1
+      ],
+      "description": "Optional prospective native client proof v1. Server writes only; see reader-contract.md.",
+      "rls": {
+        "write": false
+      }
+    },
+    "loyalty_identity_beneficiary_user_id": {
+      "type": "string",
+      "description": "Optional prospective native client proof v1. Server writes only; see reader-contract.md.",
+      "rls": {
+        "write": false
+      }
+    },
+    "loyalty_identity_client_profile_id": {
+      "type": "string",
+      "description": "Optional prospective native client proof v1. Server writes only; see reader-contract.md.",
+      "rls": {
+        "write": false
+      }
+    },
+    "loyalty_identity_country_code": {
+      "type": "string",
+      "pattern": "^[A-Z]{2}$",
+      "description": "Optional prospective native client proof v1. Server writes only; see reader-contract.md.",
+      "rls": {
+        "write": false
+      }
+    },
+    "loyalty_identity_attested_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Optional prospective native client proof v1. Server writes only; see reader-contract.md.",
+      "rls": {
+        "write": false
+      }
+    },
+    "loyalty_identity_source_kind": {
+      "type": "string",
+      "enum": [
+        "direct",
+        "order",
+        "pharmacy"
+      ],
+      "description": "Optional prospective native client proof v1. Server writes only; see reader-contract.md.",
+      "rls": {
+        "write": false
+      }
+    },
+    "loyalty_identity_source_id": {
+      "type": "string",
+      "description": "Optional prospective native client proof v1. Server writes only; see reader-contract.md.",
+      "rls": {
+        "write": false
+      }
+    },
+    "loyalty_identity_pharmacy_id": {
+      "type": "string",
+      "description": "Optional prospective native client proof v1. Server writes only; see reader-contract.md.",
+      "rls": {
+        "write": false
+      }
     }
   },
   "required": [

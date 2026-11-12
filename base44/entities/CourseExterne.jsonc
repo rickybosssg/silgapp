@@ -866,6 +866,123 @@
     },
     "accepted_price_quote_json": {
       "type": "string"
+    },
+    "loyalty_identity_version": {
+      "type": "number",
+      "enum": [
+        1
+      ],
+      "description": "Optional prospective native client proof v1. Server writes only; see reader-contract.md.",
+      "rls": {
+        "write": false
+      }
+    },
+    "loyalty_identity_beneficiary_user_id": {
+      "type": "string",
+      "description": "Optional prospective native client proof v1. Server writes only; see reader-contract.md.",
+      "rls": {
+        "write": false
+      }
+    },
+    "loyalty_identity_client_profile_id": {
+      "type": "string",
+      "description": "Optional prospective native client proof v1. Server writes only; see reader-contract.md.",
+      "rls": {
+        "write": false
+      }
+    },
+    "loyalty_identity_country_code": {
+      "type": "string",
+      "pattern": "^[A-Z]{2}$",
+      "description": "Optional prospective native client proof v1. Server writes only; see reader-contract.md.",
+      "rls": {
+        "write": false
+      }
+    },
+    "loyalty_identity_attested_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Optional prospective native client proof v1. Server writes only; see reader-contract.md.",
+      "rls": {
+        "write": false
+      }
+    },
+    "loyalty_identity_source_kind": {
+      "type": "string",
+      "enum": [
+        "direct",
+        "order",
+        "pharmacy"
+      ],
+      "description": "Optional prospective native client proof v1. Server writes only; see reader-contract.md.",
+      "rls": {
+        "write": false
+      }
+    },
+    "loyalty_identity_source_id": {
+      "type": "string",
+      "description": "Optional prospective native client proof v1. Server writes only; see reader-contract.md.",
+      "rls": {
+        "write": false
+      }
+    },
+    "loyalty_identity_pharmacy_id": {
+      "type": "string",
+      "description": "Optional prospective native client proof v1. Server writes only; see reader-contract.md.",
+      "rls": {
+        "write": false
+      }
+    },
+    "delivery_integrity_state": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "verified"
+      ],
+      "description": "Server finalization progress. Not independent proof of historical delivery.",
+      "rls": {
+        "write": false
+      }
+    },
+    "delivery_integrity_operation_id": {
+      "type": "string",
+      "rls": {
+        "write": false
+      }
+    },
+    "delivery_integrity_actor_id": {
+      "type": "string",
+      "rls": {
+        "write": false
+      }
+    },
+    "delivery_integrity_version": {
+      "type": "string",
+      "rls": {
+        "write": false
+      }
+    },
+    "delivery_effects_pending_json": {
+      "type": "string",
+      "rls": {
+        "write": false
+      }
+    },
+    "delivery_integrity_driver_state": {
+      "type": "string",
+      "enum": [
+        "attested",
+        "unattested"
+      ],
+      "rls": {
+        "write": false
+      }
+    },
+    "delivery_integrity_driver_evidence_json": {
+      "type": "string",
+      "rls": {
+        "write": false
+      }
     }
   },
   "required": [
@@ -875,7 +992,30 @@
   ],
   "rls": {
     "read": {},
-    "create": {},
+    "create": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "id": "6a69e697d890ca3b15df9618"
+              }
+            },
+            {
+              "data.country_code": "BF"
+            },
+            {
+              "data.enterprise_id": null
+            }
+          ]
+        }
+      ]
+    },
     "update": {
       "user_condition": {
         "role": "admin"
