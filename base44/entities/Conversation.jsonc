@@ -179,6 +179,14 @@
       "rls": {
         "write": false
       }
+    },
+    "pharmacy_open_alert": {
+      "type": "object",
+      "description": "Private server opening intent and one-shot push claim. Never accept this object from a client.",
+      "rls": {
+        "read": false,
+        "write": false
+      }
     }
   },
   "required": [
