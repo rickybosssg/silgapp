@@ -112,15 +112,19 @@
     "revision"
   ],
   "rls": {
-    "read": true,
+    "read": {
+      "user_condition": {
+        "id": "__service_role_only_wallet_terminal_v1__"
+      }
+    },
     "create": {
       "user_condition": {
-        "role": "admin"
+        "id": "__service_role_only_wallet_terminal_v1__"
       }
     },
     "update": {
       "user_condition": {
-        "role": "admin"
+        "id": "__service_role_only_wallet_terminal_v1__"
       }
     },
     "delete": {
