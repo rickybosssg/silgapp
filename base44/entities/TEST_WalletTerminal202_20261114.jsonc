@@ -114,15 +114,15 @@
   "rls": {
     "read": {
       "user_condition": {
-        "id": "__service_role_only_wallet_terminal_v1__"
-      }
-    },
-    "create": {
-      "user_condition": {
-        "id": "__service_role_only_wallet_terminal_v1__"
+        "role": "admin"
       }
     },
     "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
       "user_condition": {
         "id": "__service_role_only_wallet_terminal_v1__"
       }
