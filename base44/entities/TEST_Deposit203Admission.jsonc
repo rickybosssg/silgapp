@@ -1,0 +1,59 @@
+{
+  "name": "TEST_Deposit203Admission",
+  "type": "object",
+  "properties": {
+    "purpose": {
+      "type": "string",
+      "enum": [
+        "control",
+        "partition"
+      ]
+    },
+    "epoch": {
+      "type": "string"
+    },
+    "bucket": {
+      "type": "number"
+    },
+    "revision": {
+      "type": "number",
+      "default": 0
+    },
+    "token": {
+      "type": "string",
+      "default": ""
+    },
+    "payload": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "purpose",
+    "epoch",
+    "revision",
+    "token",
+    "payload"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "id": "__service_role_only_deposit_submission203__"
+      }
+    },
+    "read": {
+      "user_condition": {
+        "id": "__service_role_only_deposit_submission203__"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "id": "__service_role_only_deposit_submission203__"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "id": "__service_role_only_deposit_submission203__"
+      }
+    }
+  }
+}
