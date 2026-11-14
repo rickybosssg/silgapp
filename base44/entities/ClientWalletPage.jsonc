@@ -1,0 +1,38 @@
+{
+  "name": "ClientWalletPage",
+  "type": "object",
+  "properties": {
+    "private_payload": {
+      "type": "object",
+      "rls": {
+        "read": false,
+        "write": false
+      }
+    }
+  },
+  "required": [
+    "private_payload"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "id": "__service_role_only_wallet_v1__"
+      }
+    },
+    "read": {
+      "user_condition": {
+        "id": "__service_role_only_wallet_v1__"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "id": "__service_role_only_wallet_v1__"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "id": "__service_role_only_wallet_v1__"
+      }
+    }
+  }
+}
