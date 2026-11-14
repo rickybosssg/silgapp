@@ -1,0 +1,81 @@
+{
+  "name": "TEST_Deposit203Result",
+  "type": "object",
+  "properties": {
+    "scope": {
+      "type": "string"
+    },
+    "request_id": {
+      "type": "string"
+    },
+    "user_email": {
+      "type": "string"
+    },
+    "user_type": {
+      "type": "string"
+    },
+    "user_id": {
+      "type": "string"
+    },
+    "type_dette": {
+      "type": "string"
+    },
+    "preuve_url": {
+      "type": "string"
+    },
+    "preuve_type": {
+      "type": "string"
+    },
+    "country_code": {
+      "type": "string"
+    },
+    "statut": {
+      "type": "string"
+    },
+    "receipt_key": {
+      "type": "string"
+    },
+    "receipt_provider": {
+      "type": "string"
+    },
+    "receipt_reference": {
+      "type": "string"
+    },
+    "date_envoi": {
+      "type": "string"
+    },
+    "montant_paye": {
+      "type": "number"
+    },
+    "montant_du": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "scope",
+    "request_id",
+    "montant_paye"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "id": "__service_role_only_deposit_submission203__"
+      }
+    },
+    "read": {
+      "user_condition": {
+        "id": "__service_role_only_deposit_submission203__"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "id": "__service_role_only_deposit_submission203__"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "id": "__service_role_only_deposit_submission203__"
+      }
+    }
+  }
+}
