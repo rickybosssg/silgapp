@@ -114,32 +114,23 @@
   "rls": {
     "read": {
       "user_condition": {
-        "role": "admin"
+        "id": "__service_role_only_wallet_terminal_v1__"
       }
     },
     "create": {
       "user_condition": {
-        "role": "admin"
+        "id": "__service_role_only_wallet_terminal_v1__"
       }
     },
     "update": {
       "user_condition": {
-        "role": "admin"
+        "id": "__service_role_only_wallet_terminal_v1__"
       }
     },
     "delete": {
-      "$and": [
-        {
-          "user_condition": {
-            "role": "admin"
-          }
-        },
-        {
-          "data.wallet_receipt_version": {
-            "$ne": 1
-          }
-        }
-      ]
+      "user_condition": {
+        "id": "__service_role_only_wallet_terminal_v1__"
+      }
     }
   }
 }
