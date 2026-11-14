@@ -1,0 +1,68 @@
+{
+  "name": "TEST_Deposit203Request",
+  "type": "object",
+  "properties": {
+    "contract": {
+      "type": "string"
+    },
+    "epoch": {
+      "type": "string"
+    },
+    "request_key": {
+      "type": "string"
+    },
+    "driver_key": {
+      "type": "string"
+    },
+    "proof_key": {
+      "type": "string"
+    },
+    "receipt_key": {
+      "type": "string",
+      "default": ""
+    },
+    "revision": {
+      "type": "number",
+      "default": 0
+    },
+    "token": {
+      "type": "string",
+      "default": ""
+    },
+    "payload": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "contract",
+    "epoch",
+    "request_key",
+    "driver_key",
+    "proof_key",
+    "revision",
+    "token",
+    "payload"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "id": "__service_role_only_deposit_submission203__"
+      }
+    },
+    "read": {
+      "user_condition": {
+        "id": "__service_role_only_deposit_submission203__"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "id": "__service_role_only_deposit_submission203__"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "id": "__service_role_only_deposit_submission203__"
+      }
+    }
+  }
+}
