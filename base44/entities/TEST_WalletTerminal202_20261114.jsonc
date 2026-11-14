@@ -1,0 +1,132 @@
+{
+  "name": "TEST_WalletTerminal202_20261114",
+  "type": "object",
+  "properties": {
+    "scope": {
+      "type": "string"
+    },
+    "label": {
+      "type": "string"
+    },
+    "statut": {
+      "type": "string"
+    },
+    "revision": {
+      "type": "integer"
+    },
+    "wallet_receipt_v1": {
+      "type": "object",
+      "rls": {
+        "read": {
+          "user_condition": {
+            "id": "__service_role_only_wallet_terminal_v1__"
+          }
+        },
+        "create": {
+          "user_condition": {
+            "id": "__service_role_only_wallet_terminal_v1__"
+          }
+        },
+        "update": {
+          "user_condition": {
+            "id": "__service_role_only_wallet_terminal_v1__"
+          }
+        },
+        "delete": {
+          "user_condition": {
+            "id": "__service_role_only_wallet_terminal_v1__"
+          }
+        },
+        "write": {
+          "user_condition": {
+            "id": "__service_role_only_wallet_terminal_v1__"
+          }
+        }
+      }
+    },
+    "wallet_receipt_version": {
+      "type": "integer",
+      "rls": {
+        "read": {
+          "user_condition": {
+            "id": "__service_role_only_wallet_terminal_v1__"
+          }
+        },
+        "create": {
+          "user_condition": {
+            "id": "__service_role_only_wallet_terminal_v1__"
+          }
+        },
+        "update": {
+          "user_condition": {
+            "id": "__service_role_only_wallet_terminal_v1__"
+          }
+        },
+        "delete": {
+          "user_condition": {
+            "id": "__service_role_only_wallet_terminal_v1__"
+          }
+        },
+        "write": {
+          "user_condition": {
+            "id": "__service_role_only_wallet_terminal_v1__"
+          }
+        }
+      }
+    },
+    "wallet_receipt_epoch": {
+      "type": "string",
+      "rls": {
+        "read": {
+          "user_condition": {
+            "id": "__service_role_only_wallet_terminal_v1__"
+          }
+        },
+        "create": {
+          "user_condition": {
+            "id": "__service_role_only_wallet_terminal_v1__"
+          }
+        },
+        "update": {
+          "user_condition": {
+            "id": "__service_role_only_wallet_terminal_v1__"
+          }
+        },
+        "delete": {
+          "user_condition": {
+            "id": "__service_role_only_wallet_terminal_v1__"
+          }
+        },
+        "write": {
+          "user_condition": {
+            "id": "__service_role_only_wallet_terminal_v1__"
+          }
+        }
+      }
+    }
+  },
+  "required": [
+    "scope",
+    "label",
+    "statut",
+    "revision"
+  ],
+  "rls": {
+    "read": true,
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "id": "__service_role_only_wallet_terminal_v1__"
+      }
+    }
+  }
+}
