@@ -1112,9 +1112,18 @@
       }
     },
     "delete": {
-      "user_condition": {
-        "role": "admin"
-      }
+      "$and": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "data.wallet_receipt_version": {
+            "$ne": 1
+          }
+        }
+      ]
     }
   }
 }
