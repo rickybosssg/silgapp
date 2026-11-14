@@ -103,6 +103,37 @@
           }
         }
       }
+    },
+    "wallet_receipt_recorded_at": {
+      "type": "string",
+      "format": "date-time",
+      "rls": {
+        "read": {
+          "user_condition": {
+            "id": "__service_role_only_wallet_terminal_v1__"
+          }
+        },
+        "create": {
+          "user_condition": {
+            "id": "__service_role_only_wallet_terminal_v1__"
+          }
+        },
+        "update": {
+          "user_condition": {
+            "id": "__service_role_only_wallet_terminal_v1__"
+          }
+        },
+        "delete": {
+          "user_condition": {
+            "id": "__service_role_only_wallet_terminal_v1__"
+          }
+        },
+        "write": {
+          "user_condition": {
+            "id": "__service_role_only_wallet_terminal_v1__"
+          }
+        }
+      }
     }
   },
   "required": [
