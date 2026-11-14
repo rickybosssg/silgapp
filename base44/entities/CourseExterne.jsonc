@@ -983,6 +983,96 @@
       "rls": {
         "write": false
       }
+    },
+    "wallet_receipt_v1": {
+      "type": "object",
+      "rls": {
+        "create": {
+          "user_condition": {
+            "id": "__service_role_only_wallet_terminal_v1__"
+          }
+        },
+        "read": {
+          "user_condition": {
+            "id": "__service_role_only_wallet_terminal_v1__"
+          }
+        },
+        "update": {
+          "user_condition": {
+            "id": "__service_role_only_wallet_terminal_v1__"
+          }
+        },
+        "delete": {
+          "user_condition": {
+            "id": "__service_role_only_wallet_terminal_v1__"
+          }
+        },
+        "write": {
+          "user_condition": {
+            "id": "__service_role_only_wallet_terminal_v1__"
+          }
+        }
+      }
+    },
+    "wallet_receipt_version": {
+      "type": "integer",
+      "rls": {
+        "create": {
+          "user_condition": {
+            "id": "__service_role_only_wallet_terminal_v1__"
+          }
+        },
+        "read": {
+          "user_condition": {
+            "id": "__service_role_only_wallet_terminal_v1__"
+          }
+        },
+        "update": {
+          "user_condition": {
+            "id": "__service_role_only_wallet_terminal_v1__"
+          }
+        },
+        "delete": {
+          "user_condition": {
+            "id": "__service_role_only_wallet_terminal_v1__"
+          }
+        },
+        "write": {
+          "user_condition": {
+            "id": "__service_role_only_wallet_terminal_v1__"
+          }
+        }
+      }
+    },
+    "wallet_receipt_epoch": {
+      "type": "string",
+      "rls": {
+        "create": {
+          "user_condition": {
+            "id": "__service_role_only_wallet_terminal_v1__"
+          }
+        },
+        "read": {
+          "user_condition": {
+            "id": "__service_role_only_wallet_terminal_v1__"
+          }
+        },
+        "update": {
+          "user_condition": {
+            "id": "__service_role_only_wallet_terminal_v1__"
+          }
+        },
+        "delete": {
+          "user_condition": {
+            "id": "__service_role_only_wallet_terminal_v1__"
+          }
+        },
+        "write": {
+          "user_condition": {
+            "id": "__service_role_only_wallet_terminal_v1__"
+          }
+        }
+      }
     }
   },
   "required": [
